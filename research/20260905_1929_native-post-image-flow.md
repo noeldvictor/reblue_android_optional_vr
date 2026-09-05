@@ -102,3 +102,22 @@ bytes removed. All eight PNGs/reports retained. Actual free 54,378,684,416 ->
 57,564,717,056; recovered 3,186,032,640 bytes (2.97 GiB). Incoming raw consumed
 zero; remaining allowance exactly 995,330,400 flat + 2,189,724,000 VR, no
 retry. Final net disk change will include those replacements and small outputs.
+
+## Capture receipt and documentation handoff
+
+VR runner session 35542 completed successfully; owned PID 26676 terminated at
+19:42:33. Log 811 audits all 16 temporary settings. Existing isolated set
+`out/verification/native_post_image_flow_vr` contains 120 raws totaling
+2,189,724,000 unique bytes; automatic paths are hard links, not another payload.
+Runner-reported ending free space was 55,371,874,304 bytes. Fresh raw allowance
+consumed 2,189,724,000; remaining 995,330,400 bytes, reserved for the planned flat
+set, not a retry allowance. No flat run has started. Pixel analysis, both-eye
+inspection and final runtime qualification remain pending; completion of capture
+alone is not a visual pass. Preserve the existing set for analysis, do not rerun.
+
+At the owner's storage-instruction update, checked the completed session and
+confirmed no running `reblue_vk` process. Restored the original five-setting
+profile (capture delay 60, minimum draws 600, count 120; autoplay/perf enabled).
+No new build, capture, analysis export or deletion was needed for this docs edit.
+`AGENTS.md` now explicitly covers interrupted-job storage accounting, duplicate
+producer prevention and guaranteed cleanup of temporary capture overrides.

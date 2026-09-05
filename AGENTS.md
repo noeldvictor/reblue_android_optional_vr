@@ -176,6 +176,12 @@ including temporary outputs that exist only while a job is running.
   budget. Do not credit the same cleanup savings twice or carry an already-used
   allowance into a new checkpoint. Reconcile the ledger with actual free space
   before starting another large producer; investigate unexplained growth first.
+- On interruption or handoff, record each agent-started producer's session/PID,
+  output location, enforced limit, completion state and consumed/remaining byte
+  budget. Before resuming, inspect the existing process and outputs; a quiet
+  poll or lost tool session is not permission to launch a duplicate job.
+  Finish accounting for completed outputs before retrying or replacing them.
+  Do not treat an unused allowance as a reason to generate more evidence.
 - Reuse configured build trees, dependencies and installed game data. Do not
   make full backups/copies of builds or assets for a small change. Check for
   junctions and hard links: logical directory sizes can count the same bytes
@@ -235,6 +241,9 @@ including temporary outputs that exist only while a job is running.
   unlimited logging allowance.
   At run completion or interruption, stop only agent-started jobs that are no
   longer needed and restore the owner's profile after temporary overrides.
+  Put producer shutdown and temporary-profile restoration in guaranteed cleanup
+  paths where possible; do not rely on reaching the final step of a successful
+  run. On resumption, check for leftover capture overrides before another launch.
 - Keep the current baseline, current flat/VR verification and evidence needed
   for unresolved failures. For superseded experiments, retain small reports,
   logs and representative images; losslessly compress or remove redundant raw
