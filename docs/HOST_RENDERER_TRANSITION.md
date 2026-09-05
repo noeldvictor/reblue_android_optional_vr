@@ -30,6 +30,24 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Explicit native post-image checkpoint (2026-09-05): native atlas/composite and
+optical/noise consumers now use actual sampled colour/depth images and exposure.
+The sequence imports the scene boundary once, passes completed images directly
+between roots, applies incoming exposure once and publishes only the final result
+for remaining UI/getter consumers. No intermediate resolve publication or new
+cross-frame resource cache. All 30 CTests and 42 source guards pass. Normal flat/
+VR record 3,001/7,801 native sequences/imports/final publications, zero original
+scopes or refusals. Both 120-frame sets have 0/119 large changes and no cyan hits;
+first/last VR depth is correctly crossed, all full endpoints inspected. Only one
+root is GPU exercised; multi-root/HDR image flow remains unqualified on GPU.
+Initial scene resolve/getter import, final UI publication, engine producers and
+parent frame scheduling remain. Existing VR blur, authored events and full-game
+gates remain open; no Quest. Four superseded normal raw sets removed, preserving
+16 PNGs/reports and all distinct startup/preview/failure evidence; the new pair
+is the baseline. Net volume usage fell 2.94 GiB, ending with 53.59 GiB free.
+Exact evidence, consumed budget and retention review:
+`research/20260905_1929_native-post-image-flow.md`.
+
 Native scene-post handoff checkpoint (2026-09-05): the main scene caller now
 passes its explicit colour/depth images directly to native effect scheduling,
 skipping both guest temporary-container constructors, wrapper invocation and

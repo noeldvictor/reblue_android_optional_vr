@@ -121,3 +121,126 @@ profile (capture delay 60, minimum draws 600, count 120; autoplay/perf enabled).
 No new build, capture, analysis export or deletion was needed for this docs edit.
 `AGENTS.md` now explicitly covers interrupted-job storage accounting, duplicate
 producer prevention and guaranteed cleanup of temporary capture overrides.
+
+## Resumed VR inspection and flat preflight
+
+Previous goal turn made progress: `8c45d12` strengthened storage rules, recorded
+the completed capture and restored the profile. Resume the same checkpoint and
+remaining allowance, not a new budget. Existing VR analysis session 99763 is now
+terminal; no renderer or capture was relaunched to replace the existing set.
+
+All 120 VR frames were analyzed in bounded memory. First
+`frame_1788651740_0.raw`, last `frame_1788651750_119.raw`, render frames
+7708..7827, stacked 1440x3168: 0/119 changes above 6%, maximum 0.475698829%
+(pair 81); cyan 0/120, maximum 0%. First and last stereo bands both show far
+-1 px / near -9 px, correctly crossed, spread 8 px. Inspected all four full
+eye endpoints: coherent village, stairs, rocks and moving windmill shadows;
+existing distant blur remains. This framing does not qualify character/shadow
+alignment. Six endpoint/overview PNGs total 6,024,124 bytes, no every-frame export.
+
+VR last sampled counters: 7,801 native scopes, sequences, roots, direct handoffs,
+scene imports and final publications; zero original scopes/container wrappers,
+sequence or input refusals. Maximum roots 1, direct inter-root images 0; CPU
+multi-root exposure tests are not GPU qualification. Logs 810/811 both mount
+1673 archives / 119346 names; 811 confirms the 1440x1584 OpenXR session and eye
+offset distinct from the game camera. Checked error/critical/device-loss/fatal/
+exception/assertion markers absent. Binary hash unchanged from the build above.
+
+Before the flat run, actual free 55,353,761,792 bytes. Logs/perf from 19:29
+onward total 2,676,243 bytes before flat, plus the six PNGs and small helpers,
+well within the shared 100 MiB allowance. Remaining raw budget 995,330,400 bytes
+exactly covers one 120-frame 1920x1080 set; peak incoming raw plus the entire
+small-output cap leaves >50.5 GiB free. Rechecked original profile: five settings,
+delay 60/minimum 600/count 120. Reuse the bounded runner and existing binary;
+flat stops on a complete set or 110 seconds. No additional raw retry allowance.
+
+## Flat qualification and superseded-control review
+
+Flat session 30157 / owned PID 26780 completed, 19:49:58-19:51:05, log 812.
+All five original settings audited; 1673 archives / 119346 names mounted.
+Last sample 3,001 native scopes, sequences, roots, direct handoffs, scene imports
+and final publications; zero original scopes/wrappers/container paths, input or
+sequence refusals. Maximum one root, no direct inter-root edge GPU coverage.
+All three logs have zero checked runtime error markers. Thirty CTests and all
+42 source guards rerun successfully without rebuilding. A first reflection
+test invocation used a nonexistent filename; corrected to the discovered
+`tools/reflection_lock_order_test.py` (three tests pass), no generated outputs.
+
+Flat 120 raws: `frame_1788652260_0.raw` through `frame_1788652264_119.raw`,
+render frames 2845..2964, 1920x1080. Streaming check: 0/119 changes above 6%,
+maximum 2.847608025% (pair 0); no cyan hits, maximum .022665895%, median
+.011598187%. Full first/last images inspected: recognizable Shu with cast
+silhouette, foliage, ground and changing windmill shadows. Existing distant
+DoF remains. This qualifies only the normal short field window, not full-game
+coverage, authored multi-root events, title artwork or the unresolved late scene.
+Runner/profile/process checks are terminal/restored; no Quest/Thor run.
+
+Before further retention cleanup, exact scoped NTFS inventory is unchanged:
+29,565 raw paths / 28,331 unique payloads, 263,324,814,100 logical bytes and
+233,564,594,672 allocated bytes. The first fresh removal was fully spent on
+equal-sized replacement captures; it is not credited again. The new normal
+pair has passed streaming, full endpoint and both-eye review, so it is now the
+baseline. Reviewed the complete scene-handoff worklog and retention condition:
+its normal pair is now superseded for the same short field question, not needed
+as complete raw sequences. Preserve its eight PNGs/reports/logs and all distinct
+startup, authored/synthetic previews/shared probes and unresolved failures.
+
+Remove only `native_scene_handoff_flat` raws (`frame_1788650556_0.raw` through
+`frame_1788650559_119.raw`, 995,330,400 bytes) and `_vr` raws
+(`frame_1788650414_0.raw` through `frame_1788650422_119.raw`, 2,189,724,000
+bytes), with their exact automatic hard links. Reuse the reviewed validator
+in `out/verification/cleanup_verified_post_controls.ps1`: dry run first,
+exact endpoints/counts/sizes, no reparse ancestry, exactly two NTFS links per
+payload, all same-name references checked, renderer stopped. Historical pixels
+will be unrecoverable; small visual evidence remains. This further cleanup
+funds no new producer in this checkpoint; measure recovery and final net usage.
+
+## Final retention and checkpoint result
+
+Second cleanup completed after a successful read-only validation, then full
+revalidation with deletion enabled: 240 unique payloads / 480 exact paths,
+3,185,054,400 logical bytes removed. Measured volume free
+54,351,921,152 -> 57,537,953,792 bytes: recovered 3,186,032,640 bytes (2.97 GiB).
+Both this pair and the earlier removed sequence pair now have zero raws and
+retain all 16 PNGs. Reports/logs retained; historical removed pixels unavailable.
+
+Retained current baseline `native_post_image_flow_flat` / `_vr`: 240 unique raws /
+3,185,054,400 bytes, eight endpoint/stereo PNGs / 9,780,919 bytes, three app logs /
+972,952 bytes and six perf files / 2,462,032 bytes. Runtime small evidence totals
+13,215,903 bytes; helpers, CTest logs and research are small text, together well
+below the shared 100 MiB cap. No assets, downloads, full backups, new build trees
+or every-frame PNG export. No active renderer/analysis session remains; original
+five-setting profile and the tested executable hash were checked unchanged.
+
+Final scoped NTFS inventory: 29,085 raw paths / 28,091 unique payloads,
+260,139,759,700 unique logical bytes, 230,379,540,272 bytes reported by
+GetCompressedFileSizeW after identity deduplication. Relative to the initial
+archive, exactly 240 fewer unique raws and 3,185,054,400 fewer logical bytes.
+This still exceeds the 10 GiB target; no historical blanket exemption or new raw
+producer is scheduled. The original capture allowance is fully spent. Further
+capture plans must reconcile the current archive and storage ledger first.
+
+Keep the new baseline's complete normal sequences until equivalent verified
+replacement allows cleanup; preserve their small reports/endpoints afterward.
+Readiness early-startup, grading startup controls, all distinct authored/synthetic
+effect previews/shared probes and unresolved late-scene/failure evidence remain
+protected, pending equivalent qualification or resolution. Review these named
+categories before future captures; this checkpoint does not grant indefinite
+retention or extra capture allowance for the entire historical archive.
+
+Ending actual free 57,537,957,888 bytes (53.59 GiB). From the original preflight
+54,376,407,040 bytes, net volume usage fell 3,161,550,848 bytes (2.94 GiB).
+Both cleanup receipts are gross; equal replacement raws consumed the first one.
+Net change also includes build/small-output and unrelated volume activity, not
+an exact repository artifact sum. No further large producer under this budget.
+
+The guest-source skill anchored the existing instruction/lifetime boundaries;
+devloop reused the built binary/test trees and restored the profile; vrsim and
+local raw analysis qualified the two desktop eyes without any device access.
+This is progress, not completion: next replace the initial scene resolve/getter
+import with explicit native completed-scene ownership and downstream consumers,
+then remove final UI publication and the remaining parent scheduler/engine
+producers. Multi-root/unknown-callback GPU cases, HDR image flow, authored effect
+events, full native animation/material/light data, title artwork, VR blur,
+late-scene failures and representative fields/battles/cutscenes/menus/transitions/
+reloads in both eyes remain required before Quest qualification.
