@@ -111,3 +111,88 @@ all eight existing PNGs retained. Actual volume free 54,392,713,216 ->
 Removed raw payload is 3,185,054,400 bytes. Incoming raw consumed zero;
 remaining allowance exactly 995,330,400 flat + 2,189,724,000 VR, no retry.
 This gross reclamation is not a claim of net savings after pending captures.
+
+Implementation `f0f96d3` committed/pushed; unchanged 19:15:17 executable used.
+VR log 808, PID 18832, 19:19:12-19:20:25: all 16 settings audited; native
+sun/shadows, multiview/layered textures, camera mode 2, height zero, scale 1,
+mirror/legacy stereo off. Process-local simulator reports 1440x1584 eyes;
+absolute runtime DLL path verified, no registry changes. Capture delay 60 /
+minimum 450 / count 120. Last sample 7,801 direct handoffs/sequences/roots,
+zero original container/wrapper/post scopes or refusals, maximum one root.
+Exactly 120 stacked 1440x3168 raws, frames 7621-7740, 2,189,724,000 bytes;
+both first/last stereo checks correctly crossed, near-far -8, spread 8.
+Streaming analysis and full-eye inspection pending, not yet image-qualified.
+
+Before flat producer: free 55,383,183,360 bytes (51.58 GiB). Freshly removed
+3,185,054,400 unique raw bytes; consumed 2,189,724,000, remaining 995,330,400,
+exactly the planned flat set. The ~5.3 MB beyond raw growth includes runtime
+small outputs and remains within the shared 100 MiB cap; bounded endpoint
+analysis shares that cap. No additional large output or fresh retry allowance.
+Original five-setting profile restored for flat, delay 60/minimum 600/count120.
+
+VR streaming analysis finished: `frame_1788650414_0.raw` through
+`frame_1788650422_119.raw`, 0/119 changes above 6%, maximum .392904742%,
+zero cyan pixels. First/last bands 44/52/62/72/82/90/95% measure
+-1/-2/-3/-5/-6/-8/-9 pixels in both captures. All four full first/last eye
+PNGs inspected: coherent orange-sky village, rocks, stairs/ground and changing
+windmill shadow. Existing distant blur remains; Shu's shadow is not qualified
+in this framing. No new defect identified in this short normal window.
+This does not qualify title artwork, late scenes, authored multi-root events,
+headset comfort or complete-game rendering.
+
+## Flat pixels, final verification and retention
+
+Flat log 809, owned PID 23916, 19:21:33-19:22:40: all five original settings
+audited. Last sample 3,001 direct handoffs/sequences/roots, zero original
+container/wrapper/post scopes or input/sequence refusals; maximum one root.
+Captures `frame_1788650556_0.raw` through `frame_1788650559_119.raw`, frames
+2840-2959, 1920x1080. Streaming analysis: 0/119 changes above 6%, maximum
+3.288869599%, no cyan hits (maximum .020592207%, median .011188272%).
+Full first/last PNGs inspected: recognizable Shu and cast silhouette, foliage,
+ground and moving windmill shadows; existing distant DoF remains. No new
+defect identified in this short normal sequence.
+
+All three logs 807-809 mount 1673 archives / 119346 names, with zero checked
+error/critical/VK_ERROR/device-loss/exception/assertion/fatal markers. Original
+five-setting profile read back. All owned renderer/build/analysis sessions
+terminal; no runtime registry edits or Quest/Thor run. Guest-source established
+the exact boundary/lifetime; devloop reused existing trees; vrsim exercised
+both final desktop eyes. Unknown callbacks, disabled/empty lists, multiple roots
+and comparison-setting fallback remain unqualified on GPU; source/CPU guards
+are not substitutes for those cases or broader full-game verification.
+
+Retained new evidence: 240 unique raw payloads / 3,185,054,400 bytes, eight
+endpoint/stereo PNGs / 9,777,907 bytes, three app logs / 963,202 bytes and six
+perf files / 2,441,552 bytes. Small evidence totals 13,182,661 bytes, below
+the cumulative 100 MiB cap. Helpers/research are small text; no every-frame
+PNG export, assets, dependency downloads or duplicate configure trees.
+Both removed readiness normal sets contain zero raws and retain all eight
+PNGs. Historical removed pixels are not recoverable.
+
+Current normal baseline is `native_scene_handoff_flat` / `_vr`; retain the
+sequence normal pair as previous control, eligible for review at the next
+replacement checkpoint, not automatic deletion. Readiness early-startup,
+all authored/synthetic effect previews/shared probes and unresolved failure /
+control evidence remain protected until equivalent qualification replaces them.
+The entire raw allowance is consumed; no retry/growth allowance remains.
+
+Final scoped NTFS-identity inventory across automatic and isolated roots:
+29,565 paths / 28,331 unique raws, 263,324,814,100 logical and 233,564,594,672
+allocated bytes. All counts and byte totals match the prior checkpoint: the
+raw archive did not grow. It is still far over the 10 GiB target, so its
+historical review obligation and no-growth/reclaim-before-capture gate persist.
+
+Ending measured free 54,376,480,768 bytes (50.64 GiB). Net volume usage
+increased 18,989,056 bytes (18.11 MiB) from initial preflight. Gross recovery
+2.97 GiB was spent on equal-sized replacement captures, not saved a second
+time. Remaining net growth covers retained small outputs/build changes and
+unattributed volume activity; volume change is not an exact repo artifact sum.
+No further large producer is scheduled under this spent budget.
+
+Next: replace resolve-link/exposure and scene-output getter associations with
+explicit native frame-image ownership and downstream UI/presentation inputs;
+move the remaining parent scheduler and engine producers to host scene/frame
+data. Native light/visibility/animation/material producers, authored effect
+events, title artwork, VR blur, late-scene failures and representative fields /
+battles/cutscenes/menus/transitions/reloads in both eyes remain unfinished.
+This is removed guest rendering execution, not completion of the full goal.

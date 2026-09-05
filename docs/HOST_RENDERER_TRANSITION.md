@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native scene-post handoff checkpoint (2026-09-05): the main scene caller now
+passes its explicit colour/depth images directly to native effect scheduling,
+skipping both guest temporary-container constructors, wrapper invocation and
+complete destructors. Camera/focus updates and saved effect flags remain intact.
+All 30 CTests and 39 source guards pass; only the affected guest partition
+regenerated/rebuilt. Normal flat/VR record 3,001/7,801 direct handoffs and zero
+original container/wrapper/post scopes or refusals. Both 120-frame sequences
+have 0/119 large changes and no cyan hits; first/last eye depth is correctly
+crossed and all full endpoint images inspected. Scene-output getters, resolve
+links/exposure, engine producers, parent scheduling, UI and full-game gates
+remain; distant VR blur is not fixed. No Quest. Removed superseded readiness
+normal raws, kept all eight PNGs and protected startup/failure evidence; equal
+replacement raw bytes leave the archive unchanged. Net volume usage increased
+18.11 MiB, ending with 50.64 GiB free. Exact evidence and retention:
+`research/20260905_1912_native-scene-post-handoff.md`.
+
 Native effect-sequence checkpoint (2026-09-05): the supported complete list
 wrapper now schedules post roots on the host with explicit depth, without
 the guest global-depth copy, virtual dispatch or container cleanup. Full
@@ -39,8 +55,9 @@ pass. Normal flat/VR record 2,701/8,101 native sequences, zero original wrappers
 or post scopes/refusals; only one root per sequence is GPU exercised. Both
 120-frame captures have 0/119 large changes and no cyan; first/last VR depth
 is correctly crossed and both full eyes were inspected. Multi-root/unknown
-callback GPU coverage, scene temporary containers, resolve links/exposure,
-engine producers, UI and complete frame/game gates remain. No Quest.
+callback GPU coverage, resolve links/exposure, engine producers, UI and complete
+frame/game gates remain. Its scene temporary containers are removed by the
+newer handoff checkpoint above. No Quest.
 Two superseded normal raw sets removed with eight PNGs/reports retained;
 replacement raw bytes exactly match removal, so the raw archive did not grow.
 Net volume usage increased 49.91 MiB, ending with 50.66 GiB free. Exact evidence:
