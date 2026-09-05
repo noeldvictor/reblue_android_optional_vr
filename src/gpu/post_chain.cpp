@@ -428,13 +428,16 @@ bool PrepareReadable(VideoState &s, GuestTexture *image) {
   return Readable(image);
 }
 
-// Content, transitioned for sampling; null when it cannot be sampled.
-GuestTexture *Source(VideoState &s, GuestTexture *t) {
-  GuestTexture *src = Content(t);
+// Explicit image, transitioned for sampling; no alias or slot inference.
+GuestTexture *NativeSource(VideoState &s, GuestTexture *src) {
   if (!Readable(src))
     return nullptr;
   Transition(s, src->texture, src->layout, plume::RenderTextureLayout::SHADER_READ);
   return src;
+}
+// Compatibility and imported-asset source only.
+GuestTexture *Source(VideoState &s, GuestTexture *t) {
+  return NativeSource(s, Content(t));
 }
 
 // The factor a reader of Source(t) applies: a scaled resolve that aliases
@@ -484,59 +487,64 @@ float GuestPixelConstant(u32 device_guest, u32 reg, u32 lane) {
   return float(device->psFloatConstants[reg][lane]);
 }
 
-// The dof draw samples depth in slot 0, the scene in slot 1 and five blurred
-// levels in slots 2-6 (1/2, 1/4, 1/8, 1/16, 1/16). One dual-filter pass per
-// level, each from the previous.
-bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
-                     GuestTexture *depth_texture, const DofParameters &parameters) {
+// One private atlas with five regions. Inputs already name sampled images and
+// exposure, so native production never follows resolve links or retained slots.
+bool BuildDofAtlas(VideoState &s, Chain &c, const HostPostInputs &inputs,
+                   const DofParameters &parameters) {
   c.dof = DofInputs{};
-  GuestTexture *scene = Source(s, scene_texture);
+  auto *scene = NativeSource(s, inputs.scene);
   if (!scene)
     return false;
   const bool layered = scene->layers > 1;
-  if (REXCVAR_GET(bd_host_post_atlas)) {
-    // One pass: the five levels side by side in an atlas half the scene's
-    // height (W/2 + W/4 + W/8 + W/16 + W/16 = W), each filtered from the
-    // scene by post_pyramid_ps. Five render passes into the guest's level
-    // textures before (2026-09-04).
-    auto *pyr = Pipeline(s, c, Shader::Pyramid, scene->format, layered);
-    Scratch *atlas = GetScratch(s, c, scene->width, std::max(1u, scene->height / 2),
-                                scene->format, 2, scene->layers);
-    if (!pyr || !atlas)
-      return false;
-    const float level_scale = SourceScale(scene_texture);
-    c.dof.scene_scale = level_scale;
-    c.dof.scene_src = scene;
-    c.dof.scene_tex = scene_texture;
-    Transition(s, atlas->texture.get(), atlas->layout, plume::RenderTextureLayout::COLOR_WRITE);
-    u32 x = 0;
-    for (u32 level = 0; level < 5; ++level) {
-      const u32 shift = std::min(level + 1, 4u);
-      const u32 w = std::max(1u, scene->width >> shift);
-      const u32 h = std::max(1u, scene->height >> shift);
-      PassAt(s, pyr, atlas->framebuffer.get(), x, 0, w, h,
-             PostPush{scene->descriptorIndex, level,
-                      float(REXCVAR_GET(bd_host_post_blur)), level_scale},
-             /*keep_bound=*/level + 1 < 5);
-      c.dof.rects[level][0] = float(x) / float(atlas->width);
-      c.dof.rects[level][1] = 0.0f;
-      c.dof.rects[level][2] = float(w) / float(atlas->width);
-      c.dof.rects[level][3] = float(h) / float(atlas->height);
-      x += w;
-    }
-    Transition(s, atlas->texture.get(), atlas->layout, plume::RenderTextureLayout::SHADER_READ);
-    c.dof.atlas = atlas;
-    for (u32 i = 0; i < 5; ++i)
-      c.dof.levels[i] = nullptr;
-    c.dof.depth = depth_texture;
-    c.dof.parameters = parameters;
-    c.dof.valid = Readable(Content(c.dof.depth));
-    if (c.dof_frames++ < 3)
-      BD_INFO("[post] dof atlas {}x{} from the {}x{} scene in one pass, depth {}",
-              atlas->width, atlas->height, scene->width, scene->height,
-              c.dof.valid ? "yes" : "no");
-    return true;
+  auto *pyr = Pipeline(s, c, Shader::Pyramid, scene->format, layered);
+  Scratch *atlas = GetScratch(s, c, scene->width, std::max(1u, scene->height / 2),
+                              scene->format, 2, scene->layers);
+  if (!pyr || !atlas)
+    return false;
+  c.dof.scene_scale = inputs.exposure;
+  c.dof.scene_src = scene;
+  Transition(s, atlas->texture.get(), atlas->layout, plume::RenderTextureLayout::COLOR_WRITE);
+  u32 x = 0;
+  for (u32 level = 0; level < 5; ++level) {
+    const u32 shift = std::min(level + 1, 4u);
+    const u32 w = std::max(1u, scene->width >> shift);
+    const u32 h = std::max(1u, scene->height >> shift);
+    PassAt(s, pyr, atlas->framebuffer.get(), x, 0, w, h,
+           PostPush{scene->descriptorIndex, level,
+                    float(REXCVAR_GET(bd_host_post_blur)), inputs.exposure},
+           /*keep_bound=*/level + 1 < 5);
+    c.dof.rects[level][0] = float(x) / float(atlas->width);
+    c.dof.rects[level][1] = 0.0f;
+    c.dof.rects[level][2] = float(w) / float(atlas->width);
+    c.dof.rects[level][3] = float(h) / float(atlas->height);
+    x += w;
   }
+  Transition(s, atlas->texture.get(), atlas->layout, plume::RenderTextureLayout::SHADER_READ);
+  c.dof.atlas = atlas;
+  c.dof.depth = inputs.depth;
+  c.dof.parameters = parameters;
+  c.dof.valid = Readable(c.dof.depth);
+  if (c.dof_frames++ < 3)
+    BD_INFO("[post] dof atlas {}x{} from the {}x{} scene in one pass, depth {} exposure {}",
+            atlas->width, atlas->height, scene->width, scene->height,
+            c.dof.valid ? "yes" : "no", inputs.exposure);
+  return true;
+}
+
+// Explicit compatibility importer. Only the old non-atlas mode uses retained
+// level slots; normal whole-post rendering calls BuildDofAtlas directly.
+bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
+                     GuestTexture *depth_texture, const DofParameters &parameters) {
+  if (REXCVAR_GET(bd_host_post_atlas)) {
+    const bool built = BuildDofAtlas(s, c,
+        {Content(scene_texture), Content(depth_texture), SourceScale(scene_texture)}, parameters);
+    c.dof.scene_tex = scene_texture; // compatibility cleanup identity only
+    return built;
+  }
+  c.dof = DofInputs{};
+  GuestTexture *scene = Source(s, scene_texture);
+  if (!scene) return false;
+  const bool layered = scene->layers > 1;
   auto *dual = Pipeline(s, c, Shader::DualDown, scene->format, layered);
   if (!dual)
     return false;
@@ -579,9 +587,9 @@ bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
   // A missing tail repeats the last level, so the composite always has five.
   for (u32 i = filled; i < 5; ++i)
     c.dof.levels[i] = c.dof.levels[filled - 1];
-  c.dof.depth = depth_texture;
+  c.dof.depth = Content(depth_texture);
   c.dof.parameters = parameters;
-  c.dof.valid = Readable(Content(c.dof.depth));
+  c.dof.valid = Readable(c.dof.depth);
   if (c.dof_frames++ < 3)
     BD_INFO("[post] dof pyramid: {} levels from the {}x{} scene, depth {}, "
             "params ({:.3g}, {:.3g}, {:.3g}, {:.3g})",
@@ -679,12 +687,12 @@ bool HostComposite(VideoState &s, Chain &c, GuestTexture *scene,
     return bail("inputs");
   if (!rt.texture || !rt.framebuffer || rt.layers > 2)
     return bail("target");
-  GuestTexture *depth = Source(s, c.dof.depth);
+  GuestTexture *depth = NativeSource(s, c.dof.depth);
   if (!depth)
     return bail("depth not readable");
   CompositeConstants k{};
   if (heat.enabled) {
-    const auto *noise = Source(s, heat_image);
+    const auto *noise = NativeSource(s, heat_image);
     if (!noise || !heat_sampler) return bail("heat noise image/sampler");
     k.heat[0] = heat.amplitude_x;
     k.heat[1] = heat.amplitude_y;
@@ -810,18 +818,17 @@ bool RenderLensFlare(VideoState &s, Chain &c, const PostAttachment &output,
   static bool reported_images = false;
   if (!reported_images) {
     for (u32 i = 0; i < images.size(); ++i) {
-      const auto *asset = Content(images[i]);
-      BD_INFO("[native-post] optical image {} {}x{} descriptor {} native {:016X} source alias {}",
+      const auto *asset = images[i];
+      BD_INFO("[native-post] explicit optical image {} {}x{} descriptor {} native {:016X}",
           i, asset->width, asset->height, asset->descriptorIndex,
-          asset->nativeGpu ? asset->nativeGpu->asset->id : 0,
-          asset != images[i]);
+          asset->nativeGpu ? asset->nativeGpu->asset->id : 0);
     }
     reported_images = true;
   }
   for (auto *image : images)
-    if (!Source(s, image)) return false;
+    if (!NativeSource(s, image)) return false;
   for (u32 i = 0; i < parameters.count; ++i)
-    sprites[i].texture = Content(images[sprites[i].texture])->descriptorIndex;
+    sprites[i].texture = images[sprites[i].texture]->descriptorIndex;
   const auto allocation = UploadHostConstants(sprites.data(), sizeof(sprites));
   auto *pipeline = Pipeline(s, c, Shader::LensFlare, output.format, output.layers > 1);
   auto *framebuffer = output.framebuffer;
@@ -841,7 +848,19 @@ bool RenderLensFlare(VideoState &s, Chain &c, const PostAttachment &output,
 }
 } // namespace
 
-bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *output,
+bool HostPostImportInputs(GuestTexture *scene, GuestTexture *depth, HostPostInputs &inputs) {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  const HostPostInputs imported{Content(scene), Content(depth), SourceScale(scene)};
+  if (!s.ready || !imported.scene || !imported.scene->texture ||
+      !imported.depth || !imported.depth->texture ||
+      !std::isfinite(imported.exposure) || imported.exposure <= 0)
+    return false;
+  inputs = imported;
+  return true;
+}
+
+bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
                     const DofParameters &dof, const BloomParameters &bloom,
                     const LensFlareParameters &flare,
                     const std::array<GuestTexture *, 4> &flare_images,
@@ -857,9 +876,9 @@ bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *outp
   auto &s = state();
   std::lock_guard lock(s.mutex);
   auto &c = chain();
-  auto *source = Content(scene);
-  auto *z = Content(depth);
-  if (!s.ready || c.failed)
+  auto *source = inputs.scene;
+  auto *z = inputs.depth;
+  if (!s.ready || c.failed || !std::isfinite(inputs.exposure) || inputs.exposure <= 0)
     return false;
   const bool scene_ready = PrepareReadable(s, source);
   const bool depth_ready = PrepareReadable(s, z);
@@ -882,10 +901,9 @@ bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *outp
   if (flare.count > flare.sprites.size()) return false;
   if (flare.count) {
     for (auto *image : flare_images) {
-      if (auto *asset = Content(image); asset && asset->texture)
+      if (auto *asset = image; asset && asset->texture)
         BindTextureSRVLocked(s, asset);
-      if (!Readable(Content(image)) || Content(image) == output ||
-          Content(image)->layers != 1) return false;
+      if (!Readable(image) || image == output || image->layers != 1) return false;
     }
     for (u32 i = 0; i < flare.count; ++i)
       if (flare.sprites[i].texture >= flare_images.size()) return false;
@@ -893,7 +911,7 @@ bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *outp
   u32 grain_sampler = 0;
   u32 heat_sampler = 0;
   const auto prepare_noise = [&](GuestTexture *image, u32 &sampler) {
-    auto *asset = Content(image);
+    auto *asset = image;
     if (asset && asset->texture) BindTextureSRVLocked(s, asset);
     if (!Readable(asset) || asset == output || asset->layers != 1) return false;
     plume::RenderSamplerDesc recipe;
@@ -938,7 +956,7 @@ bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *outp
   if (s.plume_framebuffer_bound)
     DrawQueueFlush(s.command_list);
   HostTargetDropLinks(s, output);
-  if (!BuildDofPyramid(s, c, scene, depth, dof) || !c.dof.valid)
+  if (!BuildDofAtlas(s, c, inputs, dof) || !c.dof.valid)
     throw std::runtime_error("Native post atlas production failed");
   const auto directional = BuildDirectionalBloom(s, c, source, bloom, bloom_atlases);
   const auto write_attachment = [&](u32 index) {
@@ -974,7 +992,7 @@ bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *outp
     } else {
       shader = Shader::Grade;
       if (grade.grain) {
-        auto *noise = Source(s, grain_image);
+        auto *noise = NativeSource(s, grain_image);
         if (!noise) throw std::runtime_error("Native grading grain image failed");
         push.src2 = noise->descriptorIndex;
       }
@@ -1001,8 +1019,8 @@ bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *outp
     Pass(s, pipeline, target.framebuffer, target.width, target.height, push, true);
   }
   output->surfaceDrawn = true;
-  // The complete source is consumed before publishing the new output alias.
-  DetachSourceSurfaceLocked(s, scene);
+  // Caller carries the completed output directly; there is no per-root getter
+  // publication or mutation of an input's resolve associations here.
   c.dof.valid = false;
   s.command_list->setFramebuffer(nullptr);
   Transition(s, output->texture, output->layout, plume::RenderTextureLayout::SHADER_READ);

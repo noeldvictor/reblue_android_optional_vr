@@ -24,11 +24,23 @@ struct ScanlineParameters;
 struct GradeParameters;
 struct HeatShimmerParameters;
 
+// Borrowed, synchronous render inputs. These name the actual sampled images,
+// not resolve destinations. Owners keep them alive until rendering completes.
+struct HostPostInputs {
+  GuestTexture *scene = nullptr;
+  GuestTexture *depth = nullptr;
+  float exposure = 1.0f;
+};
+
+// Temporary scene/getter boundary: import an alias or an already materialized
+// output once. No draw or copy is issued. Native stages never call this helper.
+bool HostPostImportInputs(GuestTexture *scene, GuestTexture *depth, HostPostInputs &inputs);
+
 // Whole native atlas + folded bloom/composite + instanced optical sprites.
 // The caller supplies an explicit attachment and native optical image mirrors.
 // No draw interception, shader-register import or tile allocation. False is
 // a preflight refusal; failures after GPU work starts are fatal, not replayed.
-bool HostPostRender(GuestTexture *scene, GuestTexture *depth, GuestTexture *output,
+bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
                     const DofParameters &dof, const BloomParameters &bloom,
                     const LensFlareParameters &flare,
                     const std::array<GuestTexture *, 4> &flare_images,

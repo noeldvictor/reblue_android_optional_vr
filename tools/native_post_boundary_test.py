@@ -29,7 +29,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         cls.bloom_shader = (root / "src/gpu/shaders/hlsl/post_bloom_direction_ps.hlsl").read_text(encoding="utf-8")
 
     def test_native_inputs_prepare_their_own_sampling_descriptors(self):
-        helper = self.post.split("bool PrepareReadable(", 1)[1].split("// Content, transitioned", 1)[0]
+        helper = self.post.split("bool PrepareReadable(", 1)[1].split("GuestTexture *NativeSource(", 1)[0]
         self.assertIn("BindTextureSRVLocked(s, image) == kInvalidDescriptorIndex", helper)
         self.assertLess(helper.index("BindTextureSRVLocked("), helper.index("return Readable(image)"))
         for name in ("s.textures[", "SetTexture(", "ResolveRtToTexture", "copyTexture", "__imp__"):
@@ -178,6 +178,8 @@ class NativePostBoundaryTest(unittest.TestCase):
         body = self.post.split("bool RenderLensFlare(", 1)[1].split("} // namespace", 1)[0]
         self.assertIn("drawInstanced(6, parameters.count, 0, 0)", body)
         self.assertIn("output.framebuffer", body)
+        self.assertIn("NativeSource(s, image)", body)
+        self.assertNotIn("Content(", body)
         for name in ("s.render_target", "GuestPixelConstant", "D3DDevice_", "s.textures[", "device_guest"):
             self.assertNotIn(name, body)
         self.assertNotIn("filter(8660", self.scheduler)
@@ -197,7 +199,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         for name in ("GuestPixelConstant", "device_guest", "s.textures[", "s.render_target",
                      "HostPostIntercept", "ResolveRtToTexture", "TrackResolveSource"):
             self.assertNotIn(name, body)
-        self.assertLess(body.index("DrawQueueFlush("), body.index("BuildDofPyramid("))
+        self.assertLess(body.index("DrawQueueFlush("), body.index("BuildDofAtlas("))
         self.assertIn("HostComposite(s, c, source, nullptr, composed, bloom, heat, heat_image, heat_sampler, directional)", body)
         self.assertIn("s.draw_framebuffer_bound = false", body)
 
@@ -209,21 +211,61 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("parameters.threshold", body)
 
     def test_native_scheduler_has_explicit_completed_output(self):
-        body = self.scheduler.split("bool RenderPostPlan(", 1)[1].split("bool AcquirePostTargets(", 1)[0]
-        self.assertIn("Video::PublishSceneOutput(target, scene, 1.0f)", body)
+        body = self.scheduler.split("bool RenderPostPlan(", 1)[1].split("void PublishPostOutput(", 1)[0]
+        self.assertIn("HostPostRender(inputs, target,", body)
+        self.assertNotIn("PublishSceneOutput", body)
         for name in ("__imp__", "sub_8221E758", "sub_8221CB38", "sub_822166E8"):
             self.assertNotIn(name, body)
+        publication = self.scheduler.split("void PublishPostOutput(", 1)[1].split("bool AcquirePostTargets(", 1)[0]
+        self.assertIn("Video::PublishSceneOutput(completed, scene_output, 1.0f)", publication)
 
     def test_native_sequence_uses_explicit_depth_without_global_publication(self):
         body = self.scheduler.split("bool RunEffectSequence(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
         for name in ("GuestTexture *scene, GuestTexture *depth",
-                     "targets.images[sequence->Output(i)]", "RenderPostPlan(plan, scene, depth,"):
+                     "targets.images[sequence->Output(i)]", "RenderPostPlan(plan, inputs,"):
             self.assertIn(name, body)
         for name in ("Texture(kDepth)", "sub_82184790(", "sub_8221CC90(",
                      "REX_CALL", "__imp__", "bd::mem::store", "ctx.r1", "SetTexture("):
             self.assertNotIn(name, body)
         self.assertNotIn("Texture(", body)
         self.assertIn("REX_HOOK_RAW(bdEffectSlotArrayApply)", self.scheduler)
+
+    def test_native_stage_and_atlas_do_not_follow_resolve_links(self):
+        render = self.post.split("bool HostPostRender(", 1)[1].split("bool HostPostPrepareDof(", 1)[0]
+        atlas = self.post.split("bool BuildDofAtlas(", 1)[1].split("bool BuildDofPyramid(", 1)[0]
+        for body in (render, atlas):
+            for name in ("Content(", "SourceScale(", "sourceSurface", "resolveScale",
+                         "DetachSourceSurfaceLocked(", "s.textures[", "BuildDofPyramid("):
+                self.assertNotIn(name, body)
+        self.assertIn("auto *source = inputs.scene", render)
+        self.assertIn("auto *z = inputs.depth", render)
+        self.assertIn("c.dof.scene_scale = inputs.exposure", atlas)
+        self.assertIn("c.dof.depth = inputs.depth", atlas)
+        self.assertIn("NativeSource(s, c.dof.depth)", self.post)
+        self.assertIn("NativeSource(s, inputs.scene)", atlas)
+
+    def test_native_sequence_imports_once_and_publishes_only_completed_output(self):
+        body = self.scheduler.split("bool RunEffectSequence(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
+        self.assertEqual(body.count("HostPostImportInputs("), 1)
+        self.assertEqual(body.count("PublishPostOutput("), 1)
+        execution = body.split("const float exposure = inputs.exposure;", 1)[1]
+        loop, publication = execution.split("\n  PublishPostOutput(", 1)
+        self.assertNotIn("Publish", loop)
+        self.assertNotIn("HostPostImportInputs", loop)
+        self.assertIn("inputs.scene = targets.images[sequence->Output(i - 1)]", loop)
+        self.assertIn("inputs.exposure = sequence->Exposure(i, exposure)", loop)
+        self.assertIn("RenderPostPlan(plan, inputs,", loop)
+        self.assertTrue(publication.startswith("targets.images[sequence->Output(sequence->count - 1)], scene)"))
+        self.assertLess(body.index("callback !="), body.index("HostPostImportInputs("))
+
+    def test_scene_import_preserves_alias_exposure_without_producing_gpu_work(self):
+        body = self.post.split("bool HostPostImportInputs(", 1)[1].split("bool HostPostRender(", 1)[0]
+        self.assertIn("Content(scene), Content(depth), SourceScale(scene)", body)
+        self.assertIn("std::lock_guard lock(s.mutex)", body)
+        self.assertIn("!std::isfinite(imported.exposure) || imported.exposure <= 0", body)
+        self.assertLess(body.index("return false"), body.index("inputs = imported"))
+        for name in ("ResolveRtToTexture", "PublishSceneOutput", "copyTexture", "Pass(", "OpenCommandList"):
+            self.assertNotIn(name, body)
 
     def test_scene_handoff_borrows_explicit_outputs_without_temporary_containers(self):
         helper = self.scheduler.split("GuestTexture *SceneOutput(", 1)[1].split("struct PostEffects", 1)[0]

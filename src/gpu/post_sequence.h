@@ -16,6 +16,11 @@ struct PostSequence {
   // Stage zero samples the incoming scene. Each later stage samples its
   // predecessor's completed output, never the target it is about to write.
   constexpr uint32_t Output(uint32_t stage) const { return stage % 2; }
+  // Scene exposure is consumed once. Completed native stages already contain
+  // exposed colour; feeding the original exposure back would darken each root.
+  constexpr float Exposure(uint32_t stage, float incoming) const {
+    return stage == 0 ? incoming : 1.0f;
+  }
 };
 constexpr std::optional<PostSequence> MakePostSequence(uint32_t count) {
   if (count > PostSequence::kCapacity) return {};

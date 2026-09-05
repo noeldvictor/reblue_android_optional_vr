@@ -72,6 +72,7 @@ struct Stats {
   uint64_t sequences = 0, sequence_roots = 0, sequence_empty = 0;
   uint64_t sequence_original = 0, sequence_refused = 0, sequence_max = 0;
   uint64_t scene_handoffs = 0, scene_original = 0;
+  uint64_t image_imports = 0, final_publications = 0, direct_image_edges = 0;
   uint32_t frame = 0;
 };
 thread_local Stats stats;
@@ -122,6 +123,9 @@ void Report() {
   BD_INFO("[native-post] direct scene handoffs {} original container scopes {}; "
           "no temporary post containers on the direct path; scene output/getter adapters remain",
           stats.scene_handoffs, stats.scene_original);
+  BD_INFO("[native-post] scene image imports {} final publications {} direct inter-root images {}; "
+          "explicit exposure, no intermediate resolve publication",
+          stats.image_imports, stats.final_publications, stats.direct_image_edges);
 }
 bool Words(uint64_t address, uint64_t bytes) {
   if (!address || (address & 3) || !bytes || address + bytes - 1 > UINT32_MAX ||
@@ -389,16 +393,14 @@ bool ReadPlan(uint32_t owner, DofParameters &dof, BloomParameters &bloom,
   }
   return true;
 }
-bool RenderPostPlan(const PostPlan &plan, GuestTexture *scene, GuestTexture *depth,
+bool RenderPostPlan(const PostPlan &plan, const HostPostInputs &inputs,
                     GuestTexture *target) {
   const auto &tail = plan.tail;
-  if (HostPostRender(scene, depth, target, plan.dof, plan.bloom, tail.flare, tail.flare_images,
+  if (HostPostRender(inputs, target, plan.dof, plan.bloom, tail.flare, tail.flare_images,
                      tail.adjustments, tail.scanline, tail.grade, tail.grain_image,
                      tail.heat, tail.heat_image)) {
     if (plan.has_dof)
       PublishDofProducerProperties(plan.owner + 3440);
-    if (!Video::PublishSceneOutput(target, scene, 1.0f))
-      throw std::runtime_error("Native post output publication failed");
     stats.flare_frames += tail.flare.count != 0;
     stats.flare_inactive += tail.flare.count == 0;
     stats.flare_sprites += tail.flare.count;
@@ -417,6 +419,13 @@ bool RenderPostPlan(const PostPlan &plan, GuestTexture *scene, GuestTexture *dep
     return true;
   }
   return false;
+}
+void PublishPostOutput(GuestTexture *completed, GuestTexture *scene_output) {
+  // UI/getter compatibility publication belongs only at the completed boundary,
+  // never between native roots. A failed publication cannot replay rendered work.
+  if (!Video::PublishSceneOutput(completed, scene_output, 1.0f))
+    throw std::runtime_error("Native post output publication failed");
+  ++stats.final_publications;
 }
 bool AcquirePostTargets(GuestTexture *scene, GuestTexture *depth, uint32_t count,
                         PostTargets &targets) {
@@ -479,17 +488,25 @@ bool RunEffectSequence(uint32_t list, GuestTexture *scene, GuestTexture *depth) 
   PostTargets targets;
   if (!AcquirePostTargets(scene, depth, sequence->target_count, targets))
     return refuse("image targets");
+  HostPostInputs inputs;
+  if (!HostPostImportInputs(scene, depth, inputs)) return refuse("scene image import");
+  ++stats.image_imports;
+  const float exposure = inputs.exposure;
   for (uint32_t i = 0; i < sequence->count; ++i) {
     auto &plan = plans[i];
     // A preceding local-focus root publishes the shared authored focus getter.
     // Later roots must observe that ordered update, not their preflight value.
     if (i && plan.has_dof && !ReadDofProducerParameters(plan.owner + 3440, plan.dof))
       throw std::runtime_error("Native effect sequence lost its preflighted focus input");
-    if (!RenderPostPlan(plan, scene, depth, targets.images[sequence->Output(i)])) {
+    if (i) inputs.scene = targets.images[sequence->Output(i - 1)];
+    inputs.exposure = sequence->Exposure(i, exposure);
+    if (!RenderPostPlan(plan, inputs, targets.images[sequence->Output(i)])) {
       if (i) throw std::runtime_error("Native effect sequence refused after a completed root");
       return refuse("first root image preflight");
     }
   }
+  PublishPostOutput(targets.images[sequence->Output(sequence->count - 1)], scene);
+  stats.direct_image_edges += sequence->count - 1;
   ++stats.sequences;
   stats.sequence_roots += sequence->count;
   stats.sequence_max = std::max(stats.sequence_max, uint64_t(sequence->count));
@@ -692,8 +709,12 @@ REX_HOOK_RAW(sub_8221B1D8) {
     auto *scene = Texture(source);
     auto *depth = Texture(kDepth);
     PostTargets targets;
+    HostPostInputs inputs;
     if (AcquirePostTargets(scene, depth, 1, targets) &&
-        RenderPostPlan(plan, scene, depth, targets.images[0])) {
+        HostPostImportInputs(scene, depth, inputs) &&
+        RenderPostPlan(plan, inputs, targets.images[0])) {
+      ++stats.image_imports;
+      PublishPostOutput(targets.images[0], scene);
       Report();
       return;
     }

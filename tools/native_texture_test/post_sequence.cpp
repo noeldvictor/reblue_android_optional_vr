@@ -32,4 +32,23 @@ int main() {
   }
   assert(!MakePostSequence(PostSequence::kCapacity + 1));
   assert(!MakePostSequence(std::numeric_limits<uint32_t>::max()));
+  // Exposure belongs to the incoming scene only, even when two targets are
+  // reused repeatedly. Already-materialized and aliased HDR inputs must agree.
+  for (uint32_t count = 1; count <= PostSequence::kCapacity; ++count) {
+    const auto sequence = MakePostSequence(count);
+    std::array<std::array<double, 2>, 2> targets{};
+    std::array<double, 2> input{8, 12}, reference{2, 3};
+    for (uint32_t stage = 0; stage < count; ++stage) {
+      const auto output = sequence->Output(stage);
+      if (stage) input = targets[sequence->Output(stage - 1)];
+      const auto exposure = sequence->Exposure(stage, .25f);
+      assert(exposure == (stage == 0 ? .25f : 1.0f));
+      assert(sequence->Exposure(stage, 1.0f) == 1.0f);
+      for (uint32_t eye = 0; eye < 2; ++eye) {
+        targets[output][eye] = input[eye] * exposure * .5 + double(stage);
+        reference[eye] = reference[eye] * .5 + double(stage);
+      }
+      assert(targets[output] == reference);
+    }
+  }
 }
