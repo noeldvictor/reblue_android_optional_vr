@@ -220,9 +220,17 @@ moves two whole material callbacks onto the host, preserving blending/depth-writ
 policy and the water-highlight clamp. Host build, 31 CPU tests and 83 source guards
 pass. A bounded flat run exercises 1,964 water preparations without material
 fallback/refusal/faults; one sanity image was inspected. Refraction/snapshot
-execution remains unobserved in that field. Native material updates/assets,
+execution remains unobserved in that field. Native material assets,
 parameter/state/getter adapters and full-frame qualification remain open. Ten
 superseded diagnostics were removed, reclaiming 4.27 MB measured; no raw captures.
+
+The [water-update follow-up](research/20260906_0726_native-water-update.md) moves
+the complete animation/23-parameter update and sampling-mode counter callbacks
+onto the host. A fixed 32-entry write plan preserves sequential aliases without
+disk dumps. Host build, 31 CPU tests and 88 source guards pass; 301 in-game
+publications match the original, followed by 2,701 normal native updates without
+fallback/refusal. Native data/storage and full-frame/event/stereo qualification
+remain open. Ten superseded diagnostics were removed; no raw captures were added.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

@@ -555,3 +555,63 @@ cumulative original-baseline growth 995,106,816 B. Build/Git/metadata and
 unattributed volume activity stay charged; scoped cache/dump inspection found
 no new files. Later docs/Git writes still count. No live producer/profile override
 remains; no further verification matrix is launched by this accounting entry.
+
+## Continuing the same storage ledger: water update, 07:11
+
+Preflight 2026-09-06 07:11:57 EDT: 64,467,468,288 B free; no renderer/compiler/
+CMake/Ninja/linker/CTest active. The 86 build logs total 138,214 B. The original
+baseline remains 65,462,788,096 B (995,319,808 B cumulative growth); last retained
+diagnostic accounting is 63,847,547 B. All original caps and the zero-incoming-raw
+gate remain unchanged.
+
+Reuse the post-output CPU fixture and desktop tree. Plan <=256 MiB temporary
+build/link overlap and <=6 MiB new diagnostics across retries: focused CPU
+publication/alias tests, the existing CPU suite, host link and bounded flat
+original-publication comparison plus normal native execution with one <=4 MiB
+window image. No new binary/tree/tools, raw capture, guest/shader rebuild or
+persistent profile change. The comparison uses a fixed 32-word in-memory write
+overlay, never a dump of the material/arena. Retire the preceding normal flat
+log 867/perf-065659/material-window PNG and build 24/CPU 21/focused 13 logs only
+after equivalent replacements pass. Keep distinct XR/non-MSAA/failure/raw data.
+The existing live wrappers retain the cumulative free-space/log/diagnostic guards.
+
+Focused build 14 and CPU 22 pass (31/31, 3.59 s). Host build 25 exits 0 with both
+whole callbacks linked and no guest/shader rebuild. All 88 source guards pass.
+The original-comparison run PID 22500/session 31230 stopped successfully at its
+first sample above 256 updates: 301 checked, zero wrong/refused/compatibility,
+288 tick advances and 6,923 parameter words. Log 868 is 111,333 B; no performance
+CSV, PNG or raw output was produced. This distinct first exact water-publication
+comparison is retained until an equivalent comparison supersedes it, not repeated
+as a permanent per-commit log. Profile restored byte-for-byte; producer terminal.
+Normal native execution now uses PID 26432/session 50037, started 07:22:58,
+75-second bound, one <=4 MiB PNG, captures off and guaranteed profile restoration.
+Its outputs and all retries stay within the same <=6 MiB step plan and original
+checkpoint limits. Do not restart this producer merely because a poll is quiet.
+
+Closeout 07:26: normal PID 26432/session 50037 terminal, wrapper exit 0 and
+profile restored byte-for-byte. Last sample: 2,701 native updates, 1,719 tick
+advances, 62,123 parameter words, zero fallback/refusal/reference execution.
+The new flat PNG was inspected; temporal/stereo/refraction events remain open.
+Both logs have zero runtime/config error matches. Evidence and exact hashes:
+`20260906_0726_native-water-update.md`. No further game/XR/capture run queued.
+
+Gross new diagnostics 4,353,076 B: build/test 6,333; comparison log 868 111,333;
+normal log 869 273,140; perf-072301 pair 606,320; PNG 3,355,950. Zero new raw,
+cache/dump, tool download, guest/shader rebuild or configured build tree.
+After replacement/path/length/ignore/reparse/process validation, removed ten
+files: reblue_24, cpu_21, host_post_output_test_13 stdout/stderr pairs, flat log
+867, perf-065659 pair and native_refraction_material_window.png. Logical bytes
+4,236,095; immediate free 64,460,967,936 ->64,465,207,296 B:
+**4,239,360 B measured reclaimed**, counted once. Reports/hashes remain and
+diagnostics can be regenerated; all protected data/distinct evidence preserved.
+
+Retained payload growth 116,981 B includes the first exact-publication comparison
+log (111,333 B, replace after equivalent comparison); remaining growth is minor
+replacement size drift. Reserved accounting 63,961,991 B: 86 build logs/138,207 B,
+12 runtime logs/3,504,145 B, 20 perf files/8,963,168 B, eight GPU-fixture files/
+8,364,855 B plus unchanged 41 MiB tool/inspection reservation. Two PNGs/6,690,106 B
+fit within that reservation. Final free 64,465,207,296 B (60.04 GiB); net from
+07:11 preflight +2,260,992 B used; cumulative +997,580,800 B from the original
+baseline. Build/Git/metadata and unrelated volume activity remain charged;
+later documentation/Git writes still count. All producers terminal and profiles
+restored. Full renderer/desktop gate remains open; no unpublished gitlink staged.

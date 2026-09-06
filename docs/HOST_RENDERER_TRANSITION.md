@@ -30,14 +30,26 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Water animation/parameter update (2026-09-06): complete water-update and shared
+sampling-mode callbacks now have native replacements, preserving tick cadence,
+23 parameter words, mode counters and sequential alias behavior in a bounded
+32-entry plan. Host build, 31 CPU tests and 88 source guards pass; 301 complete
+authored publications match the original, followed by 2,701 normal native updates
+with zero fallback/refusal. A flat sanity image was inspected. Authored data,
+parameter storage and counters/tick source remain imports. Native material assets,
+standalone mode dispatch and refraction/snapshot/both-eye/full-game qualification
+remain open. Ten obsolete diagnostics were removed, reclaiming 4,239,360 B
+measured; no raw captures or Quest runs. Evidence:
+`research/20260906_0726_native-water-update.md`.
+
 Water/refraction setup (2026-09-06): two whole callback replacements now execute
 host preparation order, checked parameter/image imports and the existing water
 highlight clamp, preserving depth-write and other blend policy. Host build,
 31 CPU tests and 83 source guards pass. A bounded flat run reports 1,964 native
 water preparations with zero material fallback/refusal/faults; one sanity image
 was inspected. Refraction and snapshot execution were not observed in that field,
-so their authored runtime qualification remains open. Material updates/animation,
-native assets/storage, child state/parameter/getter adapters and complete scene/
+so their authored runtime qualification remains open. Native assets/storage,
+child state/parameter/getter adapters and complete scene/
 frame ownership remain. Ten superseded diagnostics were removed, reclaiming
 4,272,128 B measured; no raw captures or Quest runs. Evidence:
 `research/20260906_0700_native-refraction-materials.md`.

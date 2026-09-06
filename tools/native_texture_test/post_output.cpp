@@ -14,6 +14,7 @@
 #endif
 #include <cassert>
 #include "refraction_material_cases.h"
+#include "water_update_cases.h"
 using namespace bd::gpu;
 using namespace plume;
 
@@ -615,4 +616,5 @@ int main() {
   SceneFramebufferOwnership();
   SceneCommands();
   refraction_material_tests::Run();
+  water_update_tests::Run();
 }
