@@ -233,6 +233,12 @@ REX_HOOK_RAW(D3DDevice_SetVertexShaderConstantB) {
   const u32 start = ctx.r4.u32;
   const u32 count = ctx.r6.u32;
   __imp__D3DDevice_SetVertexShaderConstantB(ctx, base);
+  // Both original foliage producers (bdSceneNodeDrawSingle at 0x82280488
+  // and sub_8227F360 at 0x8227F940) store VS c57 inline, then publish bool 31
+  // before any draw. Use that existing boundary signal; do not reimport c57
+  // on every ordinary native draw or turn the whole node into a legacy scope.
+  if (start <= 31 && count > 31 - start)
+    bd::gpu::InvalidateNativeShaderParameters(true, 57, 1);
   bd::gpu::Video::MarkVSConstantsDirty();
   bd::gpu::scene::NoteBoolsSet(true, start, count);
 }
@@ -254,8 +260,24 @@ REX_HOOK_RAW(D3DDevice_SetPixelShaderConstantB) {
 // setter path, so the FN setter hooks never see them, so mark both stages
 // dirty.
 REBLUE_CONSTANT_DIRTY_HOOK(bdSetViewportConstants,
-                           (bd::gpu::Video::MarkVSConstantsDirty(),
+                           (bd::gpu::InvalidateNativeShaderParameters(true, 21, 1),
+                            bd::gpu::InvalidateNativeShaderParameters(false, 21, 1),
+                            bd::gpu::Video::MarkVSConstantsDirty(),
                             bd::gpu::Video::MarkPSConstantsDirty()))
+// bdVisualObjectSetShaderConstants (0x82143F70) calls the VS c54..57
+// setter, then writes visual+3544's vector inline to VS/PS c53 and publishes
+// bools. No draws inside this function; invalidate the two inline rows on exit.
+REBLUE_CONSTANT_DIRTY_HOOK(bdVisualObjectSetShaderConstants,
+                           (bd::gpu::InvalidateNativeShaderParameters(true, 53, 1),
+                            bd::gpu::InvalidateNativeShaderParameters(false, 53, 1),
+                            bd::gpu::Video::MarkVSConstantsDirty(),
+                            bd::gpu::Video::MarkPSConstantsDirty()))
+// Toon vf04 is a leaf inline writer of VS c50/c51 (the latter includes two
+// inherited stack words). Preserve the original data until its shader ABI is
+// replaced; it must not inherit another material's native parameter rows.
+REBLUE_CONSTANT_DIRTY_HOOK(Visual__Shader__Toon__vf04,
+                           (bd::gpu::InvalidateNativeShaderParameters(true, 50, 2),
+                            bd::gpu::Video::MarkVSConstantsDirty()))
 // This one also brackets the 2D overlay scope. Visual__DrawVerticesUP is where
 // Blue Dragon flushes its sorted 2D content - sprites, the intro credits, the
 // HUD - so every draw inside it is an overlay, and the stereo path puts those
@@ -267,6 +289,7 @@ REBLUE_CONSTANT_DIRTY_HOOK(bdSetViewportConstants,
 // stride and must not be doubled.
 REX_EXTERN(__imp__Visual__DrawVerticesUP);
 REX_HOOK_RAW(Visual__DrawVerticesUP) {
+  bd::gpu::LegacyShaderParameterScope parameter_scope;
   auto &s = bd::gpu::state();
   const bool outer = s.overlay2DScope;
   s.overlay2DScope = true;
@@ -278,9 +301,13 @@ REX_HOOK_RAW(Visual__DrawVerticesUP) {
 // Visual__DrawSortedQueues also writes PS c3 (device+0x1730) inline during its
 // draw setup, a separate writer from Visual__DrawVerticesUP that likewise skips
 // the setter path.
-REBLUE_CONSTANT_DIRTY_HOOK(Visual__DrawSortedQueues,
-                           (bd::gpu::Video::MarkVSConstantsDirty(),
-                            bd::gpu::Video::MarkPSConstantsDirty()))
+REX_EXTERN(__imp__Visual__DrawSortedQueues);
+REX_HOOK_RAW(Visual__DrawSortedQueues) {
+  bd::gpu::LegacyShaderParameterScope parameter_scope;
+  __imp__Visual__DrawSortedQueues(ctx, base);
+  bd::gpu::Video::MarkVSConstantsDirty();
+  bd::gpu::Video::MarkPSConstantsDirty();
+}
 
 #undef REBLUE_CONSTANT_DIRTY_HOOK
 

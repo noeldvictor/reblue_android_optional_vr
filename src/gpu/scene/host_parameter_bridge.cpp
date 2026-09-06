@@ -63,7 +63,7 @@ void Report() {
       "[host-parameters] projection primary {} secondary {} inactive {} "
       "matrix writes {}; flushes {} VS {} PS {} vectors {}; compatibility {} "
       "refused {}; checked {} wrong {}; engine inputs/parameter descriptors, "
-      "inline writers and draw-time shader-register import remain",
+      "inline writers and shader ABI adapters remain",
       stats.primary, stats.secondary, stats.inactive, stats.matrices,
       stats.flushes, stats.vertex, stats.pixel, stats.vectors,
       stats.compatibility, stats.refused, stats.checked, stats.wrong);
@@ -135,10 +135,17 @@ struct Transfer {
     store(mask_address + 4, uint32_t(mask | dirty));
   }
   void Publish() const {
+    std::array<uint32_t, 1024> words;
     Apply([](uint32_t address) { return bd::mem::load<uint32_t>(address); },
-          [](uint32_t address, uint32_t word) {
+          [&](uint32_t address, uint32_t word) {
+            const uint64_t offset = uint64_t(address) - Destination();
+            if (offset < uint64_t(count) * 16)
+              words[size_t(offset) / 4] = word;
+            // Compatibility/getter/verification mirror. Native draw storage
+            // receives the computed words, never a reread of this destination.
             bd::mem::store<uint32_t>(address, word);
           });
+    PublishNativeShaderParameters(device, vertex, first, count, words.data());
     Note(vertex, first, count, source);
   }
   void Count() const {
@@ -378,6 +385,7 @@ void SetHostFloatParameters(PPCContext &ctx, uint8_t *base, bool vertex) {
                           ctx.r6.u32, ctx.r7.u64, vertex};
   if (reference_execution) {
     original(ctx, base);
+    InvalidateNativeShaderParameters(vertex, transfer.first, transfer.count);
     Note(vertex, transfer.first, transfer.count, transfer.source);
     return;
   }
@@ -387,6 +395,9 @@ void SetHostFloatParameters(PPCContext &ctx, uint8_t *base, bool vertex) {
       !transfer.StackIndependent(uint64_t(ctx.r1.u32) - 32, 4) ||
       !transfer.StackIndependent(uint64_t(ctx.r1.u32) + 48, 8)) {
     Fallback(ctx, base, original);
+    // Refused stack/control aliases may have side effects outside the range.
+    InvalidateNativeShaderParameters(true, 0, 256);
+    InvalidateNativeShaderParameters(false, 0, 256);
     Note(vertex, transfer.first, transfer.count, transfer.source);
   } else {
     if (REXCVAR_GET(bd_host_parameters_verify)) {
@@ -396,6 +407,7 @@ void SetHostFloatParameters(PPCContext &ctx, uint8_t *base, bool vertex) {
       ReferenceScope scope;
       original(ctx, base);
       Checked(ctx.r3.u64 == result && prediction.Matches(), "float setter");
+      InvalidateNativeShaderParameters(vertex, transfer.first, transfer.count);
       Note(vertex, transfer.first, transfer.count, transfer.source);
     } else {
       transfer.Publish();

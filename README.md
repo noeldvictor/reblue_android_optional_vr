@@ -75,7 +75,7 @@ Quest-ready release.
 | Resource uploads | Bounded host staging pages, fence-safe reuse/retirement, separate from shader constants | Complete native dynamic-geometry producers and asset streaming/backpressure |
 | Deferred work | Host depth, ordering, bounded batch planning, consumer loop, surface expansion and cleanup | Native scene/pass inputs, remaining entry fields, engine storage and visual/material/state adapters |
 | Object/pass transforms | Host world/view/projection publication and view-projection composition, direct native camera/XR view input; enabled by default | Engine object/camera sources, inherited matrix cache, complete native scene/pass data and shader-ABI removal |
-| Parameter producers | Host pass-projection builders, matrix transposition, parameter flush and both float setters; 1891328 matching original-publication checks and stable short normal flat/final-eye sequences | Engine parameter blocks, inline writers, draw-time shader-register import, native pass/material associations and broader visual qualification |
+| Parameter producers/storage | Host builders, flush/setters and bounded native CPU float storage consumed by uploads/replay; 34591 flat / 501224 XR block comparisons match | Source descriptors, explicit inline/UI imports, shader-register ABI, guest mirrors/getters, native material associations and broad visual qualification |
 | View frustum | Native six-plane construction and current-frame host-culling ownership; byte-safe imports, 18341 matching producer checks, 436841 matching consumer-shadow checks and stable short normal flat/final-eye sequences | Engine camera sources, other-view clients, getter publications and broader visual qualification |
 | Skin bindings | Explicit per-draw model-local joint indices and host-owned current palette gathering; matrix-value identity guessing removed | Native animation/pose producers, persistent skeleton/skin assets, remaining discovery/entry adapters and a dedicated GPU palette ABI |
 | Raster state | Native depth, cull/fill, colour-write and stencil intent; host setter execution and no normal per-draw raster-cache translation | Sampler and other-state producers, engine getter shadows, complete material/pass recipes and unexercised stencil GPU paths |
@@ -231,6 +231,15 @@ disk dumps. Host build, 31 CPU tests and 88 source guards pass; 301 in-game
 publications match the original, followed by 2,701 normal native updates without
 fallback/refusal. Native data/storage and full-frame/event/stereo qualification
 remain open. Ten superseded diagnostics were removed; no raw captures were added.
+
+The [native parameter-storage follow-up](research/20260906_1215_native-parameter-storage.md)
+wires host producers directly to bounded CPU-owned blocks consumed by draw uploads
+and replay. Independent flat/XR comparisons exposed and fixed missing visual,
+foliage and Toon/fur notifications. Host build, 31 CPU tests and 94 source guards
+pass; normal flat rendering and one sanity image were checked. Inline/UI imports,
+guest mirrors and the shader ABI remain explicit work, not a completed host frame.
+Twenty-one obsolete diagnostics were removed, reclaiming 4.46 MB measured; no
+new raw captures or Quest runs.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

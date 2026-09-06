@@ -23,6 +23,7 @@
 #include "core/logging.h"
 #include "core/memory_helpers.h"
 #include "gpu/d3d.h"
+#include "gpu/constant_buffers.h"
 #include "gpu/device.h"
 #include "gpu/host_resource_heap.h"
 #include "gpu/occlusion.h"
@@ -149,6 +150,7 @@ u32 Direct3D_CreateDevice_hook(u32 /*adapter*/, u32 /*deviceType*/,
   auto *memory = REX_KERNEL_MEMORY();
   const u32 device_guest = memory->SystemHeapAlloc(kGuestDeviceSize, 0x100);
   memory->Zero(device_guest, kGuestDeviceSize);
+  bd::gpu::InitializeNativeShaderParameters(device_guest);
   CopyDispatchTable(device_guest, kRenderStateTableGuestAddr,
                     kRenderStateTableEntries, kRenderStateDispatchOffset,
                     kRenderStateDefaultOffset);

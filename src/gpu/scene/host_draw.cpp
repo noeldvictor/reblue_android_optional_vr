@@ -2659,22 +2659,20 @@ bool HostDrawReplay(const NodeTag &tag) {
 
   t_replaying = true;
   MaterialOverride ov;
-  // The live blocks are byte-swapped once per template, not once per
-  // sub-draw: nothing writes the device's constants between the sub-draws of
-  // a replay, and the two 4 KB swaps per draw were 2.7% of the Draw Thread's
-  // samples on the desktop (2026-09-03), scalar on the Quest's ARM64 tail.
+  // Copy the native CPU parameter owner once per template, not per sub-draw.
+  // Capture/reference reads elsewhere deliberately stay independent.
   alignas(16) static thread_local u8 vs_base[kBlockBytes];
   alignas(16) static thread_local u8 ps_base[kBlockBytes];
-  // The guest's blocks change only through its constant setters (hooked, a
-  // generation each write); between two host-issued nodes nothing writes
-  // them, so the previous copy stands (bd_host_draw_fast).
+  // Native producers and known inline writers advance the generation. UI
+  // loops with unhooked inline stores and diagnostic comparisons force a copy.
   {
     static thread_local u64 copied_gen = 0;
     static thread_local u32 copied_device = 0;
     const u64 gen = GuestConstantWriteGeneration();
-    if (!fast || copied_gen != gen || copied_device != device_guest) {
-      CopyGuestVertexBlock(device_guest, vs_base);
-      CopyGuestPixelBlock(device_guest, ps_base);
+    if (!fast || ForceShaderParameterCopy() || copied_gen != gen ||
+        copied_device != device_guest) {
+      CopyRenderVertexBlock(device_guest, vs_base);
+      CopyRenderPixelBlock(device_guest, ps_base);
       copied_gen = gen;
       copied_device = device_guest;
     }

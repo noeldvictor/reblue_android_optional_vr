@@ -665,3 +665,72 @@ use +4,624,384 B from 07:45 and +1,027,854,336 B from the original baseline.
 Volume changes include build/Git/metadata and unrelated activity; do not equate
 them with attributable artifacts. Later docs/Git writes remain charged.
 Native water storage, the full frame/desktop gate and publication remain open.
+
+## Continuing the same storage ledger: native parameter owner, 11:59
+
+Preflight 2026-09-06 11:59:32 EDT: 64,435,494,912 B free, no tracked renderer/
+build/test producers. Original baseline remains 65,462,788,096 B; cumulative
+growth 1,027,293,184 B. Retained inventory unchanged at 63,963,741 B reserved
+diagnostics (92 build logs / 139,957 B; 12 runtime logs / 3,504,145 B; 20 perf
+files / 8,963,168 B; eight GPU-fixture files / 8,364,855 B plus 41 MiB tools/
+inspection reservation). Two PNGs / 6,690,106 B fit within that reservation.
+
+Shared parameter producer/upload ownership, not another storage-only change.
+Reuse the desktop and CPU trees; <=256 MiB build/link overlap and <=1 MiB new
+logs across retries, plus one <=4 MiB flat PNG within the existing aggregate
+10 MiB PNG reservation (only 3,795,654 B overlap room before replacement).
+The guarded runs disable raw capture; comparison runs also disable perf CSV,
+stop on errors and require 10,000 checked blocks plus 256 field water updates
+within 45 seconds. Normal flat sanity is bounded at 75 seconds; no broad game
+or stereo-image qualification is claimed. The same checkpoint disk/log guards
+remain active. No new raw allowance, downloads, guest/shader rebuild or tree.
+
+First CPU build 01/PID 22588 and suite 23/PID 14308 passed 31/31. Host build
+27/PID 25736/session 61031 linked successfully; comparison log 870/PID 17760
+stopped on an unnotified c53 writer. Builds 28/PID 984 and 29/PID 21172 passed;
+logs 871/PID 22052 and 872/PID 26768 exposed c57 then c50. Each stopped and
+restored the profile. Exact sources identified visual setup, foliage's bool31
+boundary and Toon/fur inline rows; these are explicit remaining imports.
+
+After replacement/length/ignore/reparse/process validation, removed four logs:
+reblue_26 and cpu_22 stdout/stderr pairs, 6,340 logical B. Immediate free
+64,434,569,216 ->64,434,577,408 B: **8,192 B measured reclaimed**, counted once.
+These logs are regenerable; results remain recorded. No protected evidence,
+data, assets or build trees were removed.
+
+Build 30/PID 26444 and parameter fixture 02/PID 21232 pass; CPU 24/PID 26468
+passes 31/31 and all 94 source guards pass. Comparison log 873/PID 27016/session
+10611 terminates successfully: last sample 34,591 checked blocks, zero wrong,
+301 native water updates before bounded stop, all six profile settings audited.
+No new raw/perf outputs in any comparison. The owner profile is restored.
+Normal flat log 874/PID 25784/session 55678 terminates at its 75-second bound:
+855,492 native blocks, 11,144,896 imported words, 157,468 legacy blocks; verifier
+off. Water 2,701 updates / 1,964 preparations, no fallback/refusal/fault. One
+3,362,832 B / 1920x1080 flat PNG was inspected; sane standing-field pixels,
+not sequence/both-eye/full-game qualification. Perf pair totals 602,224 B.
+After cleanup, the existing desktop XR simulator was reused for parameter-only
+comparison log 875/PID 22748/session 14864: 501,224 checked native blocks, zero
+mismatch, 301 water updates, all 17 settings audited and view composition active.
+No XR perf/image/raw outputs. All jobs terminal; owner profile restored.
+
+After replacement hashes/results/pixels, exact ignored paths, sizes, reparse-free
+ancestors and absent producers were verified, removed 17 obsolete files:
+reblue_27/28/29, host_parameter_test_01, cpu_23 stdout/stderr pairs; normal log
+869, perf-072301 pair, water-update PNG; resolved parameter failures 870/871/872.
+Logical 4,430,195 B; immediate free 64,430,690,304 ->64,435,142,656 B,
+**4,452,352 B measured increase**. With the four logs above, this step reclaimed
+**4,460,544 B measured**, 21 files / 4,436,535 logical B. No double credit;
+results/causes/hashes remain in `20260906_1215_native-parameter-storage.md`.
+No protected data, assets, distinct raw/eye/failure evidence or trees removed.
+
+Gross new diagnostic payload 4,865,296 B across retries: logs 900,240 B,
+normal perf 602,224 B, PNG 3,362,832 B. Net retained growth 428,761 B chiefly
+establishes first flat/XR independent parameter-storage comparison coverage;
+replace after equivalent checks, not permanent per-commit retention. Reserved
+accounting 64,385,620 B: 94 build logs/138,514 B, 14 runtime logs/3,931,563 B,
+20 perf files/8,959,072 B, eight GPU fixtures/8,364,855 B plus unchanged 41 MiB
+tool/inspection reservation. Two PNGs/6,696,988 B fit within that reservation.
+12:21:09 free 64,434,106,368 B (60.01 GiB), step volume use +1,388,544 B,
+cumulative +1,028,681,728 B. Volume changes include unrelated activity and
+source/build/Git/metadata, not solely diagnostics; later docs/Git writes count.
+Full native frame/desktop gate and root/dependency publication remain open.

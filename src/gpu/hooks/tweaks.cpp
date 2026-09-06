@@ -22,6 +22,7 @@
 
 #include "core/logging.h"
 #include "core/memory_helpers.h"
+#include "gpu/constant_buffers.h"
 #include "engine/engine.h"
 #include "gpu/d3d.h"
 #include "gpu/device.h"
@@ -217,6 +218,8 @@ void bdCameraRefractionUvScaleHook(PPCRegister &r11) {
   be_f32 *ps = dev->psFloatConstants[kScreenUVScaleReg];
   ps[0] = 0.5f;
   ps[1] = 0.5f;
+  bd::gpu::InvalidateNativeShaderParameters(true, kScreenUVScaleReg, 1);
+  bd::gpu::InvalidateNativeShaderParameters(false, kScreenUVScaleReg, 1);
   bd::gpu::Video::MarkPSConstantsDirty();
 }
 
@@ -235,11 +238,12 @@ void bdMotionBlurQuadInsetHook(PPCRegister &r5) {
   }
 }
 
-// The fur shell loop writes edgeRW (VS c51) inline per shell, where .z =
+// The fur shell loop writes VS c50 and edgeRW (VS c51) inline per shell, where .z =
 // shell/N is the volume slice and .y the extrusion, bypassing
 // SetVertexShaderConstantFN, so nothing else marks the constants dirty between
 // shells.
 void bdFurShellConstantsDirtyHook() {
+  bd::gpu::InvalidateNativeShaderParameters(true, 50, 2);
   bd::gpu::Video::MarkVSConstantsDirty();
 }
 

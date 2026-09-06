@@ -17,6 +17,7 @@
 #include "gpu/scene/deferred_surface.h"
 #include "gpu/scene/deferred_work.h"
 #include "gpu/scene/host_draw.h"
+#include "gpu/scene/shader_parameter_import.h"
 #include <algorithm>
 #include <array>
 #include <cstring>
@@ -223,6 +224,10 @@ struct EngineBridge {
       return;
     if (!DeferredConstantMask(first, count))
       throw std::runtime_error("Invalid deferred constant copy range");
+    std::array<uint32_t, 1024> words;
+    for (uint32_t i = 0; i < count * 4; ++i)
+      words[i] = ImportParameterWord(bytes + i * 4);
+    PublishNativeShaderParameters(device, vertex, first, count, words.data());
     std::memmove(
         bd::mem::at<uint8_t>(device + (vertex ? 0x700 : 0x1700) + first * 16),
         bytes, count * 16);
@@ -231,6 +236,7 @@ struct EngineBridge {
   void Floats(bool vertex, uint32_t first, const std::array<float, 4> &values) {
     if (!DeferredConstantMask(first, 1))
       throw std::runtime_error("Invalid deferred constant vector");
+    PublishNativeShaderParameters(device, vertex, first, 1, values.data());
     for (uint32_t i = 0; i < 4; ++i)
       Write<float>(device + (vertex ? 0x700 : 0x1700) + first * 16 + i * 4,
                    values[i]);

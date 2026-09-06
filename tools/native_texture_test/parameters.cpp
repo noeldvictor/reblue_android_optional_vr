@@ -8,6 +8,7 @@
 #undef NDEBUG
 #endif
 #include "gpu/scene/shader_parameter_import.h"
+#include "gpu/native_parameter_buffer.h"
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -16,6 +17,89 @@
 #include <random>
 #include <vector>
 using namespace bd::gpu::scene;
+
+void NativeStorage() {
+  using bd::gpu::NativeParameterBuffer;
+  NativeParameterBuffer<16> owner;
+  std::array<uint32_t, 16> source, output, expected;
+  for (uint32_t i = 0; i < source.size(); ++i) source[i] = i + 11;
+  output.fill(0xfeedface);
+  assert(owner.Missing() == 16 && !owner.Copy(output.data()));
+  assert(output[0] == 0xfeedface); // no partial/uninitialized upload
+  assert(owner.Publish(4, 4, source.data() + 4));
+  assert(owner.Missing() == 12);
+  expected = source;
+  std::fill(source.begin() + 4, source.begin() + 8, 0xdeadbeef);
+  size_t imported = 999, reads = 0;
+  assert(!owner.ImportMissing([&](size_t i, uint32_t &word) {
+    ++reads; word = source[i]; return i != 12;
+  }, imported));
+  assert(owner.Missing() == 12 && !owner.Copy(output.data()));
+  assert(owner.ImportMissing([&](size_t i, uint32_t &word) {
+    assert(i < 4 || i >= 8); word = source[i]; return true;
+  }, imported));
+  assert(imported == 12 && owner.Missing() == 0);
+  assert(owner.Copy(output.data()) && output == expected);
+  source.fill(0xbaadf00d); // producer memory may be overwritten/reused
+  assert(owner.ImportMissing([](size_t, uint32_t &) {
+    assert(false); return false;
+  }, imported) && imported == 0);
+  assert(owner.Copy(output.data()) && output == expected);
+  assert(owner.Invalidate(7, 2));
+  assert(owner.ImportMissing([&](size_t i, uint32_t &word) {
+    assert(i == 7 || i == 8); word = source[i]; return true;
+  }, imported) && imported == 2);
+  expected[7] = expected[8] = 0xbaadf00d;
+  assert(owner.Copy(output.data()) && output == expected);
+  for (auto [first, count] : {std::pair<size_t, size_t>{17, 0}, {16, 1},
+                            {SIZE_MAX, 1}, {1, SIZE_MAX}}) {
+    assert(!owner.Publish(first, count, source.data()));
+    assert(!owner.Invalidate(first, count));
+    assert(owner.Copy(output.data()) && output == expected);
+  }
+  assert(owner.Publish(16, 0, nullptr));
+  assert(!owner.Publish(0, 1, nullptr) && !owner.Copy(nullptr));
+  owner.Zero();
+  assert((owner.Copy(output.data()) && output == std::array<uint32_t, 16>{}));
+  owner.Clear();
+  assert(owner.Missing() == 16 && !owner.Copy(output.data()));
+  const std::array<uint32_t, 8> bits{0, 0x80000000, 1, 0x7f800000,
+                                   0xff800000, 0x7fc12345, 0x7f812345, 0xffffffff};
+  for (size_t alignment = 0; alignment < 16; ++alignment) {
+    std::array<uint8_t, 48> bytes{};
+    std::array<uint32_t, 8> imported_words;
+    for (size_t i = 0; i < bits.size(); ++i) {
+      for (size_t lane = 0; lane < 4; ++lane)
+        bytes[alignment + i * 4 + lane] = uint8_t(bits[i] >> ((3 - lane) * 8));
+      imported_words[i] = ImportParameterWord(bytes.data() + alignment + i * 4);
+    }
+    assert(imported_words == bits);
+    assert(owner.Publish(0, 8, imported_words.data()));
+    assert(owner.Publish(8, 8, imported_words.data()));
+    bytes.fill(0xdd);
+    assert(owner.Copy(output.data()));
+    for (size_t i = 0; i < 16; ++i) assert(output[i] == bits[i % 8]);
+  }
+  assert(owner.Publish(0, bits.size(), bits.data()));
+  assert(owner.Publish(8, bits.size(), bits.data()));
+  assert(owner.Copy(output.data()));
+  for (size_t i = 0; i < output.size(); ++i) assert(output[i] == bits[i % 8]);
+  // Stage independence and a complete 4 KiB ABI-sized block. Clearing one
+  // owner (device change/compatibility scope) cannot leak a previous lifetime.
+  NativeParameterBuffer<1024> stages[2];
+  stages[0].Zero(); stages[1].Zero();
+  assert(stages[0].Publish(200, 8, bits.data()));
+  std::array<uint32_t, 1024> block;
+  assert(stages[1].Copy(block.data()));
+  for (auto word : block) assert(word == 0);
+  stages[0].Clear();
+  assert(!stages[0].Copy(block.data()));
+  stages[0].Zero();
+  assert(stages[0].Copy(block.data()));
+  for (auto word : block) assert(word == 0);
+  std::cout << "native storage: owned bits, poisoned producer, missing-only import, "
+               "transactional refusal, invalidation, stages and lifetime passed\n";
+}
 
 uint64_t OriginalMask(uint32_t first, uint32_t count) {
   const uint32_t begin = std::rotr(first, 2) & 0x3fffffff;
@@ -52,6 +136,7 @@ void OriginalCopy(std::vector<uint8_t> &bytes, uint32_t source,
   }
 }
 int main() {
+  NativeStorage();
   uint32_t ranges = 0;
   for (uint32_t first = 0; first <= 257; ++first)
     for (uint32_t count = 0; count <= 257; ++count) {

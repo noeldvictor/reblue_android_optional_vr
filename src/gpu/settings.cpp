@@ -674,6 +674,9 @@ REXCVAR_DEFINE_BOOL(bd_host_parameters, true, kCvarGroup,
 REXCVAR_DEFINE_BOOL(bd_host_parameters_verify, false, kCvarGroup,
                     "Compare host parameter publications with one original "
                     "execution; correctness only, not normal host execution.");
+REXCVAR_DEFINE_BOOL(bd_native_parameter_storage_verify, false, kCvarGroup,
+                    "Compare native draw parameter storage to independent guest "
+                    "mirrors before shader-specific adjustments; fail on mismatch.");
 REXCVAR_DEFINE_BOOL(bd_host_frustum, true, kCvarGroup,
                     "Construct view planes on the host and use the native "
                     "current-frame scene frustum for default-view culling.");

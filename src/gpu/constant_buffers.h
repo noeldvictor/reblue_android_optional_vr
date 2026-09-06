@@ -165,11 +165,29 @@ u32 UploadVertexBlockFromStaged(u32 index);
 
 // The guest's vertex / pixel constant file, byte-swapped and NaN-flushed into
 // `out` (4096 bytes) the way the uploads read it; from the guest device, never
-// through a material override. For the host-issued node draw.
+// through a material override. Independent reference/capture ONLY.
 void CopyGuestVertexBlock(u32 device_guest, u8 *out);
 void CopyGuestPixelBlock(u32 device_guest, u8 *out);
-// Bumped by the guest's float constant setters (hooks/state.cpp); a copy of
-// the guest's blocks taken at one generation is current while it holds.
+// Native CPU ownership; row indices here are a temporary shader ABI adapter,
+// not a native material schema. Publications retain exact host-endian bits.
+void InitializeNativeShaderParameters(u32 device_guest);
+void PublishNativeShaderParameters(u32 device_guest, bool vertex, u32 first,
+                                   u32 count, const void *host_words);
+void InvalidateNativeShaderParameters(bool vertex, u32 first, u32 count);
+void CopyRenderVertexBlock(u32 device_guest, u8 *out);
+void CopyRenderPixelBlock(u32 device_guest, u8 *out);
+bool ForceShaderParameterCopy();
+// Original UI loops contain inline writes between draws. Until those loops
+// are replaced, their draws explicitly import the reference and invalidate
+// the native owner on exit (including exception exits). Nesting is supported.
+struct LegacyShaderParameterScope {
+  LegacyShaderParameterScope();
+  ~LegacyShaderParameterScope();
+  LegacyShaderParameterScope(const LegacyShaderParameterScope &) = delete;
+  LegacyShaderParameterScope &operator=(const LegacyShaderParameterScope &) = delete;
+};
+// Bumped by publications AND inline-writer invalidations; bypass reuse inside
+// LegacyShaderParameterScope, whose inline stores have no per-write signal.
 void NoteGuestConstantWrite();
 u64 GuestConstantWriteGeneration();
 

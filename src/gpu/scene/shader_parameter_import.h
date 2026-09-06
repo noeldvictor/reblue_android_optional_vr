@@ -6,9 +6,20 @@
  */
 #pragma once
 #include <array>
+#include <bit>
 #include <cstdint>
+#include <cstring>
 
 namespace bd::gpu::scene {
+// Import an arbitrary-alignment source without typed aliasing or floating-
+// point conversion. Native ownership receives the returned host-order bits.
+inline uint32_t ImportParameterWord(const uint8_t *bytes) {
+  uint32_t word;
+  std::memcpy(&word, bytes, 4);
+  if constexpr (std::endian::native == std::endian::little)
+    word = std::byteswap(word);
+  return word;
+}
 inline bool ParameterRangeSupported(uint32_t first, uint32_t count) {
   return first <= 256 && count <= 256 - first;
 }

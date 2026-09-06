@@ -144,9 +144,12 @@ std::optional<Publication> Prepare(PPCContext &ctx,
   result.vectors = result.update[1] || result.update[2] ? 16 : 4;
   result.suppressed = bd::mem::load<uint8_t>(kSuppress) == 1;
   result.dirty = bd::mem::load<uint64_t>(result.device);
-  for (uint32_t i = 0; i < 64; ++i)
-    result.constants[i] =
-        bd::mem::load<float>(result.device + 0x700 + kFirstVector * 16 + i * 4);
+  // Only the independent original-execution comparison needs untouched rows.
+  // Normal publication overwrites its entire native prefix below.
+  if (REXCVAR_GET(bd_native_transforms_verify))
+    for (uint32_t i = 0; i < 64; ++i)
+      result.constants[i] =
+          bd::mem::load<float>(result.device + 0x700 + kFirstVector * 16 + i * 4);
   if (!result.suppressed) {
     const std::array<RenderMatrix, 4> packed{
         TransposeRenderMatrix(inputs.world), TransposeRenderMatrix(inputs.view),
@@ -216,6 +219,9 @@ void Publish(const Publication &publication) {
     if (publication.update[i])
       WriteMatrix(kMatrices + i * 64, *matrices[i]);
   if (!publication.suppressed) {
+    PublishNativeShaderParameters(publication.device, true, kFirstVector,
+                                   publication.vectors,
+                                   publication.constants.data());
     for (uint32_t i = 0; i < publication.vectors * 4; ++i)
       bd::mem::store<float>(publication.device + 0x700 + kFirstVector * 16 +
                                 i * 4,

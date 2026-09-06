@@ -18,6 +18,8 @@
 #include <bit>
 #include <cstring>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
@@ -36,6 +38,7 @@
 #include "core/memory_helpers.h"
 #include "core/profiling.h"
 #include "gpu/d3d.h"
+#include "gpu/native_parameter_buffer.h"
 #include "gpu/device.h"
 #include "gpu/draw_intent.h"
 #include "gpu/vertex_pull.h"
@@ -51,6 +54,7 @@
 #include "gpu/shaders/shader_cache.h"
 
 REXCVAR_DECLARE(bool, bd_constants_gpu_upload);
+REXCVAR_DECLARE(bool, bd_native_parameter_storage_verify);
 REXCVAR_DECLARE(bool, bd_record_mask);
 REXCVAR_DECLARE(bool, bd_record_declared);
 REXCVAR_DECLARE(bool, bd_material_tier);
@@ -695,7 +699,130 @@ const InstanceRecord *StagedInstanceRecord(u32 index) {
 
 namespace {
 std::atomic<u64> g_guest_constant_gen{1};
+std::mutex g_parameter_mutex;
+NativeParameterBuffer<1024> g_parameters[2];
+u32 g_parameter_device = 0;
+thread_local u32 t_legacy_parameter_depth = 0;
+struct ParameterStats {
+  u64 publications = 0, words = 0, blocks = 0, imported = 0;
+  u64 legacy = 0, resets = 0, checked = 0, wrong = 0;
+  u32 frame = 0;
+} g_parameter_stats;
+
+void BindParameterDevice(u32 device) {
+  if (g_parameter_device == device) return;
+  g_parameter_device = device;
+  for (auto &parameters : g_parameters) parameters.Clear();
+  ++g_parameter_stats.resets;
+  NoteGuestConstantWrite();
+}
+void ReportParameterStorage() {
+  auto &s = g_parameter_stats;
+  const auto frame = FrameStatFrameCount();
+  if (frame - s.frame < 300) return;
+  BD_INFO("[native-parameter-storage] publications {} words {}; native blocks {} "
+          "imported words {} legacy blocks {} resets {}; checked {} wrong {}; "
+          "shader ABI, source descriptors, inline/UI imports and guest mirrors remain",
+          s.publications, s.words, s.blocks, s.imported, s.legacy, s.resets,
+          s.checked, s.wrong);
+  s.frame = frame;
+}
+// No renderer lock acquisition while holding g_parameter_mutex. Producers
+// publish then release it before calling the renderer's dirty adapters.
+void CopyNativeParameterBlock(u32 device, bool vertex, u8 *out) {
+  if (!device || !out) return;
+  std::lock_guard lock(g_parameter_mutex);
+  BindParameterDevice(device);
+  const u32 source = device + (vertex ? 0x700 : 0x1700);
+  if (t_legacy_parameter_depth) {
+    CopyByteSwap32FlushNaN(out, source, kConstantBlockBytes);
+    ++g_parameter_stats.legacy;
+  } else {
+    auto &parameters = g_parameters[vertex ? 0 : 1];
+    size_t imported = 0;
+    if (!parameters.ImportMissing([&](size_t i, uint32_t &word) {
+          const auto *bytes = bd::mem::try_at<const u8>(source + u32(i) * 4);
+          if (!bytes) return false;
+          std::memcpy(&word, bytes, 4);
+          word = std::byteswap(word);
+          return true;
+        }, imported) || !parameters.Copy(out))
+      throw std::runtime_error("Unavailable native shader parameter import");
+    g_parameter_stats.imported += imported;
+    ++g_parameter_stats.blocks;
+    // Preserve the existing shader upload policy: flush NaNs, not infinities,
+    // signed zero or subnormals. The CPU owner itself always retains raw bits.
+    for (u32 i = 0; i < 1024; ++i) {
+      u32 word;
+      std::memcpy(&word, out + i * 4, 4);
+      if ((word & 0x7fffffff) > 0x7f800000) {
+        word = 0;
+        std::memcpy(out + i * 4, &word, 4);
+      }
+    }
+    if (REXCVAR_GET(bd_native_parameter_storage_verify)) {
+      alignas(16) std::array<u8, kConstantBlockBytes> reference;
+      CopyByteSwap32FlushNaN(reference.data(), source, kConstantBlockBytes);
+      ++g_parameter_stats.checked;
+      if (std::memcmp(reference.data(), out, kConstantBlockBytes)) {
+        ++g_parameter_stats.wrong;
+        for (u32 i = 0; i < 1024; ++i) {
+          u32 actual, expected;
+          std::memcpy(&actual, out + i * 4, 4);
+          std::memcpy(&expected, reference.data() + i * 4, 4);
+          if (actual == expected) continue;
+          BD_ERROR("[native-parameter-storage] {} c{}.{} native {:08x} reference "
+                   "{:08x} device {:08x} frame {}", vertex ? "VS" : "PS",
+                   i / 4, i % 4, actual, expected, device, FrameStatFrameCount());
+          break;
+        }
+        throw std::runtime_error("Native shader parameter storage mismatch");
+      }
+    }
+  }
+  ReportParameterStorage();
+}
 } // namespace
+
+void InitializeNativeShaderParameters(u32 device_guest) {
+  std::lock_guard lock(g_parameter_mutex);
+  g_parameter_device = device_guest;
+  // Called on actual zeroed device creation, including address reuse. Do not
+  // reset for a presentation resize, which preserves parameter state.
+  for (auto &parameters : g_parameters) parameters.Zero();
+  ++g_parameter_stats.resets;
+  NoteGuestConstantWrite();
+}
+void PublishNativeShaderParameters(u32 device_guest, bool vertex, u32 first,
+                                   u32 count, const void *host_words) {
+  std::lock_guard lock(g_parameter_mutex);
+  if (!device_guest || first > 256 || count > 256 - first)
+    throw std::runtime_error("Invalid native shader parameter publication");
+  BindParameterDevice(device_guest);
+  if (!g_parameters[vertex ? 0 : 1].Publish(first * 4, count * 4, host_words))
+    throw std::runtime_error("Missing native shader parameter payload");
+  ++g_parameter_stats.publications;
+  g_parameter_stats.words += count * 4;
+  NoteGuestConstantWrite();
+}
+void InvalidateNativeShaderParameters(bool vertex, u32 first, u32 count) {
+  std::lock_guard lock(g_parameter_mutex);
+  auto &parameters = g_parameters[vertex ? 0 : 1];
+  if (first > 256 || count > 256 - first) parameters.Clear();
+  else parameters.Invalidate(first * 4, count * 4);
+  NoteGuestConstantWrite();
+}
+LegacyShaderParameterScope::LegacyShaderParameterScope() {
+  ++t_legacy_parameter_depth;
+}
+LegacyShaderParameterScope::~LegacyShaderParameterScope() {
+  --t_legacy_parameter_depth;
+  InvalidateNativeShaderParameters(true, 0, 256);
+  InvalidateNativeShaderParameters(false, 0, 256);
+}
+bool ForceShaderParameterCopy() {
+  return t_legacy_parameter_depth || REXCVAR_GET(bd_native_parameter_storage_verify);
+}
 
 void NoteGuestConstantWrite() {
   g_guest_constant_gen.fetch_add(1, std::memory_order_relaxed);
@@ -885,15 +1012,13 @@ void PinScreenUVScaleReg(u8 *block) {
 }
 
 // The vertex or pixel block into scratch: from the host-issued draw's
-// template when one is set (already host order), else swapped from the guest.
+// template when one is set (already host order), else native CPU storage.
 void FetchVertexBlock(UploadState &s, u32 device_guest) {
   const auto *ov = bd::gpu::state().material_override;
   if (ov && ov->vs) {
     std::memcpy(s.scratchVS, ov->vs, kConstantBlockBytes);
   } else {
-    CopyByteSwap32FlushNaN(s.scratchVS,
-                           device_guest + offsetof(D3DDevice, vsFloatConstants),
-                           kConstantBlockBytes);
+    CopyNativeParameterBlock(device_guest, true, s.scratchVS);
   }
   // The sun shadow fit sees every draw's block here, interpreted and
   // replayed alike, in host byte order (gpu/shadow_fit.h).
@@ -907,9 +1032,15 @@ void FetchPixelBlock(UploadState &s, u32 device_guest) {
     std::memcpy(s.scratchPS, ov->ps, kConstantBlockBytes);
     return;
   }
-  CopyByteSwap32FlushNaN(s.scratchPS,
-                         device_guest + offsetof(D3DDevice, psFloatConstants),
-                         kConstantBlockBytes);
+  CopyNativeParameterBlock(device_guest, false, s.scratchPS);
+}
+
+void CopyRenderVertexBlock(u32 device_guest, u8 *out) {
+  CopyNativeParameterBlock(device_guest, true, out);
+}
+void CopyRenderPixelBlock(u32 device_guest, u8 *out) {
+  CopyNativeParameterBlock(device_guest, false, out);
+  if (device_guest && out) PinScreenUVScaleReg(out);
 }
 
 void CopyGuestVertexBlock(u32 device_guest, u8 *out) {

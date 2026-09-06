@@ -30,6 +30,19 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native parameter storage (2026-09-06): float setters/flush, native transforms and
+deferred producers publish directly into bounded host CPU owners, now consumed
+by ordinary uploads and replay base blocks. Independent flat/XR comparisons
+match 34,591/501,224 sampled native blocks with zero mismatch after exposing
+missing visual c53, foliage c57 and Toon/fur c50/c51 notifications. Host build,
+31 CPU tests and 94 source guards pass; normal flat records 855,492 native blocks
+alongside 11,144,896 imported words and 157,468 legacy UI blocks. One flat sanity
+image was inspected, not sequence/both-eye/full-game qualification. Shader ABI,
+source descriptors, inline/UI imports, guest mirrors/getters and complete native
+material/frame ownership remain. Twenty-one superseded diagnostics removed,
+4,460,544 B measured reclaimed; no raw captures or Quest work. Evidence:
+`research/20260906_1215_native-parameter-storage.md`.
+
 Native material disk ownership (2026-09-06): runtime/cooker persistence now has
 independent aggregate byte/file limits, a free-space reserve and a non-waiting
 writer lease. Full storage retains usable native resident materials without
