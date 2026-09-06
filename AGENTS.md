@@ -169,6 +169,10 @@ including temporary outputs that exist only while a job is running.
   Give each large producer an explicit output location, byte or file-count
   limit, stop condition and retention/cleanup plan. Retries share the original
   job's cumulative storage budget; failed runs do not reset the allowance.
+  Enforce those limits in the producer or its supervising wrapper, not only in
+  prose. Monitor output growth and free space while long jobs run, and stop the
+  agent-started producer before its limit or reserve is breached. Allow for bytes
+  it can write between checks; a final disk check alone is insufficient.
 - Keep one cumulative storage ledger in the checkpoint worklog for all large
   producers: starting free space, planned peak growth, bytes produced, measured
   bytes reclaimed, retained outputs and ending free space. Include concurrent
@@ -201,6 +205,10 @@ including temporary outputs that exist only while a job is running.
   failure frames needed for visual review and reports.
   Check tools' default cache, temporary and automatic output locations before
   running them; include those bytes in the job budget, not just named outputs.
+  New diagnostic helpers must default to captures off and bounded logs; require
+  an explicit per-run opt-in for raw frames, verbose dumps or bulk image exports.
+  Prefer summaries and selected failure evidence over redundant successful-run
+  output. Do not change the owner's persistent profile merely to set defaults.
 - Cook or convert assets in bounded batches, reusing unchanged native outputs.
   Avoid extracting the whole game or retaining every intermediate format for a
   small test. Budget overlapping source, temporary and final representations;
@@ -270,6 +278,8 @@ including temporary outputs that exist only while a job is running.
   other data. Record what was removed, whether it can be regenerated, and the
   measured bytes recovered; note when historical raw evidence is no longer
   available. Ask before deleting anything whose ownership or value is unclear.
+  An inventory or cleanup proposal is not reclaimed space. Report completed
+  cleanup separately from candidates still awaiting review or removal.
 - After storage-heavy work, report ending free space and the measured net disk
   change, plus any large retained outputs and their cleanup condition. If the
   budget cannot fit without deleting protected or uncertain data, stop the
