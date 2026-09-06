@@ -72,6 +72,33 @@ Interrupted/invalid derived files are rejected and recooked from owned source
 data when available. Write failures retain usable in-memory data but increment
 an explicit counter. `Load(id)` never cooks or repairs a file on its own.
 
+Persistent storage has a separate `NativeMaterialDiskBudget`: by default,
+**1 MiB logical payload, 4096 files and at least 20 GiB free**. The file-count
+cap bounds small-file allocation overhead; logical bytes are not allocated disk
+bytes. The writer additionally requires 64 KiB free-space headroom for allocation
+and metadata. Existing files, including invalid files and unknown regular files,
+count across restarts. A bounded scan stops on excess count/bytes; unknown
+subdirectories and links refuse writing rather than being traversed or ignored.
+An invalid target with multiple hard links is not overwritten.
+
+Writers use an exclusive, non-waiting `.bdmat-writer` directory lease while
+checking the aggregate budget and writing. Competing/stale leases refuse new
+writes; they are never stolen. After a crash, an owner must verify that no writer
+is live before removing a stale lease. This coordinates cooperating library and
+cooker instances, not arbitrary external modifications of the cache directory.
+No disk files are evicted automatically. Full/unknown storage or a write failure
+leaves the native resident material usable; source-free loads of existing valid
+files still work, even when further writes are disabled. This is not a fallback
+to guest rendering. The cooker returns an error if requested persistence fails.
+
+`disk_budget_refusals` distinguishes storage-limit failures from RAM residency
+refusals; failed persistence also increments `write_failures`. Disk file/byte
+counts describe the last write inventory, not a live scan; when
+`disk_inventory_complete` is false they may be only observed lower bounds.
+Runtime reports this through `[native-material-disk]`. Texture/mesh caches have
+separate implementations; these material limits do not bound those outputs or
+the whole installation. The format and content IDs are unchanged.
+
 Build the standalone cooker with the material tests (Clang toolchain as needed):
 
 ```sh

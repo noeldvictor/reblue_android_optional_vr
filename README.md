@@ -248,6 +248,8 @@ result below supersedes their short-field flicker findings, not their remaining
 ownership or full-game coverage limitations.
 The persistent material contract and standalone cooker are documented in
 [Native material assets](docs/NATIVE_MATERIAL_FORMAT.md).
+Material persistence now has independent byte/file limits and a free-space
+reserve; a full cache keeps native resident data usable without evicting files.
 The [native texture contract](docs/NATIVE_TEXTURE_FORMAT.md) covers texture
 files, the independent mip cooker, native sampling and the remaining resource bridge.
 The [binding checkpoint](research/20260904_1946_native-material-texture-bindings.md)

@@ -1,14 +1,19 @@
 #include "gpu/scene/native_material_library.h"
 
+#include <barrier>
 #include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <thread>
 
 using namespace bd::gpu::scene;
 namespace {
+// Tiny private fixtures may run on CI volumes with less than the application's
+// 20 GiB reserve. Explicitly override only that reserve, never the default caps.
+constexpr NativeMaterialDiskBudget kTestDisk{1ull << 20, 4096, 0};
 void Require(bool ok, const char *what) {
   if (!ok)
     throw std::runtime_error(what);
@@ -122,7 +127,7 @@ void TestMaterialAssets() {
   Scratch scratch;
   NativeMaterialHandle pinned;
   {
-    NativeMaterialLibrary library(scratch.path, 2);
+    NativeMaterialLibrary library(scratch.path, 2, kTestDisk);
     pinned = library.Resolve(asset);
     Require(pinned && pinned->id == id && pinned->asset == asset, "cook and pin");
     Require(library.Resolve(asset) == pinned, "dedup ownership");
@@ -133,7 +138,7 @@ void TestMaterialAssets() {
   }
   Require(pinned->asset == asset, "draw owns asset beyond library destruction");
   {
-    NativeMaterialLibrary restarted(scratch.path, 2);
+    NativeMaterialLibrary restarted(scratch.path, 2, kTestDisk);
     auto loaded = restarted.Load(id); // no guest tags, source commands or runtime
     Require(loaded && loaded->asset == pinned->asset, "disk-only load on restart");
     Require(restarted.Stats().loaded == 1 && restarted.Stats().cooked == 0,
@@ -156,29 +161,183 @@ void TestMaterialAssets() {
   corrupt.resize(12);
   WriteBytes(scratch.path / NativeMaterialLibrary::FileName(id), corrupt);
   {
-    NativeMaterialLibrary damaged(scratch.path);
+    NativeMaterialLibrary damaged(scratch.path, 16384, kTestDisk);
     Require(!damaged.Load(id), "reject interrupted write");
     Require(bool(damaged.Resolve(asset)), "recook invalid derived file");
     Require(damaged.Stats().cooked == 1 && damaged.Stats().invalid == 2,
             "corruption reported, not a cache hit");
   }
   {
-    NativeMaterialLibrary repaired(scratch.path);
+    NativeMaterialLibrary repaired(scratch.path, 16384, kTestDisk);
     Require(bool(repaired.Load(id)), "repaired file reloads");
   }
   WriteBytes(scratch.path / NativeMaterialLibrary::FileName(id ^ 1), file);
   {
-    NativeMaterialLibrary wrong_name(scratch.path);
+    NativeMaterialLibrary wrong_name(scratch.path, 16384, kTestDisk);
     Require(!wrong_name.Load(id ^ 1), "valid bytes under wrong identity rejected");
   }
   {
     // A file where the directory should be forces an I/O failure even as admin.
-    NativeMaterialLibrary unwritable(scratch.path / NativeMaterialLibrary::FileName(id));
+    NativeMaterialLibrary unwritable(scratch.path / NativeMaterialLibrary::FileName(id), 16384, kTestDisk);
     Require(bool(unwritable.Resolve(asset)), "failed persistence retains usable host data");
     Require(unwritable.Stats().write_failures == 1, "write failure is observable");
-    NativeMaterialLibrary zero_budget(scratch.path, 0);
+    NativeMaterialLibrary zero_budget(scratch.path, 0, kTestDisk);
     Require(!zero_budget.Resolve(asset) && zero_budget.Stats().resident == 0,
             "zero capacity must not grow");
   }
+  const auto variant = [&](uint8_t power) {
+    auto value = asset;
+    value.properties.shininess = power;
+    return value;
+  };
+  {
+    Scratch limited;
+    const NativeMaterialDiskBudget budget{1024, 2, 0};
+    NativeMaterialLibrary library(limited.path, 1, budget);
+    NativeMaterialId first_id = 0, missing_id = 0;
+    for (uint8_t power = 1; power <= 8; ++power) {
+      const auto material = library.Resolve(variant(power));
+      Require(material && material->asset == variant(power), "disk-full keeps native material usable");
+      if (power == 1) first_id = material->id;
+      missing_id = material->id;
+    }
+    const auto stats = library.Stats();
+    Require(stats.resident == 1 && stats.budget_refusals == 0 &&
+            stats.disk_budget_refusals == 6 && stats.write_failures == 6,
+            "RAM eviction does not reset the independent disk file budget");
+    Require(stats.disk_files == 2 && stats.disk_bytes == 2 * kNativeMaterialFileBytes &&
+            stats.disk_inventory_complete, "complete bounded inventory");
+    Require(!std::filesystem::exists(limited.path / NativeMaterialLibrary::FileName(missing_id)),
+            "refusal creates no extra material file");
+    Require(!std::filesystem::exists(limited.path / ".bdmat-writer"), "lease released after refusal");
+    NativeMaterialLibrary restarted(limited.path, 2, budget);
+    Require(bool(restarted.Resolve(variant(9))) && restarted.Stats().disk_budget_refusals == 1,
+            "restart cannot reset file budget");
+    NativeMaterialLibrary read_only(limited.path, 2, {0, 0, UINT64_MAX});
+    Require(bool(read_only.Load(first_id)) && !read_only.Load(missing_id),
+            "source-free loading remains available with writes disabled, without inventing missing assets");
+  }
+  {
+    Scratch limited;
+    NativeMaterialLibrary library(limited.path, 8, {2 * kNativeMaterialFileBytes - 1, 16, 0});
+    Require(bool(library.Resolve(asset)), "one material fits byte budget");
+    const auto second = library.Resolve(variant(2));
+    Require(bool(second) && library.Resolve(variant(2)) == second, "failed persistence stays deduplicated in RAM");
+    Require(library.Stats().disk_budget_refusals == 1 && library.Stats().disk_files == 1 &&
+            library.Stats().disk_bytes == kNativeMaterialFileBytes, "byte limit independent of file count");
+  }
+  {
+    Scratch limited;
+    const auto directory = limited.path / "disabled";
+    NativeMaterialLibrary library(directory, 2, {kNativeMaterialFileBytes - 1, 2, 0});
+    Require(bool(library.Resolve(asset)) && !std::filesystem::exists(directory),
+            "oversized single output refuses before creating a directory");
+    NativeMaterialLibrary no_files(limited.path / "zero-files", 2, {1024, 0, 0});
+    Require(bool(no_files.Resolve(asset)) && no_files.Stats().disk_budget_refusals == 1 &&
+            !std::filesystem::exists(limited.path / "zero-files"), "zero file budget has no output");
+    NativeMaterialLibrary reserve(limited.path, 2, {1024, 16, UINT64_MAX});
+    Require(bool(reserve.Resolve(asset)) && reserve.Stats().disk_budget_refusals == 1 &&
+            std::filesystem::is_empty(limited.path), "unavailable free-space reserve refuses and releases lease");
+  }
+  {
+    Scratch limited;
+    std::vector<uint8_t> foreign(80, 0xa5);
+    WriteBytes(limited.path / "unrecognized.tmp", foreign);
+    NativeMaterialLibrary library(limited.path, 2, {2 * kNativeMaterialFileBytes, 16, 0});
+    Require(bool(library.Resolve(asset)) && library.Stats().disk_budget_refusals == 1 &&
+            library.Stats().disk_bytes == foreign.size(), "foreign and partial files count toward disk bytes");
+    Require(std::filesystem::file_size(limited.path / "unrecognized.tmp") == foreign.size(),
+            "never evict foreign files to make room");
+  }
+  {
+    Scratch limited;
+    WriteBytes(limited.path / "a", file);
+    WriteBytes(limited.path / "b", file);
+    WriteBytes(limited.path / "c", file);
+    NativeMaterialLibrary library(limited.path, 2, {1024, 1, 0});
+    Require(bool(library.Resolve(asset)) && library.Stats().disk_budget_refusals == 1 &&
+            library.Stats().disk_files == 2 && !library.Stats().disk_inventory_complete,
+            "over-budget enumeration stops at one entry over the limit and labels partial inventory");
+  }
+  {
+    Scratch limited;
+    auto partial = file;
+    partial.resize(12);
+    WriteBytes(limited.path / NativeMaterialLibrary::FileName(id), partial);
+    NativeMaterialLibrary library(limited.path, 2, {kNativeMaterialFileBytes, 1, 0});
+    Require(bool(library.Resolve(asset)) && library.Stats().write_failures == 0 &&
+            library.Stats().disk_bytes == kNativeMaterialFileBytes && library.Stats().disk_files == 1,
+            "repair charges replacement size, not an additional file");
+    NativeMaterialLibrary restarted(limited.path, 2, {0, 0, 0});
+    Require(bool(restarted.Load(id)), "bounded replacement remains source-free on restart");
+  }
+  {
+    Scratch limited;
+    const auto lock = limited.path / ".bdmat-writer";
+    Require(std::filesystem::create_directory(lock), "create simulated cooperating/stale writer lease");
+    NativeMaterialLibrary library(limited.path, 2, kTestDisk);
+    Require(bool(library.Resolve(asset)) && library.Stats().write_failures == 1 &&
+            std::filesystem::is_directory(lock) && !std::filesystem::exists(limited.path / NativeMaterialLibrary::FileName(id)),
+            "never steal another writer's lease or write without it");
+    Require(std::filesystem::remove(lock), "release test-owned simulated lease");
+    NativeMaterialLibrary restarted(limited.path, 2, kTestDisk);
+    Require(bool(restarted.Resolve(asset)) && restarted.Stats().write_failures == 0,
+            "a later writer can persist after lease release");
+  }
+  {
+    Scratch limited;
+    Require(std::filesystem::create_directory(limited.path / "unknown-subtree"), "create unknown subtree");
+    NativeMaterialLibrary library(limited.path, 2, kTestDisk);
+    Require(bool(library.Resolve(asset)) && library.Stats().write_failures == 1 &&
+            !library.Stats().disk_inventory_complete, "unknown subtree refuses rather than recursing or ignoring bytes");
+  }
+  for (unsigned trial = 0; trial < 8; ++trial) {
+    Scratch limited;
+    std::barrier start(3);
+    std::array<NativeMaterialHandle, 2> materials;
+    std::array<NativeMaterialLibraryStats, 2> stats;
+    const auto write = [&](size_t index) {
+      NativeMaterialLibrary library(limited.path, 2, {kNativeMaterialFileBytes, 1, 0});
+      start.arrive_and_wait();
+      materials[index] = library.Resolve(variant(uint8_t(index + 1)));
+      stats[index] = library.Stats();
+    };
+    std::thread first(write, 0), second(write, 1);
+    start.arrive_and_wait();
+    first.join();
+    second.join();
+    Require(materials[0] && materials[1], "contending writers retain both native resident assets");
+    Require(stats[0].write_failures + stats[1].write_failures == 1,
+            "only one competing library persists within a one-file budget");
+    size_t files = 0;
+    for (const auto &entry : std::filesystem::directory_iterator(limited.path)) {
+      Require(entry.is_regular_file() && entry.file_size() == kNativeMaterialFileBytes,
+              "concurrent write leaves one complete file and no stale lease");
+      ++files;
+    }
+    Require(files == 1, "concurrent library instances cannot oversubscribe aggregate disk budget");
+  }
+  {
+    Scratch limited;
+    Scratch outside;
+    const auto target = outside.path / "protected.bin";
+    auto partial = file;
+    partial.resize(12);
+    WriteBytes(target, partial);
+    std::filesystem::create_hard_link(target, limited.path / NativeMaterialLibrary::FileName(id));
+    NativeMaterialLibrary library(limited.path, 2, kTestDisk);
+    Require(bool(library.Resolve(asset)) && library.Stats().write_failures == 1 &&
+            std::filesystem::file_size(target) == partial.size(), "invalid hard-linked target is never overwritten");
+    std::error_code error;
+    std::filesystem::create_symlink(target, limited.path / "foreign-link", error);
+    if (!error) {
+      NativeMaterialLibrary linked(limited.path, 2, kTestDisk);
+      Require(bool(linked.Resolve(variant(2))) && linked.Stats().write_failures == 1 &&
+              !linked.Stats().disk_inventory_complete, "symlinks refuse without following them");
+    } else {
+      std::cout << "symlink fixture unavailable: " << error.message() << '\n';
+    }
+  }
+  std::cout << "native material disk byte/file/reserve budgets, restart, repair and lease safeguards passed\n";
   std::cout << "native material format, identity, persistence and ownership passed\n";
 }

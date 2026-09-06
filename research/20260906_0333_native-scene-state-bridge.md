@@ -615,3 +615,53 @@ fit within that reservation. Final free 64,465,207,296 B (60.04 GiB); net from
 baseline. Build/Git/metadata and unrelated volume activity remain charged;
 later documentation/Git writes still count. All producers terminal and profiles
 restored. Full renderer/desktop gate remains open; no unpublished gitlink staged.
+
+## Continuing the same storage ledger: native material disk guard, 07:45
+
+Preflight 2026-09-06 07:45:04 EDT: 64,439,558,144 B free, no renderer/compiler/
+CMake/Ninja/linker/CTest active. Original baseline stays 65,462,788,096 B:
+1,023,229,952 B cumulative volume growth. The 86 build logs remain 138,207 B;
+last reserved diagnostic accounting is 63,961,991 B. Actual native material
+cache is 30 files / 2,040 logical B; it is not a cleanup target.
+
+Source inspection found the material library's residency limit did not limit
+its persistent files. Close that prerequisite before expanding native water
+assets: aggregate disk byte/file caps, a free-space reserve, non-waiting writer
+lease, bounded inventory and safe refusal without losing usable native data.
+This does not convert the remaining water parameter buffers or shader ABI.
+
+Reuse `out/native_material_test` and the desktop build tree. Step plan, including
+all retries: <=256 MiB temporary build/link overlap, <=1 MiB temporary private
+test fixtures and <=1 MiB new diagnostics. Existing material fixture/cooker,
+source-free read-only validation of the 30 actual assets, then a host link;
+no game runs, captures, asset conversion, downloads, shaders or guest rebuild.
+The existing wrapper's cumulative free-space and log guards remain enforced.
+After a successful replacement host link, retire only the previous reblue_25
+stdout/stderr pair; retain all distinct runtime/CPU/GPU/pixel evidence. Other
+new small logs establish this first disk-budget test and source-free reload;
+replace them at the next equivalent verification, not per commit forever.
+
+Closeout: focused material build 02/PID 26792 and CPU 02/PID 22152 pass (1/1,
+0.11 s), including eight actual two-library contention trials. Cooker build
+01/PID 25140 passes; read-only validation loads all 30 real native assets
+(2,040 logical B unchanged; composable fields 30/30/7). Host build 26/PID 27524/
+session 74032 terminates successfully, no guest objects or shaders rebuilt.
+All producers terminal, private test scratch removed and profile unchanged.
+Exact source findings, limits and hashes: `20260906_0757_native-material-storage.md`.
+
+Gross new logs 5,934 B across all attempts. After replacement/hash/path/length/
+ignore/reparse/process validation, removed six obsolete logs: reblue_25,
+native_material_test_01 and material_cpu_01 stdout/stderr pairs. Logical bytes
+4,184; immediate free 64,434,925,568 ->64,434,933,760 B, **8,192 B measured
+increase**, counted once. Logs are regenerable, results retained in the report;
+no protected evidence, actual material assets or build trees were removed.
+
+Retained log growth 1,750 B establishes new material disk-budget coverage:
+92 build logs / 139,957 B. Reserved checkpoint diagnostics 63,963,741 B; all
+runtime/perf/PNG/GPU/tool reservations unchanged. No new capture, cache file,
+asset conversion or download. Replace these small material logs after the next
+equivalent verification. Cleanup-end free 64,434,933,760 B (60.01 GiB), drive-wide
+use +4,624,384 B from 07:45 and +1,027,854,336 B from the original baseline.
+Volume changes include build/Git/metadata and unrelated activity; do not equate
+them with attributable artifacts. Later docs/Git writes remain charged.
+Native water storage, the full frame/desktop gate and publication remain open.

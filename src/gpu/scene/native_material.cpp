@@ -312,6 +312,10 @@ void NativeMaterialNoteReplay(uint32_t mask) {
             "{} invalid, {} write failures, {} budget refusals; {} discovery bytes",
             assets.cooked, assets.loaded, assets.resident, assets.memory_hits,
             assets.invalid, assets.write_failures, assets.budget_refusals, discovery_bytes);
+    BD_INFO("[native-material-disk] {} budget refusals; last write inventory {} files / {} logical bytes, complete {}; "
+            "disk-full keeps native resident data, never evicts files",
+            assets.disk_budget_refusals, assets.disk_files, assets.disk_bytes,
+            assets.disk_inventory_complete);
     last_report = frame;
   }
 }

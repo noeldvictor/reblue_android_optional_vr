@@ -30,6 +30,15 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native material disk ownership (2026-09-06): runtime/cooker persistence now has
+independent aggregate byte/file limits, a free-space reserve and a non-waiting
+writer lease. Full storage retains usable native resident materials without
+evicting files or resetting the budget on restart. The expanded CPU fixture,
+including eight two-writer trials, and host link pass. All 30 existing material
+assets load source-free; no game run, capture or asset rewrite was needed.
+This closes a storage prerequisite, not water parameter or frame ownership.
+Evidence: `research/20260906_0757_native-material-storage.md`.
+
 Water animation/parameter update (2026-09-06): complete water-update and shared
 sampling-mode callbacks now have native replacements, preserving tick cadence,
 23 parameter words, mode counters and sequential alias behavior in a bounded

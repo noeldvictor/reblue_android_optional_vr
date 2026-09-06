@@ -6,14 +6,36 @@
  */
 #include "gpu/scene/native_material_library.h"
 
+#include <algorithm>
 #include <charconv>
 #include <fstream>
 #include <string>
 
 namespace bd::gpu::scene {
+namespace {
+// Non-waiting interprocess lease shared by runtime and standalone cookers.
+// Never steal an existing/stale lock. A crash may leave it behind: read-only
+// loading and in-memory cooking still work until an owner reviews that lock.
+struct MaterialWriteLease {
+  std::filesystem::path path;
+  bool owned = false;
+  explicit MaterialWriteLease(const std::filesystem::path &directory)
+      : path(directory / ".bdmat-writer") {
+    std::error_code error;
+    owned = std::filesystem::create_directory(path, error);
+  }
+  ~MaterialWriteLease() {
+    if (owned) {
+      std::error_code ignored;
+      std::filesystem::remove(path, ignored); // our empty lease, never recursive
+    }
+  }
+};
+} // namespace
 NativeMaterialLibrary::NativeMaterialLibrary(std::filesystem::path directory,
-                                           size_t capacity)
-    : directory_(std::move(directory)), capacity_(capacity) {}
+                                           size_t capacity,
+                                           NativeMaterialDiskBudget disk_budget)
+    : directory_(std::move(directory)), capacity_(capacity), disk_budget_(disk_budget) {}
 
 std::filesystem::path NativeMaterialLibrary::FileName(NativeMaterialId id) {
   char digits[16];
@@ -80,15 +102,92 @@ bool NativeMaterialLibrary::Read(NativeMaterialId id, NativeMaterialAsset &asset
 bool NativeMaterialLibrary::Write(NativeMaterialId id, std::span<const uint8_t> bytes) {
   if (directory_.empty())
     return false;
+  const auto refuse = [&] { ++stats_.disk_budget_refusals; return false; };
+  if (!disk_budget_.max_files || bytes.size() > disk_budget_.max_bytes)
+    return refuse();
   std::error_code error;
   std::filesystem::create_directories(directory_, error);
+  if (error || !std::filesystem::is_directory(std::filesystem::symlink_status(directory_, error)) || error)
+    return false;
+  MaterialWriteLease lease(directory_);
+  if (!lease.owned)
+    return false;
+
+  // Rescan under the lease so restarts and other cooperating library instances
+  // cannot reset the budget. Do not recurse, follow links, or evict files.
+  stats_.disk_files = 0;
+  stats_.disk_bytes = 0;
+  stats_.disk_inventory_complete = false;
+  const auto path = directory_ / FileName(id);
+  uint64_t previous_bytes = 0;
+  bool exists = false;
+  for (std::filesystem::directory_iterator it(directory_, error), end; it != end && !error; it.increment(error)) {
+    if (it->path() == lease.path)
+      continue;
+    const auto status = it->symlink_status(error);
+    if (error || !std::filesystem::is_regular_file(status))
+      return false; // unknown subtree or link has an unbounded/unowned footprint
+    const auto size = it->file_size(error);
+    if (error || size > UINT64_MAX - stats_.disk_bytes)
+      return false;
+    ++stats_.disk_files;
+    stats_.disk_bytes += size;
+    if (stats_.disk_files > disk_budget_.max_files || stats_.disk_bytes > disk_budget_.max_bytes)
+      return refuse();
+    if (it->path() == path) {
+      // Repairing an invalid derived file must not change another hard link.
+      if (it->hard_link_count(error) != 1 || error)
+        return false;
+      exists = true;
+      previous_bytes = size;
+    }
+  }
   if (error)
     return false;
+  stats_.disk_inventory_complete = true;
+  const auto retained_bytes = stats_.disk_bytes - previous_bytes;
+  if ((!exists && stats_.disk_files == disk_budget_.max_files) ||
+      bytes.size() > disk_budget_.max_bytes - retained_bytes)
+    return refuse();
+  const auto space = std::filesystem::space(directory_, error);
+  if (error || space.available == uintmax_t(-1))
+    return false;
+  // Keep headroom for the file's allocation and lease/directory metadata, not
+  // just its 68 logical bytes. The outer job still budgets total peak overlap.
+  if (space.available < disk_budget_.min_free_bytes ||
+      space.available - disk_budget_.min_free_bytes < (64ull << 10))
+    return refuse();
+
+  // Another writer may have completed between Resolve's read and this lease.
+  // Preserve a valid file, including the content-hash collision case.
+  if (exists && previous_bytes == kNativeMaterialFileBytes) {
+    std::ifstream current(path, std::ios::binary);
+    std::array<uint8_t, kNativeMaterialFileBytes> existing;
+    NativeMaterialAsset asset;
+    if (!current.read(reinterpret_cast<char *>(existing.data()), existing.size()))
+      return false;
+    if (NativeMaterialContentId(existing) == id && DecodeNativeMaterial(existing, asset)) {
+      const bool same = std::equal(existing.begin(), existing.end(), bytes.begin(), bytes.end());
+      stats_.invalid += !same;
+      return same;
+    }
+  }
   // A derived cache, never an original asset. Length, checksum and identity
   // validation reject interrupted writes; Resolve recooks them from the source.
-  std::ofstream file(directory_ / FileName(id), std::ios::binary | std::ios::trunc);
+  // New names are exclusive; do not truncate a file created outside the lease.
+  std::ofstream file(path, std::ios::binary | (exists ? std::ios::trunc : std::ios::noreplace));
+  if (!file.is_open())
+    return false;
   file.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
   file.close();
+  if (file) {
+    stats_.disk_files += !exists;
+    stats_.disk_bytes = retained_bytes + bytes.size();
+  } else {
+    stats_.disk_inventory_complete = false;
+    if (!exists)
+      std::filesystem::remove(path, error); // only the new partial file we opened exclusively
+  }
   return bool(file);
 }
 
