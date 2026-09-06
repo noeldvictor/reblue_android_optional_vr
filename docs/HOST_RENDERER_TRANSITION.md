@@ -30,6 +30,24 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native single-sample scene ownership (2026-09-06, local renderer integration):
+existing non-MSAA colour/depth images, views and descriptors now have a bounded
+native owner with fence retirement; surface headers are binding adapters. Native
+post receives the source images directly without initial colour publication or
+getter imports. Matching depth getters borrow native backing; retired adapters
+cannot enter the old surface pool and overwrite an image retained by a reader.
+Host build, 31 CPU tests and 53 source guards pass. Normal non-MSAA flat/XR record
+3,600/10,200 native depth handoffs and zero compatibility depth publications;
+normal native post has zero imports/original scopes/refusals. Non-MSAA post-off
+recovery publishes all 3,600 deferred colours; default-MSAA regression also passes.
+One non-MSAA flat PNG was inspected, not stereo/sequence/full-game qualification.
+Thirteen superseded small diagnostics were removed (884,736 B measured reclaimed).
+Initial source allocation still uses the temporary surface allocator; native
+allocation/pass construction, scaled/getter cases, UI/frame scheduling and the
+full desktop gate remain open. Independent ownership contracts/tests form the local
+checkpoint; renderer/Plume publication still awaits approval. No Quest work.
+Evidence: `research/20260906_0138_native-single-sample-ownership.md`.
+
 Native depth-image lease (2026-09-06, local renderer integration): matching
 MSAA depth getters now borrow the native resolved image/view/descriptor instead
 of copying it or creating a resolve link. Native and remaining adapter accesses

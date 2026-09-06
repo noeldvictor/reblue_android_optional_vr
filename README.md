@@ -128,16 +128,21 @@ GPU integration remains uncommitted pending dependency publication approval.
 At that checkpoint initial depth publication, UI scheduling and full-frame/game
 gates remained open.
 
-The latest [native depth-image handoff](research/20260906_0110_native-depth-image-lease.md)
-lets matching MSAA depth getters borrow the native image/descriptor, removing
-their redundant copy and resolve link. Native and adapter accesses now share
-one layout record. The host build, 31 CPU tests, 52 source guards and bounded
-flat/XR/recovery checks pass; normal flat/XR record 3,600/9,600 native depth
-handoffs with no compatibility depth publications. Non-MSAA depth, scaled/other
-formats, full scene/UI/frame ownership and desktop game/pixel gates remain open.
-The independent lease/layout tests are locally checkpointed; renderer integration
-still awaits dependency publication approval. The newest inspected normal-flat
-PNG replaces two older sanity images; raw baselines/failure evidence are preserved.
+The [native depth-image handoff](research/20260906_0110_native-depth-image-lease.md)
+removes matching MSAA depth copies/resolve links and shares one live layout record
+between native owners and adapters. The latest
+[single-sample ownership change](research/20260906_0138_native-single-sample-ownership.md)
+also moves non-MSAA scene images/views/descriptors into a bounded, fence-retired
+native store without duplicating GPU images. Native post receives those source
+images directly; depth getters borrow their backing. Host build, 31 CPU tests,
+53 source guards and bounded non-MSAA flat/XR/recovery plus default-MSAA checks
+pass. Normal non-MSAA flat/XR record 3,600/10,200 native depth handoffs and zero
+compatibility depth publications or native-post imports/refusals. One non-MSAA
+flat PNG was inspected, not new sequence/stereo qualification. Initial source
+allocation, scaled/getter cases, full scene/UI/frame ownership and desktop game
+gates remain open. Independent contracts/tests are local checkpoints; renderer
+integration still awaits dependency publication approval. Protected raw/failure
+evidence remains; superseded small diagnostics are cleaned up at checkpoints.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
