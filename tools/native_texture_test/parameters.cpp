@@ -10,6 +10,7 @@
 #include "gpu/scene/shader_parameter_import.h"
 #include "gpu/native_parameter_buffer.h"
 #include "immediate_ui.h"
+#include "visual_schedule.h"
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -137,6 +138,7 @@ void OriginalCopy(std::vector<uint8_t> &bytes, uint32_t source,
   }
 }
 int main() {
+  visual_schedule_test::Run();
   ImmediateUiTests();
   NativeStorage();
   uint32_t ranges = 0;

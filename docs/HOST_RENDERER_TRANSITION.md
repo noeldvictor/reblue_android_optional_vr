@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Sorted visual scheduling (2026-09-06): the complete `Visual__DrawSortedQueues`
+now owns model/primitive order and dispatch on the host, using one bounded
+32 KiB key array without guest bucket heads/next pointers. Model preparation,
+live callback inputs, shader changes, deferred limits and final native colour
+publication are preserved; the enclosing full legacy parameter scope is gone.
+Host build, 31 CPU tests and 103 source guards pass. Normal flat/XR samples
+record 2,121/425 schedules and 78,861/36,784 primitives without fallback/faults;
+952,257 XR parameter blocks match, with zero full legacy blocks in normal
+flat/XR. One flat sanity image was inspected. Queued models/deferred effects
+have CPU/source coverage only, not authored runtime qualification. Authored
+queue/vertex/visual storage and producers, bone/material/pass callbacks, state/
+resource/getter adapters and the deferred emulated resolve remain. Full native
+frame/game/both-eye gates remain open, before Quest. Eighteen superseded
+diagnostics removed, 4,694,016 B measured reclaimed. Evidence and carefully
+scoped speed counters: `research/20260906_1323_native-visual-schedule.md`.
+
 Immediate UI submission (2026-09-06): the complete `Visual__DrawVerticesUP`
 body now prepares colour/optional translation on the host, publishes native
 parameters and owns a bounded CPU vertex copy uploaded directly without guest

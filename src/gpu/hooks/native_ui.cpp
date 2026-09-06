@@ -65,7 +65,7 @@ void Report() {
   if (stats.reported && frame - stats.frame < 300) return;
   BD_INFO("[native-immediate-ui] native {} checked {} wrong {} compatibility {} refused {}; "
           "empty {} translated {} vertex bytes {} upload failures {}; "
-          "host preparation/geometry, authored vertex sources, sorted scheduler and draw-state adapters remain",
+          "host preparation/geometry, authored vertex sources and draw-state adapters remain",
       stats.native, stats.checked, stats.wrong, stats.compatibility, stats.refused,
       stats.empty, stats.translated, stats.vertex_bytes, stats.upload_failures);
   stats.frame = frame; stats.reported = true;

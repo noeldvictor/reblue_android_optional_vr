@@ -51,9 +51,9 @@ class ParameterStorageBoundaryTest(unittest.TestCase):
         for row in (21, 53):
             for stage in ("true", "false"):
                 self.assertIn(f"InvalidateNativeShaderParameters({stage}, {row}, 1)", state)
-        # Sorted scheduling remains an explicit original scope; the immediate
-        # producer now owns its parameters and geometry, not another import.
-        self.assertEqual(state.count("LegacyShaderParameterScope parameter_scope"), 1)
+        # Both whole producers now publish their computed parameters directly.
+        self.assertNotIn("LegacyShaderParameterScope parameter_scope", state)
+        self.assertIn("DrawNativeSortedVisuals(ctx, base)", state)
         self.assertIn("DrawNativeImmediateUi(ctx, base)", state)
         self.assertIn("REBLUE_CONSTANT_DIRTY_HOOK(bdVisualObjectSetShaderConstants", state)
         self.assertIn("start <= 31 && count > 31 - start", state)

@@ -23,6 +23,7 @@
 #include "gpu/constant_buffers.h"
 #include "gpu/scene/host_parameter_bridge.h"
 #include "gpu/hooks/native_ui.h"
+#include "gpu/hooks/native_visual_schedule.h"
 #include "gpu/device.h"
 #include "gpu/shadow_fit.h"
 #include "gpu/frame_stats.h"
@@ -292,15 +293,10 @@ REBLUE_CONSTANT_DIRTY_HOOK(Visual__Shader__Toon__vf04,
 REX_HOOK_RAW(Visual__DrawVerticesUP) {
   bd::gpu::hooks::DrawNativeImmediateUi(ctx, base);
 }
-// Visual__DrawSortedQueues also writes PS c3 (device+0x1730) inline during its
-// draw setup, a separate writer from Visual__DrawVerticesUP that likewise skips
-// the setter path.
-REX_EXTERN(__imp__Visual__DrawSortedQueues);
+// Complete native ordering/dispatch, including models and deferred primitives.
+// The host tail publishes PS c3 directly; no surrounding full-block import.
 REX_HOOK_RAW(Visual__DrawSortedQueues) {
-  bd::gpu::LegacyShaderParameterScope parameter_scope;
-  __imp__Visual__DrawSortedQueues(ctx, base);
-  bd::gpu::Video::MarkVSConstantsDirty();
-  bd::gpu::Video::MarkPSConstantsDirty();
+  bd::gpu::hooks::DrawNativeSortedVisuals(ctx, base);
 }
 
 #undef REBLUE_CONSTANT_DIRTY_HOOK

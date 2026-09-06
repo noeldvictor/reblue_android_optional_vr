@@ -58,13 +58,39 @@ Snapshot: 2026-09-06; the table records earlier checkpoints, with newer local wo
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
 
-Latest local checkpoint: [native immediate UI submission](research/20260906_1252_native-immediate-ui.md)
-removes guest Begin/End vertex scratch from `Visual__DrawVerticesUP` and publishes
-host-owned colour/translation values. Build, 31 CPU tests, 99 source guards and
-bounded original/flat/XR checks pass. The sorted scheduler, authored vertex
-producers and shader/texture/state adapters remain; this is not complete native
-UI or full-game/both-eye qualification. Pushes still require approval naming the
-configured GitHub destinations.
+Latest local checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
+moves the complete model/primitive scheduler and its sorting storage onto the
+host, following native immediate vertex submission. Build, 31 CPU tests and
+103 source guards pass. Bounded flat/XR checks record 78,861/36,784 scheduled
+primitives without fallback or faults; 952,257 XR parameter blocks match the
+independent reference. Normal flat/XR full-block legacy parameter imports are
+zero. One flat field image was inspected; queued models/deferred effects have
+CPU coverage but were not exercised in these field runs.
+
+**How much is left?** Significant render-data and callback ownership work, not
+a known percentage. Host submission, modern GPU features and much of the pass
+scheduling are implemented, but the finished frame still needs:
+
+- Native scene/object storage, asset discovery/bindings and dynamic vertex producers.
+- Native animation/pose/skeleton production and complete GPU skinning ownership.
+- Remaining material/shader/bool/sampler/texture adapters and guest getter removal.
+- Remaining visual/effect/reflection/deferred callbacks, including emulated resolves.
+- Representative fields, battles, cutscenes, menus, transitions, reloads and
+  animated effects verified in both eyes, then Quest 2 qualification.
+
+Gameplay intentionally remains recompiled; removing guest **rendering** does not
+mean rewriting the entire game. Host-issued draws alone do not prove completion.
+
+**Speed so far:** the latest sampled field checks reduce imported float words
+per native parameter block from about 13.00 to 0.757 (94% less import work),
+while eliminating the scheduler's full-block legacy imports. This is **not a
+94% FPS gain** or a controlled whole-project benchmark. The latest 1920x1080
+desktop field check has a 16.667 ms median frame interval (~60 FPS), 6.610 ms
+`other_ms` and 5.677 ms GPU time over its last 600 samples. No reliable overall
+speedup percentage or Quest performance claim is established. Details and
+limitations are in the checkpoint report above.
+
+Pushes still require approval naming the configured GitHub destinations.
 
 | Area | Implemented | Still required |
 | --- | --- | --- |
@@ -82,6 +108,7 @@ configured GitHub destinations.
 | Texture assets | Persistent `.bdtex` assets, independent mip cooking, shared host GPU ownership, direct immutable material bindings and native stable samplers; enabled by default | Asset-level scene associations, dynamic/inherited inputs, remaining imports and headset-specific formats |
 | Resource uploads | Bounded host staging pages, fence-safe reuse/retirement, separate from shader constants | Complete native dynamic-geometry producers and asset streaming/backpressure |
 | Deferred work | Host depth, ordering, bounded batch planning, consumer loop, surface expansion and cleanup | Native scene/pass inputs, remaining entry fields, engine storage and visual/material/state adapters |
+| Sorted visuals / immediate submission | Complete host sorted model/primitive scheduler, bounded host order, model preparation policy and direct immediate vertex upload; no normal guest bucket sorting or enclosing full legacy parameter scope | Authored model/vertex producers and storage, bone/visual/material/pass callbacks, deferred-effect consumer/resolves and authored model/UI/both-eye qualification |
 | Object/pass transforms | Host world/view/projection publication and view-projection composition, direct native camera/XR view input; enabled by default | Engine object/camera sources, inherited matrix cache, complete native scene/pass data and shader-ABI removal |
 | Parameter producers/storage | Host builders, flush/setters and bounded native CPU float storage consumed by uploads/replay; 34591 flat / 501224 XR block comparisons match | Source descriptors, explicit inline/UI imports, shader-register ABI, guest mirrors/getters, native material associations and broad visual qualification |
 | View frustum | Native six-plane construction and current-frame host-culling ownership; byte-safe imports, 18341 matching producer checks, 436841 matching consumer-shadow checks and stable short normal flat/final-eye sequences | Engine camera sources, other-view clients, getter publications and broader visual qualification |

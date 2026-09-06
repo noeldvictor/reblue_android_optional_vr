@@ -785,3 +785,54 @@ unrelated volume changes are not claimed as cleanup. Later docs/Git writes count
 Sorted scheduling, full native frame/game/both-eye gates and publication remain
 open. A renewed normal Plume push was rejected for missing repository-specific
 upload authorization; no workaround or parent gitlink staging.
+
+## Continuing the same storage ledger: sorted visual schedule, 13:12
+
+Preflight 2026-09-06 13:12:49 EDT: 65,279,000,576 B free, no tracked
+build/test/game producers. Original 65,462,788,096 B baseline and all prior
+limits remain unchanged. Retained reservation 64,399,348 B; 94 build logs /
+138,209 B. Two retained PNGs / 6,687,153 B leave 3,798,607 B temporary overlap
+inside the 10 MiB inspection cap. No unrelated volume gains credited as cleanup.
+
+Reuse the existing CPU and host trees for the whole sorted scheduler. Bound
+build/link overlap at 256 MiB, new aggregate logs at 1 MiB, one normal perf
+pair at 1 MiB and a replacement flat PNG at the actual overlap allowance above.
+No raw capture, new tool/tree, asset rewrite or guest/shader rebuild. CPU
+linked-order oracle and callback-sensitive dispatch tests precede incremental
+host build; independent parameter and normal flat/XR checks expose inline
+writers formerly hidden by the enclosing legacy scope. Validate replacement
+evidence before retiring equivalent outputs; preserve original UI comparison,
+distinct non-MSAA and unresolved-failure evidence. Producers retain the original
+cumulative free-space/log/diagnostic stop guards across retries.
+
+Sorted-scheduler follow-up verified: host builds 33/PID 19548/session 39460
+and 34/PID 784, CPU fixtures 04/PID 22612 and 05/PID 14720, suites 26/PID
+27496 and 27/PID 26928 all pass. Final 31/31 CPU and 103 source guards.
+Flat comparison log 879/PID 23784/session 64438 has 12,806 matching original
+UI outputs and 239,393 matching native blocks. Final normal flat log 880/PID
+26048/session 50316 records 2,121 host schedules / 78,861 primitives, no
+fallback/faults, and the inspected 3,359,345 B field image. Final XR log 881/
+PID 26508/session 52179 has 425 schedules / 36,784 primitives, 952,257 matching
+parameter blocks and no faults. Normal flat/XR full legacy blocks are zero;
+queued models/deferred effects were not observed and retain CPU-only coverage.
+All jobs terminal and owner profile restored. No new run after the status/
+README request. Exact binaries, coverage and timing limitations are recorded
+in `20260906_1323_native-visual-schedule.md`.
+
+After equivalent replacements, removed 18 exact ignored/reparse-free obsolete
+files: build 32/33, fixture 03/04, CPU 25/26 stdout/stderr pairs; runtime
+876/877/878; perf-124446 pair and immediate-UI PNG. Logical 4,680,814 B;
+immediate free 65,261,813,760 ->65,266,507,776 B at 13:23:35, measured reclaimed
+**4,694,016 B**, counted once. No protected data, assets, trees or distinct
+failure/non-MSAA evidence removed. Results and hashes remain in reports.
+
+Reserved inventory 64,407,085 B: 94 build logs/138,226 B, 14 runtime logs/
+3,953,316 B, 20 perf files/8,959,072 B, eight fixtures/8,364,855 B and fixed
+41 MiB tool/inspection reservation. Two PNGs/6,693,501 B fit within it; no new
+cache/raw/cooked files. Gross diagnostic log/perf/PNG payload 4,694,899 B;
+net retained replacement payload +14,085 B from run-size drift, replace on
+equivalent coverage. Reused CPU fixture +418,304 logical B for new independent
+order/model tests, within the tools reservation; final host binary +20,480 B.
+Post-cleanup drive-wide use +12,492,800 B since 13:12, +196,280,320 B from the
+original baseline, including unrelated volume activity/metadata. Later docs/
+Git writes count. No push retry or unpublished dependency gitlink staging.
