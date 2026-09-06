@@ -157,6 +157,12 @@ Ignored files still consume disk: a clean `git status` is not a storage check.
 Count build outputs, caches, captures, logs, asset intermediates and Git history,
 including temporary outputs that exist only while a job is running.
 
+Default to **no new large artifacts unless the current change needs them**.
+Reuse existing outputs, build incrementally and disable captures for nonvisual
+diagnostics. Documentation-only work needs focused text/diff checks, not a new
+build or game run. Automatic goal continuations and unattended runs obey the
+same limits; they do not authorize more storage or reset a checkpoint's budget.
+
 - Check actual volume free space before builds, asset cooking, downloads and
   captures. Estimate peak additional space first: final outputs plus overlapping
   temporary, extraction, conversion and linker files. For a large job, record
@@ -216,6 +222,9 @@ including temporary outputs that exist only while a job is running.
   an explicit per-run opt-in for raw frames, verbose dumps or bulk image exports.
   Prefer summaries and selected failure evidence over redundant successful-run
   output. Do not change the owner's persistent profile merely to set defaults.
+  Bound aggregate log/cache retention as well as individual file sizes: repeated
+  small runs can still fill the disk. Rotate agent-owned disposable diagnostics
+  within the checkpoint budget, preserving required baseline and failure evidence.
 - Cook or convert assets in bounded batches, reusing unchanged native outputs.
   Avoid extracting the whole game or retaining every intermediate format for a
   small test. Budget overlapping source, temporary and final representations;
