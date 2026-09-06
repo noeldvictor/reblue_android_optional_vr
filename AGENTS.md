@@ -36,6 +36,9 @@ These ceilings include retries and continuations, not just the latest run.
 Stop space-producing work and ask before exceeding them; continue low-storage
 source or documentation work where possible. Unknown output size is not zero:
 inspect the producer's defaults and set an enforceable bound before launching.
+Implementation checkpoint summaries must include a short storage line: measured
+net disk change, ending free space, bytes actually reclaimed and any retained
+growth with its reason. Report unavailable measurements as unknown, not zero.
 See the detailed rules below for the separate raw-capture archive gate and
 protected evidence.
 
@@ -224,6 +227,13 @@ be retained or cleaned up afterward. Prefer a focused test over a full rebuild
 when it answers the same question. Do not launch inherited build/capture jobs
 for a status or instruction-file request; documentation-only verification is
 text and diff checks.
+
+The latest request controls what work resumes after an interruption. A status,
+documentation or cleanup request does not authorize continuing a queued renderer
+verification matrix. Check any already-running agent-owned producer, account for
+its outputs and ensure temporary profiles are restored when it stops; do not
+launch the next build, game run or capture merely because an earlier handoff
+listed it. Keep unfinished verification explicitly pending.
 
 - Check actual volume free space before builds, asset cooking, downloads and
   captures. Estimate peak additional space first: final outputs plus overlapping
