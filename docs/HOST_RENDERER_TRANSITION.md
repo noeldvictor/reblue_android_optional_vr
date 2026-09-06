@@ -30,6 +30,23 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native depth-image lease (2026-09-06, local renderer integration): matching
+MSAA depth getters now borrow the native resolved image/view/descriptor instead
+of copying it or creating a resolve link. Native and remaining adapter accesses
+share one live layout record; final post outputs use the same retained-image
+boundary. Host build, 31 CPU tests and 52 source guards pass. Normal flat/XR
+record 3,600/9,600 native depth handoffs and zero compatibility depth publications;
+normal native post has zero imports/original scopes/refusals. Post-disabled
+recovery publishes all 3,600 pending colours while still borrowing native depth.
+Non-MSAA post also passes but its 3,600 depth handoffs remain compatibility work;
+scaled/other-format cases and complete scene/UI/frame ownership remain open.
+One normal-flat PNG was inspected, not sequence/stereo/full-game qualification.
+Twenty superseded diagnostics, including two replaced normal-flat PNGs, were
+removed (11,141,120 B measured reclaimed), preserving raw/failure evidence.
+Independent lease/layout contracts and tests are the local checkpoint; renderer
+integration and Plume gitlink publication still await approval. No Quest work.
+Evidence: `research/20260906_0110_native-depth-image-lease.md`.
+
 Native post-image ownership (2026-09-06, local renderer integration): post
 outputs now have their own bounded FP16 image/view/framebuffer pool, not
 `PostColor` resource-header allocations. Native write leases exclude live

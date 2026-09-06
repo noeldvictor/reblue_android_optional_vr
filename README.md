@@ -116,7 +116,7 @@ renderer wiring remains pending with the scene integration. The host build,
 pass. At that checkpoint temporary output allocation and final UI/depth
 publication still needed conversion; these were not new pixel qualifications.
 
-The latest [native post-image ownership](research/20260906_0014_native-post-image-ownership.md)
+The [native post-image ownership](research/20260906_0014_native-post-image-ownership.md)
 replaces the post output allocator with a bounded native FP16 pool. The final
 getter borrows the completed image/descriptor without a copy or resolve link;
 live readers prevent write-lease reuse and destruction is fence-gated. The host
@@ -125,7 +125,19 @@ non-MSAA diagnostics have zero post imports/fallbacks/refusals and settle at two
 resident post images. One normal-flat window PNG was inspected, not a new
 flat/VR sequence qualification. The independent pool/test is locally checkpointed;
 GPU integration remains uncommitted pending dependency publication approval.
-Initial depth publication, UI scheduling and full-frame/game gates remain open.
+At that checkpoint initial depth publication, UI scheduling and full-frame/game
+gates remained open.
+
+The latest [native depth-image handoff](research/20260906_0110_native-depth-image-lease.md)
+lets matching MSAA depth getters borrow the native image/descriptor, removing
+their redundant copy and resolve link. Native and adapter accesses now share
+one layout record. The host build, 31 CPU tests, 52 source guards and bounded
+flat/XR/recovery checks pass; normal flat/XR record 3,600/9,600 native depth
+handoffs with no compatibility depth publications. Non-MSAA depth, scaled/other
+formats, full scene/UI/frame ownership and desktop game/pixel gates remain open.
+The independent lease/layout tests are locally checkpointed; renderer integration
+still awaits dependency publication approval. The newest inspected normal-flat
+PNG replaces two older sanity images; raw baselines/failure evidence are preserved.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

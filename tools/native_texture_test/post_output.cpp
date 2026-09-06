@@ -1,6 +1,7 @@
 // CPU contract checks: native interface doubles, no GPU allocation/submission.
 #include "gpu/host_post_output.h"
 #include "gpu/native_post_images.h"
+#include "gpu/native_image_lease.h"
 #include "gpu/post_sequence.h"
 #include <array>
 #ifdef NDEBUG
@@ -200,5 +201,60 @@ void PoolOwnership() {
   auto failure = pool.Acquire(recipe, [] { return NativePostImageHandle{}; });
   assert(!failure && pool.Stats().failed == 1 && pool.Stats().bytes == 0);
 }
+void SharedLayoutAndLease() {
+  ImageLayoutRecord local;
+  assert(local == RenderTextureLayout::UNKNOWN);
+  RenderTextureLayout native = RenderTextureLayout::SHADER_READ;
+  local.Bind(native);
+  assert(&local.Get() == &native && local == RenderTextureLayout::SHADER_READ);
+  local = RenderTextureLayout::COPY_DEST;
+  assert(native == RenderTextureLayout::COPY_DEST);
+  native = RenderTextureLayout::DEPTH_WRITE;
+  assert(local == RenderTextureLayout::DEPTH_WRITE);
+  const auto transition = [](RenderTextureLayout &record) { record = RenderTextureLayout::SHADER_READ; };
+  transition(local); // existing compatibility transition helpers also update the owner
+  assert(native == RenderTextureLayout::SHADER_READ);
+  ImageLayoutRecord snapshot = local;
+  snapshot = RenderTextureLayout::COLOR_WRITE;
+  assert(local == RenderTextureLayout::SHADER_READ); // copy construction never shares a binding
+  RenderTextureLayout other_native = RenderTextureLayout::UNKNOWN;
+  ImageLayoutRecord other;
+  other.Bind(other_native);
+  other = local; // assignment copies the value into the destination's own record
+  assert(other_native == native && &other.Get() == &other_native);
+  other = RenderTextureLayout::COPY_SOURCE;
+  assert(native == RenderTextureLayout::SHADER_READ);
+  local.Unbind();
+  native = RenderTextureLayout::DEPTH_WRITE;
+  assert(local == RenderTextureLayout::SHADER_READ && &local.Get() != &native);
+
+  int identity = 0;
+  auto owner = std::make_shared<RenderTextureLayout>(RenderTextureLayout::SHADER_READ);
+  const std::weak_ptr<const void> weak = owner;
+  NativeImageLease lease{owner, {reinterpret_cast<RenderTexture *>(&identity), owner.get(),
+      16, 8, 2, RenderFormat::D32_FLOAT_S8_UINT, 0, 1}};
+  assert(lease && lease.Fits(16, 8, 2));
+  assert(!lease.Fits(16, 8, 1) && !lease.Fits(8, 8, 2) && !lease.Fits(16, 0, 2));
+  local.Bind(*lease.image.layout);
+  owner.reset();
+  assert(!weak.expired()); // type-erased ownership retains the native layout/image lifetime
+  local = RenderTextureLayout::COPY_SOURCE;
+  assert(*lease.image.layout == RenderTextureLayout::COPY_SOURCE);
+  auto second_reader = lease;
+  lease = {};
+  assert(!weak.expired());
+  local.Unbind(); // do this before releasing the final owner
+  second_reader = {};
+  assert(weak.expired() && local == RenderTextureLayout::COPY_SOURCE);
+  assert(!lease && !lease.Fits(16, 8, 2));
+  owner = std::make_shared<RenderTextureLayout>();
+  lease = {owner, {reinterpret_cast<RenderTexture *>(&identity), owner.get(),
+      16, 8, 1, RenderFormat::R16G16B16A16_FLOAT, 4, 1}};
+  assert(lease.Fits(16, 8, 1));
+  auto invalid = lease; invalid.owner.reset(); assert(!invalid.Fits(16, 8, 1));
+  invalid = lease; invalid.image.layout = nullptr; assert(!invalid);
+  invalid = lease; invalid.image.samples = 4; assert(!invalid);
+  invalid = lease; invalid.image.descriptor_index = ~uint32_t{0}; assert(!invalid);
+}
 } // namespace
-int main() { OutputContract(); PoolOwnership(); }
+int main() { OutputContract(); PoolOwnership(); SharedLayoutAndLease(); }

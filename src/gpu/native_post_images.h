@@ -55,9 +55,9 @@ public:
     auto result = images_.Acquire(id, bytes, std::forward<Create>(create));
     if (result) {
       if (!existing) entries_.push_back({recipe, id, result});
-      // A boundary reader may have transitioned the image using its own layout
-      // record. Force a barrier on the next full overwrite; the backend owns
-      // the actual old layout. This does NOT discard or reset the GPU image.
+      // Force ordering before the next full overwrite, including when the last
+      // user also left it in a write layout. The backend owns the actual old
+      // layout. This does NOT discard or reset the GPU image.
       result->layout = plume::RenderTextureLayout::UNKNOWN;
     }
     return result;
