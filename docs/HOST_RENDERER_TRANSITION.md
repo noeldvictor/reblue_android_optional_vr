@@ -30,6 +30,20 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Immediate UI submission (2026-09-06): the complete `Visual__DrawVerticesUP`
+body now prepares colour/optional translation on the host, publishes native
+parameters and owns a bounded CPU vertex copy uploaded directly without guest
+Begin/End heap scratch. Host build, 31 CPU tests and 99 source guards pass;
+16,664 original preparations/uploads match, normal flat/XR record 84,502/35,350
+native submissions without fallback/refusal/upload failure. One standing-field
+sanity image was inspected; translated/empty inputs have CPU coverage only.
+The original sorted scheduler (including model and deferred-primitive handling)
+still has a full legacy parameter scope. Authored vertex production, shader/
+texture/state adapters, complete UI/frame ownership and broad desktop/both-eye
+qualification remain open. Fourteen obsolete diagnostics removed, 4,685,824 B
+measured reclaimed. No raw captures or Quest work. Evidence:
+`research/20260906_1252_native-immediate-ui.md`.
+
 Native parameter storage (2026-09-06): float setters/flush, native transforms and
 deferred producers publish directly into bounded host CPU owners, now consumed
 by ordinary uploads and replay base blocks. Independent flat/XR comparisons

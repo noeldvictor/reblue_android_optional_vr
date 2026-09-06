@@ -11,6 +11,7 @@
 #pragma once
 
 #include <rex/types.h>
+#include <span>
 
 namespace bd::gpu::hooks {
 
@@ -21,5 +22,10 @@ namespace bd::gpu::hooks {
 void DispatchHostNodeDraw(u32 device_guest, u32 primitive_type, bool indexed,
                           u32 count, u32 start_index, i32 base_vertex,
                           u32 start_vertex);
+
+// CPU-owned six-lane UI triangle strip; copied once into fence-managed host
+// upload storage before this returns. No guest scratch or Begin/End state.
+// device_guest is still the explicit state/texture/shader ABI adapter.
+bool DispatchHostImmediateUi(u32 device_guest, std::span<const u32> words);
 
 } // namespace bd::gpu::hooks

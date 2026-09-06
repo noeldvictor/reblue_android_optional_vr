@@ -734,3 +734,54 @@ tool/inspection reservation. Two PNGs/6,696,988 B fit within that reservation.
 cumulative +1,028,681,728 B. Volume changes include unrelated activity and
 source/build/Git/metadata, not solely diagnostics; later docs/Git writes count.
 Full native frame/desktop gate and root/dependency publication remain open.
+
+## Continuing the same storage ledger: immediate UI, 12:41
+
+Preflight 2026-09-06 12:41:10 EDT: 65,302,700,032 B free (60.82 GiB), no
+tracked build/test/game producers. The original 65,462,788,096 B baseline and
+all checkpoint limits remain unchanged. The drive gained space since the last
+status check without agent cleanup; do not credit that gain to this task.
+Existing diagnostic reservation remains 64,385,620 B, including 94 build logs /
+138,514 B and two PNGs / 6,696,988 B inside the 10 MiB inspection allowance.
+
+Reuse the desktop/CPU trees for the immediate UI producer replacement; <=256
+MiB build/link overlap, <=1 MiB new logs across retries, <=4 MiB replacement
+flat PNG constrained by the actual 3,788,772 B aggregate overlap room, and
+<=1 MiB normal perf pair. No raw frames, downloads, cooked assets, new build
+tree or guest/shader rebuild. Verify original preparation/vertex submission,
+then normal native rendering and parameter ownership. Replace equivalent
+build/CPU/normal-flat evidence after validating it; retain a new original-UI
+comparison only until equivalent subsequent coverage. Jobs continue to enforce
+the original free-space, cumulative diagnostics/log and raw-capture gates.
+
+Immediate-UI follow-up complete: CPU fixture 03/PID 22236 and suite 25/PID
+25656 pass 31/31, with 99 source guards. Host 31/PID 24864/session 69277 and
+32/PID 19944 pass without guest/shader rebuild. Original comparison log 876/
+PID 27056/session 13646 has 16,664 matching UI submissions and 203,105 matching
+native parameter blocks. Normal flat log 877/PID 24072/session 94346 has 84,502
+native submissions without fallback/refusal/upload failure and one inspected
+3,352,997 B field sanity image. The final lazy-buffer binary is checked in
+desktop XR log 878/PID 26828/session 4754: 35,350 native UI submissions,
+264,067 matching parameter blocks, no failures. All jobs terminal; profile
+restored. No new build/game run after the owner's status interruption.
+
+Validated equivalent evidence before removing 14 exact ignored, reparse-free
+obsolete diagnostics: build 30/31, fixture 02 and CPU 24 stdout/stderr pairs;
+runtime 873/874/875, perf-121336 pair and parameter-storage PNG. A first ancestor
+check refused before deleting anything. Corrected FileInfo/DirectoryInfo checks
+then completed two removals: 4,362,240 +323,584 B measured = **4,685,824 B**,
+4,673,420 logical B total, counted once. Results/binary/image hashes remain in
+`20260906_1252_native-immediate-ui.md`. No protected outputs/data/trees removed.
+
+Gross diagnostic payload 4,677,313 B; net retained payload +3,893 B, combining
+new original-UI coverage with replacement parameter evidence and size drift.
+Replace on equivalent future verification. Reserved inventory 64,399,348 B:
+94 build logs/138,209 B, 14 runtime logs/3,937,404 B, 20 perf files/8,967,264 B,
+eight fixtures/8,364,855 B and fixed 41 MiB tools/inspection reservation. Two
+PNGs/6,687,153 B fit inside that reservation; no new cache/raw/cooked outputs.
+Closing pre-documentation/Git free 65,273,823,232 B (60.79 GiB), +28,876,800 B
+drive-wide use since 12:41 and +188,964,864 B from the original baseline;
+unrelated volume changes are not claimed as cleanup. Later docs/Git writes count.
+Sorted scheduling, full native frame/game/both-eye gates and publication remain
+open. A renewed normal Plume push was rejected for missing repository-specific
+upload authorization; no workaround or parent gitlink staging.

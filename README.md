@@ -58,6 +58,14 @@ Snapshot: 2026-09-06; the table records earlier checkpoints, with newer local wo
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
 
+Latest local checkpoint: [native immediate UI submission](research/20260906_1252_native-immediate-ui.md)
+removes guest Begin/End vertex scratch from `Visual__DrawVerticesUP` and publishes
+host-owned colour/translation values. Build, 31 CPU tests, 99 source guards and
+bounded original/flat/XR checks pass. The sorted scheduler, authored vertex
+producers and shader/texture/state adapters remain; this is not complete native
+UI or full-game/both-eye qualification. Pushes still require approval naming the
+configured GitHub destinations.
+
 | Area | Implemented | Still required |
 | --- | --- | --- |
 | Native mesh assets | Versioned persistent `.bdmesh` cache, triangle lists, shared host GPU buffers and existing generated LOD support; enabled by default | Asset-level discovery/loading, independent native layouts/materials, dynamic geometry and cache streaming/eviction |

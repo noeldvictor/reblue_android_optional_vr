@@ -22,6 +22,7 @@
 #include "gpu/d3d.h"
 #include "gpu/constant_buffers.h"
 #include "gpu/scene/host_parameter_bridge.h"
+#include "gpu/hooks/native_ui.h"
 #include "gpu/device.h"
 #include "gpu/shadow_fit.h"
 #include "gpu/frame_stats.h"
@@ -283,20 +284,13 @@ REBLUE_CONSTANT_DIRTY_HOOK(Visual__Shader__Toon__vf04,
 // HUD - so every draw inside it is an overlay, and the stereo path puts those
 // in *both* eyes rather than once across the seam.
 //
-// Bracketing the guest's own function beats inspecting vertices: two
+// Bracket semantic UI submission, not a vertex shape: two
 // shape-based tests were tried and both quadrupled the frame, because a
 // full-screen post blit is also a four-vertex triangle strip at the sprite
-// stride and must not be doubled.
-REX_EXTERN(__imp__Visual__DrawVerticesUP);
+// stride and must not be doubled. The replacement owns preparation/geometry;
+// its RAII scope restores the overlay flag even if submission throws.
 REX_HOOK_RAW(Visual__DrawVerticesUP) {
-  bd::gpu::LegacyShaderParameterScope parameter_scope;
-  auto &s = bd::gpu::state();
-  const bool outer = s.overlay2DScope;
-  s.overlay2DScope = true;
-  __imp__Visual__DrawVerticesUP(ctx, base);
-  s.overlay2DScope = outer;
-  bd::gpu::Video::MarkVSConstantsDirty();
-  bd::gpu::Video::MarkPSConstantsDirty();
+  bd::gpu::hooks::DrawNativeImmediateUi(ctx, base);
 }
 // Visual__DrawSortedQueues also writes PS c3 (device+0x1730) inline during its
 // draw setup, a separate writer from Visual__DrawVerticesUP that likewise skips

@@ -47,6 +47,8 @@
 #include "gpu/vertex_pull.h"
 #include "gpu/occlusion_cull.h"
 #include "gpu/hooks/draw_dispatch.h"
+#include "gpu/hooks/native_ui.h"
+#include "gpu/native_ui_vertices.h"
 #include "gpu/frame.h"
 #include "gpu/post_chain.h"
 #include "gpu/scene/host_draw.h"
@@ -1538,6 +1540,9 @@ u32 D3DDevice_EndVertices_hook(u32 /*device_guest*/) {
   if (!p.data_va || !p.vertex_count)
     return 0;
 
+  bd::gpu::hooks::ObserveOriginalImmediateUi(p.device, p.primitive_type,
+      p.vertex_count, p.stride, bd::mem::at<const u8>(p.data_va));
+
   const bool ok = UploadAndBindUpVertices(p.primitive_type, p.data_va,
                                          p.vertex_count, p.stride);
   if (!ok)
@@ -1656,6 +1661,27 @@ u32 D3DDevice_DrawVertices_hook(u32 device_guest, u32 primitiveType,
 } // namespace
 
 namespace bd::gpu::hooks {
+bool DispatchHostImmediateUi(u32 device_guest, std::span<const u32> words) {
+  if (words.empty()) return true;
+  if (words.size() % kImmediateUiWords ||
+      words.size() > size_t(kImmediateUiMaxVertices) * kImmediateUiWords) return false;
+  ConstantAllocation upload;
+  {
+    std::lock_guard lock(state().mutex);
+    Video::OpenCommandListLocked();
+    upload = UploadHostBytes(words.data(), u32(words.size_bytes()), 4);
+  }
+  if (!upload.memory) return false; // never draw a previous vertex binding
+  Video::SetVertexStream(0, upload.ref, upload.size, kImmediateUiStride);
+  state().overlay2D = false; // semantic scope, not a shape/stride guess
+  DrawArgs args{};
+  args.is_up = true;
+  args.vertexOrIndexCount = u32(words.size() / kImmediateUiWords);
+  NoteDrawKind(3);
+  DispatchDraw(device_guest, u32(xe::PrimitiveType::kTriangleStrip), "NativeImmediateUI", args);
+  return true;
+}
+
 void DispatchHostNodeDraw(u32 device_guest, u32 primitive_type, bool indexed,
                           u32 count, u32 start_index, i32 base_vertex,
                           u32 start_vertex) {
