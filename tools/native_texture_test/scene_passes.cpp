@@ -12,6 +12,7 @@
 #include "gpu/scene/native_view_schedule.h"
 #include "gpu/scene/view_schedule_geometry.h"
 #include "effect_activation_cases.h"
+#include "effect_lifecycle_cases.h"
 #include "gpu/native_image_layers.h"
 #include <array>
 #include <functional>
@@ -267,6 +268,7 @@ void CheckResults() {
 }
 int main() {
   CheckEffectActivation();
+  CheckEffectLifecycle();
   CheckViewSchedule();
   CheckDispatch();
   CheckResults();

@@ -349,3 +349,55 @@ No live renderer/build producer remains. That additional volume change is not
 attributed to these diagnostic payloads or credited away; it remains charged to
 the cumulative cap. No further large producer is launched. Required evidence
 retains its existing cleanup conditions; later source/Git metadata still counts.
+
+## Continuing the same storage ledger: effect lifecycle, 05:36
+
+Preflight 2026-09-06 05:36:14 EDT: free 64,539,910,144 B; no live renderer,
+compiler, linker, CMake, Ninja or CTest producer. Original baseline remains
+65,462,788,096 B; cumulative volume growth is 922,877,952 B, including subsequent
+source/Git and unattributed volume changes. Scoped latest runtime logs remain
+862/863, and the owner's 116-B capture profile is unchanged. The 76 build logs
+total 126,029 B. Previous retained diagnostics total 55,395,456 B, including the
+fixed 41 MiB tool/inspection reservation; protected raw evidence has zero incoming
+allowance. No prior cleanup is credited again.
+
+Reuse the configured CPU/desktop trees and guarded wrappers. Plan no more than
+512 MiB temporary build/link overlap and 8 MiB new diagnostics across retries:
+focused lifecycle CPU cases, existing suite, host link, bounded capture-off flat
+and XR runs, one bounded normal-flat PNG replacement. These verify new callback
+ordering and lifecycle execution. Do not regenerate guest/shader objects, acquire
+tools or create raw captures. After equivalent checks and pixel inspection,
+retire eligible reblue_20/cpu_17/focused_04 logs, normal flat/XR 862/863 and their
+perf pairs, and the effect-activation PNG. Preserve distinct non-MSAA, recovery,
+optical and unresolved-failure evidence. The original live storage floor and all
+aggregate caps remain enforced; record actual results and cleanup here.
+
+All three build/test producers and flat/XR runs are terminal, exit 0. Host build,
+31 CPU tests and 72 source guards pass; runtime evidence is in the 05:36 lifecycle
+report. New build/test logs 6,319 B; runtime logs 883,378 B; perf files 2,253,024 B;
+one inspected PNG 3,278,821 B: 6,421,542 B new diagnostics, below the 8 MiB plan.
+The PNG stays inside the fixed inspection reservation, not counted twice.
+No new raw/cache/dump files, guest/shader rebuild, tool download or build tree.
+
+Completed cleanup: validated all 13 exact targets, lengths, ignored regular-file
+status, approved workspace parents, reparse-free ancestors, old/replacement PNG
+hashes and absence of active renderer/build processes before deletion. Removed
+reblue_20, cpu_17 and host_scene_pass_test_04 stdout/stderr pairs; logs 862/863;
+perf-051857 and perf-052041 CSV/metadata pairs; native_effect_activation_window.png.
+Logical bytes 6,275,409; immediate free space 64,529,297,408 ->64,535,580,672 B:
+**6,283,264 B measured reclaimed**, counted once. Exact old files are gone;
+reports/hashes remain and equivalent checks can regenerate diagnostics. All
+protected raw/failure, distinct non-MSAA/recovery/optical evidence, game data,
+saves, profiles, source, dependencies and build trees are preserved.
+
+Closing inventory: 76 build logs /125,813 B, 11 runtime logs /3,387,001 B,
+20 perf files /8,959,072 B; zero new raw/cache/dump files. Retained diagnostics
+including the unchanged 41 MiB tool/inspection reservation total 55,463,502 B.
+The two retained PNGs total 6,612,977 B within that reservation. They replace
+equivalent evidence; the modest payload change captures the new lifecycle
+counters/current pixels and is eligible for retirement after equivalent future
+checks, not a new permanent archive. Free 64,535,580,672 B (60.10 GiB). Net volume
+growth from the 05:36 preflight is 4,329,472 B; cumulative from the original
+baseline is 927,207,424 B. Unattributed volume/Git/metadata changes remain charged.
+No live producer or profile override remains; later source/Git metadata still
+counts. The protected historical raw gate and all original caps remain active.

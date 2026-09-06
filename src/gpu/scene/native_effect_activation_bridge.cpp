@@ -1,9 +1,10 @@
 /**
- * @brief   Native effect activation, registry ordering and array mutation.
+ * @brief   Native effect activation, registry mutation and preparation lifecycle.
  * @copyright Copyright (c) 2026 reblue contributors
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_effect_activation.h"
+#include "gpu/scene/native_effect_lifecycle.h"
 #include "gpu/scene/native_registry_array.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
@@ -19,6 +20,12 @@
 REX_EXTERN(__imp__sub_82173DF8);
 REX_EXTERN(__imp__sub_8221D678);
 REX_EXTERN(__imp__sub_8221D9A8);
+REX_EXTERN(__imp__sub_8221D530);
+REX_EXTERN(__imp__sub_8221DB00);
+REX_EXTERN(__imp__sub_8221D548);
+REX_EXTERN(__imp__sub_8221DBE0);
+REX_EXTERN(__imp__sub_8221DCA0);
+REX_EXTERN(__imp__sub_8221D5E0);
 REX_EXTERN(sub_8221D678);
 REX_EXTERN(sub_8221D9A8);
 REX_EXTERN(sub_826BE0A8); // temporary shared array allocator, not registry logic
@@ -42,6 +49,12 @@ struct Stats {
   uint32_t frame = 0;
 };
 thread_local Stats stats;
+struct LifecycleStats {
+  std::array<uint64_t, 2> prepares{}, finishes{};
+  uint64_t begin_callbacks = 0, end_callbacks = 0, resource_begins = 0, resource_ends = 0;
+  uint64_t destroyed = 0, frees = 0, compatibility = 0, refused = 0;
+};
+thread_local LifecycleStats lifecycle;
 void Report() {
   const auto frame = FrameStatFrameCount();
   if (frame - stats.frame < 300) return;
@@ -51,6 +64,13 @@ void Report() {
           stats.activations, stats.registrations, stats.removals, stats.membership,
           stats.compatibility, stats.refused, stats.faults, stats.metadata,
           stats.allocations, stats.insertions, stats.erasures);
+  BD_INFO("[native-effect-lifecycle] model prepare {} finish {} visual prepare {} finish {}; "
+          "participant callbacks begin {} end {} resource begin {} end {}; destroyed {} frees {}; "
+          "compatibility {} refused {} shared faults {}; host preparation/cleanup/teardown, "
+          "imported callbacks, identities and shared storage",
+          lifecycle.prepares[0], lifecycle.finishes[0], lifecycle.prepares[1], lifecycle.finishes[1],
+          lifecycle.begin_callbacks, lifecycle.end_callbacks, lifecycle.resource_begins, lifecycle.resource_ends,
+          lifecycle.destroyed, lifecycle.frees, lifecycle.compatibility, lifecycle.refused, stats.faults);
   stats.frame = frame;
 }
 bool Range(uint64_t address, uint64_t bytes) {
@@ -123,6 +143,7 @@ struct CallScope {
 struct RegistryAdapter : CallScope {
   const uint32_t registry;
   RegistryAdapter(PPCContext &ctx, uint8_t *base) : CallScope(ctx, base), registry(ctx.r3.u32) {}
+  RegistryAdapter(PPCContext &ctx, uint8_t *base, uint32_t address) : CallScope(ctx, base), registry(address) {}
   uint32_t Record(uint32_t group) { return registry + group * 12; }
   int32_t Count(uint32_t group) { return Read<int32_t>(Record(group) + 8); }
   uint32_t Mask(uint32_t participant) { return Virtual(participant, 28); }
@@ -194,7 +215,86 @@ struct RegistryAdapter : CallScope {
     EraseRegistryEntry(slots, uint32_t(index));
     ++stats.erasures;
   }
+  uint32_t Storage(uint32_t group) { return Read<uint32_t>(Record(group)); }
+  void Free(uint32_t storage) { Call(sub_826BEF30, storage); ++lifecycle.frees; }
+  void SetStorage(uint32_t group, uint32_t storage) { Write<uint32_t>(Record(group), storage); }
+  void SetCapacity(uint32_t group, uint32_t capacity) { Write<uint32_t>(Record(group) + 4, capacity); }
+  void SetCount(uint32_t group, uint32_t count) { Write<uint32_t>(Record(group) + 8, count); }
 };
+struct PreparationAdapter : RegistryAdapter {
+  const uint32_t group, input, extra;
+  PreparationAdapter(PPCContext &ctx, uint8_t *base, uint32_t registry,
+                     uint32_t kind, uint32_t subject = 0, uint32_t argument = 0)
+      : RegistryAdapter(ctx, base, registry), group(kind), input(subject), extra(argument) {}
+  int32_t Count() { return RegistryAdapter::Count(group); }
+  uint32_t Participant(int32_t index) {
+    const auto participant = Entry(group, index);
+    Check(Words(participant, 6));
+    return participant;
+  }
+  uint32_t Invoke(uint32_t object, uint32_t slot, bool preparing = false) {
+    const auto address = VirtualAddress(object, slot);
+    auto *fn = address ? REX_KERNEL_STATE()->function_dispatcher()->GetFunction(address) : nullptr;
+    Check(fn != nullptr);
+    ctx.r3.u64 = object;
+    if (preparing) { ctx.r4.u64 = input; ctx.r5.u64 = extra; }
+    ctx.last_indirect_target = address;
+    fn(ctx, base);
+    return ctx.r3.u32;
+  }
+  int32_t Begin(int32_t index) {
+    const auto result = Invoke(Participant(index), group * 8, true);
+    ++lifecycle.begin_callbacks;
+    return int32_t(result);
+  }
+  void End(int32_t index) { Invoke(Participant(index), group * 8 + 4); ++lifecycle.end_callbacks; }
+  uint8_t Active(int32_t index) { return Read<uint8_t>(Participant(index) + 4 + group); }
+  void SetActive(int32_t index, uint8_t active) { Write<uint8_t>(Participant(index) + 4 + group, active); }
+  uint32_t InputResource() { return Read<uint32_t>(input + 4); }
+  uint32_t Resource() { return Read<uint32_t>(registry + 36); }
+  void SetResource(uint32_t resource) { Write<uint32_t>(registry + 36, resource); }
+  void BeginResource(uint32_t resource) { Invoke(resource, 32); ++lifecycle.resource_begins; }
+  void EndResource(uint32_t resource) { Invoke(resource, 36); ++lifecycle.resource_ends; }
+};
+bool PreparationReady(PPCContext &ctx, uint32_t registry, uint32_t group) {
+  return StackReady(ctx) && Words(registry, 40) && ArrayReady(registry + group * 12);
+}
+bool TryPrepareEffect(PPCContext &ctx, uint8_t *base, uint32_t registry,
+                      uint32_t group, uint32_t input, uint32_t extra) {
+  const bool enabled = REXCVAR_GET(bd_native_passes);
+  if (!enabled || !PreparationReady(ctx, registry, group) || (!group && !Words(input, 8))) {
+    ++lifecycle.compatibility; lifecycle.refused += enabled;
+    return false; // the only refusal point, before any native side effects
+  }
+  PreparationAdapter adapter(ctx, base, registry, group, input, extra);
+  ctx.r3.s64 = group ? PrepareEffectParticipants(adapter) : PrepareEffectModel(adapter);
+  ++lifecycle.prepares[group];
+  return true;
+}
+bool TryFinishEffect(PPCContext &ctx, uint8_t *base, uint32_t registry, uint32_t group) {
+  const bool enabled = REXCVAR_GET(bd_native_passes);
+  if (!enabled || !PreparationReady(ctx, registry, group)) {
+    ++lifecycle.compatibility; lifecycle.refused += enabled;
+    return false;
+  }
+  PreparationAdapter adapter(ctx, base, registry, group);
+  if (group) FinishEffectParticipants(adapter);
+  else FinishEffectModel(adapter);
+  ++lifecycle.finishes[group];
+  return true;
+}
+bool TryDestroyEffectRegistry(PPCContext &ctx, uint8_t *base) {
+  const bool enabled = REXCVAR_GET(bd_native_passes);
+  if (!enabled || !StackReady(ctx) || !Words(kRegistry, 40) ||
+      !ArrayReady(kRegistry) || !ArrayReady(kRegistry + 12) || !ArrayReady(kRegistry + 24)) {
+    ++lifecycle.compatibility; lifecycle.refused += enabled;
+    return false;
+  }
+  RegistryAdapter adapter(ctx, base, kRegistry);
+  DestroyEffectRegistry(adapter);
+  ++lifecycle.destroyed;
+  return true;
+}
 struct ActivationAdapter : CallScope {
   const uint32_t effects;
   ActivationAdapter(PPCContext &ctx, uint8_t *base) : CallScope(ctx, base), effects(ctx.r3.u32) {}
@@ -279,5 +379,38 @@ REX_HOOK_RAW(sub_8221D9A8) {
     UnregisterEffectParticipant(adapter, participant);
     ++stats.removals;
   }
+  Report();
+}
+REX_HOOK_RAW(sub_8221D530) {
+  using namespace bd::gpu::scene;
+  if (!TryPrepareEffect(ctx, base, kRegistry, 0, ctx.r3.u32, ctx.r4.u32))
+    __imp__sub_8221D530(ctx, base);
+  Report();
+}
+REX_HOOK_RAW(sub_8221DB00) {
+  using namespace bd::gpu::scene;
+  if (!TryPrepareEffect(ctx, base, ctx.r3.u32, 0, ctx.r4.u32, ctx.r5.u32))
+    __imp__sub_8221DB00(ctx, base);
+  Report();
+}
+REX_HOOK_RAW(sub_8221D548) {
+  using namespace bd::gpu::scene;
+  if (!TryFinishEffect(ctx, base, kRegistry, 0)) __imp__sub_8221D548(ctx, base);
+  Report();
+}
+REX_HOOK_RAW(sub_8221DBE0) {
+  using namespace bd::gpu::scene;
+  if (!TryPrepareEffect(ctx, base, ctx.r3.u32, 1, ctx.r4.u32, ctx.r5.u32))
+    __imp__sub_8221DBE0(ctx, base);
+  Report();
+}
+REX_HOOK_RAW(sub_8221DCA0) {
+  using namespace bd::gpu::scene;
+  if (!TryFinishEffect(ctx, base, ctx.r3.u32, 1)) __imp__sub_8221DCA0(ctx, base);
+  Report();
+}
+REX_HOOK_RAW(sub_8221D5E0) {
+  using namespace bd::gpu::scene;
+  if (!TryDestroyEffectRegistry(ctx, base)) __imp__sub_8221D5E0(ctx, base);
   Report();
 }

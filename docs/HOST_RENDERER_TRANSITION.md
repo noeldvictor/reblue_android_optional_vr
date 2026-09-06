@@ -30,19 +30,32 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Effect preparation and cleanup (2026-09-06): both preparation groups, paired
+resource/participant cleanup and global array teardown now execute in native
+code through six whole-function replacements. Host build, 31 CPU tests and 72
+source guards pass. Bounded flat/XR field checks record 381,870/723,492 model
+prepare/finish pairs and 681,379/1,151,643 visual pairs, zero lifecycle fallback,
+refusal or faults. One flat sanity PNG was inspected; timed stops did not exercise
+global teardown, which has CPU coverage only. Callback implementations, native
+identities/storage, scene ownership and full desktop game/both-eye qualification
+remain open. Thirteen superseded diagnostics were removed, reclaiming 6,283,264 B
+measured; 60.10 GiB remains free, no new raw captures. Evidence:
+`research/20260906_0536_native-effect-lifecycle.md`.
+
 Effect activation and registry mutation (2026-09-06): host replacements cover
 all effect selectors and the three-group registration/removal algorithms,
 including signed-priority ordering, duplicate/first-removal semantics, live
 callback inputs, indexed-view tail cleanup and checked native array mutations.
-Authored flags, callback metadata, shared array storage/readers and lifecycle
-remain imports; this is not complete registry or frame ownership. Host link,
+Authored flags, callback metadata and shared array storage remain imports;
+preparation/cleanup now have the follow-up above. This is not complete registry
+or frame ownership. Host link,
 31 CPU tests and 69 source guards pass. Bounded flat/XR checks each record
 28 registrations, 9 removals, 40 insertions and 18 erasures, with zero activation/
 registry compatibility, refusals or faults. Existing parent/scene/post checks
 also pass. One flat sanity PNG was inspected, not sequence/stereo/full-game
 qualification. Thirteen superseded small diagnostics were removed, reclaiming
 6,418,432 B measured; 60.11 GiB remains free and no raw captures were added.
-Preparation consumers, registry/scene ownership and full desktop game/both-eye
+Callback implementations, registry/scene ownership and full desktop game/both-eye
 gates remain required before Quest. Evidence:
 `research/20260906_0516_native-effect-activation.md`.
 
