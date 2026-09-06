@@ -27,6 +27,8 @@ class NativePostBoundaryTest(unittest.TestCase):
         cls.composite_shader = (root / "src/gpu/shaders/hlsl/post_composite_ps.hlsl").read_text(encoding="utf-8")
         cls.bloom = (root / "src/gpu/post_bloom.h").read_text(encoding="utf-8")
         cls.bloom_shader = (root / "src/gpu/shaders/hlsl/post_bloom_direction_ps.hlsl").read_text(encoding="utf-8")
+        cls.images = (root / "src/gpu/host_post_inputs.h").read_text(encoding="utf-8")
+        cls.sampled = (root / "src/gpu/sampled_image.h").read_text(encoding="utf-8")
 
     def test_native_inputs_prepare_their_own_sampling_descriptors(self):
         helper = self.post.split("bool PrepareReadable(", 1)[1].split("GuestTexture *NativeSource(", 1)[0]
@@ -34,13 +36,34 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertLess(helper.index("BindTextureSRVLocked("), helper.index("return Readable(image)"))
         for name in ("s.textures[", "SetTexture(", "ResolveRtToTexture", "copyTexture", "__imp__"):
             self.assertNotIn(name, helper)
-        for function, following in (("HostPostRender", "HostPostPrepareDof"),
-                                    ("HostPostPrepareDof", "HostPostProducerSkip")):
+        for function, following in (("HostPostPrepareDof", "HostPostProducerSkip"),):
             body = self.post.split(f"bool {function}(", 1)[1].split(f"bool {following}(", 1)[0]
             self.assertEqual(body.count("PrepareReadable(s,"), 2)
             self.assertLess(body.index("lock(s.mutex)"), body.index("PrepareReadable(s,"))
             self.assertLess(body.index("const bool depth_ready"), body.index("Video::OpenCommandListLocked()"))
             self.assertIn("if (!scene_ready || !depth_ready ||", body)
+        imported = self.post.split("bool HostPostImportInputs(", 1)[1].split("SampledImage BorrowPostImage(", 1)[0]
+        self.assertEqual(imported.count("PrepareReadable(s,"), 2)
+        self.assertLess(imported.index("lock(s.mutex)"), imported.index("PrepareReadable(s,"))
+        self.assertLess(imported.index("PrepareReadable(s,"), imported.index("Snapshot(Content(scene))"))
+        borrow = self.post.split("SampledImage BorrowPostImage(", 1)[1].split("bool HostPostRender(", 1)[0]
+        self.assertIn("PrepareReadable(s, image) ? Snapshot(image)", borrow)
+        self.assertLess(borrow.index("lock(s.mutex)"), borrow.index("PrepareReadable(s,"))
+        for name in ("Content(", "sourceSurface", "s.textures[", "HostTargetAcquire", "ResolveGuestTexture"):
+            self.assertNotIn(name, borrow)
+
+    def test_native_sampled_contract_has_no_guest_resource_identity(self):
+        for name in ("GuestTexture", "rex/", "selfVa", "sourceSurface", "resolveScale", "D3D", "Xenos"):
+            self.assertNotIn(name, self.images + self.sampled)
+        self.assertIn("SampledImage scene", self.images)
+        self.assertIn("SampledImage depth", self.images)
+        self.assertIn("plume::RenderTextureLayout *layout", self.sampled)
+        self.assertIn("&t->layout", self.post)
+        render = self.post.split("bool HostPostRender(", 1)[1].split("bool HostPostPrepareDof(", 1)[0]
+        self.assertIn("inputs.CanRenderTo(output->texture, output->layers)", render)
+        self.assertLess(render.index("inputs.CanRenderTo("), render.index("Video::OpenCommandListLocked()"))
+        for name in ("source->selfVa", "z->selfVa", "PrepareReadable(s, source)", "PrepareReadable(s, z)"):
+            self.assertNotIn(name, render)
 
     def test_directional_bloom_imports_intent_without_original_mask_production(self):
         body = self.scheduler.split("bool ReadPlan(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
@@ -237,8 +260,8 @@ class NativePostBoundaryTest(unittest.TestCase):
             for name in ("Content(", "SourceScale(", "sourceSurface", "resolveScale",
                          "DetachSourceSurfaceLocked(", "s.textures[", "BuildDofPyramid("):
                 self.assertNotIn(name, body)
-        self.assertIn("auto *source = inputs.scene", render)
-        self.assertIn("auto *z = inputs.depth", render)
+        self.assertIn("auto *source = &inputs.scene", render)
+        self.assertIn("auto *z = &inputs.depth", render)
         self.assertIn("c.dof.scene_scale = inputs.exposure", atlas)
         self.assertIn("c.dof.depth = inputs.depth", atlas)
         self.assertIn("NativeSource(s, c.dof.depth)", self.post)
@@ -253,7 +276,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         loop, publication = execution.split("\n  PublishPostOutput(", 1)
         self.assertNotIn("Publish", loop)
         self.assertNotIn("HostPostImportInputs", loop)
-        self.assertIn("inputs.scene = targets.images[sequence->Output(i - 1)]", loop)
+        self.assertIn("inputs.scene = BorrowPostImage(targets.images[sequence->Output(i - 1)])", loop)
         self.assertIn("inputs.exposure = sequence->Exposure(i, exposure)", loop)
         self.assertIn("RenderPostPlan(plan, inputs,", loop)
         self.assertTrue(publication.startswith("targets.images[sequence->Output(sequence->count - 1)], scene)"))
@@ -264,7 +287,7 @@ class NativePostBoundaryTest(unittest.TestCase):
 
     def test_scene_import_preserves_alias_exposure_without_producing_gpu_work(self):
         body = self.post.split("bool HostPostImportInputs(", 1)[1].split("bool HostPostRender(", 1)[0]
-        self.assertIn("Content(scene), Content(depth), SourceScale(scene)", body)
+        self.assertIn("Snapshot(Content(scene)), Snapshot(Content(depth)), SourceScale(scene)", body)
         self.assertIn("std::lock_guard lock(s.mutex)", body)
         self.assertIn("!std::isfinite(imported.exposure) || imported.exposure <= 0", body)
         self.assertLess(body.index("return false"), body.index("inputs = imported"))

@@ -30,9 +30,25 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native sampled-image inputs (2026-09-05): scene completion, native atlas,
+composite and directional-bloom scene/depth reads now carry native texture and
+descriptor identities with the owner's live layout record, without GuestTexture
+headers in the input contract. Boundary adapters prepare sampling views; native
+preflight rejects unresolved MSAA, invalid dimensions/descriptors/exposure,
+eye-count mismatches and physical-image feedback before GPU work. The desktop
+host build, 30 native texture/post CTests and 43 post/scene source guards pass.
+Two capture-disabled flat diagnostics (default MSAA and no MSAA) each record
+3,601 native post scopes, zero scene-image imports/original scopes/refusals;
+the latter exercises direct source images. No new pixel or VR qualification.
+Initial scene publication copies, output/optical-image adapters, native resolve
+producer wiring and full-frame/game gates remain. No captures, downloads or
+Quest work. Evidence: `research/20260905_2129_native-scene-attachment-images.md`.
+
 Native attachment-resolve prerequisite (2026-09-05, not yet scene-integrated):
 local Plume commit `a8b3c15` adds layered colour/depth MSAA resolve attachments,
-mode/capability preflight and clear/discard handling. Its 8x8 real-GPU test
+mode/capability preflight and clear/discard handling. Test commit `465c2ad` also
+covers actual FP16 HDR/D32_FLOAT_S8_UINT scene formats, depth MIN/SAMPLE_ZERO
+with stencil NONE, resumed LOAD and held clears. Its 8x8 real-GPU test
 passes mono/two-eye sample averaging, depth MIN versus SAMPLE_ZERO, LOAD,
 DISCARD, pending/held zero-draw clears and eighteen-attachment readbacks with
 core/synchronization validation (zero API errors/warnings). The existing 30 CPU

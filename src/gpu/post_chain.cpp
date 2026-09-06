@@ -179,7 +179,7 @@ struct BloomMaskView {
 
 // What the dof draw bound, kept for the composite at the ms_tex draw.
 struct DofInputs {
-  GuestTexture *depth = nullptr;
+  SampledImage depth;
   GuestTexture *levels[5] = {};
   // The scene as the dof draw saw it: the first resolve's content (the
   // surface when that resolve aliased, the texture otherwise) and its
@@ -187,7 +187,7 @@ struct DofInputs {
   // the two the guest resolves its (dropped) dof output into the same
   // texture at scale 1, which under the host chain is a seeded, unscaled
   // copy of the scene - the frame came out four times too bright reading it.
-  GuestTexture *scene_src = nullptr;
+  SampledImage scene_src;
   GuestTexture *scene_tex = nullptr;
   // The level atlas (bd_host_post_atlas): one pass, the levels side by side.
   Scratch *atlas = nullptr;
@@ -408,6 +408,18 @@ bool Readable(GuestTexture *t) {
          t->layers <= 2;
 }
 
+SampledImage Snapshot(GuestTexture *t) {
+  if (!t) return {};
+  return {t->texture, &t->layout, t->width, t->height, t->layers,
+          t->format, t->descriptorIndex, t->sampleCount};
+}
+bool Readable(const SampledImage &image) { return bool(image); }
+const SampledImage *NativeSource(VideoState &s, const SampledImage &image) {
+  if (!image) return nullptr;
+  Transition(s, image.texture, *image.layout, plume::RenderTextureLayout::SHADER_READ);
+  return &image;
+}
+
 // Explicit native inputs must own their sampling readiness. A newly created
 // depth image has never passed through the compatibility SetTexture path;
 // waiting for that side effect would execute one guest post scope per scene.
@@ -502,7 +514,7 @@ bool BuildDofAtlas(VideoState &s, Chain &c, const HostPostInputs &inputs,
   if (!pyr || !atlas)
     return false;
   c.dof.scene_scale = inputs.exposure;
-  c.dof.scene_src = scene;
+  c.dof.scene_src = *scene;
   Transition(s, atlas->texture.get(), atlas->layout, plume::RenderTextureLayout::COLOR_WRITE);
   u32 x = 0;
   for (u32 level = 0; level < 5; ++level) {
@@ -510,7 +522,7 @@ bool BuildDofAtlas(VideoState &s, Chain &c, const HostPostInputs &inputs,
     const u32 w = std::max(1u, scene->width >> shift);
     const u32 h = std::max(1u, scene->height >> shift);
     PassAt(s, pyr, atlas->framebuffer.get(), x, 0, w, h,
-           PostPush{scene->descriptorIndex, level,
+           PostPush{scene->descriptor_index, level,
                     float(REXCVAR_GET(bd_host_post_blur)), inputs.exposure},
            /*keep_bound=*/level + 1 < 5);
     c.dof.rects[level][0] = float(x) / float(atlas->width);
@@ -537,7 +549,7 @@ bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
                      GuestTexture *depth_texture, const DofParameters &parameters) {
   if (REXCVAR_GET(bd_host_post_atlas)) {
     const bool built = BuildDofAtlas(s, c,
-        {Content(scene_texture), Content(depth_texture), SourceScale(scene_texture)}, parameters);
+        {Snapshot(Content(scene_texture)), Snapshot(Content(depth_texture)), SourceScale(scene_texture)}, parameters);
     c.dof.scene_tex = scene_texture; // compatibility cleanup identity only
     return built;
   }
@@ -553,7 +565,7 @@ bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
   // alias of the unscaled surface. 0 means 1 to the shader.
   float level_scale = SourceScale(scene_texture);
   c.dof.scene_scale = level_scale;
-  c.dof.scene_src = scene;
+  c.dof.scene_src = Snapshot(scene);
   c.dof.scene_tex = scene_texture;
   u32 filled = 0;
   for (u32 slot = 2; slot <= 6; ++slot) {
@@ -587,7 +599,7 @@ bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
   // A missing tail repeats the last level, so the composite always has five.
   for (u32 i = filled; i < 5; ++i)
     c.dof.levels[i] = c.dof.levels[filled - 1];
-  c.dof.depth = Content(depth_texture);
+  c.dof.depth = Snapshot(Content(depth_texture));
   c.dof.parameters = parameters;
   c.dof.valid = Readable(c.dof.depth);
   if (c.dof_frames++ < 3)
@@ -601,7 +613,7 @@ bool BuildDofPyramid(VideoState &s, Chain &c, GuestTexture *scene_texture,
 
 // The bloom mask into the slot-1 texture the guest's ms_tex samples (and the
 // host composite reads): bright pass at the mask's size, two blur passes.
-GuestTexture *BuildBloomMask(VideoState &s, Chain &c, GuestTexture *scene,
+GuestTexture *BuildBloomMask(VideoState &s, Chain &c, const SampledImage *scene,
                              u32 device_guest) {
   GuestTexture *dst = s.textures[1];
   if (!scene || !dst || !dst->texture || dst->layers != scene->layers ||
@@ -622,7 +634,7 @@ GuestTexture *BuildBloomMask(VideoState &s, Chain &c, GuestTexture *scene,
   const u32 ratio = scene->width >= w * 2 ? scene->width / w : 1;
   Transition(s, a->texture.get(), a->layout, plume::RenderTextureLayout::COLOR_WRITE);
   Pass(s, bright, a->framebuffer.get(), w, h,
-       PostPush{scene->descriptorIndex, ratio, threshold, intensity});
+       PostPush{scene->descriptor_index, ratio, threshold, intensity});
   Transition(s, a->texture.get(), a->layout, plume::RenderTextureLayout::SHADER_READ);
   Transition(s, b->texture.get(), b->layout, plume::RenderTextureLayout::COLOR_WRITE);
   Pass(s, blur, b->framebuffer.get(), w, h, PostPush{a->slot, 0, 1.0f, 0.0f});
@@ -658,7 +670,7 @@ PostAttachment Attachment(Scratch *target) {
   return {target->texture.get(), target->framebuffer.get(),
           target->width, target->height, target->layers, target->format};
 }
-bool HostComposite(VideoState &s, Chain &c, GuestTexture *scene,
+bool HostComposite(VideoState &s, Chain &c, const SampledImage *scene,
                    GuestTexture *bloom, const PostAttachment &rt,
                    const BloomParameters &parameters,
                    const HeatShimmerParameters &heat = {}, GuestTexture *heat_image = nullptr,
@@ -687,7 +699,7 @@ bool HostComposite(VideoState &s, Chain &c, GuestTexture *scene,
     return bail("inputs");
   if (!rt.texture || !rt.framebuffer || rt.layers > 2)
     return bail("target");
-  GuestTexture *depth = NativeSource(s, c.dof.depth);
+  const auto *depth = NativeSource(s, c.dof.depth);
   if (!depth)
     return bail("depth not readable");
   CompositeConstants k{};
@@ -711,7 +723,7 @@ bool HostComposite(VideoState &s, Chain &c, GuestTexture *scene,
     k.w0[i] = parameters.scene_weight[i];
     k.w1[i] = parameters.bloom_weight[i];
   }
-  k.indices0[0] = depth->descriptorIndex;
+  k.indices0[0] = depth->descriptor_index;
   k.bloom[0] = parameters.threshold;
   k.bloom[1] = parameters.intensity;
   k.bloom[2] = fold ? 1.0f : 0.0f;
@@ -753,7 +765,7 @@ bool HostComposite(VideoState &s, Chain &c, GuestTexture *scene,
   s.command_list->setGraphicsDescriptorSetDynamic(
       s.constant_descriptor_set.get(), kConstantDescriptorSetIndex, offsets, 3);
   Pass(s, pipe, fb, rt.width, rt.height,
-       PostPush{scene->descriptorIndex,
+       PostPush{scene->descriptor_index,
                 bloom ? bloom->descriptorIndex : 0u,
                 float(REXCVAR_GET(bd_host_post_debug_depth)
                           ? 1
@@ -769,7 +781,7 @@ bool HostComposite(VideoState &s, Chain &c, GuestTexture *scene,
 #endif
 }
 
-BloomMaskView BuildDirectionalBloom(VideoState &s, Chain &c, GuestTexture *scene,
+BloomMaskView BuildDirectionalBloom(VideoState &s, Chain &c, const SampledImage *scene,
                                     const BloomParameters &parameters,
                                     const std::array<Scratch *, 2> &atlases) {
   const auto &directional = parameters.directional;
@@ -851,13 +863,20 @@ bool RenderLensFlare(VideoState &s, Chain &c, const PostAttachment &output,
 bool HostPostImportInputs(GuestTexture *scene, GuestTexture *depth, HostPostInputs &inputs) {
   auto &s = state();
   std::lock_guard lock(s.mutex);
-  const HostPostInputs imported{Content(scene), Content(depth), SourceScale(scene)};
-  if (!s.ready || !imported.scene || !imported.scene->texture ||
-      !imported.depth || !imported.depth->texture ||
+  if (!s.ready || !PrepareReadable(s, Content(scene)) || !PrepareReadable(s, Content(depth)))
+    return false;
+  const HostPostInputs imported{Snapshot(Content(scene)), Snapshot(Content(depth)), SourceScale(scene)};
+  if (!imported.scene || !imported.depth ||
       !std::isfinite(imported.exposure) || imported.exposure <= 0)
     return false;
   inputs = imported;
   return true;
+}
+
+SampledImage BorrowPostImage(GuestTexture *image) {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  return s.ready && PrepareReadable(s, image) ? Snapshot(image) : SampledImage{};
 }
 
 bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
@@ -876,25 +895,19 @@ bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
   auto &s = state();
   std::lock_guard lock(s.mutex);
   auto &c = chain();
-  auto *source = inputs.scene;
-  auto *z = inputs.depth;
+  const auto *source = &inputs.scene;
+  const auto *z = &inputs.depth;
   if (!s.ready || c.failed || !std::isfinite(inputs.exposure) || inputs.exposure <= 0)
     return false;
-  const bool scene_ready = PrepareReadable(s, source);
-  const bool depth_ready = PrepareReadable(s, z);
-  if (!scene_ready || !depth_ready ||
-      !output || !output->texture || source == output || z == output ||
-      source->layers != z->layers || source->layers != output->layers) {
+  if (!output || !inputs.CanRenderTo(output->texture, output->layers)) {
     static u32 refused = 0;
     if (refused++ < 8)
       BD_WARN("[native-post] image preflight frame {} ready {} failed {}; "
-              "source {:08X} texture {} slot {} layers {}; depth {:08X} texture {} slot {} layers {}; "
+              "source texture {} slot {} layers {}; depth texture {} slot {} layers {}; "
               "output {:08X} texture {} layers {}",
               FrameStatFrameCount(), s.ready, c.failed,
-              source ? source->selfVa : 0, source && source->texture,
-              source ? source->descriptorIndex : kInvalidDescriptorIndex, source ? source->layers : 0,
-              z ? z->selfVa : 0, z && z->texture,
-              z ? z->descriptorIndex : kInvalidDescriptorIndex, z ? z->layers : 0,
+              bool(source->texture), source->descriptor_index, source->layers,
+              bool(z->texture), z->descriptor_index, z->layers,
               output ? output->selfVa : 0, output && output->texture, output ? output->layers : 0);
     return false;
   }
@@ -1164,20 +1177,17 @@ bool HostPostIntercept(VideoState &s, u64 ps_hash, u32 device_guest) {
       DrawQueueFlush(s.command_list);
     // The scene the dof draw saw (see DofInputs); the ms_tex slot 0 is the
     // guest's re-resolve of its dropped dof output.
-    GuestTexture *scene = c.dof.valid && Readable(c.dof.scene_src)
-                              ? c.dof.scene_src
-                              : Source(s, s.textures[0]);
+    const auto imported_scene = c.dof.valid && Readable(c.dof.scene_src)
+        ? SampledImage{} : Snapshot(Source(s, s.textures[0]));
+    const auto *scene = NativeSource(s, c.dof.valid && Readable(c.dof.scene_src)
+                              ? c.dof.scene_src : imported_scene);
     // (scene is null under multiview, where the chain does not run on the
     // two-layer targets yet; the null must not be compared into a deref.)
-    if (scene && scene == c.dof.scene_src)
-      Transition(s, scene->texture, scene->layout,
-                 plume::RenderTextureLayout::SHADER_READ);
     // The bloom mask reads the first dof level rather than the scene: half
     // the texels, and already scaled when the scene is a scaled alias.
-    GuestTexture *bloom_src =
-        c.dof.valid && c.dof.levels[0] ? Content(c.dof.levels[0]) : nullptr;
-    if (!Readable(bloom_src) || c.dof.scene_scale == 1.0f)
-      bloom_src = scene;
+    const auto imported_bloom = Snapshot(c.dof.valid && c.dof.levels[0] ? Content(c.dof.levels[0]) : nullptr);
+    const auto *bloom_src = !Readable(imported_bloom) || c.dof.scene_scale == 1.0f
+        ? scene : NativeSource(s, imported_bloom);
     // Folded: the composite takes the bright pass of dof level 2 (240x135,
     // twice dual-downsampled, a spread comparable to the guest's two 9-tap
     // blurs at 480x270) instead of three passes into a mask texture

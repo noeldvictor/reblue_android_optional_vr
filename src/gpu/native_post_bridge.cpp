@@ -432,9 +432,9 @@ void PublishPostOutput(GuestTexture *completed, GuestTexture *scene_output) {
     throw std::runtime_error("Native post output publication failed");
   ++stats.final_publications;
 }
-bool AcquirePostTargets(GuestTexture *scene, GuestTexture *depth, uint32_t count,
+bool AcquirePostTargets(GuestTexture *scene, const SampledImage &depth, uint32_t count,
                         PostTargets &targets) {
-  if (!scene || !scene->texture || !depth || !depth->texture || !count || count > 2)
+  if (!scene || !scene->texture || !depth || !count || count > 2)
     return false;
   constexpr std::array roles{HostTargetClass::PostColor, HostTargetClass::PostColorAlternate};
   for (uint32_t i = 0; i < count; ++i) {
@@ -500,7 +500,7 @@ bool RunEffectSequence(uint32_t list, HostPostInputs inputs, GuestTexture *scene
     // Later roots must observe that ordered update, not their preflight value.
     if (i && plan.has_dof && !ReadDofProducerParameters(plan.owner + 3440, plan.dof))
       throw std::runtime_error("Native effect sequence lost its preflighted focus input");
-    if (i) inputs.scene = targets.images[sequence->Output(i - 1)];
+    if (i) inputs.scene = BorrowPostImage(targets.images[sequence->Output(i - 1)]);
     inputs.exposure = sequence->Exposure(i, exposure);
     if (!RenderPostPlan(plan, inputs, targets.images[sequence->Output(i)])) {
       if (i) throw std::runtime_error("Native effect sequence refused after a completed root");
@@ -721,8 +721,8 @@ REX_HOOK_RAW(sub_8221B1D8) {
     auto *depth = Texture(kDepth);
     PostTargets targets;
     HostPostInputs inputs;
-    if (AcquirePostTargets(scene, depth, 1, targets) &&
-        HostPostImportInputs(scene, depth, inputs) &&
+    if (HostPostImportInputs(scene, depth, inputs) &&
+        AcquirePostTargets(scene, inputs.depth, 1, targets) &&
         RenderPostPlan(plan, inputs, targets.images[0])) {
       ++stats.image_imports;
       PublishPostOutput(targets.images[0], scene);

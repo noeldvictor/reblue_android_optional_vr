@@ -11,6 +11,7 @@
 #pragma once
 #include <rex/types.h>
 #include <array>
+#include "gpu/host_post_inputs.h"
 
 namespace bd::gpu {
 
@@ -24,13 +25,9 @@ struct ScanlineParameters;
 struct GradeParameters;
 struct HeatShimmerParameters;
 
-// Borrowed, synchronous render inputs. These name the actual sampled images,
-// not resolve destinations. Owners keep them alive until rendering completes.
-struct HostPostInputs {
-  GuestTexture *scene = nullptr;
-  GuestTexture *depth = nullptr;
-  float exposure = 1.0f;
-};
+// Boundary adapter only: prepare a known image's native sampling view. Does
+// not follow resolve links, import texture slots, or allocate a guest resource.
+SampledImage BorrowPostImage(GuestTexture *image);
 
 // Temporary scene/getter boundary: import an alias or an already materialized
 // output once. No draw or copy is issued. Native stages never call this helper.

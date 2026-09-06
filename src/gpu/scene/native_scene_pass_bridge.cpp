@@ -296,7 +296,7 @@ bool End(PPCContext &ctx, uint32_t source) {
   if (current_result && Words(kPhase, 4) && bd::mem::load<int32_t>(kPhase) == 3)
     current_result->Complete(bd::mem::load<uint32_t>(source + 4),
         bd::mem::load<uint32_t>(source + 8),
-        {sampled_color.image, sampled_depth.image, sampled_color.exposure},
+        {BorrowPostImage(sampled_color.image), BorrowPostImage(sampled_depth.image), sampled_color.exposure},
         pass.color, pass.depth, color_output, depth_output);
   ReleaseResourceAdapter(pass.color->selfVa);
   bd::mem::store<uint32_t>(source + 28, 0);
@@ -365,8 +365,8 @@ void NativeSceneResultScope::Complete(uint32_t color_getter, uint32_t depth_gett
           "Completed native scene lost its output adapter");
     result.output_references[i] = outputs[i]->selfVa;
   }
-  stats.materialized_color += inputs.scene != color;
-  stats.materialized_depth += inputs.depth != depth;
+  stats.materialized_color += inputs.scene.texture != color->texture;
+  stats.materialized_depth += inputs.depth.texture != depth->texture;
   result_.Complete(frame_, std::move(result));
   ++stats.completed;
 }

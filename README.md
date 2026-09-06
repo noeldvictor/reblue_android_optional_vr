@@ -97,7 +97,13 @@ Quest-ready release.
 | Desktop verification | All 30 material/texture/state/camera/post CTests and 45 source guards pass; scene-result normal flat/VR have zero post getter imports/fallbacks, 0/119 large changes, no cyan hits and correctly crossed first/last VR depth; both eyes inspected | Authored effect events, multi-root/HDR/nested-view GPU cases, title artwork, distant VR blur, per-eye flare optics and VR character-shadow/full-game coverage remain unqualified; earlier late-scene failures are not superseded |
 | Android / Quest 2 | ARM64 build/APK and OpenXR/controller foundations exist from earlier work | Full desktop completion gate, then fresh device qualification and optimization |
 
-The latest [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
+Newer [native sampled-image work](research/20260905_2129_native-scene-attachment-images.md)
+removes guest resource headers from scene/post inputs and extends native resolve
+GPU tests to the scene's HDR/depth formats. The host build, CPU/input checks and
+capture-disabled flat diagnostics pass; native resolve producer wiring and fresh
+full-frame pixel verification remain unfinished.
+
+The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
 Six superseded normal raw sets and their automatic copies/links were removed,
 retaining their 16 previews and reports; two new sets form the baseline. Net
