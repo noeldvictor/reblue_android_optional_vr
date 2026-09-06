@@ -163,6 +163,15 @@ diagnostics. Documentation-only work needs focused text/diff checks, not a new
 build or game run. Automatic goal continuations and unattended runs obey the
 same limits; they do not authorize more storage or reset a checkpoint's budget.
 
+Unless the owner approves a different budget, cap a checkpoint at **2 GiB peak
+additional disk use**, **100 MiB of newly retained diagnostics** (including any
+downloaded diagnostic tools) and **10 MiB of aggregate build/test logs**. These
+are ceilings, not allowances to spend; keep smaller jobs smaller. Existing
+tighter limits and the free-space/capture gates below still apply. Count all
+attempts and continuations together, including unfinished prior work; do not
+rename a checkpoint to reset its budget. If the work cannot fit, pause the
+space-producing step and ask before increasing these limits.
+
 - Check actual volume free space before builds, asset cooking, downloads and
   captures. Estimate peak additional space first: final outputs plus overlapping
   temporary, extraction, conversion and linker files. For a large job, record
