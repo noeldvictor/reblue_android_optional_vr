@@ -195,12 +195,22 @@ Ignored files still consume disk: a clean `git status` is not a storage check.
 Count build outputs, caches, captures, logs, asset intermediates and Git history,
 including temporary outputs that exist only while a job is running.
 
-Default to **no new large artifacts unless the current change needs them**.
-Reuse existing outputs, build incrementally and disable captures for nonvisual
-diagnostics. Documentation-only work needs focused text/diff checks, not a new
-build or game run. Do not create diagnostic directories, screenshots or dated
-research reports merely to record an instruction-file or other text-only edit;
-update the relevant existing documentation and report read-only disk checks
+Default to **no new artifacts unless the current request needs them**. For every
+output-producing command, including a retry, follow this order:
+
+1. Inspect and reuse existing evidence, tools and outputs where sufficient.
+2. Choose the smallest necessary output; set its location, aggregate size limit
+   and stop condition before launch. Include automatic caches and temporary files.
+3. Budget replacement overlap and validate new evidence before retiring the old.
+4. Remove verified superseded agent-created outputs, then report actual retained
+   growth and reclaimed bytes. Do not start another run with an unreviewed backlog.
+
+These checks should be lightweight for small commands; they do not require a new
+report or inventory file. Reuse existing outputs, build incrementally and disable
+captures for nonvisual diagnostics. Documentation-only work needs focused
+text/diff checks, not a new build or game run. Do not create diagnostic directories,
+screenshots or dated research reports merely to record an instruction-file or
+other text-only edit; update the relevant existing documentation and report read-only disk checks
 inline. Reuse an open checkpoint's storage ledger instead of creating a new
 per-turn accounting file. Automatic goal continuations and unattended runs obey
 the same limits; they do not authorize more storage or reset a checkpoint's budget.
