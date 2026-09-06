@@ -58,7 +58,7 @@ struct GuestTraverseCtx {
   be_u32 sceneGraph; // +0x04 root node at sceneGraph+0x10
   be_u32 palette;    // +0x08 matrix palette base, 64 bytes per slot
   u8 _0C[0x20];
-  be_f32 radiusScale; // +0x2C min of the three axis scales
+  be_f32 radiusScale; // +0x2C max of the three axis scales
 };
 static_assert(offsetof(GuestTraverseCtx, radiusScale) == 0x2C);
 
@@ -66,7 +66,9 @@ static_assert(offsetof(GuestTraverseCtx, radiusScale) == 0x2C);
 constexpr u32 kVisualBoneCount = 0x74C;
 constexpr u32 kVisualSkinned = 0x780;
 constexpr u32 kVisualWorld = 0x954;
-constexpr u32 kVisualBoneContainer = 0xA40;
+// InitBones and model-unload both pass visual+2632 to the lane container API.
+// +0xA40 is a separate metadata pointer, not the palette container.
+constexpr u32 kVisualBoneContainer = 0xA48;
 constexpr u32 kVisualTech = 0xBB8;         // the technique id the PSO predictor tracks
 // A byte per matrix index, incremented by the walk for every node drawn in
 // render view 1 (the guest's own per-node draw counter).

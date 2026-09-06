@@ -110,6 +110,7 @@ public:
   std::shared_ptr<const ModelMaterialImport> Find(
       uint32_t source_model, uint32_t source_mesh);
   ModelMaterialRegistryStats Stats() const;
+  uint64_t Generation(uint32_t source_model) const;
   // Logical retained vector storage plus a conservative per-model bookkeeping
   // allowance. Shared material assets and geometry have their own library/GPU
   // arena budgets; retired geometry currently remains in the bounded GPU cache.
@@ -121,6 +122,7 @@ private:
     std::atomic<size_t> live{0}, bytes{0};
   };
   struct Model {
+    uint64_t generation = 0;
     std::vector<ModelMaterialImport> meshes;
     std::shared_ptr<Accounting> accounting;
     size_t bytes = 0;

@@ -213,6 +213,10 @@ std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {
 
 } // namespace
 
+uint64_t LoadedNativeModelGeneration(uint32_t source_model) {
+  return Models().Generation(source_model);
+}
+
 std::shared_ptr<const NativeGeometry> FindLoadedNativeGeometry(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,
     uint32_t first_index, uint32_t index_count, uint64_t layout, uint32_t stride) {

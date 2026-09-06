@@ -50,6 +50,7 @@
 #include "gpu/resources.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/host_draw.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/host_frustum_bridge.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/shadow_fit.h"
@@ -115,6 +116,8 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
       bd::mem::try_field<u32>(ctx_va, offsetof(GuestTraverseCtx, palette));
   const float radius_scale =
       LoadF32(ctx_va + offsetof(GuestTraverseCtx, radiusScale));
+  const auto instance_pose = FindNativeInstancePose(
+      bd::mem::try_load<u32>(ctx_va), bd::mem::try_load<u32>(ctx_va + 4), palette);
 
   const u32 saved_r1 = ctx.r1.u32;
   const u32 frame = saved_r1 - kFrameBytes;
@@ -231,11 +234,13 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           // up in the Quest profile.
           float m[16];
           float c[3];
-          const auto *mp = bd::mem::try_at<const be_u32>(matrix);
+          const bool native_pose = instance_pose && index < instance_pose->transforms.size();
+          const auto *mp = native_pose ? nullptr : bd::mem::try_at<const be_u32>(matrix);
           const auto *cp = bd::mem::try_at<const be_u32>(mesh + offsetof(GuestMesh, centre));
-          if (!mp || !cp)
+          if ((!native_pose && !mp) || !cp)
             goto children; // nothing to draw; the subtree still walks
           for (u32 i = 0; i < 16; ++i) {
+            if (native_pose) { m[i] = instance_pose->transforms[index][i]; continue; }
             const u32 bits = static_cast<u32>(mp[i]);
             std::memcpy(&m[i], &bits, sizeof(float));
           }

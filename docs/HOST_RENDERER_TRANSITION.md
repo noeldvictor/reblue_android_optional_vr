@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after load-owned geometry/material associations. These milestones organize the
+Updated 2026-09-06 after native instance render-pose publication. These milestones organize the
 unchanged completion requirements above; none is a substitute for the full gate.
 
 1. **Scene/material dependency map and targeted verification.** Start from
@@ -47,7 +47,10 @@ unchanged completion requirements above; none is a substitute for the full gate.
    Geometry/buffer associations now resolve during load, and converted base
    geometry replays consume load-owned GPU handles. Control/texture/pass inputs,
    independent layouts, source-key adapter and draw templates remain. Next are
-   native instance updates and direct draws, not another first-draw cache.
+   complete native object/update contracts and direct draws, not another first-draw cache.
+   Native IDs and final render-pose snapshots now feed traversal/replay, including
+   the actual dirty-state-gated handoff and late pose writers. Pose calculation,
+   original copy, secondary palettes and the source index remain temporary.
    Scenario checks must establish feature execution; empty queues are untested.
    The loader visibility/slot readers and idle-state contract are corrected:
    two post-event state-0 samples now pass with positive material/lookup deltas.
@@ -62,8 +65,9 @@ unchanged completion requirements above; none is a substitute for the full gate.
    adapters need explicit removal conditions, not permanent address identities.
    Native mesh disk retention is now independently bounded (256 MiB /16,384
    files, free-space reserve and writer lease). The existing GPU arena remains
-   separate. Load-time base-geometry production is now active; native instance
-   ownership, independent layouts and direct submission are still required.
+   separate. Load-time base geometry and render-pose snapshots are now active;
+   complete native update production, independent layouts and direct submission
+   are still required.
 3. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
    and verify characters in the relevant field/battle/cutscene/shadow paths.
@@ -84,6 +88,19 @@ work over introducing a new build system. No overall development-speed
 multiplier is established.
 
 ## Latest qualified checkpoint
+
+Instance render poses (2026-09-06): native IDs/generations, bounded immutable pose
+storage, completed render-handoff publication and traversal/replay consumers.
+The final boundary includes late writers after InitBones and the actual derived
+copy callback's dirty-state gate. Host 53, Release fixture/CPU 09, 137 source
+guards and 11 scenario cases pass. Flat PSO-off run 900: 239 live instances
+/368,896 B, 118,851 fresh matching pose reads, zero pose misses/refusals/drift;
+fresh geometry/material checks also match. One full-size sanity image inspected.
+Original pose calculation/copy, secondary palettes, skin gathering, source index,
+templates and direct scene/shadow submission remain. This does not qualify
+movement/reload sequences, effects, both eyes or the complete desktop frame.
+Evidence and failed-attempt corrections:
+`research/20260906_1850_native-instance-render-poses.md`.
 
 Load-owned geometry (2026-09-06): the model-load hook resolves primitive buffer/
 declaration associations and produces GPU geometry before publication. Four

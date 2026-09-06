@@ -37,6 +37,8 @@ void TestNativeModelMaterials() {
   Require(!registry.Find(1, 10) && registry.Stats().indexed == 0,
           "lookup must never discover or create a model");
   Require(registry.Publish(1, {Mesh(20), Mesh(10)}), "preload publication");
+  const auto first_generation = registry.Generation(1);
+  Require(first_generation && !registry.Generation(999), "only published native model generations exist");
   auto first = registry.Find(1, 10);
   auto sibling = registry.Find(1, 20);
   Require(first && sibling && first->program.materials[0]->id == sibling->program.materials[0]->id,
@@ -50,6 +52,7 @@ void TestNativeModelMaterials() {
           registry.Stats().live == 1 && registry.Stats().bytes == old_bytes,
           "retired leases remain owned and charged");
   Require(registry.Publish(1, {Mesh(10, 24)}), "source address reuse");
+  Require(registry.Generation(1) > first_generation, "source reuse gets a fresh native generation");
   auto replacement = registry.Find(1, 10);
   Require(replacement && replacement->program.materials[0]->id != old_id &&
           first->program.materials[0]->id == old_id && registry.Stats().live == 2,

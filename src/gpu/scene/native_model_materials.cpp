@@ -48,7 +48,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   if (models_.erase(source_model))
     ++stats_.retired;
   const size_t bytes = RetainedBytes(meshes, meshes.capacity());
-  if (!source_model || meshes.size() > kMaxMeshes || bytes > max_bytes_ ||
+  if (!source_model || stats_.published == UINT64_MAX || meshes.size() > kMaxMeshes || bytes > max_bytes_ ||
       accounting_->bytes.load() > max_bytes_ - bytes ||
       accounting_->live.load() >= max_models_) {
     ++stats_.refused;
@@ -70,6 +70,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
     previous = mesh.source_mesh;
   }
   auto model = std::make_shared<Model>();
+  model->generation = stats_.published + 1;
   model->meshes = std::move(meshes);
   model->bytes = bytes;
   accounting_->bytes.fetch_add(bytes);
@@ -111,6 +112,12 @@ ModelMaterialRegistryStats ModelMaterialRegistry::Stats() const {
   stats.live = accounting_->live.load();
   stats.bytes = accounting_->bytes.load();
   return stats;
+}
+
+uint64_t ModelMaterialRegistry::Generation(uint32_t source_model) const {
+  std::lock_guard lock(mutex_);
+  const auto it = models_.find(source_model);
+  return it == models_.end() ? 0 : it->second->generation;
 }
 
 } // namespace bd::gpu::scene

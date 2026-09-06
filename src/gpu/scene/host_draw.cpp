@@ -74,6 +74,7 @@
 #include "gpu/scene/mesh_lod.h"
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_material.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/native_texture_binding.h"
@@ -2578,7 +2579,9 @@ bool HostDrawReplay(const NodeTag &tag) {
   float world_rows[16];
   {
     float m[16];
-    if (const u8 *src = bd::mem::try_at<u8>(tag.matrix_va)) {
+    if (CopyNativeInstanceWorld(tag, m)) {
+      // Updated by the instance producer, not imported for each replayed node.
+    } else if (const u8 *src = bd::mem::try_at<u8>(tag.matrix_va)) {
       // One translation for the 64 bytes; the guest holds them big-endian.
       for (u32 i = 0; i < 16; ++i) {
         u32 bits;

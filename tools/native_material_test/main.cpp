@@ -12,11 +12,13 @@ void TestMaterialAssets();
 void TestNativeSkinBindings();
 void TestNativeReflectionRecipes();
 void TestNativeModelMaterials();
+void TestNativeInstances();
 void Check(bool good) {
   if (!good)
     throw std::runtime_error("native material check failed");
 }
 static int RunTests(int argc, char **argv) {
+  TestNativeInstances();
   // 0xff inside bone/colour operands must not terminate the stream. Two
   // strips share geometry records but carry different material properties.
   const std::vector<uint16_t> words = {

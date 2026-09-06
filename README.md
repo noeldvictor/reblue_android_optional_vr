@@ -58,20 +58,22 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest ownership checkpoint (2026-09-06): model loading now associates native GPU
-geometry with each primitive's material recipe. Four material/skin/reflection/
-shadow-policy consumers no longer read guest index/vertex association tables.
-The scoped desktop run loads 2,973 primitive geometries across 114 model
-publications, with zero load failures. Converted base-geometry replays reuse
-those handles; LOD/specialized paths and draw templates remain.
+Latest ownership checkpoint (2026-09-06): native instance IDs and immutable render
+poses now feed host traversal and replayed world transforms. Publication follows
+the actual render handoff, including late pose edits; normal draw lookup does not
+import matrices. The scoped field check has 239 live instances /360 KiB,
+118,851 fresh matching pose reads and no pose lookup misses or refusals.
+Host build, Release behavioral fixture, 137 source guards and 11 scenario cases
+pass. One 1920x1080 field image was inspected; **movement, sequences, both eyes
+and full-game qualification remain open**. Original pose calculation/copy,
+secondary palettes, source lookup and retained draw templates remain.
+[Instance implementation and evidence](research/20260906_1850_native-instance-render-poses.md).
 
-Two post-event field samples show 51,173 additional load-owned draws and 2,650
-fresh geometry identity checks, all matching. Another 15,253 diffuse /14,541
-specular comparisons match. Host build, Debug/Release CPU fixtures and 130 source
-guards pass. One 1920x1080 field sanity image was inspected; **movement, sequences,
-both eyes and full-game qualification remain open**. Native instances, independent
-layouts, source-index removal and direct scene/shadow submission are next.
-[Geometry implementation and evidence](research/20260906_1743_load-owned-model-geometry.md).
+The preceding load-owned geometry path supplies 2,973 primitive geometries and
+their material associations. The new field check adds 51,624 native-handle draws
+and 2,700 matching geometry checks. Independent layouts, complete native object/
+texture/pass records and direct scene/shadow submission are next.
+[Geometry implementation](research/20260906_1743_load-owned-model-geometry.md).
 The [corrected loader/field observations](research/20260906_1638_field-state-observations.md)
 remain the scenario gate; water activity alone is not a field identifier.
 
@@ -89,7 +91,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; load-owned primitive geometry/material associations, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and texture associations, independent layouts, dynamic geometry and streaming/backpressure |
-| Scene submission | Host traversal/replay, native packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Native object storage and transforms; replace retained guest draw templates and remaining resource dependencies |
+| Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
 | Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |

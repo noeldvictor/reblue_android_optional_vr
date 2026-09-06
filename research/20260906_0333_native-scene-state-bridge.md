@@ -1308,3 +1308,25 @@ logs, not every attempt. New JPEG shares the existing 10 MiB image reservation.
 Post-cleanup free 64,961,671,168 B; drive-wide use 8,867,840 B from this inventory,
 distinct from the smaller retained task payload. Final docs/Git writes remain
 charged. Native instances/layouts/direct draws and full desktop gate remain.
+
+### Native instance render poses, same checkpoint
+
+Continued the unpublished instance draft on `ad5aa25`, following a read-only
+planning turn. Final handoff publication includes late pose writers and the
+actual derived callback's dirty gate. Host 53, Release CPU 09, 137 source guards,
+11 scenario cases and flat run 900/image pass. Fresh delta 118,851 matching pose
+reads, no pose misses/refusals/drift; 239 live /368,896 B. Full evidence and failed
+attempts 894..899: `20260906_1850_native-instance-render-poses.md`. No full native
+pose calculation, movement/reload/both-eye/complete-frame qualification claimed.
+
+Draft start free 64,957,763,584 B; original <=256 MiB overlap /<=4 MiB fixture/log
+plan and cumulative ceilings remain. No raw/perf/cache/shader dumps or new trees;
+mesh cache unchanged at 3,510 /36,510,144 B. Final fixture payload 2,768,014 B.
+After validating run 900 and its 399,365-byte image, deleted 36 superseded exact
+logs/old geometry JPEG, 1,739,573 logical B. Free 64,882,774,016 ->64,884,563,968 B:
+**1,789,952 B measured reclaimed**, once. Fixture/log/image/build-log retention
+grows **204,331 B** for new boundary coverage; one current representation retained.
+Keep final build 53 /material 10 /CPU 09 and run 900/image, not every attempt.
+Prior protected raw/normal flat-XR/unresolved broad failures and game data remain.
+Post-cleanup drive-wide use 73,199,616 B from draft start, not all attributable to
+the task. Source/docs/Git writes follow; no new raw allowance or budget reset.
