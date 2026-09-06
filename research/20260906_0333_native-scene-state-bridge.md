@@ -1070,3 +1070,46 @@ Net retained diagnostic payload falls 38,397 B. Host +9,216 B, CPU fixture
 Ending post-cleanup volume use +6,451,200 B from Toon preflight, including
 unattributed drive-wide movement; not all volume change is task output. Final
 source/docs/Git writes are measured at handoff. No budget reset or new exception.
+
+### Static-object dependency index, source-only continuation
+
+Previous turn made progress: Toon `f956abd` and workflow/docs `99e6757` were
+published, worktree clean, all producers terminal and profile restored. Final
+free was 65,178,120,192 B (+34,783,232 B drive-wide use from Toon preflight).
+Scoped verification/log/cache/HLSL checks found no new outputs after 15:05;
+26 new Git objects totaled 128,445 B. The remaining drive movement is not
+attributed to the renderer or claimed as cleanup. Earlier savings count once.
+
+Current read-only preflight: 65,176,121,344 B free, no relevant active producer;
+94 retained build logs total 140,140 B. The existing call graph is 2,375,990 B
+and lacks recursion, source locations, indirect and instruction-hook metadata.
+The new parser was verified in memory against all 18,777 generated bodies;
+eight tiny fixture tests pass, with no surviving temporary files. No host/guest
+build, game run, raw image, asset conversion, dump or new diagnostic log is needed.
+
+Reserve at most 8 MiB additional overlap for one explicit bounded replacement
+of `out/callgraph.json`, plus <=200 KiB total temporary test fixtures. The old
+cache remains until atomic replacement succeeds; oversized/low-space/error
+cases retain it. New retained growth, if any, is for source/indirect/hook
+coverage and reusable indexing, not a per-run archive. Keep one current index;
+replace it on source/schema changes, never retain a series. Tools/source edits
+fit the existing reservation and cumulative limits; final sizes/free measured.
+
+Index processes 52853, 73911 and 45602 are terminal (memory-only, schema 2,
+then corrected schema 3). Ten fixture tests pass; real source excludes trailing
+hook prototypes, retains recursion and recognizes Toon macro declarations.
+Final index 8,249,479 B versus original 2,375,990 B: **+5,873,489 B retained**
+for source/indirect/hook coverage and fast reuse. Schema 2's 8,260,958 B file
+was atomically superseded; no partial or index generation archive remains.
+Corrected retry peak: index+temporary <=16 MiB total; actual payload pair
+16,510,437 B, or 14,134,447 B additional over the original cache, rather than
+the initial 8 MiB additional estimate. Actual peak free space was not sampled;
+the cumulative 2 GiB/100 MiB limits remain sufficient. No more index writes
+are needed this checkpoint. Temporary fixture allowance remains <=200 KiB.
+
+Pre-publication free 65,139,838,976 B, +36,282,368 B drive-wide use from this
+preflight; the amount beyond index/source edits is unattributed, not renderer
+output or cleanup savings. No game/build/capture/cache-asset outputs were
+produced, no profile changes. Source map and exact evidence are in
+`20260906_1531_static-model-ownership-frontier.md`. Final Git writes measured
+at handoff; no cleanup credit beyond the already recorded prior checkpoint.

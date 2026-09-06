@@ -37,9 +37,14 @@ unchanged completion requirements above; none is a substitute for the full gate.
    `bdSceneTreeDraw`, `bdSceneNodeCullTraverse`, `bdSceneNodeDrawSingle`,
    `host_walk.cpp`, `host_draw.cpp`, `native_mesh.*` and `native_material.*`.
    Record actual data producers, current replacement hooks, indirect callbacks,
-   consumers and deletion conditions. `tools/callgraph.py` currently sees direct
-   call sites only, not runtime frequency or all indirect targets. Scenario
-   checks must establish feature execution; empty queues are untested coverage.
+   consumers and deletion conditions. The
+   [static-model source map](../research/20260906_1531_static-model-ownership-frontier.md)
+   traces request/build/registration/lifetime/draw boundaries. The existing call
+   graph now exposes direct/original/indirect/instruction-hook sites and
+   conservative host-hook declaration boundaries; linked activation and indirect
+   targets still need review. Next is the load-time native model/primitive record
+   producer, independent of optional PSO precaching, then native consumption.
+   Scenario checks must establish feature execution; empty queues are untested.
 2. **Complete native static-object path.** Reuse the existing native asset
    libraries and submission backend. Move asset/mesh/material association and
    instance storage above draw submission, using stable native handles. Replace

@@ -91,8 +91,13 @@ The dependency-ordered queue is maintained in
 Work is organized around complete producer-to-consumer paths, not isolated
 callback counts:
 
-1. Map the remaining scene/material dependencies, including indirect callbacks
-   and already-replaced bodies; establish repeatable feature-specific checks.
+The [static-model dependency map](research/20260906_1531_static-model-ownership-frontier.md)
+identifies the existing load-time integration points and remaining template/data
+dependencies. The source-index tool now exposes indirect and hook boundaries;
+this tooling checkpoint does not itself convert additional rendering.
+
+1. Resolve the selected scene/material path's remaining indirect/data contracts
+   using that map; establish repeatable feature-specific checks.
 2. Complete one native static-object path from asset loading and material
    association through native instances to scene/shadow submission.
 3. Complete character asset, pose, joint-palette and GPU skinning ownership.
