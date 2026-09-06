@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native single-sample scene framebuffers (2026-09-06, local renderer integration):
+scene begin now constructs mono/stereo framebuffers from retained native images,
+outside the resource-header cache. Bounded residency keys exact source owners and
+density-map identity; fence retirement destroys framebuffers before their source
+images. The existing native MSAA path remains intact. Host build, 31 CPU tests and
+57 source guards pass. Non-MSAA flat/XR record 3,600/10,500 native depth handoffs,
+zero compatibility depth publications and no post imports/refusals; non-MSAA
+recovery publishes all 3,600 pending colours, and default-MSAA regression passes.
+One non-MSAA flat PNG was inspected and replaces its predecessor, not sequence/
+stereo/full-game qualification. Twenty-three superseded diagnostics were removed,
+reclaiming 8,167,424 B measured. Independent contract/tests are locally checkpointed;
+renderer/Plume publishing still requires approval. Native pass command/clear and
+draw-state execution, remaining getters/scaling, full scene/UI/frame ownership and
+desktop game gates remain open. No Quest work.
+Evidence: `research/20260906_0236_native-scene-framebuffers.md`.
+
 Native scene source allocation (2026-09-06, local renderer integration): scene
 colour/depth images now originate in the native store for both single-sample and
 MSAA, using explicit native formats/extent/layers/sample counts. Scene begin no

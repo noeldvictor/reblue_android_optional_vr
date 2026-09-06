@@ -143,16 +143,25 @@ contracts/tests are local checkpoints; renderer
 integration still awaits dependency publication approval. Protected raw/failure
 evidence remains; superseded small diagnostics are cleaned up at checkpoints.
 
-The latest [native scene source allocation](research/20260906_0200_native-scene-source-allocation.md)
+The [native scene source allocation](research/20260906_0200_native-scene-source-allocation.md)
 creates both MSAA and single-sample scene attachments from explicit native recipes;
 it no longer allocates them through SurfacePool or Xbox-format inputs. Binding
 headers remain temporary adapters, and native resolve framebuffers retain their
 source images. Host build, 31 CPU tests, 55 source guards and five bounded flat/XR/
 recovery checks pass, with zero unexpected native-post fallbacks or compatibility
 depth publications. Two flat sanity PNGs were inspected and replaced older
-equivalents; they do not qualify sequences or stereo pixels. Framebuffer/pass
-construction, remaining getters/scaling, full scene/UI/frame ownership and desktop
-game gates remain open. Renderer integration is still unpublished pending approval.
+equivalents; they do not qualify sequences or stereo pixels.
+
+The latest [native scene framebuffer ownership](research/20260906_0236_native-scene-framebuffers.md)
+also removes single-sample scene framebuffer creation from the resource-header
+cache. Exact native attachment owners, mono/stereo recipes and fence retirement
+replace that lifetime dependency. Host build, 31 CPU tests, 57 source guards and
+four bounded flat/XR/recovery checks pass; one non-MSAA flat PNG was inspected,
+not new sequence/stereo qualification. Superseded diagnostics were removed,
+reclaiming 8,167,424 B measured without touching protected raw/failure evidence.
+Native pass commands/clears, remaining getters/scaling, full scene/UI/frame ownership
+and desktop game gates remain open. Independent contracts/tests are local commits;
+renderer integration is still unpublished pending dependency approval.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

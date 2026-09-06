@@ -4,6 +4,7 @@
 #include "gpu/native_post_images.h"
 #include "gpu/native_image_lease.h"
 #include "gpu/post_sequence.h"
+#include "gpu/scene/native_scene_framebuffer.h"
 #include <array>
 #ifdef NDEBUG
 #undef NDEBUG
@@ -333,5 +334,98 @@ void NativeTargetOwnership() {
   assert(store.Stats().failed == 1 && store.Stats().bytes == 0);
   for (const auto &life : lives) assert(!life->descriptor && !life->image && !life->view);
 }
+struct SceneSource : RenderTexture {
+  std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &) const override { return {}; }
+  void setName(const std::string &) override {}
+};
+struct SceneFramebuffer : OutputFramebuffer {
+  std::array<std::weak_ptr<const NativeTargetImage>, 2> sources;
+  explicit SceneFramebuffer(const std::array<NativeTargetImageHandle, 2> &images)
+      : sources{images[0], images[1]} {}
+  ~SceneFramebuffer() override {
+    for (const auto &source : sources) assert(!source.expired());
+  }
+};
+void SceneFramebufferOwnership() {
+  using namespace bd::gpu::scene;
+  assert(!NativeSceneFramebuffer{}.Matches(nullptr, nullptr));
+  const auto source = [](bool depth, uint32_t layers) {
+    auto owner = std::make_shared<NativeTargetImage>();
+    owner->shape = {16, 8, layers, depth ? RenderFormat::D32_FLOAT_S8_UINT : RenderFormat::R16G16B16A16_FLOAT, 1};
+    owner->image = std::make_unique<SceneSource>();
+    owner->descriptor = depth ? 8 : 7;
+    return owner;
+  };
+  for (const auto layers : {1u, 2u}) {
+    NativeSceneFramebufferStore store(2);
+    std::array<NativeTargetImageHandle, 2> sources{source(false, layers), source(true, layers)};
+    std::array<std::weak_ptr<const NativeTargetImage>, 2> weak{sources[0], sources[1]};
+    SceneSource density;
+    uint32_t created = 0;
+    const auto acquire = [&](const std::array<NativeTargetImageHandle, 2> &pair,
+                             const RenderTexture *map = nullptr) {
+      return store.Acquire(pair, map, [&](const RenderFramebufferDesc &desc) {
+        ++created;
+        assert(desc.colorAttachmentsCount == 1 && desc.colorAttachments[0] == pair[0]->image.get());
+        assert(desc.depthAttachment == pair[1]->image.get() && !desc.depthAttachmentReadOnly);
+        assert(desc.viewMask == (layers == 2 ? 3u : 0u));
+        assert(desc.fragmentDensityMap == map);
+        assert(!desc.colorAttachmentViews && !desc.depthAttachmentView && !desc.fragmentDensityMapView);
+        return std::make_unique<SceneFramebuffer>(pair);
+      });
+    };
+    assert(!acquire({}) && !acquire({sources[0], {}}) && !acquire({sources[0], sources[0]}));
+    for (uint32_t field = 0; field < 7; ++field) {
+      auto invalid = source(true, layers);
+      if (field == 0) ++invalid->shape.width;
+      if (field == 1) ++invalid->shape.height;
+      if (field == 2) invalid->shape.layers = layers == 1 ? 2 : 1;
+      if (field == 3) invalid->shape.samples = 4;
+      if (field == 4) invalid->shape.format = RenderFormat::R16G16B16A16_FLOAT;
+      if (field == 5) invalid->descriptor = ~uint32_t{0};
+      if (field == 6) invalid->image.reset();
+      assert(!acquire({sources[0], invalid}));
+    }
+    auto multisampled = source(false, layers); multisampled->shape.samples = 4;
+    assert(!acquire({multisampled, sources[1]}) && created == 0);
+    multisampled.reset();
+    auto first = acquire(sources);
+    assert(first && created == 1 && first->Matches(sources[0]->image.get(), sources[1]->image.get()));
+    assert(!first->Matches(sources[1]->image.get(), sources[0]->image.get()));
+    sources[0]->layout = RenderTextureLayout::SHADER_READ;
+    auto reused = acquire(sources);
+    assert(reused == first && created == 1 && sources[0]->layout == RenderTextureLayout::SHADER_READ);
+    auto foveated = acquire(sources, &density);
+    assert(foveated && foveated != first && created == 2); // map identity is part of the recipe
+    std::array<NativeTargetImageHandle, 2> recreated{source(false, layers), source(true, layers)};
+    assert(!acquire(recreated) && created == 2); // bounded even with retained/pending owners
+    foveated.reset(); store.MarkUnused(0); store.AfterFence(1);
+    assert(store.Stats().resident == 2 && !acquire(recreated));
+    foveated = acquire(sources, &density); // reacquisition cancels retirement
+    store.AfterFence(0);
+    assert(store.Stats().retired == 0 && created == 2);
+    foveated.reset(); store.MarkUnused(1); store.AfterFence(1);
+    assert(store.Stats().retired == 1);
+    auto next = acquire(recreated);
+    assert(next && next != first && created == 3); // same extent is never image identity
+    first.reset(); reused.reset(); sources = {};
+    store.MarkUnused(0); store.AfterFence(1);
+    for (const auto &owner : weak) assert(!owner.expired());
+    store.AfterFence(0);
+    for (const auto &owner : weak) assert(owner.expired());
+    next.reset(); recreated = {}; store.MarkUnused(1); store.AfterFence(1);
+    assert(!store.Stats().resident && !store.Stats().bytes && store.Stats().retired == 3);
+    assert(store.Stats().refused == 2);
+  }
+  std::array<NativeTargetImageHandle, 2> sources{source(false, 1), source(true, 1)};
+  NativeSceneFramebufferStore failure(1);
+  assert(!failure.Acquire(sources, nullptr, [](const RenderFramebufferDesc &) {
+    return std::unique_ptr<RenderFramebuffer>{};
+  }));
+  assert(failure.Stats().failed == 1 && failure.Stats().bytes == 0 && failure.Stats().resident == 0);
+}
 } // namespace
-int main() { OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership(); }
+int main() {
+  OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
+  SceneFramebufferOwnership();
+}
