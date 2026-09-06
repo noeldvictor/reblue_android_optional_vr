@@ -30,6 +30,19 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native attachment-resolve prerequisite (2026-09-05, not yet scene-integrated):
+local Plume commit `a8b3c15` adds layered colour/depth MSAA resolve attachments,
+mode/capability preflight and clear/discard handling. Its 8x8 real-GPU test
+passes mono/two-eye sample averaging, depth MIN versus SAMPLE_ZERO, LOAD,
+DISCARD, pending/held zero-draw clears and eighteen-attachment readbacks with
+core/synchronization validation (zero API errors/warnings). The existing 30 CPU
+tests also pass, without rebuilding them. This does not remove the scene's
+current publication copies: native producer wiring, exposure/alpha/extent
+semantics and full-frame pixel verification remain. The dependency push was
+blocked by auto-review pending explicit owner approval; the parent gitlink is
+not committed. No main-game build, capture or Quest run. Exact evidence and
+small-tool storage accounting: `research/20260905_2047_native-attachment-resolves.md`.
+
 Scoped native scene-result checkpoint (2026-09-05): scene end supplies exact
 sampled colour/depth/exposure through a per-view, frame-bounded, single-use
 result. Native target pins and temporary output references preserve its lifetime;
