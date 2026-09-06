@@ -5,6 +5,8 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_scene_pass.h"
+#include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene_image.h"
 #include "gpu/scene/native_pass_bridge.h"
 #include "gpu/scene/native_view_bridge.h"
 #include "core/logging.h"
@@ -49,6 +51,7 @@ constexpr uint32_t kLast = (uint32_t(-32035) << 16) + 28608;
 constexpr uint32_t kSecondary = (uint32_t(-32137) << 16) + 28452;
 constexpr uint32_t kHdr = (uint32_t(-32136) << 16) + 14888 + 12;
 constexpr uint32_t kOne = (uint32_t(-32251) << 16) + 20908;
+constexpr uint32_t kPhase = (uint32_t(-32137) << 16) + 16476;
 // Header formats belong only to the existing texture/getter adapter. Roles are
 // explicit even for a square scene, no-MSAA scene, or small offscreen scene.
 constexpr uint32_t kColorFormat = 0x1A2201BF, kDepthFormat = 0x2D200196;
@@ -58,10 +61,12 @@ struct ScenePass {
   std::size_t nesting = 0;
 };
 thread_local std::vector<ScenePass> scenes;
+thread_local NativeSceneResultScope *current_result = nullptr;
 struct Stats {
   uint64_t begins = 0, ends = 0, compatibility_begin = 0, compatibility_end = 0;
   uint64_t refused = 0, outputs = 0, null_outputs = 0, checked = 0, wrong = 0;
   uint64_t camera_calls = 0, state308_calls = 0, parameters = 0, empty_clears = 0;
+  uint64_t completed = 0, consumed = 0, materialized_color = 0, materialized_depth = 0;
   uint32_t frame = 0;
 };
 thread_local Stats stats;
@@ -77,6 +82,9 @@ void Report() {
           stats.compatibility_end, stats.refused, stats.outputs, stats.null_outputs,
           stats.empty_clears, stats.checked, stats.wrong, stats.camera_calls,
           stats.state308_calls, stats.parameters);
+  BD_INFO("[native-scene] completed image results {} consumed {}; materialized colour {} depth {}; "
+          "per-view native pins, single-use inputs; output/resource publications remain",
+          stats.completed, stats.consumed, stats.materialized_color, stats.materialized_depth);
   stats.frame = frame;
 }
 bool Range(uint64_t address, uint64_t bytes) {
@@ -270,18 +278,26 @@ bool End(PPCContext &ctx, uint32_t source) {
     ++stats.empty_clears;
   }
   const float exposure = SceneOutputExposure(bd::mem::load<uint8_t>(kHdr) != 0);
+  SceneImage sampled_color, sampled_depth;
   if (depth_output) {
-    Check(Video::PublishSceneOutput(pass.depth, depth_output, 1.0f),
+    Check(Video::PublishSceneOutput(pass.depth, depth_output, 1.0f, true, &sampled_depth),
           "Native scene depth publication failed");
     ++stats.outputs;
   } else ++stats.null_outputs;
   if (color_output) {
-    Check(Video::PublishSceneOutput(pass.color, color_output, exposure),
+    Check(Video::PublishSceneOutput(pass.color, color_output, exposure, true, &sampled_color),
           "Native scene colour publication failed");
     ++stats.outputs;
   } else ++stats.null_outputs;
   uint32_t result = 0;
   Check(LeaveNativePass(result), "Native scene could not restore its previous pass");
+  // Final phase 3 ends through this vtable entry before the caller's focus and
+  // post tail. Publish exact images while the native attachments are still held.
+  if (current_result && Words(kPhase, 4) && bd::mem::load<int32_t>(kPhase) == 3)
+    current_result->Complete(bd::mem::load<uint32_t>(source + 4),
+        bd::mem::load<uint32_t>(source + 8),
+        {sampled_color.image, sampled_depth.image, sampled_color.exposure},
+        pass.color, pass.depth, color_output, depth_output);
   ReleaseResourceAdapter(pass.color->selfVa);
   bd::mem::store<uint32_t>(source + 28, 0);
   ctx.r3.u64 = ReleaseResourceAdapter(pass.depth->selfVa);
@@ -292,10 +308,82 @@ bool End(PPCContext &ctx, uint32_t source) {
   return true;
 }
 } // namespace
+
+CompletedSceneImages::CompletedSceneImages(CompletedSceneImages &&other) noexcept {
+  *this = std::move(other);
+}
+CompletedSceneImages &CompletedSceneImages::operator=(CompletedSceneImages &&other) noexcept {
+  if (this != &other) {
+    Reset();
+    inputs = std::exchange(other.inputs, {});
+    output = std::exchange(other.output, nullptr);
+    source_pins = std::exchange(other.source_pins, {});
+    output_references = std::exchange(other.output_references, {});
+  }
+  return *this;
+}
+CompletedSceneImages::~CompletedSceneImages() { Reset(); }
+void CompletedSceneImages::Reset() {
+  for (auto &address : output_references)
+    if (address) ReleaseResourceAdapter(std::exchange(address, 0));
+  for (auto &image : source_pins)
+    if (image) HostTargetUnpin(std::exchange(image, nullptr));
+  inputs = {};
+  output = nullptr;
+}
+NativeSceneResultScope::NativeSceneResultScope(uint32_t view)
+    : previous_(current_result), view_(view), frame_(FrameStatFrameCount()) {
+  // Only boundary association tokens, never image handles or sampled identities.
+  if (Words(view, 8)) {
+    color_getter_ = bd::mem::load<uint32_t>(view);
+    depth_getter_ = bd::mem::load<uint32_t>(view + 4);
+  }
+  current_result = this;
+}
+NativeSceneResultScope::~NativeSceneResultScope() {
+  // The optional result releases pins/references even on disabled post or an
+  // exception. Nested views restore their parent's separate completion slot.
+  current_result = previous_;
+}
+void NativeSceneResultScope::Complete(uint32_t color_getter, uint32_t depth_getter,
+    const HostPostInputs &inputs, GuestTexture *color, GuestTexture *depth,
+    GuestTexture *output, GuestTexture *depth_output) {
+  result_.Clear();
+  if (frame_ != FrameStatFrameCount() || !color_getter_ || !depth_getter_ ||
+      color_getter != color_getter_ || depth_getter != depth_getter_ ||
+      !inputs.scene || !inputs.depth || !output || !depth_output)
+    return;
+  CompletedSceneImages result;
+  result.inputs = inputs;
+  result.output = output;
+  const std::array sources{color, depth};
+  const std::array outputs{output, depth_output};
+  for (size_t i = 0; i < sources.size(); ++i) {
+    Check(HostTargetPin(sources[i]), "Completed native scene could not pin its source");
+    result.source_pins[i] = sources[i];
+    Check(RetainResourceAdapter(outputs[i]->selfVa) != 0,
+          "Completed native scene lost its output adapter");
+    result.output_references[i] = outputs[i]->selfVa;
+  }
+  stats.materialized_color += inputs.scene != color;
+  stats.materialized_depth += inputs.depth != depth;
+  result_.Complete(frame_, std::move(result));
+  ++stats.completed;
+}
+std::optional<CompletedSceneImages> NativeSceneResultScope::Take(uint32_t view) {
+  if (view != view_) return {}; // a nested/foreign caller cannot consume this view
+  auto result = result_.Take(FrameStatFrameCount());
+  stats.consumed += result.has_value();
+  return result;
+}
+std::optional<CompletedSceneImages> TakeCompletedSceneImages(uint32_t view) {
+  return current_result ? current_result->Take(view) : std::nullopt;
+}
 } // namespace bd::gpu::scene
 
 REX_HOOK_RAW(sub_82186BA0) {
   using namespace bd::gpu::scene;
+  if (current_result) current_result->Clear(); // before any native/legacy reuse
   const auto source = ctx.r3.u32;
   if (!Begin(ctx, base, source)) {
     ++stats.compatibility_begin;

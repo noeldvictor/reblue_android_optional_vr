@@ -51,6 +51,12 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
 // out again.
 void HostTargetReleased(GuestTexture *target);
 
+// Native readers pin the persistent slot, independently of the engine header's
+// reference count. Acquisition cannot reuse or recreate it until every reader
+// releases its pin. Calls occur outside the video mutex, on the render thread.
+bool HostTargetPin(GuestTexture *target);
+void HostTargetUnpin(GuestTexture *target);
+
 // The guest's Clear on a bound host target, kept on the target until its
 // pass binds. Returns false if the target is not host-owned.
 bool HostTargetRequestClear(GuestTexture *target, u32 flags, u32 color_argb,

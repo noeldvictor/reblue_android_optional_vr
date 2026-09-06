@@ -24,6 +24,8 @@
 #include "gpu/host_targets.h"
 
 #include <atomic>
+#include <exception>
+#include <limits>
 #include <mutex>
 
 #include <plume_render_interface.h>
@@ -51,6 +53,7 @@ struct Slot {
   u32 guest_format = 0;
   u32 sample_count = 0;
   u32 recreated = 0;
+  u32 readers = 0;
 };
 
 std::mutex g_mutex;
@@ -127,6 +130,10 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
   std::lock_guard lock(g_mutex);
   Slot &slot = SlotFor(cls);
   GuestTexture *t = slot.target;
+  // A completed native scene may still be sampled after the engine released
+  // its handle. Neither reuse nor a size/sample change may replace that image.
+  if (slot.readers)
+    return nullptr;
   if (t && (slot.width != width || slot.height != height ||
             slot.guest_format != guest_format ||
             slot.sample_count != sample_count)) {
@@ -181,6 +188,31 @@ void HostTargetReleased(GuestTexture *target) {
   if (!target)
     return;
   target->hostTargetLive = false;
+}
+
+bool HostTargetPin(GuestTexture *target) {
+  if (!target || !target->hostOwned || !target->texture)
+    return false;
+  const auto cls = static_cast<HostTargetClass>(target->hostTargetClass);
+  if (cls == HostTargetClass::None || cls >= HostTargetClass::Count)
+    return false;
+  std::lock_guard lock(g_mutex);
+  auto &slot = SlotFor(cls);
+  if (slot.target != target || slot.readers == std::numeric_limits<u32>::max())
+    return false;
+  ++slot.readers;
+  return true;
+}
+void HostTargetUnpin(GuestTexture *target) {
+  if (!target) return;
+  const auto cls = static_cast<HostTargetClass>(target->hostTargetClass);
+  if (cls == HostTargetClass::None || cls >= HostTargetClass::Count)
+    std::terminate();
+  std::lock_guard lock(g_mutex);
+  auto &slot = SlotFor(cls);
+  if (slot.target != target || !slot.readers)
+    std::terminate(); // never release another generation or wrap the pin count
+  --slot.readers;
 }
 
 bool HostTargetRequestClear(GuestTexture *target, u32 flags, u32 color_argb,

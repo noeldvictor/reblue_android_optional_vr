@@ -33,6 +33,7 @@
 #include "engine/virtual_buttons.h"
 #include "gpu/gpu.h"
 #include "gpu/scene/native_transform_bridge.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 #include "xr/xr_game_camera.h"
 #include "xr/view_composition_scope.h"
 
@@ -536,6 +537,7 @@ REX_HOOK_RAW(bdCameraRenderSetup) {
 // scope owns which camera can receive tracking and its one composed result.
 REX_EXTERN(__imp__bdRenderViewSubmit);
 REX_HOOK_RAW(bdRenderViewSubmit) {
+  bd::gpu::scene::NativeSceneResultScope scene_result(ctx.r3.u32);
   const u32 camera = bd::mem::try_load<u32>(ctx.r3.u32 + 8);
   bd::xr::ViewCompositionScope composition(
       camera ? uint64_t(camera) + 160 : 0,

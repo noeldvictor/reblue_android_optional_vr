@@ -36,6 +36,7 @@ namespace bd::gpu {
 
 namespace scene { struct NativeTextureGpuStore; struct NativeTextureBinding; }
 namespace scene { struct AlphaState; }
+struct SceneImage;
 
 class Video {
 public:
@@ -240,8 +241,11 @@ public:
   // No EDRAM flags, bound/last-drawn source inference, or square-depth heuristic.
   // Native MSAA/scale copies and downstream compatibility links remain shared.
   // Shadow output has no post/UI tile-chain publication.
+  // Optional success-only receipt names the actual sampled image/exposure;
+  // completed native consumers need not rediscover it through resolve links.
   static bool PublishSceneOutput(GuestTexture *source, GuestTexture *destination,
-                                 float exposure, bool publish_post_chain = true);
+                                 float exposure, bool publish_post_chain = true,
+                                 SceneImage *sampled = nullptr);
 
   // The other in-flight list may still reference it. Freed by DrainSlot. Takes
   // state().mutex.

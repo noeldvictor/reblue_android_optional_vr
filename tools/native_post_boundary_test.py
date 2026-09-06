@@ -244,9 +244,10 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("NativeSource(s, c.dof.depth)", self.post)
         self.assertIn("NativeSource(s, inputs.scene)", atlas)
 
-    def test_native_sequence_imports_once_and_publishes_only_completed_output(self):
-        body = self.scheduler.split("bool RunEffectSequence(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
-        self.assertEqual(body.count("HostPostImportInputs("), 1)
+    def test_native_sequence_uses_explicit_inputs_and_publishes_only_completed_output(self):
+        body = self.scheduler.split("bool RunEffectSequence(", 1)[1].split("bool RunImportedEffectSequence(", 1)[0]
+        self.assertIn("HostPostInputs inputs", body)
+        self.assertNotIn("HostPostImportInputs(", body)
         self.assertEqual(body.count("PublishPostOutput("), 1)
         execution = body.split("const float exposure = inputs.exposure;", 1)[1]
         loop, publication = execution.split("\n  PublishPostOutput(", 1)
@@ -256,7 +257,10 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("inputs.exposure = sequence->Exposure(i, exposure)", loop)
         self.assertIn("RenderPostPlan(plan, inputs,", loop)
         self.assertTrue(publication.startswith("targets.images[sequence->Output(sequence->count - 1)], scene)"))
-        self.assertLess(body.index("callback !="), body.index("HostPostImportInputs("))
+        self.assertLess(body.index("callback !="), body.index("AcquirePostTargets("))
+        imported = self.scheduler.split("bool RunImportedEffectSequence(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
+        self.assertEqual(imported.count("HostPostImportInputs("), 1)
+        self.assertIn("RunEffectSequence(list, inputs, scene)", imported)
 
     def test_scene_import_preserves_alias_exposure_without_producing_gpu_work(self):
         body = self.post.split("bool HostPostImportInputs(", 1)[1].split("bool HostPostRender(", 1)[0]
@@ -274,7 +278,12 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("Words(view.u32, 8)", body)
         self.assertIn("SceneOutput(bd::mem::load<uint32_t>(view.u32))", body)
         self.assertIn("SceneOutput(bd::mem::load<uint32_t>(view.u32 + 4))", body)
-        self.assertIn("handled = RunEffectSequence(kEffectList, scene, depth)", body)
+        self.assertIn("handled = RunImportedEffectSequence(kEffectList, scene, depth)", body)
+        native = body.split("} else if (Words(", 1)[0]
+        self.assertIn("scene::TakeCompletedSceneImages(view.u32)", native)
+        self.assertIn("RunEffectSequence(kEffectList, completed->inputs, completed->output)", native)
+        for name in ("SceneOutput(", "Texture(", "bd::mem::", "HostPostImportInputs("):
+            self.assertNotIn(name, native)
         self.assertIn("return handled", body)
         for name in ("__imp__", "REX_CALL", "REX_STORE", "bd::mem::store", "ctx.",
                      "sub_8221C9A0(", "ReleaseResourceAdapter(", "AddRef(", "view.u32 ="):

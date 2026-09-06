@@ -13,6 +13,7 @@
 #include "gpu/post_grade.h"
 #include "gpu/post_heat.h"
 #include "gpu/scene/native_transform_bridge.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/native_texture_mirror.h"
 #include "gpu/device.h"
 #include "gpu/host_targets.h"
@@ -73,6 +74,7 @@ struct Stats {
   uint64_t sequence_original = 0, sequence_refused = 0, sequence_max = 0;
   uint64_t scene_handoffs = 0, scene_original = 0;
   uint64_t image_imports = 0, final_publications = 0, direct_image_edges = 0;
+  uint64_t completed_scene_inputs = 0;
   uint32_t frame = 0;
 };
 thread_local Stats stats;
@@ -126,6 +128,9 @@ void Report() {
   BD_INFO("[native-post] scene image imports {} final publications {} direct inter-root images {}; "
           "explicit exposure, no intermediate resolve publication",
           stats.image_imports, stats.final_publications, stats.direct_image_edges);
+  BD_INFO("[native-post] completed native scene inputs {}; remaining imported image scopes {}; "
+          "native result path does not read scene image getters or resolve links",
+          stats.completed_scene_inputs, stats.image_imports);
 }
 bool Words(uint64_t address, uint64_t bytes) {
   if (!address || (address & 3) || !bytes || address + bytes - 1 > UINT32_MAX ||
@@ -438,7 +443,7 @@ bool AcquirePostTargets(GuestTexture *scene, GuestTexture *depth, uint32_t count
   }
   return true;
 }
-bool RunEffectSequence(uint32_t list, GuestTexture *scene, GuestTexture *depth) {
+bool RunEffectSequence(uint32_t list, HostPostInputs inputs, GuestTexture *scene) {
   if (!REXCVAR_GET(bd_native_post) || REXCVAR_GET(bd_native_post_verify) ||
       !REXCVAR_GET(bd_host_targets) || !REXCVAR_GET(bd_native_dof) ||
       REXCVAR_GET(bd_native_dof_verify))
@@ -486,11 +491,8 @@ bool RunEffectSequence(uint32_t list, GuestTexture *scene, GuestTexture *depth) 
     return true;
   }
   PostTargets targets;
-  if (!AcquirePostTargets(scene, depth, sequence->target_count, targets))
+  if (!AcquirePostTargets(scene, inputs.depth, sequence->target_count, targets))
     return refuse("image targets");
-  HostPostInputs inputs;
-  if (!HostPostImportInputs(scene, depth, inputs)) return refuse("scene image import");
-  ++stats.image_imports;
   const float exposure = inputs.exposure;
   for (uint32_t i = 0; i < sequence->count; ++i) {
     auto &plan = plans[i];
@@ -511,6 +513,15 @@ bool RunEffectSequence(uint32_t list, GuestTexture *scene, GuestTexture *depth) 
   stats.sequence_roots += sequence->count;
   stats.sequence_max = std::max(stats.sequence_max, uint64_t(sequence->count));
   return true;
+}
+bool RunImportedEffectSequence(uint32_t list, GuestTexture *scene, GuestTexture *depth) {
+  // Compatibility scopes only. Normal view submission receives its completed
+  // native images from the scoped producer, not from these getters or links.
+  HostPostInputs inputs;
+  if (HostPostImportInputs(scene, depth, inputs)) ++stats.image_imports;
+  // Disabled/empty lists remain native no-ops even without readable images.
+  // A nonempty list refuses the empty inputs before submitting any GPU work.
+  return RunEffectSequence(list, inputs, scene);
 }
 void VerifyAdjustmentPublication(uint32_t owner, uint32_t descriptor_offset,
                                   uint32_t register_offset,
@@ -729,7 +740,7 @@ REX_HOOK_RAW(sub_8221B1D8) {
   Report();
 }
 REX_HOOK_RAW(bdEffectSlotArrayApply) {
-  if (!RunEffectSequence(ctx.r3.u32, Texture(ctx.r4.u32), Texture(ctx.r5.u32))) {
+  if (!RunImportedEffectSequence(ctx.r3.u32, Texture(ctx.r4.u32), Texture(ctx.r5.u32))) {
     ++stats.sequence_original;
     __imp__bdEffectSlotArrayApply(ctx, base);
   }
@@ -746,10 +757,15 @@ REX_HOOK_RAW(bdEffectSlotArrayApply) {
 bool bdNativeScenePostHook(PPCRegister &view) {
   using namespace bd::gpu;
   bool handled = false;
-  if (Words(view.u32, 8)) {
+  if (auto completed = scene::TakeCompletedSceneImages(view.u32)) {
+    ++stats.completed_scene_inputs;
+    handled = RunEffectSequence(kEffectList, completed->inputs, completed->output);
+    // The local owns both native source pins through all stage submissions and
+    // final publication. Scope exit also releases them on refusal/exception.
+  } else if (Words(view.u32, 8)) {
     auto *scene = SceneOutput(bd::mem::load<uint32_t>(view.u32));
     auto *depth = SceneOutput(bd::mem::load<uint32_t>(view.u32 + 4));
-    handled = RunEffectSequence(kEffectList, scene, depth);
+    handled = RunImportedEffectSequence(kEffectList, scene, depth);
   }
   if (handled) ++stats.scene_handoffs;
   else ++stats.scene_original;

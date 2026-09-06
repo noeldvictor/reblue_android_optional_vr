@@ -28,6 +28,7 @@
 #include "gpu/frame_stats.h"
 #include "gpu/gpu_timing.h"
 #include "gpu/post_chain.h"
+#include "gpu/scene_image.h"
 #include "gpu/settings.h"
 
 namespace bd::gpu {
@@ -727,7 +728,7 @@ void NoteTileContentLocked(VideoState &s, GuestTexture *dst, bool pass_end) {
 } // namespace
 
 bool Video::PublishSceneOutput(GuestTexture *src, GuestTexture *dst, float exposure,
-                               bool publish_post_chain) {
+                               bool publish_post_chain, SceneImage *sampled) {
   if (!src || !dst || !src->texture || !dst->texture || src == dst ||
       dst->sampleCount != plume::RenderSampleCount::COUNT_1 ||
       dst->viewDimension == plume::RenderTextureViewDimension::TEXTURE_CUBE ||
@@ -746,6 +747,7 @@ bool Video::PublishSceneOutput(GuestTexture *src, GuestTexture *dst, float expos
   dst->sourceSurface = src;
   src->destinationTextures.insert(dst);
   BindTextureSRVLocked(s, src);
+  SceneImage result{src, exposure};
   if (CanAliasResolveLocked(src, dst)) {
     NoteResolveOp(ResolveOp::LazyLink);
   } else {
@@ -755,6 +757,7 @@ bool Video::PublishSceneOutput(GuestTexture *src, GuestTexture *dst, float expos
     }
     NoteResolveOp(ResolveOp::EagerCopy);
     DetachSourceSurfaceLocked(s, dst);
+    result = {dst, 1.0f}; // copied pixels already include the requested exposure
   }
   s.last_resolved_dst = dst;
   // Remaining post/UI producers still consume the legacy chain publication.
@@ -762,6 +765,7 @@ bool Video::PublishSceneOutput(GuestTexture *src, GuestTexture *dst, float expos
   if (publish_post_chain)
     NoteTileContentLocked(s, dst, /*pass_end=*/true);
   s.draw_framebuffer_bound = false;
+  if (sampled) *sampled = result; // success-only receipt; no later link traversal
   return true;
 }
 

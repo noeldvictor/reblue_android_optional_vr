@@ -18,6 +18,8 @@ class NativeSceneBoundaryTest(unittest.TestCase):
         cls.sun_math = (root / "src/gpu/scene/native_sun_camera.h").read_text(encoding="utf-8")
         cls.sun_fit = (root / "src/gpu/shadow_fit.cpp").read_text(encoding="utf-8")
         cls.tweaks = (root / "config/hooks/render_tweaks.toml").read_text(encoding="utf-8")
+        cls.targets = (root / "src/gpu/host_targets.cpp").read_text(encoding="utf-8")
+        cls.interp = (root / "src/engine/frame_interp.cpp").read_text(encoding="utf-8")
 
     def test_whole_native_pair_does_not_use_console_allocation_or_resolve(self):
         native = self.bridge[self.bridge.index("bool Begin("):self.bridge.index("REX_HOOK_RAW(")]
@@ -28,8 +30,8 @@ class NativeSceneBoundaryTest(unittest.TestCase):
             self.assertNotIn(name, native)
         self.assertIn("HostTargetClass::SceneColor", native)
         self.assertIn("HostTargetClass::SceneDepth", native)
-        self.assertIn("PublishSceneOutput(pass.depth, depth_output, 1.0f)", native)
-        self.assertIn("PublishSceneOutput(pass.color, color_output, exposure)", native)
+        self.assertIn("PublishSceneOutput(pass.depth, depth_output, 1.0f, true, &sampled_depth)", native)
+        self.assertIn("PublishSceneOutput(pass.color, color_output, exposure, true, &sampled_color)", native)
         self.assertLess(native.index("LeaveNativePass(result)"),
                         native.index("ReleaseResourceAdapter(pass.color->selfVa)"))
 
@@ -42,6 +44,45 @@ class NativeSceneBoundaryTest(unittest.TestCase):
         self.assertIn("dst->resolveScale = exposure", self.output)
         # Keep the remaining downstream compatibility dependency visible.
         self.assertIn("NoteTileContentLocked", self.output)
+
+    def test_output_receipt_carries_exposure_exactly_once_and_only_on_success(self):
+        self.assertIn("SceneImage result{src, exposure}", self.output)
+        self.assertIn("result = {dst, 1.0f}", self.output)
+        self.assertIn("if (sampled) *sampled = result", self.output)
+        self.assertGreater(self.output.index("*sampled = result"), self.output.rindex("return false"))
+        self.assertGreater(self.output.index("result = {dst, 1.0f}"), self.output.index("CopySurfaceToTextureLocked("))
+
+    def test_completion_is_view_scoped_single_use_and_keeps_explicit_ownership(self):
+        scope = self.interp.split("REX_HOOK_RAW(bdRenderViewSubmit)", 1)[1].split("REX_HOOK_RAW(bdBuildViewMatrix)", 1)[0]
+        self.assertLess(scope.index("NativeSceneResultScope scene_result(ctx.r3.u32)"),
+                        scope.index("__imp__bdRenderViewSubmit(ctx, base)"))
+        complete = self.bridge.split("void NativeSceneResultScope::Complete(", 1)[1].split("NativeSceneResultScope::Take(", 1)[0]
+        for check in ("frame_ != FrameStatFrameCount()", "color_getter != color_getter_",
+                      "depth_getter != depth_getter_", "HostTargetPin(sources[i])",
+                      "RetainResourceAdapter(outputs[i]->selfVa)", "result_.Complete(frame_, std::move(result))"):
+            self.assertIn(check, complete)
+        take = self.bridge.split("NativeSceneResultScope::Take(", 1)[1].split("TakeCompletedSceneImages(", 1)[0]
+        self.assertIn("view != view_", take)
+        self.assertIn("result_.Take(FrameStatFrameCount())", take)
+        self.assertIn("current_result = previous_", self.bridge)
+        for name in ("HostPostImportInputs", "sourceSurface", "resolveScale", "Content("):
+            self.assertNotIn(name, complete + take)
+        reset = self.bridge.split("void CompletedSceneImages::Reset()", 1)[1].split("NativeSceneResultScope::NativeSceneResultScope", 1)[0]
+        self.assertIn("ReleaseResourceAdapter(std::exchange(address, 0))", reset)
+        self.assertIn("HostTargetUnpin(std::exchange(image, nullptr))", reset)
+
+    def test_pin_blocks_native_target_reuse_and_recreation_before_mutation(self):
+        acquire = self.targets.split("GuestTexture *HostTargetAcquire(", 1)[1].split("void HostTargetReleased(", 1)[0]
+        self.assertLess(acquire.index("if (slot.readers)"), acquire.index("Disown(t)"))
+        self.assertLess(acquire.index("if (slot.readers)"), acquire.index("InitResourceHeader("))
+        pin = self.targets.split("bool HostTargetPin(", 1)[1].split("bool HostTargetRequestClear(", 1)[0]
+        for name in ("std::lock_guard lock(g_mutex)", "slot.target != target", "++slot.readers", "--slot.readers"):
+            self.assertIn(name, pin)
+        begin = self.bridge.split("REX_HOOK_RAW(sub_82186BA0)", 1)[1].split("REX_HOOK_RAW(sub_82187010)", 1)[0]
+        self.assertLess(begin.index("current_result->Clear()"), begin.index("Begin(ctx, base, source)"))
+        end = self.bridge.split("bool End(", 1)[1].split("} // namespace", 1)[0]
+        self.assertIn("bd::mem::load<int32_t>(kPhase) == 3", end)
+        self.assertLess(end.index("current_result->Complete("), end.index("ReleaseResourceAdapter(pass.color->selfVa)"))
 
     def test_view_producer_does_not_delegate_its_math(self):
         native = self.view[self.view.index("bool Produce("):self.view.index("__imp__sub_82186840(ctx, base);")]
