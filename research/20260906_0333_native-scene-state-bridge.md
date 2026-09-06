@@ -1192,3 +1192,46 @@ evidence unchanged. Ending post-cleanup drive-wide use +44,658,688 B from this
 continuation's preflight; source/build/Git/other-process use is not inferred to
 equal diagnostic payload. Exact identities and limitations are recorded in
 `20260906_1610_load-owned-model-materials.md`. Final Git writes still count.
+
+### Corrected field observations, same checkpoint
+
+The preceding read-only strategy review yielded actionable source evidence
+(hidden icon handle and 150 s walking delay), not a renderer conversion. This
+continuation corrected icon/strip visibility and the loader's 128-slot scan;
+the generated fade-state writer/update confirm idle state 0, not 4. Native model
+geometry/instance/submission ownership remains next; full desktop/both-eye gates
+are unchanged. See `20260906_1638_field-state-observations.md` for source evidence.
+
+Preflight free **65,061,658,624 B**. No live producer; original profile intact.
+Reused host/native_texture build trees, <=256 MiB compile/link overlap and <=1 MiB
+new build/test logs reserved, shared with all prior attempts and existing limits.
+Fixture 01 cmake PID 29180/session 77239 stalled after regeneration; its exact
+verified process tree was terminated, exit 1, before retry. Fixture 02 PID 19804
+passed; CPU 01 PID 30176 passed (0.07 s). Host 42 PID 30204/session 9296 passed
+(roughly 16 s log span), no guest/shader rebuild. All handles are terminal.
+120 source guards and 15 in-memory actual-runner gate cases pass. No test data
+files or source-index writes. New loader exe/PDB/object **718,242 B**, retain one
+reusable fixture and replace it on change. Runner reservation increased from
+48 to 49 MiB to account for this addition; 75 MiB stop/100 MiB hard diagnostic
+and 2 GiB original checkpoint limits remain unchanged.
+
+Runtime preflight free **65,059,090,432 B**, no live build/game producer. Existing
+49 MiB reservation plus retained diagnostics is 73,257,385 B before run/cleanup,
+leaving 5,385,815 B below the 75 MiB stop. Allowed one <=75 s PSO-off material
+diagnostic, <=400 KiB log, no perf/raw/image capture. Run 890 PID 29612/session
+98449 terminal at 16:37:38 after about 51 s; original 116-byte profile restored.
+The opening event is observed before two idle `bg41_01` contexts at frames
+1768/2068, five seconds apart. Their delta is 15,124 diffuse /14,514 specular
+matches and 58,572 model hits; zero wrong/missing/load/unsupported/input/budget
+failures. Reflection unexercised; no movement/input or new pixel qualification.
+
+New build/runtime log payload totals **195,304 B** including the stalled attempt.
+After replacement passed, removed five exact inactive non-reparse files: run
+889, host 41 stdout/stderr, loader fixture 01 stdout/stderr. Reader failure is
+diagnosed and retained in reports; no unresolved rendering evidence was deleted.
+Logical removal **292,376 B**. Immediate free **65,049,759,744 ->65,050,058,752 B**:
+**299,008 B measured reclaimed**, once. Net log retention **-97,072 B**; new
+fixture yields **+621,170 B** diagnostic retention for new behavioral coverage.
+All raw/PNG/game/active-build/normal-Toon flat-XR evidence remains unchanged.
+Post-cleanup drive-wide use **11,599,872 B** from this preflight, not equated with
+task payload. Final source/docs/Git writes still count; no producer left running.

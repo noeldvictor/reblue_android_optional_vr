@@ -44,9 +44,11 @@ public:
   bool FieldSessionLive() const;    // GameTask != 0
   bool FieldControllerLive() const; // FieldSceneController != 0
   bool FieldGameplayActive() const; // GameTask && !shutdownFlag
-  u32 FieldState() const;           // FSC+0x6A0, 4 interactive / 5 transition
+  // FSC+0x6A0 is the fade/scene state: 0 idle, NOT a complete input-ready flag.
+  // The update resumes NPCs then writes 0 at 0x8219FE44. State 4 is not idle.
+  u32 FieldState() const;
   bool IsLoading() const;           // any loader slot state in {1,2,3}
-  bool LoadingScreenUp() const;     // loader+0x88 handle present
+  bool LoadingScreenUp() const;     // actual loading icon/strip visibility
   bool MindowsPanelActive() const;  // Mindows panel focused, NOT the camp menu
   u32 CurrentModuleAddress() const; // SequenceControl+0x70, identity unresolved
 

@@ -330,11 +330,12 @@ void NativeMaterialNoteReplay(uint32_t mask) {
       // existing semantic state readers so checks can identify their scenario.
       const auto &game = bd::engine::Game::Get();
       BD_INFO("[native-material-context] frame {} mode {} field-state {} stage {} "
-              "player {} event {} movie {}",
+              "player {} event {} movie {} loader-busy {} icon-visible {}",
               frame, bd::engine::ToString(game.Mode()), game.FieldState(),
               game.Stage().Name(), game.Field().HasPlayer() ? 1 : 0,
               bd::engine::EventScenePlaying() ? 1 : 0,
-              bd::engine::SofdecMoviePlaying() ? 1 : 0);
+              bd::engine::SofdecMoviePlaying() ? 1 : 0,
+              game.IsLoading() ? 1 : 0, game.LoadingScreenUp() ? 1 : 0);
     }
     BD_INFO("[native-material] source checks (wrong/checked): diffuse {}/{}, "
             "specular {}/{}, reflection {}/{}; {} load-owned models; "

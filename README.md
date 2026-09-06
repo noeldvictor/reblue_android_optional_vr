@@ -66,11 +66,14 @@ publications, one retirement, 488,116 lookup hits and zero missing/load failures
 126,735 diffuse and 120,369 specular comparisons match. Host/material tests and
 120 source guards pass. Geometry-table associations and draw templates remain.
 
-**The new interactive-field gate did not pass.** An inspected image was the
-opening cinematic; water activity alone had incorrectly identified it as field
-readiness. Stronger semantic readers continued reporting Loading / state 0, so
-field qualification remains pending. No new stereo/Quest or speedup claim.
-[Evidence, limits and remaining dependencies](research/20260906_1610_load-owned-model-materials.md).
+The post-event field sample now passes after correcting loading-icon visibility,
+the 128-slot loader scan and the idle-state interpretation (0, not 4). Two idle
+samples after the opening event contain 15,124 new diffuse and 14,514 specular
+comparisons, all matching. This establishes scoped field material evidence,
+**not movement, new field pixels or full interactive/stereo qualification**.
+Water activity alone also occurs in the opening cinematic. No new Quest or
+speedup claim. [Reader fixes and evidence](research/20260906_1638_field-state-observations.md),
+[material ownership and remaining dependencies](research/20260906_1610_load-owned-model-materials.md).
 
 The prior [Toon checkpoint](research/20260906_1505_native-toon-materials.md)
 retains a normal flat standing-scene image and desktop XR parameter comparisons.
@@ -105,8 +108,9 @@ identifies the existing load-time integration points and remaining template/data
 dependencies. The source-index tool now exposes indirect and hook boundaries;
 this tooling checkpoint does not itself convert additional rendering.
 
-1. Reconcile the scene-state readers and establish repeatable feature-specific
-   checks; advance the mapped load-time geometry/material association contracts.
+1. Advance the mapped load-time geometry/material association contracts, using
+   the corrected post-event field check; add movement/authored-event checks as
+   their consumers are migrated.
 2. Complete one native static-object path from asset loading and material
    association through native instances to scene/shadow submission.
 3. Complete character asset, pose, joint-palette and GPU skinning ownership.

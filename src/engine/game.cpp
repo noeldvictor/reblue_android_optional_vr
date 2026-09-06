@@ -4,6 +4,7 @@
  * @license   BSD 3-Clause License
  */
 #include "engine/game.h"
+#include "engine/loader_state.h"
 
 #include <cstddef>
 
@@ -26,10 +27,13 @@ constexpr u32 kShutdownFieldActive = 0;
 constexpr u32 kFieldStateTransition = 5;
 
 // Loader [kLoaderTaskVA]
-constexpr u32 kLoader_NowLoading = 0x88; // non-null => loading screen up
+constexpr u32 kLoader_IconFade = 0x84;
+constexpr u32 kLoader_IconTask = 0x88; // persistent, including while hidden
+constexpr u32 kLoader_StripTick = 0x78;
+constexpr u32 kLoader_ForceStripVA = 0x82DC9B48;
+constexpr u32 kAnimeTask_Visible = 0x68;
 constexpr u32 kLoader_SlotArray = 0x90;  // INLINE array base
 constexpr u32 kLoader_SlotStride = 124;
-constexpr int kLoader_SlotScan = 8;
 
 // SequenceControl [addr::kSequenceControl]
 constexpr u32 kSeq_CurrentModule = 0x70;
@@ -42,13 +46,9 @@ bool AnySlotLoading(u32 loaderEA) {
   if (!loaderEA)
     return false;
   const u32 base = loaderEA + kLoader_SlotArray;
-  for (int i = 0; i < kLoader_SlotScan; ++i) {
-    const u32 state =
-        bd::mem::try_load<u32>(base + static_cast<u32>(i) * kLoader_SlotStride);
-    if (state - 1u <= 2u)
-      return true;
-  }
-  return false;
+  return AnyAssetSlotLoading([base](u32 i) {
+    return bd::mem::try_load<u32>(base + i * kLoader_SlotStride);
+  });
 }
 
 } // namespace
@@ -104,7 +104,14 @@ bool Game::IsLoading() const {
 
 bool Game::LoadingScreenUp() const {
   const u32 loader = bd::mem::try_load<u32>(kLoaderTaskVA);
-  return loader && mem::try_field<u32>(loader, kLoader_NowLoading) != 0;
+  if (!loader)
+    return false;
+  const u32 task = mem::try_field<u32>(loader, kLoader_IconTask);
+  return LoadingIconVisible(
+      mem::try_field<f32>(loader, kLoader_IconFade), task != 0,
+      task ? mem::try_field<u32>(task, kAnimeTask_Visible) : 0,
+      bd::mem::try_load<u32>(kLoader_ForceStripVA) != 0,
+      mem::try_field<i32>(loader, kLoader_StripTick));
 }
 
 bool Game::MindowsPanelActive() const {

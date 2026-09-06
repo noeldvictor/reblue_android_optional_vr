@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after load-owned model materials. These milestones organize the
+Updated 2026-09-06 after load-owned materials and corrected field observations. These milestones organize the
 unchanged completion requirements above; none is a substitute for the full gate.
 
 1. **Scene/material dependency map and targeted verification.** Start from
@@ -47,15 +47,19 @@ unchanged completion requirements above; none is a substitute for the full gate.
    Geometry/control/texture associations, source-key adapter and draw templates
    remain. Next are native geometry bindings, instance updates and direct draws.
    Scenario checks must establish feature execution; empty queues are untested.
-   The new field gate correctly refuses Loading / state 0; reconcile those
-   existing state readers against generated writers before another attempt.
-   Water updates also occur in the opening cinematic, so they are not a field ID.
+   The loader visibility/slot readers and idle-state contract are corrected:
+   two post-event state-0 samples now pass with positive material/lookup deltas.
+   This is not input/movement or pixel qualification. Water updates also occur
+   in the opening cinematic, so they are not a field ID. Extend the existing
+   scenario checks when a feature needs movement, a battle or an authored effect.
 2. **Complete native static-object path.** Reuse the existing native asset
    libraries and submission backend. Move asset/mesh/material association and
    instance storage above draw submission, using stable native handles. Replace
    guest `NodeTag` discovery and retained interpreter templates for that path;
    scene/shadow draws must not re-import per-draw console state. Temporary load
    adapters need explicit removal conditions, not permanent address identities.
+   Before enabling eager geometry cooking, bound the existing native-mesh disk
+   writer's aggregate retention; its GPU arena limit alone is not a disk limit.
 3. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
    and verify characters in the relevant field/battle/cutscene/shadow paths.
@@ -76,13 +80,23 @@ development-speed multiplier is established.
 
 ## Latest qualified checkpoint
 
+Field observations (2026-09-06): loading visibility now observes fade/task/strip
+state, and all 128 asset slots are scanned. Generated fade-state writers restore
+0 when NPCs resume; the former state-4 readiness assertion was wrong. The host
+build, loader CPU fixture, 120 source guards and 15 in-memory scenario-gate cases
+pass. Flat PSO-off run 890 observes the opening event end, then two idle field
+samples with 15,124 new diffuse /14,514 specular matches and 58,572 new model
+lookup hits. No missing/load/unsupported/input/budget failures. No new pixels,
+movement, reflection, both-eye or full-desktop qualification. Exact evidence:
+`research/20260906_1638_field-state-observations.md`.
+
 Load-owned model materials (2026-09-06): host/material fixtures and 120 source
 guards pass; PSO-off diagnostics exercise 114 publications and one retirement,
 488,116 lookup hits with no missing/load/input/budget failures, and matching
 126,735 diffuse /120,369 specular comparisons. An opening-cinematic image was
-inspected, not an interactive field. The stronger field-scenario check fails
-its bounded wait because existing readers report Loading / state 0; this is
-not a successful field/normal-mode/stereo qualification. Reflection has zero
+inspected, not an interactive field. Its initial field-scenario check failed
+because readers reported Loading / state 0; the reader issue is corrected by
+the checkpoint above, without retroactively qualifying that run. Reflection has zero
 checks. Old normal flat/XR and failure evidence remains. Geometry, instances,
 source/resource/recipe adapters and retained templates still prevent claiming
 the complete native static-object path. Details and the corrected water-marker
