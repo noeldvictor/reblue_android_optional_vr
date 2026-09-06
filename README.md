@@ -58,6 +58,11 @@ Snapshot: 2026-09-06; the table records earlier checkpoints, with newer work bel
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
 
+In progress locally: five material-pass/shader/declaration replacements pass the
+host build and 31 CPU tests. Flat-image and desktop XR parameter checks remain
+pending; these renderer edits are **not yet committed or visually qualified**.
+The status-only follow-up did not start additional builds, game runs or captures.
+
 Latest implementation checkpoint: [native deferred visuals](research/20260906_1358_native-deferred-visuals.md)
 replaces the whole deferred scheduler and its emulated resolve with a native
 scene-sized snapshot, removing the 1280x720-only gate on the native path. Host

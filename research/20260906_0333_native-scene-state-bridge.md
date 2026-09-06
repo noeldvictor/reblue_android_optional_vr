@@ -920,3 +920,48 @@ fixed 41 MiB tools/inspection; two PNGs/6,668,575 B within that reservation.
 Post-cleanup drive-wide use +5,316,608 B since 13:53, including unrelated volume
 activity/metadata. Later source/docs/Git writes count; final handoff measures
 ending free space. Replace equivalent evidence at the next qualified checkpoint.
+
+## Continuing the same storage ledger: material passes, 14:11
+
+Root `4dc37cf` published the deferred checkpoint; final free 65,232,334,848 B,
+drive-wide use +5,496,832 B for that step, no further cleanup credit. Current
+preflight free 65,236,197,376 B, no active producer, original profile intact.
+The volume gain is not agent cleanup. Same original baseline, 2 GiB cumulative
+peak, 100 MiB diagnostics, 10 MiB build logs and raw-capture gate remain.
+Retained reservation 64,419,367 B; 94 build logs /139,942 B. Two PNGs /
+6,668,575 B leave 3,817,185 B replacement overlap within the 10 MiB allowance.
+
+Reuse existing CPU/host trees: <=256 MiB build/link overlap and <=1 MiB new
+aggregate build/CPU logs across attempts. Five material lifecycle/binding bodies
+need CPU callback/alias checks, host link and bounded normal-flat plus XR
+parameter regression, since shared declaration/shader binding affects both.
+Limit new runtime logs to an estimated <=1 MiB, normal perf <=1 MiB and one
+flat PNG to the actual overlap above. Existing supervisors enforce original
+cumulative free-space/log/diagnostic and zero-new-raw guards. No downloads,
+assets/caches, new tree or guest/shader rebuild. Replace equivalent CPU/build,
+flat/perf/image and XR-parameter evidence only after qualification; preserve
+original UI, non-MSAA and unresolved-failure evidence. All retries share this
+ledger; no additional artifact allowance is created by this continuation.
+
+Standing-approval/status follow-up: the existing host build 36 / PID 19580 /
+session 24991 has completed with exit 0. It linked the local material-pass edits;
+no guest objects or shaders rebuilt (codegen reported the module up to date).
+The executable is 47,778,304 B, SHA-256
+`3e85baa70f1f1cc03ae692e0259f945c5f150629234dd0e195a362deb1a21fb0`.
+CPU fixture 07 / PID 25344 and suite 29 / PID 27592 also completed with exit 0;
+31/31 tests pass in 7.10 s. Fixture 572,928 B, SHA-256
+`4f3c6c4e8454319b763f78c7dd1d4ee3841a81cbf4688f4336968c6bf5b784c6`.
+The 111 source guards passed before interruption. No new build/test/game/capture
+was launched for this follow-up. Flat-image and desktop XR parameter checks
+remain pending; renderer source/test edits remain local, not published.
+
+No active project build/test/game producers found; the owner's original
+116-byte, five-line profile is intact. Follow-up free space before docs/Git
+writes: 65,234,227,200 B, drive-wide use +1,970,176 B from material preflight.
+Six new build/test logs total 6,503 B; retained reservation is 64,425,870 B,
+including 100 build logs /146,445 B. Fixture grew 22,528 B within the existing
+tools reservation; host grew 8,192 B. No new runtime/perf/image/raw artifacts.
+Keep these build/CPU outputs for unfinished material-pass verification and
+retain the published baseline evidence until that replacement is qualified;
+then retire equivalent superseded outputs. Nothing removed, zero reclaimed
+bytes claimed. Final handoff measures ending free space after docs/Git writes.

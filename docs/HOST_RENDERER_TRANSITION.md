@@ -30,6 +30,17 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Material passes, local work in progress (2026-09-06): five whole-function
+replacements cover pass begin/end, recipe selection, shader binding and cached
+vertex declarations. Host build 36 and CPU suite 29 (31/31, 7.10 s) completed;
+111 source guards passed before the interruption. Shared declaration binding
+changed, so normal flat-image and capture-disabled desktop XR parameter checks
+remain required before publishing the implementation. The owner's standing
+commit/push approval is recorded in `AGENTS.md`; permission is not the remaining
+gate. This status-only follow-up launches no verification producers and leaves
+the uncommitted source/test edits intact. Build/storage accounting is appended
+to `research/20260906_0333_native-scene-state-bridge.md`.
+
 Deferred visuals (2026-09-06): the complete `sub_824252D0` scheduler and primitive
 preparation now have a native replacement, with a native scene-sized snapshot
 instead of an emulated resolve or 1280x720-only gate. It preserves the 512-entry
