@@ -5,6 +5,15 @@ repository. `CLAUDE.md` imports it. Keep enduring rules here, current progress i
 [`docs/HOST_RENDERER_TRANSITION.md`](docs/HOST_RENDERER_TRANSITION.md), and dated
 evidence in `research/`. Updated 2026-09-06.
 
+**Storage-first default:** produce the minimum new data needed for the task.
+Reuse existing tools, build trees and evidence; do not start builds, game runs
+or captures for status or documentation-only requests. Before a space-producing
+job, follow [Disk-space discipline](#disk-space-discipline): budget peak overlap,
+count all retries together and enforce output limits while the job runs. Clean
+up verified obsolete agent-created outputs at each checkpoint, while preserving
+game data, active builds and required evidence. Report measured savings, not
+proposed cleanup. Free disk space is not an allowance to accumulate artifacts.
+
 ## Goal and boundaries
 
 Move **all rendering** to a host-native, modern Vulkan renderer on desktop;
