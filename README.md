@@ -53,409 +53,87 @@ not replace the host-renderer goal.
 
 ## Current state
 
-Snapshot: 2026-09-06; the table records earlier checkpoints, with newer work below.
+**The full host-renderer transition is not complete.** Gameplay stays statically
+recompiled; the local generated executable contains 18,777 function bodies, not
+the original high-level source project. There is no defensible conversion
+percentage based on function or host-draw counts.
 
-This is an unfinished renderer migration, not a fully native-rendering or
-Quest-ready release.
+Latest qualified change (2026-09-06): native Toon texture animation and edge
+parameter production replace three complete callbacks. Material-pass dispatch
+calls the native participants directly: normal flat / diagnostic desktop XR
+samples record 13,280 / 3,020 native participant calls and zero guest participant
+calls at that dispatcher. Fresh field-camera XR samples match 1,510 original
+Toon publications and 2,627,009 native parameter blocks, with no mismatch or
+Toon fallback/refusal/fault. The host build, 31 CPU tests and 115 source guards
+pass. One flat field image was inspected; this is not full-game or both-eye
+pixel qualification. [Evidence and limitations](research/20260906_1505_native-toon-materials.md).
 
-Latest implementation checkpoint: [native material-pass lifecycle and shader binding](research/20260906_1429_native-material-passes.md)
-replaces five complete guest bodies and calls host shader/declaration setters
-directly. Host build, 31 CPU tests and 111 source guards pass; flat/XR samples
-record 616,830/159,375 native pass starts with zero fallback/refusal/faults.
-One flat field image was inspected. The strengthened XR check records 2,083,519
-matching parameter blocks after a verified field-camera sample, with zero full
-legacy block imports. **Both-eye appearance and full-game qualification remain
-open**, along with authored registry/recipe/resource/shader-ABI inputs and
-participant callbacks (15,056 flat /2,400 XR sampled).
-
-Previous checkpoint: [native deferred visuals](research/20260906_1358_native-deferred-visuals.md)
-replaces the whole deferred scheduler and its emulated resolve with a native
-scene-sized snapshot, removing the 1280x720-only gate on the native path. Host
-build, 31 CPU tests and 107 source guards pass. The flat regression exercised
-5,363 empty calls and one inspected field image, **not nonempty authored effects**;
-their runtime/both-eye qualification remains open. Queue/vertex production and
-shader/state/resource/getter/material-callback adapters still remain.
-
-Earlier checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
-moves the complete model/primitive scheduler and its sorting storage onto the
-host, following native immediate vertex submission. Build, 31 CPU tests and
-103 source guards pass. Bounded flat/XR checks record 78,861/36,784 scheduled
-primitives without fallback or faults; 952,257 XR parameter blocks match the
-independent reference. Normal flat/XR full-block legacy parameter imports are
-zero. One flat field image was inspected; queued models/deferred effects have
-CPU coverage but were not exercised in these field runs.
-
-**How much is left?** Significant render-data and callback ownership work, not
-a known percentage. Host submission, modern GPU features and much of the pass
-scheduling are implemented, but the finished frame still needs:
-
-- Native scene/object storage, asset discovery/bindings and dynamic vertex producers.
-- Native animation/pose/skeleton production and complete GPU skinning ownership.
-- Remaining material/shader/bool/sampler/texture adapters and guest getter removal.
-- Remaining visual/effect/reflection/deferred callbacks, including emulated resolves.
-- Representative fields, battles, cutscenes, menus, transitions, reloads and
-  animated effects verified in both eyes, then Quest 2 qualification.
-
-Gameplay intentionally remains recompiled; removing guest **rendering** does not
-mean rewriting the entire game. Host-issued draws alone do not prove completion.
-
-**Speed evidence:** the sorted-scheduler field checks reduce imported float words
-per native parameter block from about 13.00 to 0.757 (94% less import work),
-while eliminating the scheduler's full-block legacy imports. This is **not a
-94% FPS gain** or a controlled whole-project benchmark. That 1920x1080
-desktop field check has a 16.667 ms median frame interval (~60 FPS), 6.610 ms
-`other_ms` and 5.677 ms GPU time over its last 600 samples. No reliable overall
-speedup percentage or Quest performance claim is established. Details and
-limitations are in the sorted-scheduler report above. Neither the deferred nor
-material-pass check establishes an overall speedup; nonempty deferred effects
-were not exercised.
-
-The owner granted standing commit/push approval on 2026-09-06 for
-`noeldvictor/reblue_android_optional_vr:main` and `noeldvictor/plume:main`.
-Plume is published through `3094b35`, and the reviewed scene/post integration
-uses that dependency: native scene allocations, framebuffers, attachment MSAA
-resolves, snapshots and post outputs retain their own images/descriptors/layouts
-through GPU fences. Matching depth and final post getters borrow those images
-without a copy. The retained flat check records 3,600 native scene clears and
-depth publications with zero compatibility clears/depth publications. Getter
-adapters, unconverted scopes and full desktop qualification remain; this is not
-a fully host-owned frame. The integration reuses the existing build/CPU/GPU and
-flat/XR evidence, not a new verification run. Publication review:
-[scene integration ledger](research/20260906_0333_native-scene-state-bridge.md#integration-review-and-publication-1342).
-
-| Area | Implemented | Still required |
+| Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
-| Native mesh assets | Versioned persistent `.bdmesh` cache, triangle lists, shared host GPU buffers and existing generated LOD support; enabled by default | Asset-level discovery/loading, independent native layouts/materials, dynamic geometry and cache streaming/eviction |
-| Material properties | Shared, content-keyed `.bdmat` assets for supported diffuse/specular/reflection recipes, independent cooker/loader and bounded residency; enabled by default | Native texture/lighting definitions, asset-level scene bindings, remaining draw recipes and replacement of the shader-register compatibility boundary |
-| Receiver shadows | Host policy composition from current node visibility and model controls for supported direct-tree draws; enabled by default | Native pass/visibility producers, persistent feature policy and remaining draw recipes |
-| Sun-shadow lifecycle | Complete host begin/end bodies, explicit persistent depth/output ownership and empty-pass far clears; no engine allocation or inferred resolve source; stable short flat/final-eye sequences with 38674/102251 matching ownership checks and no fallback | Engine camera snapshot/light fitting, secondary shadows, caster scheduling, sampling/resource/getter adapters, VR framing/depth and broader scene qualification |
-| Native sun camera (experimental) | Native orthographic fit, snapshot and sun-volume culling; scoped removal of an obsolete character light-eye cutoff restores Shu's shadow in the normal short flat sequence (0/119 large jumps) | **Disabled by default:** latest scoped-camera VR sequence is stable with crossed depth, but does not qualify Shu's shadow in that framing. Complete character submission, other shadow modes and broader coverage remain |
-| Lighting pass inputs | Host ambient/camera/colour/shadow parameter production and explicit direct-node shadow sampling; short publication/input comparisons pass | Native scene/light/texture associations, other draw recipes and removal of the material staging/shader ABI |
-| Reflection bindings | Explicit model selection/enable recipes and current pass/table resolution for supported direct draws; old slot-5 image handles are not retained | Null-selection inheritance, animated/ordinary texture overrides, deferred/other-phase recipes and persistent native scene associations |
-| Scene-image selection | Host selectors/binding callback and explicit per-draw current/next roles; replay resolves live inputs instead of retaining old images, with matching source checks | Scene-table production, persistent associations, intra-node pass sequences, wrapper blend/constants and dynamic/null GPU coverage |
-| Nested render passes | Host attachment/extent stack, complete supported push/pop bodies, typed native entry/exit and shared attachment binders | Engine traversal, other pass producers, getter/lifetime adapters, multiple colour attachments, deeper GPU nesting and full visual qualification |
-| Scene lifecycle | Host begin/end bodies with explicit persistent colour/depth roles and explicit-source outputs; no engine 16-slot allocation or resolve-source guessing; short flat and corrected final-eye sequences are stable, with two-layer depth outputs | State 308, engine camera sources/descriptors/getters, shared MSAA/scale copies, downstream post/UI tile-chain adapters and broader visual qualification |
-| Camera/frustum cache | Complete host inverse/unprojection/orientation and native cached shapes, using native transform values; 15341 matching full publications and stable short normal flat/final-eye sequences without fallback/imports | Engine camera sources, inherited transform imports, invalidation/settings/getters, cache-hit GPU coverage, VR framing/depth and broader scene qualification |
-| Texture assets | Persistent `.bdtex` assets, independent mip cooking, shared host GPU ownership, direct immutable material bindings and native stable samplers; enabled by default | Asset-level scene associations, dynamic/inherited inputs, remaining imports and headset-specific formats |
-| Resource uploads | Bounded host staging pages, fence-safe reuse/retirement, separate from shader constants | Complete native dynamic-geometry producers and asset streaming/backpressure |
-| Deferred work | Host depth, ordering, bounded batch planning, consumer loop, surface expansion and cleanup | Native scene/pass inputs, remaining entry fields, engine storage and visual/material/state adapters |
-| Sorted visuals / immediate submission | Complete host sorted model/primitive scheduler, bounded host order, model preparation policy and direct immediate vertex upload; no normal guest bucket sorting or enclosing full legacy parameter scope | Authored model/vertex producers and storage, bone/visual/material/pass callbacks, deferred-effect consumer/resolves and authored model/UI/both-eye qualification |
-| Object/pass transforms | Host world/view/projection publication and view-projection composition, direct native camera/XR view input; enabled by default | Engine object/camera sources, inherited matrix cache, complete native scene/pass data and shader-ABI removal |
-| Parameter producers/storage | Host builders, flush/setters and bounded native CPU float storage consumed by uploads/replay; 34591 flat / 501224 XR block comparisons match | Source descriptors, explicit inline/UI imports, shader-register ABI, guest mirrors/getters, native material associations and broad visual qualification |
-| View frustum | Native six-plane construction and current-frame host-culling ownership; byte-safe imports, 18341 matching producer checks, 436841 matching consumer-shadow checks and stable short normal flat/final-eye sequences | Engine camera sources, other-view clients, getter publications and broader visual qualification |
-| Skin bindings | Explicit per-draw model-local joint indices and host-owned current palette gathering; matrix-value identity guessing removed | Native animation/pose producers, persistent skeleton/skin assets, remaining discovery/entry adapters and a dedicated GPU palette ABI |
-| Raster state | Native depth, cull/fill, colour-write and stencil intent; host setter execution and no normal per-draw raster-cache translation | Sampler and other-state producers, engine getter shadows, complete material/pass recipes and unexercised stencil GPU paths |
-| Sampler producers | Complete scene defaults and seven supported setters execute on the host; 146571 matching original-publication checks and stable short normal flat/final-eye sequences | Inline material writers, other setters, per-draw fetch import, independent native live intent and broader GPU coverage |
-| Blend state | Native RGB/alpha blend intent and eight host setters; no normal per-draw Xenos blend-register import | Native material/pass producers, removal of getter shadows, blend constants and separate-alpha/operation GPU coverage |
-| Alpha policy | Native cutout/reference/compare/coverage intent, four host setters, shared CPU/shader comparison contract and live ordinary-draw composition | Native material/pass producers, removal of getter/replay adapters, non-GE GPU coverage and multisample/custom coverage qualification |
-| Scene submission | Host traversal/replay, authoritative native packet pipelines, frustum/occlusion culling, instancing, vertex pulling and indirect submissions | Replace retained guest draw templates and material/constant producers; remove remaining guest resource dependencies |
-| Frame and VR | Host whole-view/pass lifecycle scheduling, targets/post-processing, layered multiview presentation and desktop OpenXR test runtime | Complete native frame ownership, scene/descriptor/participant inputs, effects/UI/animation ownership and representative full-game visual checks |
-| Effect registry and lifecycle | Host selector policy, signed/stable ordering, array mutation, both preparation groups, paired cleanup and array teardown; enabled by default | Native flag/metadata/callback producers, registry storage/identities and full lifecycle GPU qualification |
-| DoF production | Complete preparation/submission replacements, native parameters and explicit-input atlas; no supported-path DoF level allocations, quads, intermediate target/resolve or PS c27 reads; enabled by default | Authored camera/focus sources, image/getter adapters, compatibility scopes and broader view/focus qualification |
-| DoF/bloom/flare scheduling | Native atlas/composite and 15 optical sprites in one instanced draw into an explicit persistent output; host-prepared input descriptors remove the three startup/transition guest warm-up scopes; normal flat/VR record zero post fallbacks | Native light/visibility producers, per-eye optics, image/property/UI adapters and broader scene coverage |
-| Effect-sequence scheduling | Host-owned ordered post-root dispatch consumes a per-view, single-use completed-scene result with explicit colour/depth/exposure; native pins preserve source lifetime, normal post skips getter/resolve-link imports; direct inter-root images, at most two alternating outputs and one final publication | Remaining scaling/output adapters, final UI publication, engine list/property/request producers, compatibility imports, unknown callbacks and multi-root/HDR/nested-view GPU qualification |
-| Directional bloom | Independent horizontal/vertical 13-tap masks in at most two private quarter-pair atlases; layered native passes replace the mode-1 guest mask cache, blur submission and resolves | Authored mode-1 activation/kernel comparisons and combined heat/bloom coverage; strong previews are stable but washed-out VR makes preview depth inconclusive; other bloom modes retain native approximations |
-| Optical adjustments | Fisheye and colour inversion fused into one native layered pass; output-aspect-aware curve, explicit attachment records and private input scratch without a seed copy or emulated resolve; visible flat/both-eye previews verified | Authored activation/parameter comparisons and event coverage, VR comfort |
-| Scanline filter | Native four-tap layered pass after optical adjustments, with host-frame animation independent of gameplay RNG; existing noise-off default retained; 860 authored strength comparisons match | Broad event coverage; earlier noisy VR preview has 1/31 large changes in visible wave bands, not a normal stability qualification |
-| Colour grading and grain | Native discolor/correction/grain pass, explicit 80-byte parameters and shared-eye animation using existing cooked assets; packed producer/texture-list/resolve removed; three post stages reuse at most two scratch images | Authored grain-event coverage and property/image adapters; deliberate RNG sequence change, no VR comfort qualification |
-| Heat shimmer | Native depth-aware scene displacement fused into the composite, with unwarped bloom, four noise taps, shared-eye animation and explicit 224-byte composite layout; no extra full-image target or guest phase writes | Authored activation/parameter checks, events and VR comfort; strong synthetic previews have 31/31 large changes, not normal stability passes |
-| Native eye geometry | Shared full runtime extent for scene and final layers; separate authored UI scale; 1440x1584 scene/final-eye pixels verified without letterboxing at XR scale 1.0 | Blur, UI/cinema/movie GPU qualification and broader modes; the default XR scale remains 0.65 |
-| Tracked camera ownership | Explicit per-view native composition, reused by scene and shadow preparation; generic light/2D/post matrix writes no longer drive tracking | Native camera sources, interpolation, reflection derivation, focus production and complete frame scheduling; renderer descriptor adapters remain |
-| Desktop verification | All 30 material/texture/state/camera/post CTests and 45 source guards pass; scene-result normal flat/VR have zero post getter imports/fallbacks, 0/119 large changes, no cyan hits and correctly crossed first/last VR depth; both eyes inspected | Authored effect events, multi-root/HDR/nested-view GPU cases, title artwork, distant VR blur, per-eye flare optics and VR character-shadow/full-game coverage remain unqualified; earlier late-scene failures are not superseded |
-| Android / Quest 2 | ARM64 build/APK and OpenXR/controller foundations exist from earlier work | Full desktop completion gate, then fresh device qualification and optimization |
+| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; shared native GPU data, mip cooking, generated LOD support and bounded owners | Asset-level discovery/loading and scene associations, independent layouts, dynamic geometry and streaming/backpressure |
+| Scene submission | Host traversal/replay, native packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Native object storage and transforms; replace retained guest draw templates and remaining resource dependencies |
+| Materials | Native material assets, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native material/texture/lighting associations, all recipes, bool/sampler inputs; remove shader-register ABI, mirrors/getters and remaining callbacks |
+| Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
+| Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
+| Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |
+| Desktop VR | Layered multiview presentation, native eye extents and headless OpenXR test runtime | Complete host frame, broader both-eye/animated-effect qualification and remaining modern-GPU/VR requirements |
+| Quest 2 | Earlier ARM64/APK and OpenXR/controller foundations | Full desktop gate first; then fresh device qualification, foveation and optimization |
 
-Newer [local native-resolve integration](research/20260905_2206_native-scene-resolve-ownership.md)
-gives scene MSAA native colour/depth resolve images and removes the initial colour
-copy from normal native post. Host builds, 30 CPU tests, 46 source guards and
-normal/post-disabled recovery diagnostics pass; one bounded desktop window image
-was inspected. [Native multiview state ordering](research/20260905_2305_native-multiview-state.md)
-is now fixed in local Plume `81bdca8`, with validated tiny GPU readbacks and
-capture-disabled desktop XR/non-MSAA diagnostics. Depth/getter publications and
-full-frame pixel/game qualification remain unfinished. The scene integration is **not yet committed
-or published**. Its Plume dependency is now published and recorded; the remaining
-renderer changes still need a scoped commit. The table above describes earlier checkpoints.
+Existing native scene/post integration is published with Plume `3094b35`.
+Normal supported paths own source/resolve images and their fence-retained
+lifetimes without inferred EDRAM sources or seed copies. Unconverted scopes
+and consumers still prevent claiming removal of all console rendering machinery.
 
-The [native post-resource boundary](research/20260905_2351_native-post-resource-contract.md)
-removes output and optical-image headers from post rendering, retaining native
-HDR images between roots. Its independent contract/test is checkpointed locally;
-renderer wiring remains pending with the scene integration. The host build,
-31 CPU tests, 48 source guards and capture-disabled flat/XR optical diagnostics
-pass. At that checkpoint temporary output allocation and final UI/depth
-publication still needed conversion; these were not new pixel qualifications.
+### Next ownership milestones
 
-The [native post-image ownership](research/20260906_0014_native-post-image-ownership.md)
-replaces the post output allocator with a bounded native FP16 pool. The final
-getter borrows the completed image/descriptor without a copy or resolve link;
-live readers prevent write-lease reuse and destruction is fence-gated. The host
-build, 31 CPU tests and 50 source guards pass. Normal flat, optical XR and
-non-MSAA diagnostics have zero post imports/fallbacks/refusals and settle at two
-resident post images. One normal-flat window PNG was inspected, not a new
-flat/VR sequence qualification. The independent pool/test is locally checkpointed;
-GPU integration remains uncommitted; dependency publication approval is now resolved.
-At that checkpoint initial depth publication, UI scheduling and full-frame/game
-gates remained open.
+The dependency-ordered queue is maintained in
+[Host renderer transition](docs/HOST_RENDERER_TRANSITION.md#active-work-queue).
+Work is organized around complete producer-to-consumer paths, not isolated
+callback counts:
 
-The [native depth-image handoff](research/20260906_0110_native-depth-image-lease.md)
-removes matching MSAA depth copies/resolve links and shares one live layout record
-between native owners and adapters. The
-[single-sample ownership change](research/20260906_0138_native-single-sample-ownership.md)
-also moves non-MSAA scene images/views/descriptors into a bounded, fence-retired
-native store without duplicating GPU images. Native post receives those source
-images directly; depth getters borrow their backing. Host build, 31 CPU tests,
-53 source guards and bounded non-MSAA flat/XR/recovery plus default-MSAA checks
-pass. Normal non-MSAA flat/XR record 3,600/10,200 native depth handoffs and zero
-compatibility depth publications or native-post imports/refusals. One non-MSAA
-flat PNG was inspected, not new sequence/stereo qualification. Independent
-contracts/tests are local checkpoints; renderer
-integration still awaits a scoped commit. Protected raw/failure
-evidence remains; superseded small diagnostics are cleaned up at checkpoints.
+1. Map the remaining scene/material dependencies, including indirect callbacks
+   and already-replaced bodies; establish repeatable feature-specific checks.
+2. Complete one native static-object path from asset loading and material
+   association through native instances to scene/shadow submission.
+3. Complete character asset, pose, joint-palette and GPU skinning ownership.
+4. Finish dynamic geometry, effects, UI and remaining reflection/pass producers.
+5. Remove unused compatibility machinery and complete the representative desktop
+   gate before Quest 2 work.
 
-The [native scene source allocation](research/20260906_0200_native-scene-source-allocation.md)
-creates both MSAA and single-sample scene attachments from explicit native recipes;
-it no longer allocates them through SurfacePool or Xbox-format inputs. Binding
-headers remain temporary adapters, and native resolve framebuffers retain their
-source images. Host build, 31 CPU tests, 55 source guards and five bounded flat/XR/
-recovery checks pass, with zero unexpected native-post fallbacks or compatibility
-depth publications. Two flat sanity PNGs were inspected and replaced older
-equivalents; they do not qualify sequences or stereo pixels.
+Small, coherent, verified commits and pushes remain the default. Focused CPU
+fixtures and incremental builds form the inner loop; rendering changes still
+need appropriate GPU/pixel checks. Startup-only counters or an empty effect
+queue do not qualify an authored field/effect path.
 
-The [native scene framebuffer ownership](research/20260906_0236_native-scene-framebuffers.md)
-also removes single-sample scene framebuffer creation from the resource-header
-cache. Exact native attachment owners, mono/stereo recipes and fence retirement
-replace that lifetime dependency. Host build, 31 CPU tests, 57 source guards and
-four bounded flat/XR/recovery checks pass; one non-MSAA flat PNG was inspected,
-not new sequence/stereo qualification. Superseded diagnostics were removed,
-reclaiming 8,167,424 B measured without touching protected raw/failure evidence.
-At that checkpoint native pass commands/clears, remaining getters/scaling, full
-scene/UI/frame ownership and desktop game gates remained open. Independent
-contracts/tests are local commits;
-renderer integration is still unpublished pending a scoped commit.
+### Evidence limits and performance
 
-The [native scene command ownership](research/20260906_0255_native-scene-commands.md)
-moves attachment write layouts, first-use discards, framebuffer binds and typed
-clears into the native scene scope, bypassing alias/seed/tile-chain selection.
-Empty scenes clear before publication; resumed scopes do not clear twice.
-The [precision-boundary change](research/20260906_0333_native-scene-state-bridge.md)
-also removes both guest high-precision-blend calls (state 308): native attachments
-stay FP16 without toggling console surface/packet formats. Only final getter words
-remain published for unconverted clients. Host build, 31 CPU tests, 60 source
-guards and bounded normal flat/XR/non-MSAA checks pass, with zero scene state-308
-calls, compatibility clears/depth publications or post imports/refusals. One new
-flat sanity PNG was inspected and replaced its predecessor, not sequence/stereo/
-full-game qualification. This follow-up reclaimed 7,196,672 B of superseded
-diagnostics. Complete draw-state execution, remaining getters/scaling, scene/UI/
-frame ownership and desktop game gates remain; integration still needs a scoped
-commit, with standing publication approval now granted.
+The full gate still includes fields, battles, cutscenes, menus, transitions,
+reloads, animated effects and both eyes. Earlier later-scene scenery/text
+failures remain unresolved evidence, not superseded by a standing-field smoke
+image. VR character shadows, distant blur, title artwork, per-eye optics and
+special-effect coverage also remain unqualified. Experimental native sun-camera
+fitting remains disabled by default.
 
-The [whole-view scheduler](research/20260906_0442_native-view-schedule.md) now
-executes parent branch selection, pass order and reflection/focus geometry on the
-host, including starts previously inlined around the shared
-[pass lifecycle dispatcher](research/20260906_0412_native-pass-dispatch.md).
-Host build, 31 CPU tests and 65 source guards pass. Bounded flat/XR checks record
-3,601/9,601 native views with zero parent or dispatcher fallbacks/refusals/faults;
-post-disabled coverage keeps the parent native while exercising isolated legacy
-post cleanup. Non-MSAA coverage also passed. One flat sanity PNG was inspected;
-superseded small diagnostics were removed, reclaiming 8.04 MB measured. Imported
-authored scene data, descriptors, registry and remaining callbacks are still conversion work, and the
-full desktop game/stereo gate is open. No new raw captures or Quest runs were made.
-
-The [effect activation and registration change](research/20260906_0516_native-effect-activation.md)
-moves all selector cases and three-group registration/removal algorithms to host
-code. Host build, 31 CPU tests, 69 source guards and bounded flat/XR checks pass;
-both runs exercise native registration/removal without fallback or faults.
-The [preparation/cleanup follow-up](research/20260906_0536_native-effect-lifecycle.md)
-also moves both preparation groups, paired resource/participant cleanup and array
-teardown onto the host. Host build, 31 CPU tests, 72 source guards and bounded
-flat/XR field checks pass with zero lifecycle fallback/refusal/faults. A flat
-sanity PNG was inspected; global teardown has CPU coverage only, and full-game/
-both-eye qualification remains open. Shared storage, identities and callback
-implementations remain imports. Superseded diagnostics were removed, reclaiming
-6.28 MB measured, with 60.10 GiB free; no new raw captures or Quest runs were made.
-
-The [native snapshot follow-up](research/20260906_0629_native-scene-snapshots.md)
-adds host-owned HDR image copies and a tiny off-screen GPU fixture. It found and
-fixed a Vulkan pending-clear/resolve ordering bug; eight mono/stereo and
-1/2/4/8-sample cases pass with zero validation errors/warnings, alongside the
-host build and 31 CPU tests. Native-extent publication is in the pending
-integration; actual authored snapshot-copy use remains unproven. No new raw
-captures were made, and superseded diagnostics were removed. This is not full
-host-frame or full-game/stereo qualification; integration remains uncommitted.
-
-The [water/refraction setup follow-up](research/20260906_0700_native-refraction-materials.md)
-moves two whole material callbacks onto the host, preserving blending/depth-write
-policy and the water-highlight clamp. Host build, 31 CPU tests and 83 source guards
-pass. A bounded flat run exercises 1,964 water preparations without material
-fallback/refusal/faults; one sanity image was inspected. Refraction/snapshot
-execution remains unobserved in that field. Native material assets,
-parameter/state/getter adapters and full-frame qualification remain open. Ten
-superseded diagnostics were removed, reclaiming 4.27 MB measured; no raw captures.
-
-The [water-update follow-up](research/20260906_0726_native-water-update.md) moves
-the complete animation/23-parameter update and sampling-mode counter callbacks
-onto the host. A fixed 32-entry write plan preserves sequential aliases without
-disk dumps. Host build, 31 CPU tests and 88 source guards pass; 301 in-game
-publications match the original, followed by 2,701 normal native updates without
-fallback/refusal. Native data/storage and full-frame/event/stereo qualification
-remain open. Ten superseded diagnostics were removed; no raw captures were added.
-
-The [native parameter-storage follow-up](research/20260906_1215_native-parameter-storage.md)
-wires host producers directly to bounded CPU-owned blocks consumed by draw uploads
-and replay. Independent flat/XR comparisons exposed and fixed missing visual,
-foliage and Toon/fur notifications. Host build, 31 CPU tests and 94 source guards
-pass; normal flat rendering and one sanity image were checked. Inline/UI imports,
-guest mirrors and the shader ABI remain explicit work, not a completed host frame.
-Twenty-one obsolete diagnostics were removed, reclaiming 4.46 MB measured; no
-new raw captures or Quest runs.
-
-The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
-records scoped image ownership, exact binary/settings and flat/both-eye checks.
-Six superseded normal raw sets and their automatic copies/links were removed,
-retaining their 16 previews and reports; two new sets form the baseline. Net
-volume usage fell 7.38 GiB, with 60.97 GiB free. The historical archive still
-exceeds its budget; the no-growth and reclaim-before-capture rules remain in force.
-
-The mesh/capture evidence and its limits are recorded in
-[the native mesh research note](research/20260904_1713_native-mesh-assets-and-capture-ownership.md);
-[the native material note](research/20260904_1748_native-material-properties.md)
-records material-source checks and flat/multiview correctness comparisons.
-The following notes describe earlier checkpoints; the latest packet-ownership
-result below supersedes their short-field flicker findings, not their remaining
-ownership or full-game coverage limitations.
-The persistent material contract and standalone cooker are documented in
-[Native material assets](docs/NATIVE_MATERIAL_FORMAT.md).
-Material persistence now has independent byte/file limits and a free-space
-reserve; a full cache keeps native resident data usable without evicting files.
-The [native texture contract](docs/NATIVE_TEXTURE_FORMAT.md) covers texture
-files, the independent mip cooker, native sampling and the remaining resource bridge.
-The [binding checkpoint](research/20260904_1946_native-material-texture-bindings.md)
-passed its short flat capture. [Host upload pages](docs/HOST_UPLOAD_ARENA.md)
-remove the subsequent texture/constant-buffer wrapping hazard, but the later
-scene still has unqualified dark/missing-geometry frames; see
-[the upload evidence](research/20260904_1959_host-upload-pages.md).
-The [receiver-shadow checkpoint](research/20260904_2041_native-shadow-receiver-inputs.md)
-passes its short flat sequence and input checks, but reproduces the 64-frame
-multiview defect. Its longer baseline also confirms the later scene remains
-broken after the upload lifetime fixes.
-The [host deferred-work checkpoint](research/20260904_2055_host-deferred-work.md)
-removes guest allocation/sorting execution from its normal path, with passing
-standalone and short flat checks; the multiview defect remains reproducible.
-The [live depth checkpoint](research/20260904_2122_live-native-deferred-depth.md)
-also replaces initial depth execution and stale replay keys with host calculation
-from current transforms. Its input comparison and normal flat capture pass;
-the multiview defect and incomplete stereo-depth qualification remain.
-The [host consumer checkpoint](research/20260904_2154_host-deferred-consumer.md)
-also replaces the guest deferred-list loop, with explicit counters for the
-remaining engine adapters. This is not full native frame ownership, and it
-does not resolve the known multiview or later-scene failures.
-The [native transform producer](research/20260904_2216_native-render-transforms.md)
-removes another guest producer and its matrix/constant helper calls; the final
-input/publication comparison has no mismatches or compatibility calls.
-The [native raster checkpoint](research/20260904_2238_native-raster-intent.md)
-also moves 15 raster setters and ordinary draw-time raster intent to the host;
-other-state execution and engine getter shadows remain explicitly tracked.
-The [native blend checkpoint](research/20260904_2302_native-blend-intent.md)
-replaces eight blend setters and removes the normal draw-time blend-register
-import; blend constants and independent material/pass sources
-remain work in progress.
-The [native alpha checkpoint](research/20260904_2327_native-alpha-policy.md)
-moves four more setters and ordinary-draw cutout/coverage intent to the host,
-with tested shared shader comparisons and the corrected reference scale.
-Engine getter shadows, retained replay recipes and broader GPU coverage remain.
-Its final desktop multiview sequence still shows flicker/banding and an
-inconclusive stereo-depth result; the alpha conversion does not qualify VR.
-Passing this desktop slice does not establish full-game coverage or headset
-performance.
-
-The [native draw-packet fix](research/20260904_2348_native-draw-intent.md) stops
-engine shader/declaration and render-state history from overwriting host packet
-intent during dispatch. Replay stays enabled. The latest short flat and final-eye
-multiview sequences have no large jumps or cyan patches, and inspected eyes no
-longer show broad horizontal banding. Blur/letterboxing, inconclusive depth,
-below-target eye sizing and full-scene coverage still require work. The
-[longer rerun](research/20260905_0010_native-draw-late-scene.md) at that checkpoint
-had deformed geometry, disappearing scenery and damaged text.
-This fixes packet consumption, not the retained recipe or scene/pass producers.
-
-The [per-draw native skin checkpoint](research/20260905_0025_native-skin-bindings.md)
-removes joint identity guessing and the node-wide retained bone table. Its
-palette-source checks have zero mismatches; inspected late-scene characters no
-longer stretch across the frame with replay enabled. Background surfaces and
-text still fail, and the stable short multiview sequence remains inconclusive
-for stereo depth. Animation evaluation and pose sources are still engine-owned.
-
-The [recurring replay diagnostics](research/20260905_0053_recurring-draw-verification.md)
-preserve later-scene examples, distinguish declared shader inputs, compare buffer
-fields without padding noise and flag incomplete draw comparisons. They expose
-remaining camera/material input differences; they do not fix or qualify the
-later scenery/text failure.
-
-The [host lighting producer](research/20260905_0121_native-lighting-pass.md)
-replaces lighting setup execution and supplies direct-node shadow sampling
-parameters from explicit host records. The short comparison has no publication
-or direct-node input mismatches. Normal late and multiview runs have no lighting
-fallbacks or direct-node source mismatches, but later scenery/text still fail
-and stereo depth remains inconclusive. Engine scene/texture associations,
-material staging and other retained inputs remain; this is not complete frame
-ownership.
-
-The [reflection-selection checkpoint](research/20260905_0144_native-reflection-selection.md)
-separates material selection from image lifetime and reflection enable. Supported
-direct draws resolve current bindings before submission; null selections remain
-an explicit compatibility boundary because the existing texture adapter treats
-them as no-ops. This is not full reflection-pass or frame ownership.
-Its first normal late run exposed a registry/upload deadlock despite matching
-source counters. The [lock-order correction](research/20260905_0235_reflection-validation-lock-order.md)
-moves binding validation outside the draw lock. The corrected run advances
-through loading with 1214021 matching source checks, but inspected later frames
-still lose rock-wall surfaces and damage text. Normal multiview remains stable
-over its short sequence but blurred/letterboxed and inconclusive for depth.
-
-The [scene-image producer](research/20260905_0301_native-scene-textures.md)
-replaces current/next scene selection and its binding callback on the host.
-The desktop comparison has no selection or publication mismatches, but only
-14 callback publications were exercised; all bound images used native handles.
-Its early field/title-transition capture alone does not requalify later scenes
-or VR. The [scene-input replay checkpoint](research/20260905_0318_native-scene-input-recipes.md)
-now replaces retained bindings with explicit roles and distinguishes different
-selection paths even when their images match. Normal execution has 34 matching
-source checks and 13133 scene-role draws, but still reproduces rock-wall popping.
-The full-size desktop VR check uses `bd_xr_render_scale=1.0`: final layers reach
-1440x1584 per eye with a stable short sequence, but content is letterboxed to
-1440x808, blurred and inconclusive for depth. That VR view does not exercise
-the scene-image callbacks. Native scene associations, pass sequences and other
-material inputs remain; no Quest performance or full-frame completion is claimed.
+The sorted-scheduler check reduced imported float words per native parameter
+block from about 13.00 to 0.757 (94% less import work), **not a 94% FPS gain**.
+Its desktop field median was 16.667 ms (~60 FPS), with 6.610 ms `other_ms` and
+5.677 ms GPU time. No controlled overall speedup or Quest performance result
+is established. [Measurements and limitations](research/20260906_1323_native-visual-schedule.md).
+The latest Toon check is correctness evidence, not a performance benchmark.
 
 ## Project documentation
 
-The [sampler producer checkpoint](research/20260905_0436_host-sampler-producers.md)
-replaces complete scene defaults and seven supported setters. Publication
-comparison and short normal desktop/final-eye checks pass, but inline material
-writers and draw-time fetch import remain. It does not qualify later scenery,
-text, stereo depth or full native frames.
-
-The [frustum checkpoint](research/20260905_0559_native-frustum-producer.md)
-moves complete plane construction and default-view culling volume ownership
-to the host. The [native camera/cache checkpoint](research/20260905_0717_native-view-cache.md)
-also replaces view inverse/unprojection/orientation execution and uses native
-transform values and cached shapes. Original comparisons and short normal
-flat/final-eye sequences pass. Engine camera sources, invalidation/settings,
-getter clients and broader scene/frame producers remain. Stable final eyes
-still do not qualify their framing or stereo depth.
-
-The [sun-shadow lifecycle checkpoint](research/20260905_0756_native-shadow-pass-lifecycle.md)
-replaces complete attachment setup/output/teardown and removes resolve-source
-guessing for that pass. Scene-camera snapshot and light fitting still execute
-through counted engine adapters; secondary shadows and caster scheduling remain.
-
 - [Host renderer transition](docs/HOST_RENDERER_TRANSITION.md): active scope,
-  completion checklist and remaining dependencies.
-- [AGENTS.md](AGENTS.md): canonical instructions for coding agents, including
-  build/verification rules and frequent, scoped commits and pushes.
-- [CLAUDE.md](CLAUDE.md): thin import of `AGENTS.md`, so shared instructions are
-  maintained in one place.
-- [Research](research/): dated experiments and evidence, not current promises.
+  ordered work queue, completion requirements and checkpoint history.
+- [AGENTS.md](AGENTS.md): canonical instructions, storage budgets and standing
+  approval for frequent scoped commits/pushes. [CLAUDE.md](CLAUDE.md) imports it.
+- [Native material format](docs/NATIVE_MATERIAL_FORMAT.md),
+  [native texture format](docs/NATIVE_TEXTURE_FORMAT.md) and
+  [host upload arena](docs/HOST_UPLOAD_ARENA.md): native data contracts.
+- [Research](research/): dated evidence, including unresolved failures; historical
+  observations are not current promises.
 - [Original VR plan](docs/VR_PORT_PLAN.md) and
-  [archived project notes](docs/archive/CLAUDE_2026-09-04.md): historical context;
+  [archived notes](docs/archive/CLAUDE_2026-09-04.md): historical context,
   superseded wherever they conflict with the current transition.
 
 ## Desktop verification

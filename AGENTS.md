@@ -145,6 +145,25 @@ interpreter mentioned in research is distinct from CPU emulation.
 - `xr_math`, camera, culling and settings math must remain testable without
   OpenXR headers. Convert handedness once, in `FromOpenXRPose`.
 
+## Ownership-oriented development
+
+- Choose complete producer/data-owner/consumer paths that remove shared guest
+  dependencies. A whole-function replacement can be a useful checkpoint, but
+  callback counts are not the work queue or a completion percentage.
+- Use generated source and the existing call graph before broader reverse
+  engineering. Direct-call graphs omit indirect targets and still contain
+  replaced bodies; static call-site counts are not runtime hotness.
+- Reuse native asset, submission and pass systems. Preserve art and gameplay
+  contracts without making console register/scratch layouts the new native API.
+  Remove temporary adapters when their last consumer is migrated.
+- Keep the inner loop in focused fixtures and incremental host builds. Group
+  related changes into coherent, verified commits; keep required GPU/pixel
+  checks proportional to risk. Target the actual feature with scene/event
+  readiness checks, not a fixed boot delay or an unexercised queue.
+- Maintain one dependency-ordered active queue in the transition document;
+  README summarizes it and research retains evidence. Do not duplicate a long
+  chronological worklog across active documents.
+
 ## Verification rules
 
 - Inspect actual pixels, not just counters or build success. Capture sequences

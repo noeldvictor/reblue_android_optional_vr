@@ -28,7 +28,61 @@ All of these remain required; shipping an intermediate component is not completi
 - Only after that desktop gate: Quest 2 qualification and VR optimization,
   including foveation, toward the recorded 72 Hz / 1440x1584-per-eye target.
 
-## Current conversion
+## Active work queue
+
+Updated 2026-09-06 after the Toon checkpoint. These milestones organize the
+unchanged completion requirements above; none is a substitute for the full gate.
+
+1. **Scene/material dependency map and targeted verification.** Start from
+   `bdSceneTreeDraw`, `bdSceneNodeCullTraverse`, `bdSceneNodeDrawSingle`,
+   `host_walk.cpp`, `host_draw.cpp`, `native_mesh.*` and `native_material.*`.
+   Record actual data producers, current replacement hooks, indirect callbacks,
+   consumers and deletion conditions. `tools/callgraph.py` currently sees direct
+   call sites only, not runtime frequency or all indirect targets. Scenario
+   checks must establish feature execution; empty queues are untested coverage.
+2. **Complete native static-object path.** Reuse the existing native asset
+   libraries and submission backend. Move asset/mesh/material association and
+   instance storage above draw submission, using stable native handles. Replace
+   guest `NodeTag` discovery and retained interpreter templates for that path;
+   scene/shadow draws must not re-import per-draw console state. Temporary load
+   adapters need explicit removal conditions, not permanent address identities.
+3. **Complete character path.** Native skeleton/skin assets, animation and pose
+   producers, joint palettes and GPU skinning; preserve gameplay synchronization
+   and verify characters in the relevant field/battle/cutscene/shadow paths.
+4. **Complete specialized producers.** Dynamic vertices, effects/particles, UI,
+   reflections and remaining pass/material callbacks, with authored event and
+   lifecycle checks rather than field-only counter coverage.
+5. **Delete unused compatibility machinery and qualify desktop.** Remove guest
+   rendering execution, register/resource/getter adapters, EDRAM/tile inference,
+   seed copies and emulated resolves as their consumers disappear. Complete all
+   representative desktop/both-eye/animated-effect checks before Quest runs.
+
+Use focused fixtures and incremental builds for the inner loop, targeted
+GPU/pixel checks for coherent rendering changes, and the broad suite at meaningful
+milestones. Maintain frequent verified commits/pushes. The measured latest host
+build log spans roughly 12 s and its 31 CPU tests take 6.94 s; prioritize removing
+repeated investigation/boot work over introducing a new build system. No overall
+development-speed multiplier is established.
+
+## Latest qualified checkpoint
+
+Toon material callbacks (2026-09-06): complete update/begin/end replacements
+own texture animation and edge-parameter production. Pass dispatch directly
+calls native participants. Flat/XR samples record 13,280/3,020 native participant
+calls and zero guest participants at that dispatcher, with no fallback/refusal/
+faults. Fresh field-camera XR samples match 1,510 original Toon publications and
+2,627,009 native parameter blocks, zero mismatch/full legacy blocks. Host build
+37, CPU suite 30 (31/31, 6.94 s) and 115 source guards pass; one flat field image
+was inspected. Counters/list/edge data, two inherited edge words, texture resource
+and shader ABI imports remain. This is not full Toon asset/frame ownership or
+both-eye/full-game qualification. No new raw captures or Quest work. Evidence:
+`research/20260906_1505_native-toon-materials.md`.
+
+## Historical checkpoints
+
+Entries below describe their dated checkpoint, not the current publication
+state or a separate active queue. Later evidence supersedes only what it
+explicitly requalifies; unresolved failure evidence remains required.
 
 Material passes (2026-09-06): five complete guest bodies now have host
 replacements for begin/end, recipe selection, shader binding and cached vertex
