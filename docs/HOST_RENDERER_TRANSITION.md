@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Effect activation and registry mutation (2026-09-06): host replacements cover
+all effect selectors and the three-group registration/removal algorithms,
+including signed-priority ordering, duplicate/first-removal semantics, live
+callback inputs, indexed-view tail cleanup and checked native array mutations.
+Authored flags, callback metadata, shared array storage/readers and lifecycle
+remain imports; this is not complete registry or frame ownership. Host link,
+31 CPU tests and 69 source guards pass. Bounded flat/XR checks each record
+28 registrations, 9 removals, 40 insertions and 18 erasures, with zero activation/
+registry compatibility, refusals or faults. Existing parent/scene/post checks
+also pass. One flat sanity PNG was inspected, not sequence/stereo/full-game
+qualification. Thirteen superseded small diagnostics were removed, reclaiming
+6,418,432 B measured; 60.11 GiB remains free and no raw captures were added.
+Preparation consumers, registry/scene ownership and full desktop game/both-eye
+gates remain required before Quest. Evidence:
+`research/20260906_0516_native-effect-activation.md`.
+
 Whole-view scheduling (2026-09-06): the complete parent `bdRenderViewSubmit`
 now selects and schedules its passes in host code, with native reflection
 candidate geometry and focus publication. Previously inlined starts enter the

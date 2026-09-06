@@ -299,3 +299,53 @@ was diagnostic payload. Unattributed volume/metadata growth remains charged, not
 discarded. No live producer or temporary profile override remains. Protected
 historical raw sets retain their prior review/cleanup gates and zero incoming
 raw allowance. Later source/Git metadata still counts in this same ledger.
+
+## Continuing the same storage ledger: effect activation, 05:16
+
+Preflight free space 64,576,348,160 B; no live renderer/build/compiler/linker.
+The small increase from the prior closing volume is not claimed as cleanup.
+Original baseline 65,462,788,096 B, 2 GiB peak cumulative growth, 100 MiB retained
+diagnostics, 10 MiB aggregate build logs and 20 GiB reserve remain unchanged.
+Retained diagnostics are 55,368,500 B including the 41 MiB tool/inspection
+reservation; the two existing PNGs total 6,695,204 B. No raw incoming allowance.
+
+Reuse the configured CPU and desktop trees, installed runtime and guarded wrappers.
+Plan at most 512 MiB temporary build/link overlap and 8 MiB new diagnostics across
+all attempts: focused scene CPU target, existing CPU suite, incremental host link,
+bounded capture-off flat/XR checks and one bounded normal-flat PNG replacement.
+This tests changed effect/registry execution, not merely a new commit label. Keep
+the original budget floor and live producer bounds; do not rebuild guest objects
+or shaders. Inspect the replacement before retiring same-purpose small outputs;
+protected raw/failure evidence and distinct recovery/non-MSAA evidence stay intact.
+Actual outcomes and cleanup must be reconciled here, not in a fresh allowance.
+
+All three build/test producers and both desktop checks completed within their
+bounds, with no new raw/cache/dump files. Focused CPU target and host link passed;
+CPU suite 31/31, source guards 69/69. Two runtime logs total 843,788 B, perf CSVs
+and metadata 2,224,352 B, build logs 6,535 B, and the inspected flat PNG 3,200,734 B:
+6,275,409 B new diagnostics within the 8 MiB plan. The PNG is inside the unchanged
+inspection reservation, not charged twice. No guest/shader rebuild or new tools.
+
+Completed cleanup: validated expected lengths, regular-file status, explicit
+workspace parents, reparse-free ancestors, ignores, both PNG hashes and absence
+of active renderer/build producers. Removed 13 superseded outputs: reblue_19,
+cpu_16 and host_scene_pass_test_03 stdout/stderr pairs; logs 858/859; perf-045055
+and perf-045232 CSV/metadata pairs; native_view_schedule_window.png. Logical
+6,408,767 B. Immediate free space 64,540,344,320 ->64,546,762,752 B:
+**6,418,432 B measured reclaimed**, counted once. Reports and hashes remain;
+the exact old outputs are gone and equivalent diagnostics can be regenerated.
+Protected raw/failure sets, distinct non-MSAA/recovery/optical evidence and all
+game/save/profile/source/dependency/build trees remain intact.
+
+Closing inventory: 76 build logs /126,029 B; 11 runtime logs /3,347,411 B;
+20 perf files /8,930,400 B; zero new raw/cache/dump files. With the fixed 41 MiB
+tool/inspection reservation, retained diagnostics total 55,395,456 B. The two
+remaining PNGs total 6,534,890 B. Free 64,546,762,752 B (60.11 GiB); net volume
+growth since this follow-up's preflight 29,585,408 B and since the original
+checkpoint 916,025,344 B. The volume fell an additional 27,463,680 B between the
+last run and cleanup. Rechecked scoped verification/log/perf/cache/dump/profile
+metadata: only the recorded outputs and restored 116-B owner profile changed.
+No live renderer/build producer remains. That additional volume change is not
+attributed to these diagnostic payloads or credited away; it remains charged to
+the cumulative cap. No further large producer is launched. Required evidence
+retains its existing cleanup conditions; later source/Git metadata still counts.

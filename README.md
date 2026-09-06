@@ -84,6 +84,7 @@ Quest-ready release.
 | Alpha policy | Native cutout/reference/compare/coverage intent, four host setters, shared CPU/shader comparison contract and live ordinary-draw composition | Native material/pass producers, removal of getter/replay adapters, non-GE GPU coverage and multisample/custom coverage qualification |
 | Scene submission | Host traversal/replay, authoritative native packet pipelines, frustum/occlusion culling, instancing, vertex pulling and indirect submissions | Replace retained guest draw templates and material/constant producers; remove remaining guest resource dependencies |
 | Frame and VR | Host whole-view/pass lifecycle scheduling, targets/post-processing, layered multiview presentation and desktop OpenXR test runtime | Complete native frame ownership, scene/descriptor/participant inputs, effects/UI/animation ownership and representative full-game visual checks |
+| Effect activation and registration | Host selector policy, signed/stable participant ordering, insertion/removal and checked array mutation; enabled by default | Native flag/metadata producers, registry storage/identities, preparation consumers and lifecycle |
 | DoF production | Complete preparation/submission replacements, native parameters and explicit-input atlas; no supported-path DoF level allocations, quads, intermediate target/resolve or PS c27 reads; enabled by default | Authored camera/focus sources, image/getter adapters, compatibility scopes and broader view/focus qualification |
 | DoF/bloom/flare scheduling | Native atlas/composite and 15 optical sprites in one instanced draw into an explicit persistent output; host-prepared input descriptors remove the three startup/transition guest warm-up scopes; normal flat/VR record zero post fallbacks | Native light/visibility producers, per-eye optics, image/property/UI adapters and broader scene coverage |
 | Effect-sequence scheduling | Host-owned ordered post-root dispatch consumes a per-view, single-use completed-scene result with explicit colour/depth/exposure; native pins preserve source lifetime, normal post skips getter/resolve-link imports; direct inter-root images, at most two alternating outputs and one final publication | Remaining scaling/output adapters, final UI publication, engine list/property/request producers, compatibility imports, unknown callbacks and multi-root/HDR/nested-view GPU qualification |
@@ -191,6 +192,15 @@ post cleanup. Non-MSAA coverage also passed. One flat sanity PNG was inspected;
 superseded small diagnostics were removed, reclaiming 8.04 MB measured. Imported
 authored scene data, descriptors, registry and remaining callbacks are still conversion work, and the
 full desktop game/stereo gate is open. No new raw captures or Quest runs were made.
+
+The [effect activation and registration change](research/20260906_0516_native-effect-activation.md)
+moves all selector cases and three-group registration/removal algorithms to host
+code. Host build, 31 CPU tests, 69 source guards and bounded flat/XR checks pass;
+both runs exercise native registration/removal without fallback or faults. Shared
+array storage, metadata callbacks and registry lifecycle remain imports. The new
+flat sanity PNG was inspected; full-game/both-eye qualification remains open.
+Superseded diagnostics were cleaned up, reclaiming 6.42 MB measured; no new raw
+captures or Quest runs were made.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
