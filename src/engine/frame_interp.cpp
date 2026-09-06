@@ -34,6 +34,7 @@
 #include "gpu/gpu.h"
 #include "gpu/scene/native_transform_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene/native_view_schedule_bridge.h"
 #include "xr/xr_game_camera.h"
 #include "xr/view_composition_scope.h"
 
@@ -533,8 +534,8 @@ REX_HOOK_RAW(bdCameraRenderSetup) {
 // bdRenderViewSubmit's descriptor +8 names the render camera shared by the
 // scene and shadow-volume preparation. Its view/projection are +160/+224.
 // This is deliberately NOT bdCameraRenderSetup's outer object (which embeds
-// this camera at +432). The original still schedules the passes; the native
-// scope owns which camera can receive tracking and its one composed result.
+// this camera at +432). The native scheduler owns pass order, and this scope
+// owns which camera can receive tracking and its one composed result.
 REX_EXTERN(__imp__bdRenderViewSubmit);
 REX_HOOK_RAW(bdRenderViewSubmit) {
   bd::gpu::scene::NativeSceneResultScope scene_result(ctx.r3.u32);
@@ -547,7 +548,9 @@ REX_HOOK_RAW(bdRenderViewSubmit) {
     ~RestoreScope() { g_viewComposition = previous; }
   } restore;
   g_viewComposition = &composition;
-  __imp__bdRenderViewSubmit(ctx, base);
+  if (!bd::gpu::scene::TryScheduleRenderView(ctx, base))
+    __imp__bdRenderViewSubmit(ctx, base);
+  scene_result.Clear(); // release unconsumed results before the camera scope exits
 }
 
 // Compose the tracked camera/XR view in native memory and feed the native

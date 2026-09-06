@@ -30,6 +30,23 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Whole-view scheduling (2026-09-06): the complete parent `bdRenderViewSubmit`
+now selects and schedules its passes in host code, with native reflection
+candidate geometry and focus publication. Previously inlined starts enter the
+shared host lifecycle dispatcher. All special-view branches remain represented;
+temporary authored inputs, descriptors, registry and remaining callbacks are
+explicit imports, not a completed native frame. Host link, 31 CPU tests and 65
+source guards pass. Bounded flat/XR checks record 3,601/9,601 native views with
+zero parent/dispatcher fallback, refusal or fault. Disabling native post exercises
+isolated legacy containers/cleanup without replaying the parent. One bounded flat
+sanity PNG was inspected, not sequence/stereo/full-game qualification. A bounded
+non-MSAA check also reached 3,601 native views without scheduler faults or fallback.
+Nineteen superseded small outputs were removed, reclaiming 8,036,352 B measured;
+closing free space is 60.14 GiB, with no new raw captures. Native
+scene production, callback/registry ownership, animation/materials/UI and the
+full desktop game/both-eye gate remain required before Quest 2. Evidence:
+`research/20260906_0442_native-view-schedule.md`.
+
 Shared pass lifecycle dispatch (2026-09-06): complete host replacements now
 execute pass-start/pass-finish scheduling, including ordered participant calls,
 live registry-slot updates and the final pass close. Existing parent-inlined
@@ -39,10 +56,10 @@ suite (31/31) and 60 existing scene/post guards pass. Bounded flat/XR checks rec
 fallbacks, refusals or faults; existing scene/post ownership checks also pass.
 One flat sanity PNG was inspected, not sequence/stereo/full-game qualification.
 Thirteen superseded diagnostics were removed, reclaiming 6,402,048 B measured;
-free space is 60.16 GiB with 3.54 MiB net growth for this follow-up. Parent branch
-decisions/inlined starts and descriptor/participant registry/callback ownership
-remain conversion work; this is not a fully native frame. The complete parent
-source trace also corrects the misleading AllPasses name: that function inserts
+free space was 60.16 GiB with 3.54 MiB net growth for that follow-up. Parent branch
+decisions/inlined starts are now converted above; descriptor/participant
+registry/callback ownership remains work. This is not a fully native frame. The
+complete parent source trace also corrects the misleading AllPasses name: that function inserts
 objects into lists, not schedules views. No Quest work. Evidence:
 `research/20260906_0412_native-pass-dispatch.md`.
 

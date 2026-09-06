@@ -239,3 +239,63 @@ is 3,706,880 B and from the original checkpoint is 870,035,456 B. Build/link
 overlap stayed within the guarded cumulative budget; no additional allowance
 was taken. No live producer or profile override remains. Later metadata/volume
 changes still belong to this same ledger, not a reset budget.
+
+## Continuing the same storage ledger: parent view scheduler, 04:42
+
+Measured preflight free space is 64,594,759,680 B; elevated CIM finds no live
+renderer/build/compiler/linker. The original 65,462,788,096-B checkpoint baseline,
+2 GiB cumulative peak cap, 100 MiB diagnostics, 10 MiB build logs and 20 GiB reserve
+remain unchanged. Last closing diagnostics were 55,341,787 B including the fixed
+41 MiB tool/inspection reservation. Current flat PNGs total 6,610,887 B.
+
+Reuse both configured trees and guarded wrappers. Plan at most 512 MiB temporary
+build/link overlap and 12 MiB new diagnostics across all attempts: focused CPU
+test, existing CPU suite, source guards, incremental host link, bounded flat/XR
+checks and isolated post-off/non-MSAA coverage as needed. No raw captures, tools,
+downloads, new build trees, shader regeneration or guest-object rebuild. At most
+one bounded normal-flat PNG replacement uses the existing aggregate reservation;
+inspect it before retiring the prior same-purpose PNG. Current/protected raw and
+unresolved-failure evidence stays untouched. Reconcile actual outputs here after
+verification; source findings belong in the separate parent-scheduler report.
+
+The documentation interruption completed without a build/capture. On resumption
+the original test/build producers were terminal and their linked binary/logs were
+verified; no producer was restarted. Resume free space was 64,578,666,496 B.
+The difference from the 04:42 preflight stays charged to this cumulative volume
+ledger; it is not credited as reclaimed space or used to reset the budget.
+Scoped diagnostics/cache inventories found no unrecorded raw/cache/dump output.
+
+All three test/build producers and four bounded desktop runs are terminal and
+successful: normal flat/XR, post-disabled MSAA recovery and normal non-MSAA flat.
+Source guards 65/65 and CPU tests 31/31 pass. Runtime results and the exact binary
+are recorded in the parent-scheduler report. No new raw capture, tool download,
+shader/guest-object regeneration or build tree. One 3,361,048-B flat sanity PNG
+was inspected before retiring its same-purpose predecessor. Four runtime logs
+total 1,326,250 B; their perf CSV/metadata total 3,445,184 B. New build/test logs
+total 6,531 B. These outputs and the PNG total 8,139,013 B, within the 12 MiB
+follow-up plan; the PNG is charged within the existing inspection reservation.
+
+Completed cleanup: the first invocation's exact-parent list guard stopped before
+deletion. Corrected the list, rechecked all targets and removed 19 superseded
+regular ignored files after checking lengths, workspace containment, reparse-free
+ancestors, old/replacement PNG hashes and absence of active producers. Removed
+stdout/stderr pairs reblue_18, cpu_15, host_scene_pass_test_02; runtime logs
+856/857/851/855 and their perf-041532/041715/032352/034729 CSV/metadata pairs; and
+native_pass_dispatch_window.png. Logical bytes 8,027,983; immediate volume free
+space 64,566,398,976 ->64,574,435,328 B: **8,036,352 B measured reclaimed**, counted
+once. Exact old outputs are gone; their reports/hashes remain and equivalent
+diagnostics can be regenerated. No protected raw/failure, distinct non-MSAA PNG,
+optical/non-MSAA-recovery evidence, game/save/profile/source/dependency/build tree removed.
+
+Closing inventory: 76 build logs /126,025 B; 11 runtime logs /3,320,459 B;
+20 perf files /8,930,400 B; zero new raw/cache/dump files. With the unchanged
+41 MiB tool/inspection reservation, retained diagnostics total 55,368,500 B.
+The remaining normal-flat and non-MSAA PNGs total 6,695,204 B within that
+reservation; retire them only after equivalent purpose-specific verification.
+Free 64,574,435,328 B (60.14 GiB). Net growth since the 04:42 preflight is
+20,324,352 B; since runtime resumption, 4,231,168 B; since the original checkpoint,
+888,352,768 B. These are volume-level measurements, not a claim that all growth
+was diagnostic payload. Unattributed volume/metadata growth remains charged, not
+discarded. No live producer or temporary profile override remains. Protected
+historical raw sets retain their prior review/cleanup gates and zero incoming
+raw allowance. Later source/Git metadata still counts in this same ledger.

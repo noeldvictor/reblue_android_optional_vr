@@ -9,9 +9,12 @@
 #include "gpu/scene/scene_precision_import.h"
 #include "gpu/scene/native_pass_dispatch.h"
 #include "gpu/scene/pass_dispatch_import.h"
+#include "gpu/scene/native_view_schedule.h"
+#include "gpu/scene/view_schedule_geometry.h"
 #include "gpu/native_image_layers.h"
 #include <array>
 #include <functional>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 using namespace bd::gpu::scene;
@@ -121,6 +124,91 @@ void CheckDispatch() {
   try { DispatchPassEnd(failed); Require(false); } catch (int) {}
   Require(failed.events == std::vector<int>{2, 30} && failed.active[0] == 1);
 }
+struct ViewScheduleAdapter {
+  uint32_t flags = 0;
+  int32_t count = 3;
+  std::vector<int> events;
+  std::function<void(int)> changed;
+  void Event(int value) { events.push_back(value); if (changed) changed(value); }
+  void PrepareView() { Event(0); }
+  int32_t IndexedViewCount() { return count; }
+  bool IndexedViewEnabled(uint32_t index) { return index != 1; }
+  void RenderIndexedView(uint32_t index) { Event(100 + int(index)); }
+  void SelectPrimaryView() { Event(2); }
+  bool SunShadowRequested() { return flags & 1; }
+  bool CubeShadowRequested() { return flags & 2; }
+  bool AuxiliaryRequested() { return flags & 4; }
+  bool ShadowVolumeRequested() { return flags & 8; }
+  bool ReflectionsRequested() { return flags & 16; }
+  bool EnvironmentRequested() { return flags & 32; }
+  bool AdditionalSceneRequested() { return flags & 64; }
+  bool PostRequested() { return flags & 128; }
+  void RenderSunShadow() { Event(3); }
+  void RenderCubeShadow() { Event(4); }
+  void RenderAuxiliary() { Event(5); }
+  void RenderShadowVolume() { Event(6); }
+  void RenderReflections() { Event(7); }
+  void RenderEnvironment() { Event(8); }
+  void RenderAdditionalScene() { Event(9); }
+  void RenderMainScene() { Event(10); }
+  void RenderPost() { Event(11); }
+  void RestoreView() { Event(12); }
+};
+void CheckViewSchedule() {
+  for (uint32_t flags = 0; flags < 256; ++flags) {
+    ViewScheduleAdapter adapter;
+    adapter.flags = flags;
+    ScheduleRenderView(adapter);
+    std::vector<int> expected{0, 100, 102, 2};
+    for (uint32_t bit = 0; bit < 7; ++bit)
+      if (flags & (1u << bit)) expected.push_back(3 + int(bit));
+    expected.push_back(10);
+    if (flags & 128) expected.push_back(11);
+    expected.push_back(12);
+    Require(adapter.events == expected);
+  }
+  ViewScheduleAdapter live;
+  live.flags = 1;
+  live.changed = [&](int event) {
+    if (event == 100) live.count = 1; // indexed bound is live, unlike participant bound
+    if (event == 3) live.flags = 2; // a preceding pass can request a later pass
+    if (event == 10) live.flags = 128; // post decision follows main-scene execution
+  };
+  ScheduleRenderView(live);
+  Require(live.events == std::vector<int>{0, 100, 2, 3, 4, 10, 11, 12});
+  for (int32_t count : {0, -1, INT32_MIN}) {
+    ViewScheduleAdapter empty;
+    empty.count = count;
+    ScheduleRenderView(empty);
+    Require(empty.events == std::vector<int>{0, 2, 10, 12});
+  }
+  ViewScheduleAdapter failed;
+  failed.count = 0;
+  failed.changed = [](int event) { if (event == 10) throw 1; };
+  try { ScheduleRenderView(failed); Require(false); } catch (int) {}
+  Require(failed.events == std::vector<int>{0, 2, 10}); // no parent replay or post after failure
+
+  const auto ray = BuildScheduledViewRay({0,0,0}, {3,4,0}, -1e-6f, 1e-6f);
+  Require(ray.length == 5 && ray.direction == std::array<float,3>{0.6f,0.8f,0});
+  Require(ScheduledFocusPoint(ray, {3,4,0}, 10, 20) == std::array<float,3>{12,16,0});
+  Require(ScheduledFocusPoint(ray, {3,4,0}, 5, 20) == std::array<float,3>{3,4,0});
+  const auto zero = BuildScheduledViewRay({1,2,3}, {1,2,3}, -1e-6f, 1e-6f);
+  Require(zero.length == 0 && zero.direction == std::array<float,3>{0,0,0});
+  Require(ScheduledFocusPoint(zero, {1,2,3}, 10, 20) == std::array<float,3>{1,2,3});
+  const auto tiny = BuildScheduledViewRay({0,0,0}, {1e-7f,0,0}, -1e-6f, 1e-6f);
+  Require(tiny.direction[0] == 1e-7f);
+  const float nan = std::numeric_limits<float>::quiet_NaN();
+  Require(std::isnan(BuildScheduledViewRay({0,0,0}, {nan,1,0}, -1e-6f, 1e-6f).length));
+  const RenderMatrix world{2,0,0,0, 0,3,0,0, 0,0,4,0, 10,20,30,1};
+  Require(TransformReflectionSphere({1,2,3,7}, world) == std::array<float,4>{12,26,42,7});
+  RenderFrustum frustum;
+  frustum.planes[0] = {1,0,0,0};
+  Require(ReflectionSphereVisible({1,0,0,1}, frustum)); // tangent survives
+  Require(!ReflectionSphereVisible({1.001f,0,0,1}, frustum));
+  Require(ReflectionSphereVisible({nan,0,0,1}, frustum));
+  frustum.planes[5] = {0,0,1,-10};
+  Require(!ReflectionSphereVisible({0,0,12,1}, frustum)); // checks all six planes
+}
 struct Lease {
   int *live = nullptr;
   int value = 0;
@@ -177,6 +265,7 @@ void CheckResults() {
 }
 }
 int main() {
+  CheckViewSchedule();
   CheckDispatch();
   CheckResults();
   // Actual getter adapter: only the final cached/requested precision words

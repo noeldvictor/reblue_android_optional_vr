@@ -83,10 +83,10 @@ Quest-ready release.
 | Blend state | Native RGB/alpha blend intent and eight host setters; no normal per-draw Xenos blend-register import | Native material/pass producers, removal of getter shadows, blend constants and separate-alpha/operation GPU coverage |
 | Alpha policy | Native cutout/reference/compare/coverage intent, four host setters, shared CPU/shader comparison contract and live ordinary-draw composition | Native material/pass producers, removal of getter/replay adapters, non-GE GPU coverage and multisample/custom coverage qualification |
 | Scene submission | Host traversal/replay, authoritative native packet pipelines, frustum/occlusion culling, instancing, vertex pulling and indirect submissions | Replace retained guest draw templates and material/constant producers; remove remaining guest resource dependencies |
-| Frame and VR | Host targets/post-processing, layered multiview presentation and desktop OpenXR test runtime | Complete host frame scheduling, effects/UI/animation ownership and representative full-game visual checks |
+| Frame and VR | Host whole-view/pass lifecycle scheduling, targets/post-processing, layered multiview presentation and desktop OpenXR test runtime | Complete native frame ownership, scene/descriptor/participant inputs, effects/UI/animation ownership and representative full-game visual checks |
 | DoF production | Complete preparation/submission replacements, native parameters and explicit-input atlas; no supported-path DoF level allocations, quads, intermediate target/resolve or PS c27 reads; enabled by default | Authored camera/focus sources, image/getter adapters, compatibility scopes and broader view/focus qualification |
 | DoF/bloom/flare scheduling | Native atlas/composite and 15 optical sprites in one instanced draw into an explicit persistent output; host-prepared input descriptors remove the three startup/transition guest warm-up scopes; normal flat/VR record zero post fallbacks | Native light/visibility producers, per-eye optics, image/property/UI adapters and broader scene coverage |
-| Effect-sequence scheduling | Host-owned ordered post-root dispatch consumes a per-view, single-use completed-scene result with explicit colour/depth/exposure; native pins preserve source lifetime, normal post skips getter/resolve-link imports; direct inter-root images, at most two alternating outputs and one final publication | Initial scene MSAA/scale copies and output adapters, final UI publication, engine list/property producers, remaining parent scheduling, compatibility imports, unknown callbacks and multi-root/HDR/nested-view GPU qualification |
+| Effect-sequence scheduling | Host-owned ordered post-root dispatch consumes a per-view, single-use completed-scene result with explicit colour/depth/exposure; native pins preserve source lifetime, normal post skips getter/resolve-link imports; direct inter-root images, at most two alternating outputs and one final publication | Remaining scaling/output adapters, final UI publication, engine list/property/request producers, compatibility imports, unknown callbacks and multi-root/HDR/nested-view GPU qualification |
 | Directional bloom | Independent horizontal/vertical 13-tap masks in at most two private quarter-pair atlases; layered native passes replace the mode-1 guest mask cache, blur submission and resolves | Authored mode-1 activation/kernel comparisons and combined heat/bloom coverage; strong previews are stable but washed-out VR makes preview depth inconclusive; other bloom modes retain native approximations |
 | Optical adjustments | Fisheye and colour inversion fused into one native layered pass; output-aspect-aware curve, explicit attachment records and private input scratch without a seed copy or emulated resolve; visible flat/both-eye previews verified | Authored activation/parameter comparisons and event coverage, VR comfort |
 | Scanline filter | Native four-tap layered pass after optical adjustments, with host-frame animation independent of gameplay RNG; existing noise-off default retained; 860 authored strength comparisons match | Broad event coverage; earlier noisy VR preview has 1/31 large changes in visible wave bands, not a normal stability qualification |
@@ -180,13 +180,17 @@ diagnostics. Complete draw-state execution, remaining getters/scaling, scene/UI/
 frame ownership and desktop game gates remain; integration publication still
 needs approval.
 
-The shared [pass-start/pass-finish dispatcher](research/20260906_0412_native-pass-dispatch.md)
-now executes in host code, preserving ordered participant work and final pass
-closure. Host build, 31 CPU tests, 60 existing source guards and bounded flat/XR
-checks pass with zero dispatcher fallbacks or faults. One flat sanity PNG was
-inspected; parent branch decisions and imported registry/callback ownership remain
-conversion work, and the full desktop game/stereo gate is still open. Superseded
-diagnostics were cleaned up; no new raw captures or Quest runs were made.
+The [whole-view scheduler](research/20260906_0442_native-view-schedule.md) now
+executes parent branch selection, pass order and reflection/focus geometry on the
+host, including starts previously inlined around the shared
+[pass lifecycle dispatcher](research/20260906_0412_native-pass-dispatch.md).
+Host build, 31 CPU tests and 65 source guards pass. Bounded flat/XR checks record
+3,601/9,601 native views with zero parent or dispatcher fallbacks/refusals/faults;
+post-disabled coverage keeps the parent native while exercising isolated legacy
+post cleanup. Non-MSAA coverage also passed. One flat sanity PNG was inspected;
+superseded small diagnostics were removed, reclaiming 8.04 MB measured. Imported
+authored scene data, descriptors, registry and remaining callbacks are still conversion work, and the
+full desktop game/stereo gate is open. No new raw captures or Quest runs were made.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

@@ -22,7 +22,8 @@ REXCVAR_DECLARE(bool, bd_native_passes);
 namespace bd::gpu::scene {
 namespace {
 // bdShaderSystemBeginFrame (0x821869F0) and bdShaderSystemFlush (0x82186B10).
-// bdRenderViewSubmit also inlines starts; its finishes use this same dispatcher.
+// The native view scheduler routes formerly inlined starts here too; the
+// compatibility parent still has inlined starts and calls this shared finish.
 // These addresses and byte flags are imports, not native scene identities.
 constexpr uint32_t kParticipants = (uint32_t(-32030) << 16) - 31132;
 constexpr uint32_t kPhase = (uint32_t(-32137) << 16) + 16476;
@@ -40,7 +41,7 @@ void Report() {
     return;
   BD_INFO("[native-pass-dispatch] begins {} ends {}; participant callbacks begin {} end {}; "
           "accepted {} cleared {}; compatibility begin {} end {} refused {} faults {}; "
-          "parent branch decisions, descriptor callbacks and participant registry/flags remain imports",
+          "descriptor callbacks and participant registry/flags remain imports",
           stats.begins, stats.ends, stats.begin_callbacks, stats.end_callbacks,
           stats.accepted, stats.cleared, stats.compatibility_begin, stats.compatibility_end,
           stats.refused, stats.faults);
