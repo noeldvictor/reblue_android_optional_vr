@@ -1235,3 +1235,47 @@ fixture yields **+621,170 B** diagnostic retention for new behavioral coverage.
 All raw/PNG/game/active-build/normal-Toon flat-XR evidence remains unchanged.
 Post-cleanup drive-wide use **11,599,872 B** from this preflight, not equated with
 task payload. Final source/docs/Git writes still count; no producer left running.
+
+### Bounded native mesh storage, same checkpoint
+
+Previous goal turn progressed through `69de326`, correcting field observations.
+The next geometry prerequisite was the unbounded native mesh disk writer, now
+replaced in the active importer. Limits: 256 MiB logical /16,384 files, 20 GiB
+reserve plus whole incoming payload/64 KiB metadata headroom; non-waiting lease,
+restart accounting, no eviction/reparse traversal/conflicting valid overwrite.
+Existing keys/formats/uploads remain unchanged. Geometry still imports through
+guest wrappers during replay; native model/instance/direct submission remains.
+Full source/test details: `20260906_1701_native-mesh-storage.md`.
+
+Initial inventory: **65,047,642,112 B** free, cache **3,510 files /36,510,144 B**.
+Build preflight **65,019,232,256 B**; permission-enabled launch free **65,005,232,128 B**.
+Intervening source-work decrease is unattributed; scoped recent outputs and
+authoritative process checks found no renderer/build producer or large new
+verification/runtime output. Reserve <=256 MiB compile/link and <=4 MiB test/log
+growth, no raw/game-run/asset-cook allowance or new build tree. Original ceilings
+and protected evidence remain unchanged.
+
+Mesh fixture 01 PID 30744, CPU 01 PID 27972 and read-only cache 01 PID 29548
+(session 26779) passed. Host 43 PID 27644/session 14558 passed, roughly 13 s,
+no guest objects/shaders rebuilt. Reconfigured only the existing mesh fixture
+as Release: configure 01 PID 30920, build 02 PID 28984, CPU 02 PID 27972 and
+cache 02 PID 24412 passed. Final exception-cleanup build 03 PID 30212, CPU 03
+PID 27704 (0.12 s), cache 03 PID 29512 passed. PID reuse is chronological, not
+one surviving job. All handles are terminal; all 124 source guards pass.
+Read-only validation loaded every existing mesh unchanged, without source/GPU
+or writes. No game/VR/capture/perf/new asset output; owner profile unchanged.
+
+Fixture before: 3,402,863 B; expanded Debug peak 7,038,207 B; final Release
+exe/objects **781,738 B**, **-2,621,125 B** versus the original. New aggregate
+logs **7,971 B** across every attempt. After final verification, deleted the
+unused Debug PDB and sixteen exact superseded logs (mesh build/CPU/cache 01/02,
+configure 01 and host 42 pairs), **3,158,859 B logical**. Immediate free
+**64,970,772,480 ->64,973,938,688 B**, **3,166,208 B actually reclaimed**, once.
+No active tree/game/required evidence was removed. Final tool+log retained
+payload shrinks **2,634,477 B**; keep one current mesh fixture, not debug/release
+duplicates. No increased runtime diagnostic reservation needed.
+
+Post-cleanup drive-wide use **73,703,424 B** from the initial inventory, including
+unattributed changes outside the measured shrinking task payload. Existing raw/
+PNG/normal field-XR/failure evidence unchanged. Final source/docs/Git writes follow;
+no new raw allowance, budget reset or full native-frame claim.

@@ -80,6 +80,12 @@ retains a normal flat standing-scene image and desktop XR parameter comparisons.
 Its water/camera activity markers do not independently prove interactive-field
 execution; full-game and both-eye pixel qualification remain open.
 
+Native mesh persistence now has independent 256 MiB /16,384-file limits, a
+20 GiB free-space reserve and a non-waiting writer lease. All 3,510 existing
+mesh files load unchanged in a source-free, read-only check; host/storage tests
+pass. This closes the disk-growth prerequisite for load-time geometry work,
+not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-storage.md).
+
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; shared native GPU data, mip cooking, generated LOD support and bounded owners | Asset-level discovery/loading and scene associations, independent layouts, dynamic geometry and streaming/backpressure |

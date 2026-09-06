@@ -6,12 +6,12 @@
  */
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_mesh_data.h"
+#include "gpu/scene/native_mesh_storage.h"
 
 #include <algorithm>
 #include <bit>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <mutex>
 #include <unordered_map>
 #include <fmt/format.h>
@@ -59,35 +59,9 @@ std::filesystem::path CacheDir() {
   return root / "native_meshes" / "v1";
 }
 
-bool ReadFile(const std::filesystem::path &path, NativeMeshData &data) {
-  std::ifstream file(path, std::ios::binary | std::ios::ate);
-  if (!file)
-    return false;
-  const auto size = file.tellg();
-  if (size < 36 || uint64_t(size) > kNativeMeshMaxBytes)
-    return false;
-  std::vector<u8> bytes(static_cast<size_t>(size));
-  file.seekg(0);
-  return bool(file.read(reinterpret_cast<char *>(bytes.data()), size)) &&
-         DecodeNativeMesh(bytes, data);
-}
-
-void WriteFile(const std::filesystem::path &path, const NativeMeshData &data) {
-  std::vector<u8> bytes;
-  if (!EncodeNativeMesh(data, bytes))
-    return;
-  std::error_code ec;
-  std::filesystem::create_directories(path.parent_path(), ec);
-  if (ec) {
-    BD_WARN("[native-mesh] cannot create cache: {}", ec.message());
-    return;
-  }
-  // These are derived cache files. An interrupted write fails the length or
-  // checksum check on the next launch and is rebuilt from the owned assets.
-  std::ofstream file(path, std::ios::binary | std::ios::trunc);
-  file.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
-  if (!file)
-    BD_WARN("[native-mesh] cannot write {}", path.string());
+NativeMeshDiskCache &DiskCache() {
+  static NativeMeshDiskCache cache(CacheDir());
+  return cache;
 }
 
 u32 Align(u32 n) { return (n + 15u) & ~15u; }
@@ -211,9 +185,8 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   if (auto it = s.meshes.find(key); it != s.meshes.end())
     return it->second;
 
-  const auto path = CacheDir() / fmt::format("{:016x}.bdmesh", key);
   NativeMeshData cached;
-  bool loaded = ReadFile(path, cached) && cached.layout == data.layout &&
+  bool loaded = DiskCache().Read(key, cached) && cached.layout == data.layout &&
                 cached.base_vertex == data.base_vertex &&
                 cached.indices == data.indices && cached.streams.size() == n;
   for (u32 i = 0; loaded && i < n; ++i)
@@ -243,7 +216,9 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   if (loaded)
     ++s.loaded;
   else {
-    WriteFile(path, data);
+    // Persistence refusal never discards usable native GPU geometry or routes
+    // this draw back through the guest. Keep one bounded resident result.
+    DiskCache().Write(key, data);
     ++s.built;
   }
   s.meshes.emplace(key, result);
@@ -274,6 +249,12 @@ void NativeMeshNoteDraw(bool native) {
           s.built, s.loaded, s.meshes.size(), s.allocated >> 20,
           double(s.native_draws) / frames, double(s.legacy_draws) / frames,
           s.refused, s.budget_refused);
+  const auto disk = DiskCache().Stats();
+  BD_INFO("[native-mesh-disk] {} writes, {} reused, {} failures / {} budget refusals, "
+          "{} conflicts; last inventory {} files / {} bytes, complete {}; "
+          "disk-full retains native geometry, never evicts files",
+          disk.written, disk.reused, disk.write_failures, disk.budget_refusals,
+          disk.conflicts, disk.files, disk.bytes, disk.inventory_complete);
   s.native_draws = s.legacy_draws = 0;
   s.last_frame = frame;
 }

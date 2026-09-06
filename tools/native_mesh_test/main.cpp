@@ -1,6 +1,8 @@
 #include "gpu/scene/native_mesh_data.h"
 #include <cstdlib>
+#include <exception>
 #include <iostream>
+#include <string_view>
 
 using namespace bd::gpu::scene;
 static void Check(bool ok, const char *name) {
@@ -9,7 +11,15 @@ static void Check(bool ok, const char *name) {
     std::exit(1);
   }
 }
-int main() {
+void TestMeshStorage();
+int VerifyMeshCache(const char *path);
+static int RunTests(int argc, char **argv) {
+  if (argc == 3 && std::string_view(argv[1]) == "--verify-cache")
+    return VerifyMeshCache(argv[2]);
+  if (argc != 1) {
+    std::cerr << "usage: native_mesh_test [--verify-cache <directory>]\n";
+    return 2;
+  }
   std::vector<uint32_t> tris;
   const std::vector<uint8_t> strip = {
       0,0, 0,1, 0,2, 0,3, 255,255, 0,4, 0,5, 0,6, 0,7};
@@ -59,4 +69,17 @@ int main() {
   mesh.base_vertex = -5;
   Check(!ValidateNativeMesh(mesh), "negative effective index rejected");
   std::cout << "native mesh: topology, bounds, round trip, truncation and corruption passed\n";
+  TestMeshStorage();
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return RunTests(argc, argv);
+  } catch (const std::exception &error) {
+    // Unwind private storage fixtures before reporting a failed check. Avoid
+    // an unhandled-exception crash/dump and abandoned temporary test outputs.
+    std::cerr << "FAIL: " << error.what() << '\n';
+    return 1;
+  }
 }

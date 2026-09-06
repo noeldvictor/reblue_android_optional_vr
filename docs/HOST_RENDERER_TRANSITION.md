@@ -58,8 +58,10 @@ unchanged completion requirements above; none is a substitute for the full gate.
    guest `NodeTag` discovery and retained interpreter templates for that path;
    scene/shadow draws must not re-import per-draw console state. Temporary load
    adapters need explicit removal conditions, not permanent address identities.
-   Before enabling eager geometry cooking, bound the existing native-mesh disk
-   writer's aggregate retention; its GPU arena limit alone is not a disk limit.
+   Native mesh disk retention is now independently bounded (256 MiB /16,384
+   files, free-space reserve and writer lease). The existing GPU arena remains
+   separate; eager load-time geometry production and native instance ownership
+   are not implemented by that storage prerequisite.
 3. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
    and verify characters in the relevant field/battle/cutscene/shadow paths.
@@ -73,12 +75,22 @@ unchanged completion requirements above; none is a substitute for the full gate.
 
 Use focused fixtures and incremental builds for the inner loop, targeted
 GPU/pixel checks for coherent rendering changes, and the broad suite at meaningful
-milestones. Maintain frequent verified commits/pushes. The measured latest host
-build log spans roughly 12 s and its 31 CPU tests take 6.94 s; prioritize removing
-repeated investigation/boot work over introducing a new build system. No overall
-development-speed multiplier is established.
+milestones. Maintain frequent verified commits/pushes. Recent host builds take
+seconds; the mesh-storage CPU fixture takes 0.12 s and the corrected post-event
+field diagnostic about 51 s. Prioritize removing repeated investigation/boot
+work over introducing a new build system. No overall development-speed
+multiplier is established.
 
 ## Latest qualified checkpoint
+
+Native mesh storage (2026-09-06): the active importer now uses a bounded disk
+cache with independent byte/file/reserve limits, non-waiting writer ownership,
+valid-payload reuse/conflict protection and checked repairs. Persistence refusal
+does not discard the already-uploaded native geometry. Host build 43, expanded
+mesh CPU fixture, all 124 source guards and read-only loading of 3,510 existing
+files /36,510,144 B pass. Format, keys and cache payloads are unchanged. No new
+game/VR/pixel run; native geometry/instance/direct submission still remains.
+Evidence: `research/20260906_1701_native-mesh-storage.md`.
 
 Field observations (2026-09-06): loading visibility now observes fade/task/strip
 state, and all 128 asset slots are scanned. Generated fade-state writers restore
