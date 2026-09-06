@@ -58,12 +58,17 @@ Snapshot: 2026-09-06; the table records earlier checkpoints, with newer work bel
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
 
-In progress locally: five material-pass/shader/declaration replacements pass the
-host build and 31 CPU tests. Flat-image and desktop XR parameter checks remain
-pending; these renderer edits are **not yet committed or visually qualified**.
-The status-only follow-up did not start additional builds, game runs or captures.
+Latest implementation checkpoint: [native material-pass lifecycle and shader binding](research/20260906_1429_native-material-passes.md)
+replaces five complete guest bodies and calls host shader/declaration setters
+directly. Host build, 31 CPU tests and 111 source guards pass; flat/XR samples
+record 616,830/159,375 native pass starts with zero fallback/refusal/faults.
+One flat field image was inspected. The strengthened XR check records 2,083,519
+matching parameter blocks after a verified field-camera sample, with zero full
+legacy block imports. **Both-eye appearance and full-game qualification remain
+open**, along with authored registry/recipe/resource/shader-ABI inputs and
+participant callbacks (15,056 flat /2,400 XR sampled).
 
-Latest implementation checkpoint: [native deferred visuals](research/20260906_1358_native-deferred-visuals.md)
+Previous checkpoint: [native deferred visuals](research/20260906_1358_native-deferred-visuals.md)
 replaces the whole deferred scheduler and its emulated resolve with a native
 scene-sized snapshot, removing the 1280x720-only gate on the native path. Host
 build, 31 CPU tests and 107 source guards pass. The flat regression exercised
@@ -71,7 +76,7 @@ build, 31 CPU tests and 107 source guards pass. The flat regression exercised
 their runtime/both-eye qualification remains open. Queue/vertex production and
 shader/state/resource/getter/material-callback adapters still remain.
 
-Previous checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
+Earlier checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
 moves the complete model/primitive scheduler and its sorting storage onto the
 host, following native immediate vertex submission. Build, 31 CPU tests and
 103 source guards pass. Bounded flat/XR checks record 78,861/36,784 scheduled
@@ -101,8 +106,9 @@ while eliminating the scheduler's full-block legacy imports. This is **not a
 desktop field check has a 16.667 ms median frame interval (~60 FPS), 6.610 ms
 `other_ms` and 5.677 ms GPU time over its last 600 samples. No reliable overall
 speedup percentage or Quest performance claim is established. Details and
-limitations are in the sorted-scheduler report above. The new deferred check
-does not establish a speedup for nonempty effects.
+limitations are in the sorted-scheduler report above. Neither the deferred nor
+material-pass check establishes an overall speedup; nonempty deferred effects
+were not exercised.
 
 The owner granted standing commit/push approval on 2026-09-06 for
 `noeldvictor/reblue_android_optional_vr:main` and `noeldvictor/plume:main`.

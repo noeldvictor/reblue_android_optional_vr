@@ -12,6 +12,7 @@
 #include "immediate_ui.h"
 #include "visual_schedule.h"
 #include "deferred_visuals.h"
+#include "material_passes.h"
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -139,6 +140,7 @@ void OriginalCopy(std::vector<uint8_t> &bytes, uint32_t source,
   }
 }
 int main() {
+  material_pass_test::Run();
   deferred_visuals_test::Run();
   visual_schedule_test::Run();
   ImmediateUiTests();

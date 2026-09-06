@@ -965,3 +965,58 @@ Keep these build/CPU outputs for unfinished material-pass verification and
 retain the published baseline evidence until that replacement is qualified;
 then retire equivalent superseded outputs. Nothing removed, zero reclaimed
 bytes claimed. Final handoff measures ending free space after docs/Git writes.
+
+Material-pass verification resumed after published status `eccddc0`: previous
+turn was progress (build completion established and status published). Current
+preflight 65,233,252,352 B free; all prior producers terminal, owner profile
+intact, no source changes since host build 36. Reuse that executable, CPU 29
+and the same supervisors/budget; no rebuild. Two capture-disabled runs (normal
+flat with one bounded window image, then desktop XR parameter comparison) may
+add <=1 MiB runtime logs, <=1 MiB perf and <=3,817,185 B image overlap. Retire
+equivalent flat/XR/build/CPU evidence only after checking replacements. Existing
+raw archive remains over budget and has **zero new raw-frame allowance**.
+
+Flat 883 / PID 27228 / session 16292 passed, one inspected 3,364,482 B PNG.
+Ten superseded flat/build/CPU files removed after replacement validation:
+4,237,027 B logical, immediate free 65,208,442,880 ->65,212,686,336 B,
+4,243,456 B measured reclaimed. XR 884 / PID 26416 / session 99036 completed
+with 303,353 matching parameters and 301 water updates, but the last parameter
+sample predates the qualified field marker and the last camera sample remains
+startup. Do not retire previous field-XR log 881 yet. Tighten the existing
+verifier to require a nonzero field-camera marker and subsequent fresh matching
+parameters; one capture/perf-disabled retry, 45 s /400 KiB runtime log limit.
+Total new runtime logs remain budgeted within the existing <=1 MiB estimate,
+including both attempts. No new image/raw/build allowance or new checkpoint.
+
+The drive lost 19,922,944 B between flat completion and the cleanup precheck;
+scoped verification/runtime/perf/cache/HLSL inventories find only the named small
+outputs, zero new cache/HLSL files or raw captures. This unexplained volume
+activity is not attributed to renderer output or credited as cleanup. Original
+cumulative reserve/growth guards remain active. XR 884 ending free 65,212,301,312 B.
+
+Stronger XR 885 / PID 18080 / session 13685 terminal 14:29:46, profile restored:
+field-camera sample 14:29:40 precedes 2,083,519 matching parameter blocks at
+14:29:45; zero full legacy imports or material-pass fallback/refusal/faults.
+601 water updates sampled. Actual verifier rejects stale 884 and accepts 885.
+All 17 settings audited; no error/config matches, raw or XR perf outputs.
+Exact source mapping, flat/XR counters, hashes and remaining qualification are
+recorded in `20260906_1429_native-material-passes.md`.
+
+After validating replacement 885 and exact ignored/reparse-free paths with no
+active producers, removed old field-XR 881 and superseded early-stop 884:
+641,593 B logical; immediate free 65,211,326,464 ->65,211,969,536 B, **643,072 B
+reclaimed**. Material checkpoint cleanup totals 12 files /4,878,620 B logical /
+**4,886,528 B measured reclaimed**, counted once. No protected evidence or trees
+removed. Gross new log/perf/PNG payload 4,943,337 B; net retained +64,717 B for
+new binding counters, stronger field-XR sampling and replacement PNG size.
+Retire equivalent current evidence after future qualification; no copied sets.
+CPU fixture +22,528 B and small bounded-verifier edits fit the tools reservation;
+host +8,192 B. Raw/cache/HLSL/cooked output allowance is unchanged.
+
+Reserved diagnostics 64,454,021 B: 94 build logs /140,120 B, 14 runtime logs /
+3,994,262 B, 20 perf files /8,963,168 B, eight GPU fixture files /8,364,855 B,
+fixed 41 MiB tools/inspection. Two PNGs /6,698,638 B within that reservation.
+All three runtime attempts total 966,032 B within the <=1 MiB estimate.
+Post-cleanup free 65,211,969,536 B, drive-wide use +24,227,840 B from material
+preflight (+21,282,816 B this continuation), including the unexplained volume
+drop above. Later source/docs/Git writes count; final handoff measures again.

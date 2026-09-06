@@ -171,6 +171,10 @@ interpreter mentioned in research is distinct from CPU emulation.
   Use visual sequences and RenderDoc when retained-state errors survive counters.
 - Use guest-call/resource counters to track remaining dependencies explicitly.
   A host-issued draw count is not the count of fully host-owned frames.
+- Require sampled verification counters to be fresh for the intended scene and
+  mode. Matching startup samples followed by a later field marker do not prove
+  field correctness; establish the active scene/camera first, then inspect a
+  subsequent comparison sample. Keep prior evidence until that replacement passes.
 - `other_ms` includes `xrWaitFrame` in XR runs; a near-zero fence wait does not
   prove GPU idleness. Read the `[xr]` CPU/wait breakdown and actual GPU timers.
   Confirm active settings, scene and binary when reporting any measurement.

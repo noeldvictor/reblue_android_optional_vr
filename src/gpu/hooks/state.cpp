@@ -142,18 +142,6 @@ void D3DDevice_SetVertexDeclaration_hook(u32 /*device*/, u32 decl_guest) {
       bd::gpu::HostResourceHeap::FromGuest<bd::gpu::GuestVertexDeclaration>(
           decl_guest);
 
-  // The recompiled VS guards its R11G11B10/SNORM decode on this bit, else it
-  // asfloat()s the normal bits to garbage.
-  {
-    auto &s = bd::gpu::state();
-    u32 spec =
-        s.pipelineState.specConstants & ~bd::gpu::kSpecConstantR11G11B10Normal;
-    if (decl && decl->hasR11G11B10Normal)
-      spec |= bd::gpu::kSpecConstantR11G11B10Normal;
-    bd::gpu::Video::SetDirtyValue<u32>(s.dirtyStates.pipelineState,
-                                       s.pipelineState.specConstants, spec);
-  }
-
   bd::gpu::Video::SetVertexDeclaration(decl);
 }
 

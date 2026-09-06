@@ -73,6 +73,11 @@ void Video::SetPixelShader(GuestShader *shader) {
 void Video::SetVertexDeclaration(GuestVertexDeclaration *decl) {
   auto &s = state();
   std::lock_guard lock(s.mutex);
+  // Both native material binding and the remaining resource adapter must
+  // update the normal-decoding specialization together with the declaration.
+  u32 spec = s.pipelineState.specConstants & ~kSpecConstantR11G11B10Normal;
+  if (decl && decl->hasR11G11B10Normal) spec |= kSpecConstantR11G11B10Normal;
+  SetDirtyValue<u32>(s.dirtyStates.pipelineState, s.pipelineState.specConstants, spec);
   s.vertex_declaration = decl;
 }
 

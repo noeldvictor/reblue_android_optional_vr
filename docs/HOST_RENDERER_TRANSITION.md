@@ -30,16 +30,21 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
-Material passes, local work in progress (2026-09-06): five whole-function
-replacements cover pass begin/end, recipe selection, shader binding and cached
-vertex declarations. Host build 36 and CPU suite 29 (31/31, 7.10 s) completed;
-111 source guards passed before the interruption. Shared declaration binding
-changed, so normal flat-image and capture-disabled desktop XR parameter checks
-remain required before publishing the implementation. The owner's standing
-commit/push approval is recorded in `AGENTS.md`; permission is not the remaining
-gate. This status-only follow-up launches no verification producers and leaves
-the uncommitted source/test edits intact. Build/storage accounting is appended
-to `research/20260906_0333_native-scene-state-bridge.md`.
+Material passes (2026-09-06): five complete guest bodies now have host
+replacements for begin/end, recipe selection, shader binding and cached vertex
+declarations. Native scheduling calls the host binders directly; normal decoding
+specialization is centralized in the shared declaration binder. Host build 36,
+CPU suite 29 (31/31, 7.10 s) and 111 source guards pass. Flat/XR samples record
+616,830/159,375 native starts, zero fallback/refusal/faults; one flat field image
+was inspected. The strengthened XR check requires a field-camera marker before
+fresh matching parameters: 2,083,519 blocks agree, zero full legacy imports.
+Registry/cache/recipe/resource/shader-ABI adapters and participant callbacks
+(15,056 flat /2,400 XR sampled) remain. Both-eye pixels, authored effects and
+full-game qualification remain open; this is not a fully host-owned frame.
+No new raw frames. Twelve obsolete diagnostics removed, 4,886,528 B measured
+reclaimed; net retained log/perf/PNG growth 64,717 B for stronger current evidence.
+Evidence: `research/20260906_1429_native-material-passes.md`. The owner's
+standing normal commit/push approval remains recorded in `AGENTS.md`.
 
 Deferred visuals (2026-09-06): the complete `sub_824252D0` scheduler and primitive
 preparation now have a native replacement, with a native scene-sized snapshot
