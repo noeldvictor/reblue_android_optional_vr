@@ -6,6 +6,7 @@
 #include "gpu/post_sequence.h"
 #include "gpu/scene/native_scene_framebuffer.h"
 #include "gpu/scene/native_scene_commands.h"
+#include "gpu/scene/native_scene_snapshot.h"
 #include <array>
 #include <limits>
 #ifdef NDEBUG
@@ -239,6 +240,23 @@ void SharedLayoutAndLease() {
       16, 8, 2, RenderFormat::D32_FLOAT_S8_UINT, 0, 1}};
   assert(lease && lease.Fits(16, 8, 2));
   assert(!lease.Fits(16, 8, 1) && !lease.Fits(8, 8, 2) && !lease.Fits(16, 0, 2));
+  assert(lease.CanPublishExtent(16, 8, 2));
+  assert(!lease.CanPublishExtent(1280, 720, 1)); // strict by default
+  assert(lease.CanPublishExtent(1280, 720, 1, NativeImageExtentPolicy::AdoptSource));
+  assert(!lease.CanPublishExtent(16, 8, 2, NativeImageExtentPolicy(99)));
+  for (auto extent : {NativeImageExtentPolicy::MatchDestination, NativeImageExtentPolicy::AdoptSource}) {
+    assert(!lease.CanPublishExtent(0, 8, 2, extent));
+    assert(!lease.CanPublishExtent(16, 0, 2, extent));
+    assert(!lease.CanPublishExtent(16, 8, 0, extent));
+    assert(!lease.CanPublishExtent(16, 8, 3, extent));
+    assert(!NativeImageLease{}.CanPublishExtent(16, 8, 2, extent));
+    auto invalid = lease;
+    invalid.image.samples = 4;
+    assert(!invalid.CanPublishExtent(16, 8, 2, extent));
+    invalid = lease;
+    invalid.owner.reset();
+    assert(!invalid.CanPublishExtent(16, 8, 2, extent));
+  }
   local.Bind(*lease.image.layout);
   owner.reset();
   assert(!weak.expired()); // type-erased ownership retains the native layout/image lifetime
@@ -450,6 +468,22 @@ struct SceneCommandRecorder {
     assert(bound && clear_depth && clear_stencil); depth = z; stencil = s; events.push_back('z');
   }
 };
+struct SnapshotRecorder {
+  std::vector<char> events;
+  RenderTexture *source = nullptr, *destination = nullptr;
+  std::vector<RenderTextureBarrier> barriers_seen;
+  void setFramebuffer(RenderFramebuffer *fb) { assert(!fb); events.push_back('e'); }
+  void barriers(RenderBarrierStages stage, const RenderTextureBarrier *values, uint32_t count) {
+    assert((stage == RenderBarrierStage::COPY && count == 2) ||
+           (stage == RenderBarrierStage::GRAPHICS && count == 1));
+    barriers_seen.insert(barriers_seen.end(), values, values + count);
+    events.push_back('b');
+  }
+  void copyTexture(RenderTexture *dst, RenderTexture *src) {
+    assert((events == std::vector<char>{'e','b'}));
+    source = src; destination = dst; events.push_back('c');
+  }
+};
 void SceneCommands() {
   using namespace bd::gpu::scene;
   const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
@@ -528,6 +562,50 @@ void SceneCommands() {
     recorder.events.clear();
     assert(next->Bind(recorder) == attachment_count && next->ApplyClear(recorder));
     assert((recorder.events == std::vector<char>{'b','f','c','z'})); // next scene clears persistent images
+    // Actual snapshot core, mono/layered and 1/2/4/8 samples. The copy must
+    // sample the ordinary resolved colour for MSAA, not its write attachment.
+    auto snapshot = std::make_shared<NativeTargetImage>();
+    snapshot->shape = {1440, 1584, layers, RenderFormat::R16G16B16A16_FLOAT, 1};
+    snapshot->image = std::make_unique<SceneSource>();
+    snapshot->descriptor = 20;
+    const auto output = snapshot->Sampled();
+    const auto input = next->ColorReadImage();
+    assert(input && input.texture == (samples > 1 ? resolved[0].texture : sources[0]->image.get()));
+    for (uint32_t field = 0; field < 9; ++field) {
+      auto bad = output;
+      if (field == 0) bad.texture = input.texture;
+      if (field == 1) bad.layout = input.layout;
+      if (field == 2) ++bad.width;
+      if (field == 3) ++bad.height;
+      if (field == 4) bad.layers = layers == 1 ? 2 : 1;
+      if (field == 5) bad.format = RenderFormat::R8G8B8A8_UNORM;
+      if (field == 6) bad.samples = 2;
+      if (field == 7) bad.descriptor_index = ~0u;
+      if (field == 8) bad.texture = nullptr;
+      SnapshotRecorder refused;
+      assert(!CopySceneSnapshot(refused, *next, bad) && refused.events.empty());
+      assert(snapshot->layout == RenderTextureLayout::UNKNOWN);
+    }
+    SnapshotRecorder copied;
+    assert(CopySceneSnapshot(copied, *next, output));
+    assert((copied.events == std::vector<char>{'e','b','c','b'}));
+    assert(copied.source == input.texture && copied.destination == output.texture);
+    assert(copied.barriers_seen.size() == 3 && copied.barriers_seen[0].texture == input.texture);
+    assert(copied.barriers_seen[0].layout == RenderTextureLayout::COPY_SOURCE);
+    assert(copied.barriers_seen[1].layout == RenderTextureLayout::COPY_DEST);
+    assert(copied.barriers_seen[2].layout == RenderTextureLayout::SHADER_READ);
+    assert(*input.layout == RenderTextureLayout::COPY_SOURCE && snapshot->layout == RenderTextureLayout::SHADER_READ);
+    recorder.events.clear();
+    assert(next->Bind(recorder) == 1 && !next->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'b','f'})); // resume writes, preserve scene contents
+    assert(snapshot->layout == RenderTextureLayout::SHADER_READ); // snapshot is independent
+  }
+  for (bool same : {false, true}) for (bool shared : {false, true}) for (bool ready : {false, true}) {
+    assert((PlanSceneSnapshot(SceneSnapshotPhase::Scene, same, shared, ready) ==
+            SceneSnapshotPlan{true, !((same || shared) && ready), true}));
+    assert((PlanSceneSnapshot(SceneSnapshotPhase::Reflection, same, shared, ready) ==
+            SceneSnapshotPlan{true, true, false}));
+    assert((PlanSceneSnapshot(SceneSnapshotPhase::Inactive, same, shared, ready) == SceneSnapshotPlan{}));
   }
 }
 } // namespace

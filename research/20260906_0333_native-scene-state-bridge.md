@@ -401,3 +401,96 @@ growth from the 05:36 preflight is 4,329,472 B; cumulative from the original
 baseline is 927,207,424 B. Unattributed volume/Git/metadata changes remain charged.
 No live producer or profile override remains; later source/Git metadata still
 counts. The protected historical raw gate and all original caps remain active.
+
+## Continuing the same storage ledger: native scene snapshots, 06:01
+
+Preflight 2026-09-06 06:01:13 EDT: 64,533,454,848 B free; no active game,
+compiler, CMake/Ninja/linker or CTest. The 76 build logs total 125,813 B. Original
+baseline remains 65,462,788,096 B, so cumulative volume growth is 929,333,248 B;
+all earlier metadata/unattributed growth stays charged. Last retained diagnostics
+55,463,502 B include the unchanged 41 MiB inspection/tool reservation. Protected
+historical raws still have zero incoming allowance.
+
+Reuse existing CPU/desktop trees and guarded wrappers. Plan at most 512 MiB
+temporary build/link overlap and 10 MiB new diagnostics across attempts: focused
+snapshot command fixture, CPU suite, host link, bounded normal flat/XR and
+non-MSAA checks, one normal-flat PNG replacement. These test newly changed image
+copy/barrier/lease execution, not a new commit stamp. No shader/guest rebuild,
+tools, raw captures or new build tree. Validate replacements before removing
+equivalent previous build/test logs, normal flat/XR 864/865 and their perf pairs,
+the lifecycle PNG, and the old normal non-MSAA runtime/perf only after that
+configuration passes. Keep distinct post-disabled/optical/failure evidence and
+the non-MSAA sanity PNG. Original cumulative caps and live guards remain active.
+
+Resumption after the instruction-file update: reblue_22, focused output_11,
+cpu_19 and flat PID 9876 are terminal, all exit 0. Flat log 866 is 267,480 B,
+perf-060320 CSV/metadata total 602,224 B, and the inspected 1920x1080 snapshot
+PNG is 3,362,161 B. Prior build/test logs total 9,206 B: 4,241,071 B new
+diagnostics so far. No raw captures. The flat image is sane, but no snapshot
+telemetry was emitted; authored water/refraction execution is unproven. The
+original profile was restored byte-for-byte. No queued XR/non-MSAA run resumed.
+
+Source inspection found the original snapshot constructor still creates a
+fixed 1280x720 texture. Requiring exact destination dimensions would preserve
+the compatibility resolve at higher native extents. Explicit native-source
+extent adoption now replaces that restriction; other output publications remain
+strict by default. Qualify the actual copy core with an 8x8 off-screen Vulkan
+fixture instead of another unchanged field scene. Distinct layers/HDR and two
+retained snapshots across resumed live writes are required; readbacks stay in
+memory. First-call telemetry will expose short-lived authored use in later runs.
+
+At 06:11 the read-only volume check showed 64,520,839,168 B free and no active
+renderer/build process. Reuse existing Plume/validation/CPU/desktop trees. Revise
+the remaining verification plan, not the checkpoint allowance: at most 512 MiB
+temporary build/link overlap and 24 MiB aggregate new diagnostics INCLUDING the
+4,241,071 B above and all retries. The extra retained test executable/object/PDB
+budget is 16 MiB for previously missing real-GPU snapshot coverage; keep one
+build representation and retire it when the fixture is superseded. No new tool,
+shader generation, raw capture, game run or persistent profile change is needed
+for this fixture. Existing overall 2 GiB/100 MiB/10 MiB-log caps and protected
+archive gate remain unchanged. Reconcile measured outputs before further work.
+
+Closeout 06:29: all producers terminal. The fixture reproduced an MSAA stale
+resolve despite zero validation errors; Plume 3094b35 fixes completion of pending
+sibling clears before resolve-output reads. Snapshot GPU CTest 03 passes all
+eight mono/layered x 1/2/4/8-sample cases with zero validation errors/warnings;
+the expanded existing resolve suite passes too. CPU 20: 31/31; source guards
+77; host build reblue_23 exit 0, no guest/shader rebuild. Exact binaries, runs,
+failure evidence and limitations are in `20260906_0629_native-scene-snapshots.md`.
+No new game run followed the earlier flat check; its snapshot use is unproven.
+
+Gross new measured diagnostic payloads before cleanup: build/test logs 58,119 B,
+flat runtime log 267,480 B, perf pair 602,224 B, PNG 3,362,161 B and the reusable
+GPU fixture directory 8,364,855 B: 12,654,839 B, within the revised 24 MiB plan.
+The PNG remains inside the existing inspection reservation for retained totals.
+No new tool download, raw capture, guest/shader rebuild or configured build tree.
+The same original limits applied to all compilation/test failures and retries.
+
+Completed cleanup, after validating all exact paths/lengths, ignored-file status,
+approved parents, reparse-free ancestors, replacement hashes and absence of live
+producers: 24 files /4,167,824 logical B. Removed reblue_21/22, cpu_18/19,
+host_post_output_test_10/11, native_scene_snapshot_test_02/03,
+native_attachment_resolve_test_15 and pixels_11 stdout/stderr pairs; flat log 864,
+perf-054145 CSV/metadata, and native_effect_lifecycle_window.png. Immediate free
+space 64,495,013,888 ->64,499,191,808 B: **4,177,920 B measured reclaimed**,
+counted once. Files are gone; reports/hashes remain, and equivalent diagnostics
+can be regenerated. Keep GPU failure logs 01/02, current flat log 866/PNG,
+XR 865, distinct non-MSAA/recovery/optical evidence and protected raw archives.
+No game/save/profile/source/dependency/build-tree data was removed.
+
+Closing inventory: 86 build logs /164,482 B; 11 checkpoint runtime logs
+/3,387,152 B; 20 perf files /8,959,072 B; 8 GPU-fixture files /8,364,855 B.
+With the existing 41 MiB inspection/tool reservation, retained diagnostics total
+63,867,177 B; two PNGs /6,696,317 B fit within that reservation. The new fixture
+is retained for distinct actual-GPU snapshot/resolve coverage, one current build
+representation; replace/retire it when that qualification is superseded.
+Old historical runtime logs outside this checkpoint were inventoried but not
+removed or mistaken for newly produced diagnostics. Protected raw growth: zero.
+
+Ending free space 64,499,191,808 B (60.07 GiB). Net growth from the 06:01 snapshot
+preflight is 34,263,040 B; from the resumption's 06:11 check, 21,647,360 B; from
+the original checkpoint, 963,596,288 B. Source/Git/metadata and unexplained volume
+activity remain charged. Later docs/Git writes still count. All producers are
+terminal and the owner's profile is restored; no pending run is authorized by
+this accounting entry. Dependency publication remains unapproved, with no push
+retry or unpublished parent gitlink staged.

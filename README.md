@@ -206,6 +206,15 @@ both-eye qualification remains open. Shared storage, identities and callback
 implementations remain imports. Superseded diagnostics were removed, reclaiming
 6.28 MB measured, with 60.10 GiB free; no new raw captures or Quest runs were made.
 
+The [native snapshot follow-up](research/20260906_0629_native-scene-snapshots.md)
+adds host-owned HDR image copies and a tiny off-screen GPU fixture. It found and
+fixed a Vulkan pending-clear/resolve ordering bug; eight mono/stereo and
+1/2/4/8-sample cases pass with zero validation errors/warnings, alongside the
+host build and 31 CPU tests. Native-extent publication is in the pending
+integration; actual authored water/refraction use remains unproven. No new raw
+captures were made, and superseded diagnostics were removed. This is not full
+host-frame or full-game/stereo qualification; remote publication needs approval.
+
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
 Six superseded normal raw sets and their automatic copies/links were removed,

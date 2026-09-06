@@ -1,0 +1,7 @@
+add_executable(native_scene_snapshot_test main.cpp)
+target_include_directories(native_scene_snapshot_test PRIVATE ../../src)
+target_link_libraries(native_scene_snapshot_test PRIVATE plume user32)
+target_compile_features(native_scene_snapshot_test PRIVATE cxx_std_23)
+enable_testing()
+add_test(NAME native_scene_snapshot_pixels COMMAND native_scene_snapshot_test)
+set_tests_properties(native_scene_snapshot_pixels PROPERTIES TIMEOUT 30)

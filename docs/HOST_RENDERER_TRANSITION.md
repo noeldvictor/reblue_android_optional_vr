@@ -30,6 +30,20 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native scene snapshots (2026-09-06): the address-free copy core preserves HDR
+and independent mono/layered images across resumed scene writes. A tiny real-GPU
+fixture exposed and fixed a Plume pending-depth-clear/color-resolve ordering bug;
+all eight mono/stereo x 1/2/4/8-sample cases and the broader resolve suite pass
+with zero Vulkan validation errors/warnings. Host build, 31 CPU tests and 77
+source guards pass. The pending bridge now adopts the native scene extent instead
+of requiring a fixed 1280x720 getter. Authored water/refraction execution remains
+unproven: the earlier flat check did not report this path, and no repeated game
+run or raw capture was made. Integration/getters/material parents/reflection
+ownership and full desktop qualification remain open. Twenty-four superseded
+small outputs were removed, reclaiming 4,177,920 B measured. Local Plume commit
+3094b35; dependency/root publication still needs approval. Evidence:
+`research/20260906_0629_native-scene-snapshots.md`.
+
 Effect preparation and cleanup (2026-09-06): both preparation groups, paired
 resource/participant cleanup and global array teardown now execute in native
 code through six whole-function replacements. Host build, 31 CPU tests and 72

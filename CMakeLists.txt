@@ -130,6 +130,12 @@ if(WIN32)
 endif()
 add_subdirectory(thirdparty)
 
+# Tiny real-Vulkan qualification of the host snapshot core. Reuses Plume and
+# installed validation layers; no game launch, shader generation or disk images.
+if(PLUME_BUILD_ATTACHMENT_RESOLVE_TESTS)
+    add_subdirectory(tools/native_scene_snapshot_test)
+endif()
+
 foreach(target IN LISTS REBLUE_TARGETS)
     if(ANDROID)
         # An APK loads a shared library from its Activity; nothing execs a

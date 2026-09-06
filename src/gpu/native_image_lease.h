@@ -8,6 +8,9 @@
 #include <memory>
 
 namespace bd::gpu {
+// Most adapters must keep their declared extent. A native whole-image producer
+// may explicitly replace that declaration; it never rescales or flattens layers.
+enum class NativeImageExtentPolicy { MatchDestination, AdoptSource };
 // The producing native store still owns fence-gated destruction. This handle
 // keeps the image, view, descriptor and layout record alive for boundary readers.
 struct NativeImageLease {
@@ -16,6 +19,12 @@ struct NativeImageLease {
   explicit operator bool() const { return owner && bool(image); }
   bool Fits(uint32_t width, uint32_t height, uint32_t layers) const {
     return bool(*this) && image.width == width && image.height == height && image.layers == layers;
+  }
+  bool CanPublishExtent(uint32_t width, uint32_t height, uint32_t layers,
+                       NativeImageExtentPolicy policy = NativeImageExtentPolicy::MatchDestination) const {
+    if (!*this || !width || !height || !layers || layers > 2) return false;
+    return policy == NativeImageExtentPolicy::AdoptSource ||
+        (policy == NativeImageExtentPolicy::MatchDestination && Fits(width, height, layers));
   }
 };
 

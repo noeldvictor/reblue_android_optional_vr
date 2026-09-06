@@ -60,6 +60,11 @@ public:
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
   bool ClearPending() const { return clear_.has_value(); }
+  // Read only after ending this scope's active render pass. For MSAA this is
+  // the ordinary attachment-resolve destination, never the multisample source.
+  SampledImage ColorReadImage() const {
+    return resolved_[0].texture ? resolved_[0] : sources_[0]->Sampled();
+  }
 
   // Caller flushes outgoing draws before any transition. A resumed pass reuses
   // its contents: only UNKNOWN sources discard, and the scope clears once.
