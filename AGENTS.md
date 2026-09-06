@@ -5,21 +5,23 @@ repository. `CLAUDE.md` imports it. Keep enduring rules here, current progress i
 [`docs/HOST_RENDERER_TRANSITION.md`](docs/HOST_RENDERER_TRANSITION.md), and dated
 evidence in `research/`. Updated 2026-09-06.
 
-**Storage-first default:** produce the minimum new data needed for the task.
-Reuse existing tools, build trees and evidence; do not start builds, game runs
-or captures for status or documentation-only requests. Choose the smallest
-sufficient verification: existing evidence and focused text/source checks first,
-then a targeted test or incremental build when needed. Before a larger run,
-capture, download or asset conversion, explain what it must establish that the
-existing outputs cannot. This does not replace required visual qualification.
-Before a space-producing job, follow
-[Disk-space discipline](#disk-space-discipline): budget peak overlap,
-count all retries together and enforce output limits while the job runs. Clean
-up verified obsolete agent-created outputs at each checkpoint, while preserving
-game data, active builds and required evidence. Report measured savings, not
-proposed cleanup. Free disk space is not an allowance to accumulate artifacts.
-Storage discipline also applies to the code and tools we add: bounded retention
-and reuse must be designed in, not left to occasional manual cleanup.
+**Storage-first default:** disk use is part of completing the task, not optional
+housekeeping. Produce the minimum new data needed:
+
+- Reuse existing tools, build trees and evidence. Status and documentation-only
+  requests need text/diff checks, not builds, game runs or captures.
+- Use existing evidence and focused checks first, then a targeted test or
+  incremental build when needed. Explain what a larger run, capture, download or
+  asset conversion must establish that existing outputs cannot. Required visual
+  qualification still applies.
+- Before producing outputs, follow
+  [Disk-space discipline](#disk-space-discipline): budget peak overlap, count
+  retries together and enforce output limits while the job runs.
+- Validate replacement evidence, then clean up verified obsolete agent-created
+  outputs at the checkpoint. Preserve game data, active builds and required
+  evidence. Report measured savings, not proposed cleanup.
+- Design bounded retention and reuse into new code and tools. Free disk space
+  is not an allowance to accumulate artifacts or defer cleanup indefinitely.
 
 **Repeated verification should target no net growth in retained artifacts.**
 Replace equivalent evidence instead of accumulating a set for every run or
@@ -394,8 +396,12 @@ listed it. Keep unfinished verification explicitly pending.
   An inventory or cleanup proposal is not reclaimed space. Report completed
   cleanup separately from candidates still awaiting review or removal.
 - After storage-heavy work, report ending free space and the measured net disk
-  change, plus any large retained outputs and their cleanup condition. If the
-  budget cannot fit without deleting protected or uncertain data, stop the
+  change, plus any large retained outputs and their cleanup condition. Distinguish
+  drive-wide free-space changes from the bytes attributable to this task; other
+  processes can change the former. Report logical file sizes separately from
+  actual reclaimed space, especially for hard links, sparse or compressed files.
+  Do not claim unrelated free-space gains as cleanup savings. If the budget
+  cannot fit without deleting protected or uncertain data, stop the
   space-producing work and ask; do not fill the disk to finish a checkpoint.
 
 ## Git and documentation
