@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Shared pass lifecycle dispatch (2026-09-06): complete host replacements now
+execute pass-start/pass-finish scheduling, including ordered participant calls,
+live registry-slot updates and the final pass close. Existing parent-inlined
+starts also finish through the native dispatcher. The host link, expanded CPU
+suite (31/31) and 60 existing scene/post guards pass. Bounded flat/XR checks record
+3,601/9,301 native starts and 9,940/22,428 finishes, with zero dispatcher
+fallbacks, refusals or faults; existing scene/post ownership checks also pass.
+One flat sanity PNG was inspected, not sequence/stereo/full-game qualification.
+Thirteen superseded diagnostics were removed, reclaiming 6,402,048 B measured;
+free space is 60.16 GiB with 3.54 MiB net growth for this follow-up. Parent branch
+decisions/inlined starts and descriptor/participant registry/callback ownership
+remain conversion work; this is not a fully native frame. The complete parent
+source trace also corrects the misleading AllPasses name: that function inserts
+objects into lists, not schedules views. No Quest work. Evidence:
+`research/20260906_0412_native-pass-dispatch.md`.
+
 Native scene precision boundary (2026-09-06, local renderer integration): the
 remaining state-308 callback is verified as Xbox high-precision blending, not
 MSAA. Its two guest calls around scene clear are removed; native FP16 attachment

@@ -168,7 +168,7 @@ The [native scene command ownership](research/20260906_0255_native-scene-command
 moves attachment write layouts, first-use discards, framebuffer binds and typed
 clears into the native scene scope, bypassing alias/seed/tile-chain selection.
 Empty scenes clear before publication; resumed scopes do not clear twice.
-The latest [precision-boundary change](research/20260906_0333_native-scene-state-bridge.md)
+The [precision-boundary change](research/20260906_0333_native-scene-state-bridge.md)
 also removes both guest high-precision-blend calls (state 308): native attachments
 stay FP16 without toggling console surface/packet formats. Only final getter words
 remain published for unconverted clients. Host build, 31 CPU tests, 60 source
@@ -179,6 +179,14 @@ full-game qualification. This follow-up reclaimed 7,196,672 B of superseded
 diagnostics. Complete draw-state execution, remaining getters/scaling, scene/UI/
 frame ownership and desktop game gates remain; integration publication still
 needs approval.
+
+The shared [pass-start/pass-finish dispatcher](research/20260906_0412_native-pass-dispatch.md)
+now executes in host code, preserving ordered participant work and final pass
+closure. Host build, 31 CPU tests, 60 existing source guards and bounded flat/XR
+checks pass with zero dispatcher fallbacks or faults. One flat sanity PNG was
+inspected; parent branch decisions and imported registry/callback ownership remain
+conversion work, and the full desktop game/stereo gate is still open. Superseded
+diagnostics were cleaned up; no new raw captures or Quest runs were made.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

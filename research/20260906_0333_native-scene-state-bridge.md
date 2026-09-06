@@ -197,3 +197,45 @@ execution outside the converted scope. Source mapping locates the larger parent
 Complete scene/material/animation/shadow/UI/frame ownership, modern GPU execution
 throughout, asset conversion and the full desktop both-eye/game gates remain
 required before Quest 2 qualification. This goal remains active.
+
+## Continuing the same storage ledger: pass dispatcher, 04:12
+
+This is not a new checkpoint allowance. At the new producer preflight, measured
+free space is 64,596,459,520 B; elevated CIM finds no game/build/compiler/linker
+producer. Reuse both configured build trees and the guarded build/run wrappers.
+Plan at most 512 MiB additional build/link overlap and 8 MiB new diagnostics,
+including one bounded flat PNG replacement inside the existing 10 MiB aggregate
+inspection reservation. No raw capture, new tool, download, build tree, shader
+regeneration or guest-object rebuild is planned. Start with the focused existing
+scene CPU target, then the CPU suite and incremental host link. Flat/XR checks
+must use capture-off bounded runs; inspect the flat replacement before retiring
+equivalent old small evidence. Protected raw/failure evidence stays untouched.
+The technical findings and actual follow-up results are recorded separately in
+`research/20260906_0412_native-pass-dispatch.md`; reconcile completed bytes here.
+
+All three build/test producers and both desktop runs are terminal, successful
+within their bounds. No new raw, cache or shader-dump output was produced. The
+two runs ended with free space 64,589,574,144 B and 64,586,895,360 B respectively.
+The new flat image was inspected before retiring its predecessor.
+
+Completed cleanup: checked exact expected lengths, regular-file status, workspace
+containment, all ancestors for reparse points, Git ignores, old/replacement PNG
+hashes and elevated CIM producer absence. Removed 13 superseded files:
+stdout/stderr pairs reblue_17, cpu_14 and host_scene_pass_test_01; normal logs
+853/854 and their perf-20260906-034306/034537 CSV/metadata pairs; and
+native_scene_precision_window.png. They total 6,395,187 logical B. Immediate free
+space rose 64,586,350,592 ->64,592,752,640 B: **6,402,048 B measured reclaimed**,
+counted once. The exact old outputs are no longer retained; reports/hashes remain
+and equivalent diagnostics can be regenerated. No protected raw/failure evidence,
+non-MSAA/optical/recovery evidence, game/save/profile/source/dependency/build tree
+was removed. Current diagnostic replacements retire after equivalent verification.
+
+Closing inventory: 76 build logs /125,827 B; 11 runtime logs /3,298,040 B;
+20 perf files /8,926,304 B; zero new raw/cache/dump files. With the unchanged
+41 MiB tool/inspection reservation, retained diagnostics total 55,341,787 B.
+The two remaining flat PNGs total 6,610,887 B inside that reservation.
+Free 64,592,752,640 B (60.16 GiB); net growth from this follow-up's preflight
+is 3,706,880 B and from the original checkpoint is 870,035,456 B. Build/link
+overlap stayed within the guarded cumulative budget; no additional allowance
+was taken. No live producer or profile override remains. Later metadata/volume
+changes still belong to this same ledger, not a reset budget.

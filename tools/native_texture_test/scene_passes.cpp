@@ -7,13 +7,119 @@
 #include "gpu/scene/native_scene_pass.h"
 #include "gpu/scene/native_scene_result.h"
 #include "gpu/scene/scene_precision_import.h"
+#include "gpu/scene/native_pass_dispatch.h"
+#include "gpu/scene/pass_dispatch_import.h"
 #include "gpu/native_image_layers.h"
 #include <array>
+#include <functional>
 #include <stdexcept>
+#include <vector>
 using namespace bd::gpu::scene;
 namespace {
 void Require(bool value) {
   if (!value) throw std::runtime_error("native scene policy check failed");
+}
+struct DispatchAdapter {
+  int32_t count = 3;
+  std::array<unsigned, 3> slots{0, 1, 2};
+  std::array<uint32_t, 4> results{0x101, 2, 0, 1};
+  std::array<uint8_t, 4> active{0, 1, 255, 0};
+  std::vector<int> events;
+  std::function<void()> open;
+  std::function<void(uint32_t)> begin, end;
+  int32_t ParticipantCount() { events.push_back(2); return count; }
+  void PublishMode() { events.push_back(0); }
+  void BeginPass() { events.push_back(1); if (open) open(); }
+  void EndPass() { events.push_back(3); }
+  bool BeginParticipant(uint32_t i) {
+    events.push_back(10 + int(i));
+    const auto result = results[slots[i]];
+    if (begin) begin(i);
+    return ImportParticipantAccepted(result);
+  }
+  bool ParticipantActive(uint32_t i) {
+    return ImportParticipantActive(active[slots[i]]);
+  }
+  void EndParticipant(uint32_t i) {
+    events.push_back(30 + int(i));
+    if (end) end(i);
+  }
+  void SetParticipantActive(uint32_t i, bool value) {
+    events.push_back((value ? 20 : 40) + int(i));
+    active[slots[i]] = uint8_t(value);
+  }
+};
+void CheckDispatch() {
+  // Both imported booleans require exactly one, not arbitrary nonzero.
+  for (uint32_t byte = 0; byte < 256; ++byte) {
+    Require(ImportParticipantActive(uint8_t(byte)) == (byte == 1));
+    for (uint32_t high : {0u, 0xFFFFFF00u, 0x12345600u})
+      Require(ImportParticipantAccepted(high | byte) == (byte == 1));
+  }
+  for (uint32_t phase = 0; phase < 16; ++phase)
+    Require(ImportPassLightSpace(phase) == (phase == 1 || phase == 4 || phase == 8));
+  Require(!ImportPassLightSpace(UINT32_MAX));
+
+  DispatchAdapter basic;
+  DispatchPassBegin(basic);
+  Require(basic.events == std::vector<int>{0, 1, 2, 10, 20, 11, 12});
+  // Refused participants retain any existing flag; begin does not clear them.
+  Require(basic.active == std::array<uint8_t, 4>{1, 1, 255, 0});
+  basic.events.clear();
+  DispatchPassEnd(basic);
+  Require(basic.events == std::vector<int>{2, 30, 40, 31, 41, 3});
+  Require(basic.active == std::array<uint8_t, 4>{0, 0, 255, 0});
+  basic.events.clear();
+  DispatchPassEnd(basic);
+  Require(basic.events == std::vector<int>{2, 3});
+
+  for (int32_t count : {0, -1, INT32_MIN}) {
+    DispatchAdapter empty;
+    empty.count = count;
+    DispatchPassBegin(empty);
+    DispatchPassEnd(empty);
+    Require(empty.events == std::vector<int>{0, 1, 2, 2, 3});
+  }
+  DispatchAdapter mutated;
+  mutated.count = 0;
+  mutated.open = [&] { mutated.count = 3; }; // begin creates the registry
+  mutated.begin = [&](uint32_t i) {
+    if (!i) {
+      mutated.count = 1; // cannot shorten the captured loop bound
+      mutated.slots = {3, 2, 1}; // but individual slots remain live
+    }
+  };
+  DispatchPassBegin(mutated);
+  Require(mutated.events == std::vector<int>{0, 1, 2, 10, 20, 11, 12});
+  Require(mutated.active == std::array<uint8_t, 4>{0, 1, 255, 1});
+  mutated.count = 3;
+  mutated.events.clear();
+  mutated.end = [&](uint32_t i) {
+    if (!i) {
+      mutated.count = 0;
+      mutated.slots = {1, 2, 3};
+    }
+  };
+  DispatchPassEnd(mutated);
+  Require(mutated.events == std::vector<int>{2, 30, 40, 32, 42, 3});
+  Require(mutated.active == std::array<uint8_t, 4>{0, 0, 255, 0});
+
+  // Nested schedules keep independent iteration state; no global loop cursor.
+  DispatchAdapter outer, inner;
+  outer.begin = [&](uint32_t i) {
+    if (!i) { DispatchPassBegin(inner); DispatchPassEnd(inner); }
+  };
+  DispatchPassBegin(outer);
+  DispatchPassEnd(outer);
+  Require(outer.events == inner.events);
+  Require(outer.active == inner.active);
+
+  // A callback fault must not trigger a second execution or an early pass end.
+  DispatchAdapter failed;
+  failed.active[0] = 1;
+  failed.end = [](uint32_t) { throw 1; };
+  try { DispatchPassEnd(failed); Require(false); } catch (int) {}
+  Require(failed.events == std::vector<int>{2, 30} && failed.active[0] == 1);
 }
 struct Lease {
   int *live = nullptr;
@@ -71,6 +177,7 @@ void CheckResults() {
 }
 }
 int main() {
+  CheckDispatch();
   CheckResults();
   // Actual getter adapter: only the final cached/requested precision words
   // change. No transient off state, resource header, packet or dirty-bit write.
