@@ -410,6 +410,12 @@ listed it. Keep unfinished verification explicitly pending.
   coherent, verified checkpoints during implementation, not one giant final
   commit. Stage explicit paths and review the staged diff. Do not sweep up
   unrelated changes, local settings, binaries, logs, disc data or cooked assets.
+- **Standing owner approval (2026-09-06):** normal, task-scoped source/test/docs
+  commits and pushes to GitHub `noeldvictor/reblue_android_optional_vr:main`
+  and `noeldvictor/plume:main` are permanently authorized unless the owner
+  revokes that approval. Do not ask again for each checkpoint to these named
+  destinations. This does not authorize force-pushes, unrelated changes,
+  secrets/game-data uploads or bypassing a genuine tool/security restriction.
 - Work on this fork's `main`. Push normal commits to its configured `origin/main`;
   verify success and report the commit. Never force-push, reset user changes or
   rewrite published history. If the remote diverges, inspect it before proceeding.

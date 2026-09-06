@@ -30,6 +30,13 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Publication follow-up (2026-09-06): the owner granted standing normal commit/
+push approval for `noeldvictor/reblue_android_optional_vr:main` and
+`noeldvictor/plume:main`. Plume is published through `3094b35`, now recorded
+by the parent dependency reference. The existing uncommitted scene/post renderer
+integration still requires scoped review and a coherent commit. Earlier dated
+approval-blocked notes are historical, not the current publication constraint.
+
 Sorted visual scheduling (2026-09-06): the complete `Visual__DrawSortedQueues`
 now owns model/primitive order and dispatch on the host, using one bounded
 32 KiB key array without guest bucket heads/next pointers. Model preparation,

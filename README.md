@@ -90,7 +90,12 @@ desktop field check has a 16.667 ms median frame interval (~60 FPS), 6.610 ms
 speedup percentage or Quest performance claim is established. Details and
 limitations are in the checkpoint report above.
 
-Pushes still require approval naming the configured GitHub destinations.
+The owner granted standing commit/push approval on 2026-09-06 for
+`noeldvictor/reblue_android_optional_vr:main` and `noeldvictor/plume:main`.
+Plume's four pending commits are published through `3094b35`; the parent now
+records that dependency revision. The existing uncommitted scene/post renderer
+integration still needs a scoped review and coherent commit. Historical reports
+retain the earlier approval blocker; it is no longer the publication constraint.
 
 | Area | Implemented | Still required |
 | --- | --- | --- |
@@ -141,8 +146,8 @@ was inspected. [Native multiview state ordering](research/20260905_2305_native-m
 is now fixed in local Plume `81bdca8`, with validated tiny GPU readbacks and
 capture-disabled desktop XR/non-MSAA diagnostics. Depth/getter publications and
 full-frame pixel/game qualification remain unfinished. The scene integration is **not yet committed
-or published**: dependency publication needs owner approval before its parent
-gitlink can be committed. The table above describes earlier checkpoints.
+or published**. Its Plume dependency is now published and recorded; the remaining
+renderer changes still need a scoped commit. The table above describes earlier checkpoints.
 
 The [native post-resource boundary](research/20260905_2351_native-post-resource-contract.md)
 removes output and optical-image headers from post rendering, retaining native
@@ -160,7 +165,7 @@ build, 31 CPU tests and 50 source guards pass. Normal flat, optical XR and
 non-MSAA diagnostics have zero post imports/fallbacks/refusals and settle at two
 resident post images. One normal-flat window PNG was inspected, not a new
 flat/VR sequence qualification. The independent pool/test is locally checkpointed;
-GPU integration remains uncommitted pending dependency publication approval.
+GPU integration remains uncommitted; dependency publication approval is now resolved.
 At that checkpoint initial depth publication, UI scheduling and full-frame/game
 gates remained open.
 
@@ -176,7 +181,7 @@ pass. Normal non-MSAA flat/XR record 3,600/10,200 native depth handoffs and zero
 compatibility depth publications or native-post imports/refusals. One non-MSAA
 flat PNG was inspected, not new sequence/stereo qualification. Independent
 contracts/tests are local checkpoints; renderer
-integration still awaits dependency publication approval. Protected raw/failure
+integration still awaits a scoped commit. Protected raw/failure
 evidence remains; superseded small diagnostics are cleaned up at checkpoints.
 
 The [native scene source allocation](research/20260906_0200_native-scene-source-allocation.md)
@@ -198,7 +203,7 @@ reclaiming 8,167,424 B measured without touching protected raw/failure evidence.
 At that checkpoint native pass commands/clears, remaining getters/scaling, full
 scene/UI/frame ownership and desktop game gates remained open. Independent
 contracts/tests are local commits;
-renderer integration is still unpublished pending dependency approval.
+renderer integration is still unpublished pending a scoped commit.
 
 The [native scene command ownership](research/20260906_0255_native-scene-commands.md)
 moves attachment write layouts, first-use discards, framebuffer binds and typed
@@ -213,8 +218,8 @@ calls, compatibility clears/depth publications or post imports/refusals. One new
 flat sanity PNG was inspected and replaced its predecessor, not sequence/stereo/
 full-game qualification. This follow-up reclaimed 7,196,672 B of superseded
 diagnostics. Complete draw-state execution, remaining getters/scaling, scene/UI/
-frame ownership and desktop game gates remain; integration publication still
-needs approval.
+frame ownership and desktop game gates remain; integration still needs a scoped
+commit, with standing publication approval now granted.
 
 The [whole-view scheduler](research/20260906_0442_native-view-schedule.md) now
 executes parent branch selection, pass order and reflection/focus geometry on the
@@ -248,7 +253,7 @@ fixed a Vulkan pending-clear/resolve ordering bug; eight mono/stereo and
 host build and 31 CPU tests. Native-extent publication is in the pending
 integration; actual authored snapshot-copy use remains unproven. No new raw
 captures were made, and superseded diagnostics were removed. This is not full
-host-frame or full-game/stereo qualification; remote publication needs approval.
+host-frame or full-game/stereo qualification; integration remains uncommitted.
 
 The [water/refraction setup follow-up](research/20260906_0700_native-refraction-materials.md)
 moves two whole material callbacks onto the host, preserving blending/depth-write
