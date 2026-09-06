@@ -199,6 +199,13 @@ including temporary outputs that exist only while a job is running.
   Run focused, low-storage checks before storage-heavy verification so simple
   failures do not consume another capture/build budget. Produce only the outputs
   needed for the current question, without weakening required qualification.
+- Before downloading tools, inspect installed toolchains and existing caches.
+  Reuse a suitable installation; prefer the required component over a full SDK
+  or duplicate toolchain. Budget both the download and extracted files, extract
+  only what is needed, and verify the extracted tools before removing disposable
+  agent-created archives. Keep only one required representation unless a specific
+  reproducibility need is recorded. Do not clear shared/global caches or tools
+  used by other projects without the owner's explicit approval.
 - Prefer streaming analysis and bounded in-memory batches over additional
   on-disk copies. Analyze complete sequences when required, but do not export
   every frame to PNG just to inspect a sample. Keep only the representative and
