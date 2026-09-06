@@ -7,8 +7,13 @@ evidence in `research/`. Updated 2026-09-06.
 
 **Storage-first default:** produce the minimum new data needed for the task.
 Reuse existing tools, build trees and evidence; do not start builds, game runs
-or captures for status or documentation-only requests. Before a space-producing
-job, follow [Disk-space discipline](#disk-space-discipline): budget peak overlap,
+or captures for status or documentation-only requests. Choose the smallest
+sufficient verification: existing evidence and focused text/source checks first,
+then a targeted test or incremental build when needed. Before a larger run,
+capture, download or asset conversion, explain what it must establish that the
+existing outputs cannot. This does not replace required visual qualification.
+Before a space-producing job, follow
+[Disk-space discipline](#disk-space-discipline): budget peak overlap,
 count all retries together and enforce output limits while the job runs. Clean
 up verified obsolete agent-created outputs at each checkpoint, while preserving
 game data, active builds and required evidence. Report measured savings, not
@@ -19,8 +24,10 @@ proposed cleanup. Free disk space is not an allowance to accumulate artifacts.
 tools), and 10 MiB of aggregate build/test logs within that diagnostic budget.
 These ceilings include retries and continuations, not just the latest run.
 Stop space-producing work and ask before exceeding them; continue low-storage
-source or documentation work where possible. See the detailed rules below for
-the separate raw-capture archive gate and protected evidence.
+source or documentation work where possible. Unknown output size is not zero:
+inspect the producer's defaults and set an enforceable bound before launching.
+See the detailed rules below for the separate raw-capture archive gate and
+protected evidence.
 
 ## Goal and boundaries
 
