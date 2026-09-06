@@ -30,6 +30,18 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native Vulkan multiview state ordering (2026-09-05, local Plume `81bdca8`):
+lazy native pass begin now reestablishes current native bindings, including
+descriptor offsets and incremental push values, with layout-disturbance and
+static/dynamic-state lifetime handling. The previously hidden first stereo draw
+failure was reproduced before GPU submission. The expanded 8x8 GPU readback suite
+passes mono/two-eye, indirect, pass-restart and compute/graphics transitions with
+zero API errors/warnings. Desktop host build, 30 CPU tests and 46 source guards
+pass. Capture-disabled XR/non-MSAA flat diagnostics record 8,701/3,601 native post
+scopes, zero imports/original scopes/refusals, with profiles restored. No new
+game pixels, full-game qualification or Quest work; publishing remains blocked
+pending approval. Evidence: `research/20260905_2305_native-multiview-state.md`.
+
 Native scene resolve integration (2026-09-05, **local uncommitted renderer work**):
 scene MSAA now writes separately owned native colour/depth resolve images with
 generation-safe keys, bounded residency and fence-gated descriptor/image lifetime.
@@ -38,8 +50,9 @@ unconsumed normal views explicitly recover the required getter publication.
 Initial depth and final UI/getter publications remain. The desktop host build,
 30 CPU tests and 46 source guards pass. Normal/recovery diagnostics verify
 3,600 deferred colours with zero/all recovered respectively; one bounded window
-PNG was inspected, not a new sequence/VR qualification. Live multiview state
-ordering, full image/game gates and the remaining ownership conversion are open.
+PNG was inspected, not a new sequence/VR qualification. The multiview ordering
+fix above is GPU-tested; full image/game gates and remaining ownership conversion
+are still open.
 Publishing the required Plume dependency still needs owner approval; neither the
 integration code nor its parent gitlink is committed. No raw captures or Quest
 work. Evidence: `research/20260905_2206_native-scene-resolve-ownership.md`.

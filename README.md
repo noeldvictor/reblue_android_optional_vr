@@ -101,8 +101,10 @@ Newer [local native-resolve integration](research/20260905_2206_native-scene-res
 gives scene MSAA native colour/depth resolve images and removes the initial colour
 copy from normal native post. Host builds, 30 CPU tests, 46 source guards and
 normal/post-disabled recovery diagnostics pass; one bounded desktop window image
-was inspected. Depth/getter publications, multiview state ordering and full-frame
-pixel/game qualification remain unfinished. This integration is **not yet committed
+was inspected. [Native multiview state ordering](research/20260905_2305_native-multiview-state.md)
+is now fixed in local Plume `81bdca8`, with validated tiny GPU readbacks and
+capture-disabled desktop XR/non-MSAA diagnostics. Depth/getter publications and
+full-frame pixel/game qualification remain unfinished. The scene integration is **not yet committed
 or published**: dependency publication needs owner approval before its parent
 gitlink can be committed. The table above describes earlier checkpoints.
 
