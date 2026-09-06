@@ -14,6 +14,14 @@ up verified obsolete agent-created outputs at each checkpoint, while preserving
 game data, active builds and required evidence. Report measured savings, not
 proposed cleanup. Free disk space is not an allowance to accumulate artifacts.
 
+**Quick storage limits:** preserve at least 20 GiB free; cap each checkpoint at
+2 GiB peak additional disk use, 100 MiB of newly retained diagnostics (including
+tools), and 10 MiB of aggregate build/test logs within that diagnostic budget.
+These ceilings include retries and continuations, not just the latest run.
+Stop space-producing work and ask before exceeding them; continue low-storage
+source or documentation work where possible. See the detailed rules below for
+the separate raw-capture archive gate and protected evidence.
+
 ## Goal and boundaries
 
 Move **all rendering** to a host-native, modern Vulkan renderer on desktop;
