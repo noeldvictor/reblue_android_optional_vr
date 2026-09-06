@@ -13,6 +13,7 @@
 #include "visual_schedule.h"
 #include "deferred_visuals.h"
 #include "material_passes.h"
+#include "toon_materials.h"
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -140,6 +141,7 @@ void OriginalCopy(std::vector<uint8_t> &bytes, uint32_t source,
   }
 }
 int main() {
+  toon_material_test::Run();
   material_pass_test::Run();
   deferred_visuals_test::Run();
   visual_schedule_test::Run();

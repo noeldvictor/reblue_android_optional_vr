@@ -60,8 +60,10 @@ class ParameterStorageBoundaryTest(unittest.TestCase):
         self.assertIn("InvalidateNativeShaderParameters(true, 57, 1)", state)
         tweaks = self.source("hooks/tweaks.cpp")
         self.assertIn("InvalidateNativeShaderParameters(true, 50, 2)", tweaks)
-        self.assertIn("REBLUE_CONSTANT_DIRTY_HOOK(Visual__Shader__Toon__vf04", state)
-        self.assertIn("InvalidateNativeShaderParameters(true, 50, 2)", state)
+        self.assertNotIn("REBLUE_CONSTANT_DIRTY_HOOK(Visual__Shader__Toon__vf04", state)
+        toon = self.source("scene/native_toon_material_bridge.cpp")
+        self.assertIn("PublishNativeShaderParameters(device, true, 50, 2, words.data())", toon)
+        self.assertIn("InvalidateNativeShaderParameters(true, 50, 2)", toon.split("void ToonFallback(", 1)[1])
         for stage in ("true", "false"):
             self.assertIn(f"InvalidateNativeShaderParameters({stage}, kScreenUVScaleReg, 1)", tweaks)
 

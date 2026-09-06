@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_material_pass.h"
+#include "gpu/scene/native_toon_material_bridge.h"
 #include "gpu/device.h"
 #include "gpu/constant_buffers.h"
 #include "gpu/frame_stats.h"
@@ -35,7 +36,7 @@ enum class Operation { Begin, End, Recipe, Shaders, Declaration };
 using Original = void (*)(PPCContext &, uint8_t *);
 struct Stats {
   std::array<uint64_t, 5> native{};
-  uint64_t vertex_binds = 0, pixel_binds = 0, declarations = 0, callbacks = 0;
+  uint64_t vertex_binds = 0, pixel_binds = 0, declarations = 0, callbacks = 0, native_callbacks = 0;
   uint64_t compatibility = 0, refused = 0, faults = 0;
   uint32_t frame = 0;
   bool reported = false;
@@ -46,11 +47,11 @@ void Report() {
   const auto frame = FrameStatFrameCount();
   if (stats.reported && frame - stats.frame < 300) return;
   BD_INFO("[native-material-pass] begin {} end {} recipes {} shaders {} declaration calls {}; "
-          "VS binds {} PS binds {} declarations {} participant callbacks {}; "
+          "VS binds {} PS binds {} declarations {} participant callbacks {} native participants {}; "
           "compatibility {} refused {} faults {}; native dispatch/binding, authored registry/recipes "
           "and resource/shader ABI adapters remain",
       stats.native[0], stats.native[1], stats.native[2], stats.native[3], stats.native[4],
-      stats.vertex_binds, stats.pixel_binds, stats.declarations, stats.callbacks,
+      stats.vertex_binds, stats.pixel_binds, stats.declarations, stats.callbacks, stats.native_callbacks,
       stats.compatibility, stats.refused, stats.faults);
   stats.frame = frame; stats.reported = true;
 }
@@ -112,6 +113,9 @@ struct Adapter {
   uint32_t ParticipantMode(uint32_t participant) { return Read(uint64_t(participant) + 4); }
   void Invoke(uint32_t participant, bool ending) {
     const auto function = Read(uint64_t(Read(participant)) + (ending ? 20 : 16));
+    ctx.last_indirect_target = function;
+    ctx.r3.u64 = participant;
+    if (TryNativeToonMaterial(function, ctx, base)) { ++stats.native_callbacks; return; }
     auto *callback = REX_KERNEL_STATE()->function_dispatcher()->GetFunction(function);
     Check(callback != nullptr); ctx.last_indirect_target = function; ctx.r3.u64 = participant;
     ++stats.callbacks;

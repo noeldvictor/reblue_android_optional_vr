@@ -262,12 +262,8 @@ REBLUE_CONSTANT_DIRTY_HOOK(bdVisualObjectSetShaderConstants,
                             bd::gpu::InvalidateNativeShaderParameters(false, 53, 1),
                             bd::gpu::Video::MarkVSConstantsDirty(),
                             bd::gpu::Video::MarkPSConstantsDirty()))
-// Toon vf04 is a leaf inline writer of VS c50/c51 (the latter includes two
-// inherited stack words). Preserve the original data until its shader ABI is
-// replaced; it must not inherit another material's native parameter rows.
-REBLUE_CONSTANT_DIRTY_HOOK(Visual__Shader__Toon__vf04,
-                           (bd::gpu::InvalidateNativeShaderParameters(true, 50, 2),
-                            bd::gpu::Video::MarkVSConstantsDirty()))
+// Toon update/begin/end now publish native texture and parameter values in
+// native_toon_material_bridge.cpp; only its explicit fallback invalidates rows.
 // This one also brackets the 2D overlay scope. Visual__DrawVerticesUP is where
 // Blue Dragon flushes its sorted 2D content - sprites, the intro credits, the
 // HUD - so every draw inside it is an overlay, and the stereo path puts those

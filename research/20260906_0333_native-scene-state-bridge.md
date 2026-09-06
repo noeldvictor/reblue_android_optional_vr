@@ -1020,3 +1020,53 @@ All three runtime attempts total 966,032 B within the <=1 MiB estimate.
 Post-cleanup free 65,211,969,536 B, drive-wide use +24,227,840 B from material
 preflight (+21,282,816 B this continuation), including the unexplained volume
 drop above. Later source/docs/Git writes count; final handoff measures again.
+
+## Continuing the same storage ledger: Toon material callbacks
+
+Previous turn was progress: published `0954377`, final free 65,211,736,064 B;
+material checkpoint drive-wide use +24,461,312 B, no extra cleanup credit.
+Current Toon preflight 65,212,903,424 B, no active producer, original profile
+intact. The small volume gain is not cleanup. Existing diagnostic reservation
+64,454,021 B and original cumulative limits remain unchanged. Two current PNGs
+total 6,698,638 B, leaving 3,787,122 B temporary replacement overlap.
+
+Three whole callbacks (Toon update/begin/end) now have native implementations;
+pass dispatch routes recognized callbacks directly and counts remaining guest
+bodies separately. CPU cases cover signed frame selection/wrap, all 6,804 normal
+counter states, live image/next-counter changes and edge-word conversion.
+115 source guards pass. Reuse CPU/host trees: <=256 MiB build/link overlap and
+<=1 MiB new aggregate build/CPU logs. After builds, bounded normal flat plus
+fresh-field desktop XR checks may add <=1 MiB runtime logs, <=1 MiB perf and
+one PNG <=3,787,122 B. XR may compare edge words against the original leaf,
+without double GPU execution. No shader/guest rebuild, new tree, download,
+asset/cache conversion or raw frames. Retire equivalent old flat/XR/build/CPU
+outputs only after validated replacements; preserve distinct non-MSAA/original
+UI/failure evidence. All attempts and continuations share this ledger/budget.
+
+### Toon qualification and cleanup, 15:05 continuation
+
+User strategy interruption paused runtime verification. Prior CPU fixture 08
+(PID 26400), host 37 (PID 21020/session 66487) and CPU suite 30 (PID 26032) were
+confirmed terminal, exit 0; six logs total 6,523 B. Source checks remain 115/115;
+CPU suite 31/31, 6.94 s. No duplicate build was launched. Continuation preflight
+free 65,207,963,648 B, no active producer and original 116-byte profile intact.
+
+Flat 886/PID 27108/session 83110 terminal 15:03:52, 282,570 B log,
+598,128 B perf/metadata, 3,333,941 B inspected PNG. XR 887/PID 28072/session 83298
+terminal 15:04:53, 365,625 B log, no perf/raw. Fresh scene/camera checks match
+1,510 Toon publications and 2,627,009 native parameter blocks; zero mismatches
+or Toon fallbacks/refusals/faults. Both profiles restored byte-for-byte. No new
+raw/cache/HLSL/cooked outputs observed. All runtime attempts total 648,195 B.
+Gross new log/perf/PNG payload 4,586,787 B; details, hashes, limits and remaining
+qualification in `20260906_1505_native-toon-materials.md`.
+
+Replaced equivalents qualified before cleanup. Removed 11 exact ignored files:
+host 36, fixture 07 and CPU 29 stdout/stderr; flat 883, XR 885, perf-142258
+CSV/metadata and material-pass PNG. No active producer/reparse ancestor; no
+protected evidence, original data or build tree removed. Logical 4,625,184 B;
+immediate free 65,201,819,648 ->65,206,452,224 B, **4,632,576 B reclaimed**, once.
+Net retained diagnostic payload falls 38,397 B. Host +9,216 B, CPU fixture
++12,800 B and small supervisor edits remain within the tools/build reservation.
+Ending post-cleanup volume use +6,451,200 B from Toon preflight, including
+unattributed drive-wide movement; not all volume change is task output. Final
+source/docs/Git writes are measured at handoff. No budget reset or new exception.
