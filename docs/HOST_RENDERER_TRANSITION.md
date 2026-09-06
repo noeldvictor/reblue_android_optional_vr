@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native scene command ownership (2026-09-06, local renderer integration): native
+scene scopes now own source/resolve write layouts, first-use discards, framebuffer
+binds and typed colour/depth/stencil clears. Scene begin no longer requests a
+console-style clear or stores it on binding headers; the native bind skips
+alias/seed/tile-chain selection. Resumed scopes preserve contents; empty scenes
+still clear before publication. Host build, 31 CPU tests and 59 source guards
+pass. Five bounded MSAA/non-MSAA flat/XR and post-off recovery checks report zero
+compatibility clears/depth publications; normal post has zero imports/refusals.
+Two flat sanity PNGs were inspected, not new sequence/stereo/full-game evidence.
+Twenty-five superseded diagnostics, including those PNG predecessors, were
+removed: 13,762,560 B measured reclaimed. Independent command contracts/tests are
+the local checkpoint; integration/Plume publication still requires approval.
+State 308, complete native draw-state execution, remaining getters/scaling,
+scene/UI/frame ownership and the full desktop game gates remain. No Quest work.
+Evidence: `research/20260906_0255_native-scene-commands.md`.
+
 Native single-sample scene framebuffers (2026-09-06, local renderer integration):
 scene begin now constructs mono/stereo framebuffers from retained native images,
 outside the resource-header cache. Bounded residency keys exact source owners and

@@ -5,7 +5,9 @@
 #include "gpu/native_image_lease.h"
 #include "gpu/post_sequence.h"
 #include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/scene/native_scene_commands.h"
 #include <array>
+#include <limits>
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -424,8 +426,113 @@ void SceneFramebufferOwnership() {
   }));
   assert(failure.Stats().failed == 1 && failure.Stats().bytes == 0 && failure.Stats().resident == 0);
 }
+struct SceneCommandRecorder {
+  std::vector<char> events;
+  std::vector<RenderTextureBarrier> writes;
+  RenderFramebuffer *bound = nullptr;
+  RenderColor color;
+  float depth = 0;
+  uint8_t stencil = 0;
+  void barriers(RenderBarrierStages stage, const RenderTextureBarrier *values, uint32_t count) {
+    assert(stage == RenderBarrierStage::GRAPHICS && count > 0 && count <= 4);
+    writes.assign(values, values + count);
+    events.push_back('b');
+  }
+  void discardTexture(RenderTexture *image) {
+    assert(image && !events.empty() && (events.back() == 'b' || events.back() == 'd'));
+    events.push_back('d');
+  }
+  void setFramebuffer(RenderFramebuffer *fb) { assert(fb); bound = fb; events.push_back('f'); }
+  void clearColor(uint32_t index, const RenderColor &value) {
+    assert(bound && index == 0); color = value; events.push_back('c');
+  }
+  void clearDepthStencil(bool clear_depth, bool clear_stencil, float z, uint8_t s) {
+    assert(bound && clear_depth && clear_stencil); depth = z; stencil = s; events.push_back('z');
+  }
+};
+void SceneCommands() {
+  using namespace bd::gpu::scene;
+  const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
+  for (uint32_t layers : {1u, 2u}) for (uint32_t samples : {1u, 2u, 4u, 8u}) {
+    std::array<NativeTargetImageHandle, 2> sources;
+    std::array<std::shared_ptr<NativeTargetImage>, 2> resolved_owners;
+    std::array<SampledImage, 2> resolved{};
+    for (uint32_t i = 0; i < 2; ++i) {
+      const auto make = [&](uint32_t sample_count) {
+        auto image = std::make_shared<NativeTargetImage>();
+        image->shape = {1440, 1584, layers,
+            i ? RenderFormat::D32_FLOAT_S8_UINT : RenderFormat::R16G16B16A16_FLOAT, sample_count};
+        image->image = std::make_unique<SceneSource>();
+        image->descriptor = i;
+        return image;
+      };
+      sources[i] = make(samples);
+      if (samples > 1) {
+        resolved_owners[i] = make(1);
+        resolved[i] = resolved_owners[i]->Sampled();
+      }
+    }
+    OutputFramebuffer framebuffer;
+    const auto create = [&](const std::array<SampledImage, 2> &outputs) {
+      return NativeSceneCommands::Create(sources, &framebuffer, outputs, clear);
+    };
+    assert(!NativeSceneCommands::Create({}, &framebuffer, resolved, clear));
+    assert(!NativeSceneCommands::Create(sources, nullptr, resolved, clear));
+    --framebuffer.width; assert(!create(resolved)); ++framebuffer.width;
+    auto invalid_clear = clear; invalid_clear.depth = -1.f;
+    assert(!NativeSceneCommands::Create(sources, &framebuffer, resolved, invalid_clear));
+    invalid_clear = clear; invalid_clear.color.a = std::numeric_limits<float>::quiet_NaN();
+    assert(!NativeSceneCommands::Create(sources, &framebuffer, resolved, invalid_clear));
+    if (samples > 1) {
+      assert(!create({}));
+      for (uint32_t field = 0; field < 9; ++field) {
+        auto bad = resolved;
+        if (field == 0) bad[0].texture = sources[0]->image.get();
+        if (field == 1) bad[1].texture = bad[0].texture;
+        if (field == 2) bad[0].layout = &sources[0]->layout;
+        if (field == 3) bad[1].layout = bad[0].layout;
+        if (field == 4) ++bad[0].width;
+        if (field == 5) ++bad[1].height;
+        if (field == 6) bad[0].layers = layers == 1 ? 2 : 1;
+        if (field == 7) bad[1].format = sources[0]->shape.format;
+        if (field == 8) bad[1].samples = samples;
+        assert(!create(bad));
+      }
+    } else assert(!create({sources[0]->Sampled(), sources[1]->Sampled()}));
+    auto scope = create(resolved);
+    assert(scope && scope->ClearPending());
+    assert(scope->Matches(sources[0]->image.get(), sources[1]->image.get()));
+    assert(!scope->Matches(sources[1]->image.get(), sources[0]->image.get()));
+    SceneCommandRecorder recorder;
+    const uint32_t attachment_count = samples > 1 ? 4u : 2u;
+    assert(scope->Bind(recorder) == attachment_count && recorder.writes.size() == attachment_count);
+    for (uint32_t i = 0; i < attachment_count; ++i) {
+      assert(recorder.writes[i].texture == (i < 2 ? sources[i]->image.get() : resolved[i - 2].texture));
+      assert(recorder.writes[i].layout == (i % 2 ? RenderTextureLayout::DEPTH_WRITE : RenderTextureLayout::COLOR_WRITE));
+    }
+    // Zero-draw scenes use exactly these same bind/clear commands before readout.
+    assert(scope->ApplyClear(recorder) && !scope->ClearPending());
+    assert((recorder.events == std::vector<char>{'b','d','d','f','c','z'}));
+    assert(recorder.color.r == .125f && recorder.color.g == .25f && recorder.color.b == .5f);
+    assert(recorder.color.a == 1.f && recorder.depth == .75f && recorder.stencil == 23);
+    recorder.events.clear();
+    assert(scope->Bind(recorder) == 0 && !scope->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'f'})); // resumed LOAD, no discard/reclear
+    sources[0]->layout = RenderTextureLayout::SHADER_READ;
+    recorder.events.clear();
+    assert(scope->Bind(recorder) == 1 && !scope->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'b','f'}));
+    for (const auto &image : sources) image->layout = RenderTextureLayout::SHADER_READ;
+    for (const auto &image : resolved) if (image.texture) *image.layout = RenderTextureLayout::SHADER_READ;
+    auto next = create(resolved);
+    recorder.events.clear();
+    assert(next->Bind(recorder) == attachment_count && next->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'b','f','c','z'})); // next scene clears persistent images
+  }
+}
 } // namespace
 int main() {
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   SceneFramebufferOwnership();
+  SceneCommands();
 }

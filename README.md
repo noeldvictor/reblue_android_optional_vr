@@ -152,7 +152,7 @@ recovery checks pass, with zero unexpected native-post fallbacks or compatibilit
 depth publications. Two flat sanity PNGs were inspected and replaced older
 equivalents; they do not qualify sequences or stereo pixels.
 
-The latest [native scene framebuffer ownership](research/20260906_0236_native-scene-framebuffers.md)
+The [native scene framebuffer ownership](research/20260906_0236_native-scene-framebuffers.md)
 also removes single-sample scene framebuffer creation from the resource-header
 cache. Exact native attachment owners, mono/stereo recipes and fence retirement
 replace that lifetime dependency. Host build, 31 CPU tests, 57 source guards and
@@ -162,6 +162,17 @@ reclaiming 8,167,424 B measured without touching protected raw/failure evidence.
 Native pass commands/clears, remaining getters/scaling, full scene/UI/frame ownership
 and desktop game gates remain open. Independent contracts/tests are local commits;
 renderer integration is still unpublished pending dependency approval.
+
+The latest [native scene command ownership](research/20260906_0255_native-scene-commands.md)
+moves attachment write layouts, first-use discards, framebuffer binds and typed
+clears into the native scene scope, bypassing alias/seed/tile-chain selection.
+Empty scenes clear before publication; resumed scopes do not clear twice. The
+host build, 31 CPU tests, 59 source guards and five bounded flat/XR/recovery
+checks pass, with zero compatibility clears or depth publications. Two flat
+sanity PNGs were inspected, not new sequence/stereo/full-game qualification.
+Superseded diagnostics were removed, reclaiming 13,762,560 B measured. State 308,
+complete draw-state execution, remaining getters/scaling, scene/UI/frame ownership
+and desktop game gates remain open; integration publication still needs approval.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
