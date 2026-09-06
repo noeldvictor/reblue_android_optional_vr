@@ -58,7 +58,15 @@ Snapshot: 2026-09-06; the table records earlier checkpoints, with newer work bel
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
 
-Latest implementation checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
+Latest implementation checkpoint: [native deferred visuals](research/20260906_1358_native-deferred-visuals.md)
+replaces the whole deferred scheduler and its emulated resolve with a native
+scene-sized snapshot, removing the 1280x720-only gate on the native path. Host
+build, 31 CPU tests and 107 source guards pass. The flat regression exercised
+5,363 empty calls and one inspected field image, **not nonempty authored effects**;
+their runtime/both-eye qualification remains open. Queue/vertex production and
+shader/state/resource/getter/material-callback adapters still remain.
+
+Previous checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
 moves the complete model/primitive scheduler and its sorting storage onto the
 host, following native immediate vertex submission. Build, 31 CPU tests and
 103 source guards pass. Bounded flat/XR checks record 78,861/36,784 scheduled
@@ -81,14 +89,15 @@ scheduling are implemented, but the finished frame still needs:
 Gameplay intentionally remains recompiled; removing guest **rendering** does not
 mean rewriting the entire game. Host-issued draws alone do not prove completion.
 
-**Speed so far:** the latest sampled field checks reduce imported float words
+**Speed evidence:** the sorted-scheduler field checks reduce imported float words
 per native parameter block from about 13.00 to 0.757 (94% less import work),
 while eliminating the scheduler's full-block legacy imports. This is **not a
-94% FPS gain** or a controlled whole-project benchmark. The latest 1920x1080
+94% FPS gain** or a controlled whole-project benchmark. That 1920x1080
 desktop field check has a 16.667 ms median frame interval (~60 FPS), 6.610 ms
 `other_ms` and 5.677 ms GPU time over its last 600 samples. No reliable overall
 speedup percentage or Quest performance claim is established. Details and
-limitations are in the checkpoint report above.
+limitations are in the sorted-scheduler report above. The new deferred check
+does not establish a speedup for nonempty effects.
 
 The owner granted standing commit/push approval on 2026-09-06 for
 `noeldvictor/reblue_android_optional_vr:main` and `noeldvictor/plume:main`.

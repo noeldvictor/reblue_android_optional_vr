@@ -30,6 +30,20 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Deferred visuals (2026-09-06): the complete `sub_824252D0` scheduler and primitive
+preparation now have a native replacement, with a native scene-sized snapshot
+instead of an emulated resolve or 1280x720-only gate. It preserves the 512-entry
+bound, live callback-sensitive dispatch, mode-dependent translation and final
+queue clear. Host build, 31 CPU tests and 107 source guards pass. The normal
+flat regression samples 5,363 empty calls, no fallback/faults, and an inspected
+field image; **nonempty authored deferred effects were not observed**. Native
+copy/resolve commands retain existing strict eight-mode GPU fixture evidence.
+Authored queue/vertex production, shader/state/texture/getter/material callbacks,
+unconverted scopes and full desktop/both-eye qualification remain. No Quest/XR
+run this checkpoint. Ten obsolete diagnostics removed, 4,259,840 B measured
+reclaimed; retained diagnostic payload shrank 12,644 B. Evidence:
+`research/20260906_1358_native-deferred-visuals.md`.
+
 Publication follow-up (2026-09-06): the owner granted standing normal commit/
 push approval for `noeldvictor/reblue_android_optional_vr:main` and
 `noeldvictor/plume:main`. Plume is published through `3094b35`, now recorded

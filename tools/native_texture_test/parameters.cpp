@@ -11,6 +11,7 @@
 #include "gpu/native_parameter_buffer.h"
 #include "immediate_ui.h"
 #include "visual_schedule.h"
+#include "deferred_visuals.h"
 #include <algorithm>
 #include <bit>
 #include <cassert>
@@ -138,6 +139,7 @@ void OriginalCopy(std::vector<uint8_t> &bytes, uint32_t source,
   }
 }
 int main() {
+  deferred_visuals_test::Run();
   visual_schedule_test::Run();
   ImmediateUiTests();
   NativeStorage();

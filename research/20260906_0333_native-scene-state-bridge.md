@@ -877,3 +877,46 @@ No new binary, cache, capture, tool, asset or diagnostic output; no cleanup was
 needed for this evidence-reuse checkpoint and no reclaimed bytes are claimed.
 Only source/documentation and normal Git metadata are added; the final inline
 handoff records ending free space and drive-wide change after commit/push.
+
+## Continuing the same storage ledger: deferred visuals, 13:53
+
+Previous review published root `b2910d4`, with 65,237,557,248 B ending free:
+27,086,848 B drive-wide growth, only 256,939 B newly written Git objects and
+small documentation growth identified. No new diagnostics or active producers;
+the later scoped logs/verification check found no new outputs explaining that
+drive-wide change. It is not charged as a known rendering artifact or credited
+as cleanup. Original checkpoint baseline/limits remain unchanged.
+
+Deferred-pass build preflight: 65,237,831,680 B free, no active build/game job.
+Reuse CPU/host trees; <=256 MiB build/link overlap and <=1 MiB new aggregate
+logs across attempts. Existing eight-mode strict snapshot GPU fixture covers
+the unchanged copy/resolve commands; new CPU tests cover the live deferred
+scheduler. A bounded normal flat regression may replace equivalent field/perf
+evidence, with <=1 MiB perf and a <=3,792,259 B PNG (actual remaining overlap
+inside the 10 MiB inspection allowance). No raw frames, asset/cache conversion,
+download, new tree or guest/shader rebuild. Preserve distinct XR/original UI,
+non-MSAA and failure evidence. Retire superseded build/CPU/flat outputs only
+after validating replacements; no budget reset across continuations/retries.
+
+Deferred verification complete: fixture 06/PID 22496, CPU suite 28/PID 15132
+(31/31, 6.81 s), host 35/PID 20472/session 50592 all exit 0; 107 source guards
+pass. No guest/shader rebuild. Flat log 882/PID 25340/session 49485 terminal
+13:56:17, profile restored: 5,363 empty native deferred calls, zero nonempty
+effects/snapshots or fallback/fault. Inspected 3,334,419 B field PNG; no XR or
+raw run. Exact hashes/settings/remaining runtime gates are recorded in
+`20260906_1358_native-deferred-visuals.md`; existing strict GPU copy tests reused.
+
+After validated replacements, removed ten exact ignored/reparse-free obsolete
+files: build 34, CPU fixture 05 and suite 27 stdout/stderr pairs; log 880,
+perf-131943 pair and sorted-visual PNG. Logical 4,249,671 B; immediate free
+65,228,255,232 ->65,232,515,072 B: **4,259,840 B reclaimed**, counted once.
+No protected data/trees or distinct original-UI/XR/non-MSAA/failure evidence
+removed. Gross new log/perf/PNG payload 4,237,027 B, net retained **-12,644 B**.
+CPU fixture +19,968 B for exhaustive live deferred scheduling coverage inside
+the tools reservation; host +10,752 B. No new cache/raw/cooked output/tool/tree.
+Reserved diagnostics 64,419,367 B: 94 build logs/139,942 B, 14 runtime logs/
+3,955,690 B, 20 perf files/8,967,264 B, eight GPU-fixture files/8,364,855 B,
+fixed 41 MiB tools/inspection; two PNGs/6,668,575 B within that reservation.
+Post-cleanup drive-wide use +5,316,608 B since 13:53, including unrelated volume
+activity/metadata. Later source/docs/Git writes count; final handoff measures
+ending free space. Replace equivalent evidence at the next qualified checkpoint.
