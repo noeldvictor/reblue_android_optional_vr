@@ -30,6 +30,22 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native scene precision boundary (2026-09-06, local renderer integration): the
+remaining state-308 callback is verified as Xbox high-precision blending, not
+MSAA. Its two guest calls around scene clear are removed; native FP16 attachment
+and pipeline formats remain fixed, without console surface/packet format edits.
+Only final engine cache/request getters are published through a preflighted
+adapter. Host build, 31 CPU tests and 60 source guards pass. Normal flat/XR/
+non-MSAA checks record 3,600/9,600/3,600 native clears, zero scene state-308 calls,
+compatibility clears/depth publications or post imports/refusals. One bounded flat
+PNG was inspected and replaced its predecessor, not new sequence/stereo/full-game
+qualification. Eighteen obsolete/empty diagnostics were removed, reclaiming
+7,196,672 B measured. Independent adapter/tests and callback diagnostics form the
+local checkpoint; renderer/Plume publication still needs approval. Other state
+producers, getters/scaling, complete scene/UI/frame ownership and desktop game
+gates remain. No Quest work. Evidence:
+`research/20260906_0333_native-scene-state-bridge.md`.
+
 Native scene command ownership (2026-09-06, local renderer integration): native
 scene scopes now own source/resolve write layouts, first-use discards, framebuffer
 binds and typed colour/depth/stencil clears. Scene begin no longer requests a

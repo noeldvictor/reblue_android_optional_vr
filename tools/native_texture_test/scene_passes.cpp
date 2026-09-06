@@ -6,7 +6,9 @@
  */
 #include "gpu/scene/native_scene_pass.h"
 #include "gpu/scene/native_scene_result.h"
+#include "gpu/scene/scene_precision_import.h"
 #include "gpu/native_image_layers.h"
+#include <array>
 #include <stdexcept>
 using namespace bd::gpu::scene;
 namespace {
@@ -70,6 +72,30 @@ void CheckResults() {
 }
 int main() {
   CheckResults();
+  // Actual getter adapter: only the final cached/requested precision words
+  // change. No transient off state, resource header, packet or dirty-bit write.
+  constexpr uint32_t device = 0x10000000;
+  for (uint32_t initial : {0u, 1u, 2u, UINT32_MAX}) {
+    std::array<uint32_t, 0x5000 / 4> words;
+    words.fill(initial);
+    uint32_t cached = initial;
+    for (int repeat = 0; repeat < 2; ++repeat) {
+      uint32_t writes = 0;
+      PublishScenePrecisionGetters(device, [&](uint32_t address, uint32_t value) {
+        Require(value == 1 && writes < 2);
+        if (writes++ == 0) {
+          Require(address == device + 11756);
+          words[(address - device) / 4] = value;
+        } else {
+          Require(address == 0x82DBE2DC);
+          cached = value;
+        }
+      });
+      Require(writes == 2 && cached == 1);
+      for (uint32_t i = 0; i < words.size(); ++i)
+        Require(words[i] == (i == 11756 / 4 ? 1u : initial));
+    }
+  }
   for (uint32_t flags = 0; flags < 64; ++flags) {
     const bool cube = flags & 1, volume = flags & 2;
     const bool color = flags & 4, depth = flags & 8;

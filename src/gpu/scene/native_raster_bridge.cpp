@@ -188,9 +188,16 @@ void UpdateRasterImport(PPCContext &ctx, uint8_t *base) {
   std::lock_guard lock(raster_mutex);
   ++stats.compatibility;
   if (!index && offset % 4 == 0 && offset / 4 < stats.other_states.size() &&
-      ++stats.other_states[offset / 4] == 1)
-    BD_INFO("[native-raster] remaining engine state offset {} first value {}",
-            offset, value);
+      ++stats.other_states[offset / 4] == 1) {
+    uint32_t callback = 0;
+    if (Range(kDevice, 4)) {
+      const auto device = bd::mem::load<uint32_t>(kDevice);
+      if (Range(uint64_t(device) + 56 + offset, 4))
+        callback = bd::mem::load<uint32_t>(device + 56 + offset);
+    }
+    BD_INFO("[native-raster] remaining engine state offset {} first value {} callback 0x{:08X}",
+            offset, value, callback);
+  }
   // A replaced/disabled raster setter can still update intent. Other-state
   // compatibility calls do not force per-draw raster-cache imports.
   if (index)
