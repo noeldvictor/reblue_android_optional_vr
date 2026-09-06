@@ -3,7 +3,7 @@
 This is the canonical, shared instruction file for coding agents in this
 repository. `CLAUDE.md` imports it. Keep enduring rules here, current progress in
 [`docs/HOST_RENDERER_TRANSITION.md`](docs/HOST_RENDERER_TRANSITION.md), and dated
-evidence in `research/`. Updated 2026-09-05.
+evidence in `research/`. Updated 2026-09-06.
 
 ## Goal and boundaries
 
@@ -147,7 +147,8 @@ interpreter mentioned in research is distinct from CPU emulation.
 ## Disk-space discipline
 
 The owner explicitly requested disk cleanup and space-conscious work on
-2026-09-05. Treat storage as a budget, not an unlimited experiment archive.
+2026-09-05 and reaffirmed it on 2026-09-06. Treat storage as a budget, not an
+unlimited experiment archive.
 Minimize retained and peak temporary bytes even when the drive has free space;
 available capacity is not a reason to keep unnecessary outputs.
 Storage cleanup is part of completing each checkpoint, not a separate future
@@ -163,14 +164,28 @@ diagnostics. Documentation-only work needs focused text/diff checks, not a new
 build or game run. Automatic goal continuations and unattended runs obey the
 same limits; they do not authorize more storage or reset a checkpoint's budget.
 
-Unless the owner approves a different budget, cap a checkpoint at **2 GiB peak
-additional disk use**, **100 MiB of newly retained diagnostics** (including any
-downloaded diagnostic tools) and **10 MiB of aggregate build/test logs**. These
-are ceilings, not allowances to spend; keep smaller jobs smaller. Existing
-tighter limits and the free-space/capture gates below still apply. Count all
-attempts and continuations together, including unfinished prior work; do not
-rename a checkpoint to reset its budget. If the work cannot fit, pause the
-space-producing step and ask before increasing these limits.
+Use these defaults unless the owner approves a different budget:
+
+| Storage measure | Default limit |
+| --- | --- |
+| Peak additional disk use per checkpoint | 2 GiB |
+| Newly retained diagnostics, including downloaded diagnostic tools | 100 MiB per checkpoint |
+| Aggregate build/test logs, also counted in diagnostics | 10 MiB per checkpoint |
+| Free space to preserve throughout a job, including temporary overlap | At least 20 GiB |
+| Total retained unique raw capture payloads, including historical sets | Around 10 GiB; exceptions and the incoming-capture gate below apply |
+
+These are ceilings, not allowances to spend; keep smaller jobs smaller.
+Existing tighter limits and the free-space/capture gates below still apply.
+Count all attempts and continuations together, including unfinished prior work;
+do not rename a checkpoint to reset its budget. If the work cannot fit, pause
+the space-producing step and ask before increasing these limits.
+
+Before storage-heavy work, state a minimal-output plan: what existing output can
+be reused, what new output is necessary, its peak byte estimate, and what will
+be retained or cleaned up afterward. Prefer a focused test over a full rebuild
+when it answers the same question. Do not launch inherited build/capture jobs
+for a status or instruction-file request; documentation-only verification is
+text and diff checks.
 
 - Check actual volume free space before builds, asset cooking, downloads and
   captures. Estimate peak additional space first: final outputs plus overlapping
