@@ -18,6 +18,8 @@ count all retries together and enforce output limits while the job runs. Clean
 up verified obsolete agent-created outputs at each checkpoint, while preserving
 game data, active builds and required evidence. Report measured savings, not
 proposed cleanup. Free disk space is not an allowance to accumulate artifacts.
+Storage discipline also applies to the code and tools we add: bounded retention
+and reuse must be designed in, not left to occasional manual cleanup.
 
 **Quick storage limits:** preserve at least 20 GiB free; cap each checkpoint at
 2 GiB peak additional disk use, 100 MiB of newly retained diagnostics (including
@@ -282,6 +284,16 @@ text and diff checks.
   small test. Budget overlapping source, temporary and final representations;
   remove only agent-created disposable intermediates after validating their
   replacements. Preserve original game data and assets needed to reproduce them.
+- Build storage limits into new disk-writing code and tools. Caches, asset
+  cookers and diagnostic producers need explicit aggregate byte limits,
+  retention/invalidation rules and a safe full-budget behavior. Reuse unchanged
+  data; do not retain a duplicate representation for every run, commit or retry.
+  Keep disposable outputs separate from originals and protected evidence, and
+  remove stale agent-created partial outputs after a failed job when safe.
+  If meeting the limit would require evicting protected data, stop the producer
+  and report the constraint instead of silently growing the output or deleting
+  that data. Verify limit and cleanup behavior with small fixtures, not a
+  disk-filling test.
 - Recheck free space between batches and after large jobs. If growth exceeds
   the estimate or threatens the reserve, safely stop the agent-started producer
   before it fills the disk. Do not launch another batch until the budget fits.
