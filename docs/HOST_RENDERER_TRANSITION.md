@@ -30,6 +30,24 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native scene source allocation (2026-09-06, local renderer integration): scene
+colour/depth images now originate in the native store for both single-sample and
+MSAA, using explicit native formats/extent/layers/sample counts. Scene begin no
+longer passes Xbox formats to SurfacePool or adopts already-created images.
+Only the temporary binding/GetDesc header remains; it does not own allocations.
+Native resolve framebuffers retain source owners through their own destruction.
+Host build, 31 CPU tests and 55 source guards pass. Normal flat MSAA/non-MSAA each
+record 3,600 native depth handoffs; normal XR MSAA/non-MSAA record 9,600/10,200;
+all have zero compatibility depth publications and native-post imports/refusals.
+MSAA recovery publishes all 3,600 deferred colours. Two bounded flat PNGs were
+inspected and replace their same-purpose predecessors; not sequence/stereo/full-
+game qualification. Thirty superseded diagnostics were removed, reclaiming
+14,684,160 B measured; protected raw/failure evidence remains. Independent recipe/
+ownership tests form the local checkpoint; renderer/Plume publication still needs
+approval. Native framebuffer/pass construction, remaining getters/scaling, frame/
+UI scheduling, broader scene ownership and full desktop gates remain. No Quest work.
+Evidence: `research/20260906_0200_native-scene-source-allocation.md`.
+
 Native single-sample scene ownership (2026-09-06, local renderer integration):
 existing non-MSAA colour/depth images, views and descriptors now have a bounded
 native owner with fence retirement; surface headers are binding adapters. Native

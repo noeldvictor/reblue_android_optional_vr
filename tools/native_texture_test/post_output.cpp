@@ -257,69 +257,81 @@ void SharedLayoutAndLease() {
   invalid = lease; invalid.image.samples = 4; assert(!invalid);
   invalid = lease; invalid.image.descriptor_index = ~uint32_t{0}; assert(!invalid);
 }
-void AdoptedTargetOwnership() {
-  NativeTargetImageStore store(2048, 2);
+void NativeTargetOwnership() {
+  NativeTargetImageStore store(4096, 2);
   const NativeTargetShape shape{16, 8, 1, RenderFormat::D32_FLOAT_S8_UINT};
-  auto life = std::make_shared<ImageLife>();
-  std::unique_ptr<RenderTexture> image = std::make_unique<PoolImage>(life);
-  std::unique_ptr<RenderTextureView> view = std::make_unique<PoolView>(life);
-  auto *physical = image.get();
-  auto *sampling = view.get();
-  const auto adopt = [&](uint64_t id, const NativeTargetShape &recipe, uint32_t descriptor = 7) {
-    return store.Adopt(id, recipe, image, view, descriptor, RenderTextureLayout::DEPTH_WRITE);
+  std::vector<std::shared_ptr<ImageLife>> lives;
+  const auto acquire = [&](uint64_t id, const NativeTargetShape &recipe) {
+    return store.Acquire(id, recipe, [&] {
+      auto result = std::make_shared<NativeTargetImage>();
+      result->shape = recipe;
+      result->descriptor = uint32_t(lives.size());
+      auto life = std::make_shared<ImageLife>();
+      lives.push_back(life);
+      result->image = std::make_unique<PoolImage>(life);
+      result->view = std::make_unique<PoolView>(life);
+      return result;
+    });
+  };
+  const auto retire = [&](const NativeTargetImage &owned) {
+    auto &life = *lives[owned.descriptor];
+    assert(life.image && life.view && life.descriptor);
+    life.descriptor = false;
   };
   for (const NativeTargetShape invalid : {NativeTargetShape{},
        {16, 8, 3, shape.format}, {UINT32_MAX, UINT32_MAX, 2, shape.format},
+       {16, 8, 1, shape.format, 0}, {16, 8, 1, shape.format, 3},
+       {16, 8, 1, shape.format, 16}, {16, 8, 1, shape.format, UINT32_MAX},
        {16, 8, 1, RenderFormat::R8G8B8A8_UNORM}}) {
-    assert(!adopt(1, invalid));
-    assert(image.get() == physical && view.get() == sampling);
+    assert(!acquire(1, invalid) && lives.empty()); // reject before any GPU allocation
   }
-  assert(!adopt(0, shape) && !adopt(1, shape, ~uint32_t{0}));
-  auto first = adopt(1, shape);
-  assert(first && first->Sampled() && !image && !view);
-  assert(first->image.get() == physical && first->view.get() == sampling);
-  assert(first->layout == RenderTextureLayout::DEPTH_WRITE);
+  assert(!acquire(0, shape));
+  auto first = acquire(1, shape);
+  assert(first && first->Sampled() && lives.size() == 1);
+  auto *physical = first->image.get();
+  auto *sampling = first->view.get();
+  assert(first->layout == RenderTextureLayout::UNKNOWN);
   ImageLayoutRecord adapter;
   adapter.Bind(first->layout);
   NativeImageLease getter{first, first->Sampled()};
   adapter = RenderTextureLayout::SHADER_READ;
   assert(*getter.image.layout == RenderTextureLayout::SHADER_READ);
   first.reset();
-  auto reused = adopt(1, shape);
+  auto reused = acquire(1, shape);
   assert(reused && reused->image.get() == physical && store.Stats().reused == 1);
+  assert(reused->view.get() == sampling && lives.size() == 1);
   assert(reused->layout == RenderTextureLayout::SHADER_READ); // acquisition is not a GPU barrier
-  assert(!adopt(1, {8, 16, 1, shape.format})); // same bytes cannot hide a shape mismatch
-  assert(!adopt(1, shape, 8)); // a descriptor belongs to its exact generation
+  assert(!acquire(1, {8, 16, 1, shape.format})); // same bytes cannot hide a shape mismatch
+  assert(!acquire(1, {8, 8, 1, shape.format, 2})); // sample count is part of identity
   reused.reset(); adapter.Unbind();
-  // Recreating the source/header must not invalidate a still-live old getter.
-  auto next_life = std::make_shared<ImageLife>();
-  image = std::make_unique<PoolImage>(next_life);
-  view = std::make_unique<PoolView>(next_life);
-  auto next = adopt(2, shape, 8);
+  auto next = acquire(2, shape);
   assert(next && next->image.get() != physical && getter.image.texture == physical);
   assert(store.Stats().bytes == 2048);
-  auto extra_life = std::make_shared<ImageLife>();
-  image = std::make_unique<PoolImage>(extra_life);
-  view = std::make_unique<PoolView>(extra_life);
-  auto *extra = image.get();
-  assert(!adopt(3, shape, 9) && image.get() == extra && view); // budget rejection never steals
-  const auto retire = [&](const NativeTargetImage &owned) {
-    auto &tracked = owned.descriptor == 7 ? life : owned.descriptor == 8 ? next_life : extra_life;
-    assert(tracked->image && tracked->view && tracked->descriptor);
-    tracked->descriptor = false;
-  };
+  assert(!acquire(3, shape) && lives.size() == 2); // entry cap, despite ample bytes
   next.reset(); store.MarkUnused(1); store.AfterFence(0, retire);
-  assert(life->image && next_life->image && store.Stats().bytes == 2048);
+  assert(lives[0]->image && lives[1]->image && store.Stats().bytes == 2048);
   store.AfterFence(1, retire);
-  assert(life->image && !next_life->image && getter); // live getter wins even after a fence
-  assert(adopt(3, shape, 9)); // moved objects remain owned by the fenced store
+  assert(lives[0]->image && !lives[1]->image && getter);
+  auto msaa = shape; msaa.samples = 4;
+  assert(!acquire(3, msaa) && lives.size() == 2); // byte cap with a free entry
   getter = {};
   store.MarkUnused(0); store.AfterFence(1, retire);
-  assert(life->image && extra_life->image);
+  assert(lives[0]->image && !acquire(3, msaa)); // pending retirement still counts
   store.AfterFence(0, retire);
-  assert(!life->image && !extra_life->image && store.Stats().bytes == 0);
-  assert(store.Stats().created == 3 && store.Stats().retired == 3);
-  assert(!adopt(4, shape)); // missing physical objects cannot create a native owner
+  assert(!lives[0]->image && store.Stats().bytes == 0);
+  uint64_t id = 3;
+  for (uint32_t layers : {1u, 2u}) for (uint32_t samples : {1u, 2u, 4u, 8u}) {
+    const NativeTargetShape recipe{8, 4, layers, RenderFormat::R16G16B16A16_FLOAT, samples};
+    auto target = acquire(id++, recipe);
+    assert(target && target->Sampled().samples == samples && target->Sampled().layers == layers);
+    assert(store.Stats().bytes == uint64_t(8 * 4 * 8 * layers * samples));
+    NativeImageLease sampled{target, target->Sampled()};
+    assert(bool(sampled) == (samples == 1)); // MSAA is never an ordinary sampled-image lease
+    sampled = {}; target.reset(); store.MarkUnused(0); store.AfterFence(0, retire);
+  }
+  assert(!store.Acquire(id, shape, [] { return NativeTargetImageHandle{}; }));
+  assert(store.Stats().failed == 1 && store.Stats().bytes == 0);
+  for (const auto &life : lives) assert(!life->descriptor && !life->image && !life->view);
 }
 } // namespace
-int main() { OutputContract(); PoolOwnership(); SharedLayoutAndLease(); AdoptedTargetOwnership(); }
+int main() { OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership(); }
