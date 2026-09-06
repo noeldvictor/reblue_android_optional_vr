@@ -30,15 +30,27 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Water/refraction setup (2026-09-06): two whole callback replacements now execute
+host preparation order, checked parameter/image imports and the existing water
+highlight clamp, preserving depth-write and other blend policy. Host build,
+31 CPU tests and 83 source guards pass. A bounded flat run reports 1,964 native
+water preparations with zero material fallback/refusal/faults; one sanity image
+was inspected. Refraction and snapshot execution were not observed in that field,
+so their authored runtime qualification remains open. Material updates/animation,
+native assets/storage, child state/parameter/getter adapters and complete scene/
+frame ownership remain. Ten superseded diagnostics were removed, reclaiming
+4,272,128 B measured; no raw captures or Quest runs. Evidence:
+`research/20260906_0700_native-refraction-materials.md`.
+
 Native scene snapshots (2026-09-06): the address-free copy core preserves HDR
 and independent mono/layered images across resumed scene writes. A tiny real-GPU
 fixture exposed and fixed a Plume pending-depth-clear/color-resolve ordering bug;
 all eight mono/stereo x 1/2/4/8-sample cases and the broader resolve suite pass
 with zero Vulkan validation errors/warnings. Host build, 31 CPU tests and 77
 source guards pass. The pending bridge now adopts the native scene extent instead
-of requiring a fixed 1280x720 getter. Authored water/refraction execution remains
+of requiring a fixed 1280x720 getter. Authored snapshot-copy execution remains
 unproven: the earlier flat check did not report this path, and no repeated game
-run or raw capture was made. Integration/getters/material parents/reflection
+run or raw capture was made. Integration/getters/reflection
 ownership and full desktop qualification remain open. Twenty-four superseded
 small outputs were removed, reclaiming 4,177,920 B measured. Local Plume commit
 3094b35; dependency/root publication still needs approval. Evidence:

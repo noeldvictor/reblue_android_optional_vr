@@ -13,6 +13,7 @@
 #undef NDEBUG
 #endif
 #include <cassert>
+#include "refraction_material_cases.h"
 using namespace bd::gpu;
 using namespace plume;
 
@@ -613,4 +614,5 @@ int main() {
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   SceneFramebufferOwnership();
   SceneCommands();
+  refraction_material_tests::Run();
 }

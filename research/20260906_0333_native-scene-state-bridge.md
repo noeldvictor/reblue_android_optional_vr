@@ -494,3 +494,64 @@ activity remain charged. Later docs/Git writes still count. All producers are
 terminal and the owner's profile is restored; no pending run is authorized by
 this accounting entry. Dependency publication remains unapproved, with no push
 retry or unpublished parent gitlink staged.
+
+## Continuing the same storage ledger: water/refraction parents, 06:50
+
+Preflight 2026-09-06 06:50:13 EDT: 64,500,072,448 B free and no live renderer,
+compiler, CMake/Ninja/linker or CTest. The 86 build logs still total 164,482 B.
+The original 65,462,788,096 B baseline and all cumulative caps remain unchanged;
+cumulative volume growth is 962,715,648 B. Last retained diagnostic inventory
+is 63,867,177 B; historical raw growth remains prohibited.
+
+Reuse the existing post-output CPU executable and configured desktop tree to
+qualify the new water/refraction setup core/imports and compile both whole hooks.
+Plan at most 256 MiB temporary compilation/link overlap and 1 MiB additional
+build/test logs across retries. Source checks run without bytecode/log exports.
+No new test binary/tree, downloads, guest/shader regeneration, game captures or
+profile changes are needed for this step. CPU policy/import tests do not prove
+authored material execution or pixels; those remain pending. After successful
+replacement, retire only reblue_23, cpu_20 and host_post_output_test_12 log pairs.
+The guarded wrapper enforces the original free-space and aggregate-log limits;
+all new retained growth and Git/metadata still count in this ledger.
+
+Focused build 13, CPU 21 (31/31 in 3.32 s) and desktop build 24 all exit 0.
+Both new hook symbols compiled/linked; codegen wrote nothing, no guest objects
+or shaders rebuilt. Revise the same step's minimal-output plan to at most 5 MiB
+new diagnostics including its build logs: one 75-second normal flat check and
+one <=4 MiB window PNG, captures disabled. This checks newly replaced material
+parents and actual field behavior, not a commit stamp. The prior snapshot run
+never observed its child; first-call parent telemetry now makes that gap testable.
+No queued XR/non-MSAA matrix is implied. The wrapper now includes the retained
+8,364,855 B GPU fixture and aggregate build logs in its existing 75 MiB small-output
+stop threshold (100 MiB ceiling); PNG overlap remains <=10 MiB. After validating
+the replacement, retire only equivalent flat log 866/perf-060320/snapshot-window
+PNG in addition to the three superseded build/test log pairs above. Retain all
+distinct XR/non-MSAA/failure/raw evidence. All original checkpoint caps persist.
+
+Closeout 07:00: build 24 and flat PID 23888/session 94172 are terminal, exit 0;
+profile restored byte-for-byte. Water parent last reports 1,964 executions with
+zero material fallback/refusal/faults, but no refraction or snapshot branch use.
+The new normal-flat image was inspected; this is not full material/sequence/VR
+qualification. CPU 31/31 and 83 source guards pass. Exact sources, binary hashes,
+settings and limitations: `20260906_0700_native-refraction-materials.md`.
+
+Gross new diagnostics 4,236,095 B: build/test logs 6,340 B; flat log 867
+270,022 B; perf-065659 pair 606,320 B; PNG 3,353,413 B. Zero raw/cache/dump files,
+downloads, guest/shader rebuilds or new build tree. After validating replacements,
+exact ignored paths/lengths, reparse-free ancestors and no active producers,
+removed ten files: reblue_23, cpu_20, host_post_output_test_12 stdout/stderr pairs,
+flat log 866, perf-060320 CSV/metadata and native_scene_snapshot_window.png.
+Logical bytes 4,264,473; immediate free 64,463,409,152 ->64,467,681,280 B:
+**4,272,128 B measured reclaimed**, counted once. Reports/hashes remain and
+diagnostics can be regenerated. All protected data/distinct evidence preserved.
+
+Retained diagnostic payloads decreased 28,378 B. Reserved inventory 63,847,547 B:
+86 build logs/138,214 B, 11 runtime logs/3,389,694 B, 20 perf files/8,963,168 B,
+eight GPU-fixture files/8,364,855 B and unchanged 41 MiB tool/inspection reserve.
+Two PNGs/6,687,569 B are within that reserve. Normal-flat evidence is eligible
+for replacement after equivalent qualification, not a growing per-commit archive.
+Free 64,467,681,280 B (60.04 GiB); net volume growth from 06:50 32,391,168 B,
+cumulative original-baseline growth 995,106,816 B. Build/Git/metadata and
+unattributed volume activity stay charged; scoped cache/dump inspection found
+no new files. Later docs/Git writes still count. No live producer/profile override
+remains; no further verification matrix is launched by this accounting entry.
