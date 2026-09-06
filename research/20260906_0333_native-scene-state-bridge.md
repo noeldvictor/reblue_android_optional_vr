@@ -1279,3 +1279,32 @@ Post-cleanup drive-wide use **73,703,424 B** from the initial inventory, includi
 unattributed changes outside the measured shrinking task payload. Existing raw/
 PNG/normal field-XR/failure evidence unchanged. Final source/docs/Git writes follow;
 no new raw allowance, budget reset or full native-frame claim.
+
+### Load-owned geometry, same checkpoint
+
+Storage prerequisite published as `cf95217`; actual geometry/association producer
+and four consumers now advance at model loading. Host 47, Debug/Release material
+fixtures, 130 source guards and post-event field run 893 pass; 2,973 load-owned
+primitive geometries, fresh matching geometry/material deltas and one inspected
+bounded JPEG. Runs 891/892 failed the freshness/image-helper gates respectively,
+were diagnosed and replaced, not reported as complete qualification. All owned
+producers are terminal and every temporary profile was restored. Full source,
+binary hashes, PIDs, settings, limits and failures are recorded once in
+`20260906_1743_load-owned-model-geometry.md`.
+
+Initial free 64,970,539,008 B; <=256 MiB build overlap and <=4 MiB new fixture/log
+growth reserved. No raw/perf/cooked-cache/dump output or new build tree. Existing
+mesh cache unchanged at 3,510 /36,510,144 B; runtime comparison suppresses writes.
+The fixture shrinks from 15,101,171 to 2,613,079 B. Retained log 893 /179,253 B
+and JPEG /373,929 B replace prior scoped counter evidence and add geometry pixels;
+old normal flat/XR and unresolved failure evidence stay protected.
+
+Two validated exact cleanup batches removed 25 files, 4,906,121 logical B:
+obsolete Debug symbols/object and superseded build/test/runtime logs. Immediate
+free-space measurements establish **4,931,584 B reclaimed**, once. Fixture plus
+runtime/image/build-log diagnostic categories shrink by at least 12,108,024 B;
+no increased tool reservation. Keep final material build 06 /CPU 05 /host 47
+logs, not every attempt. New JPEG shares the existing 10 MiB image reservation.
+Post-cleanup free 64,961,671,168 B; drive-wide use 8,867,840 B from this inventory,
+distinct from the smaller retained task payload. Final docs/Git writes remain
+charged. Native instances/layouts/direct draws and full desktop gate remain.

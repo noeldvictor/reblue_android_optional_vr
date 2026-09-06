@@ -118,6 +118,7 @@ namespace bd::gpu::scene {
 namespace {
 
 constexpr u32 kBlockBytes = 256 * 16;
+thread_local u32 t_geometry_checked_frame = ~u32{0};
 
 struct RegDelta {
   u16 reg;
@@ -180,6 +181,7 @@ struct SubDraw {
   mutable GuestBuffer *cached_index = nullptr;
   mutable u64 cached_generation = 0;
   mutable std::shared_ptr<const NativeGeometry> native_geometry;
+  mutable bool geometry_load_owned = false;
   mutable u64 native_generation = 0;
   mutable u64 native_lod_key = 0;
   bool indexed = false;
@@ -2925,8 +2927,9 @@ bool HostDrawReplay(const NodeTag &tag) {
       u32 cell_bits;
       std::memcpy(&cell_bits, &lod_cell, sizeof(cell_bits));
       const u64 lod_key = (u64(u32(lod_grid)) << 32) | cell_bits;
-      if (d.native_generation != phys_gen || d.native_lod_key != lod_key) {
+      const auto import_geometry = [&] {
         NativeMeshImport request;
+        request.persist = !REXCVAR_GET(bd_native_materials_verify);
         request.declaration = d.pipelineState.vertexDeclaration;
         request.index = d.cached_index;
         request.start_index = d.start_index;
@@ -2940,9 +2943,40 @@ bool HostDrawReplay(const NodeTag &tag) {
           request.offsets[slot] = d.stream_offset[slot];
           request.strides[slot] = d.input_slots[slot].stride;
         }
-        d.native_geometry = ImportNativeMesh(request);
+        return ImportNativeMesh(request);
+      };
+      bool new_geometry = false;
+      if (d.native_generation != phys_gen || d.native_lod_key != lod_key) {
+        d.native_geometry.reset();
+        d.geometry_load_owned = false;
+        if (!lod_triangles && d.base_vertex == 0 && d.stream_offset[0] == 0 &&
+            d.primitive_type == u32(rex::graphics::xenos::PrimitiveType::kTriangleStrip) &&
+            d.pipelineState.vertexDeclaration) {
+          d.native_geometry = FindLoadedNativeGeometry(tag, d.index_va, d.stream_va[0],
+              d.start_index, d.count, d.pipelineState.vertexDeclaration->hash,
+              d.input_slots[0].stride);
+          d.geometry_load_owned = bool(d.native_geometry);
+          new_geometry = d.geometry_load_owned;
+        }
+        // Only unconverted/deferred/dynamic/LOD variants use the old importer.
+        // Converted primitives already own geometry before their first draw.
+        if (!d.native_geometry)
+          d.native_geometry = import_geometry();
         d.native_generation = phys_gen;
         d.native_lod_key = lod_key;
+      }
+      if (d.geometry_load_owned && REXCVAR_GET(bd_native_materials_verify) &&
+          (new_geometry || t_geometry_checked_frame != frame)) {
+        // Verify every newly selected binding plus one warm binding per frame,
+        // so startup success cannot masquerade as fresh field evidence. This
+        // reconstructs the draw's content key, not just its source addresses.
+        t_geometry_checked_frame = frame;
+        const auto imported = import_geometry();
+        NativeModelGeometryCheck(imported == d.native_geometry);
+        if (imported != d.native_geometry) {
+          d.geometry_load_owned = false;
+          d.native_geometry = imported;
+        }
       }
       if (const auto &mesh = d.native_geometry) {
         std::lock_guard lock(s.mutex);
@@ -2956,6 +2990,7 @@ bool HostDrawReplay(const NodeTag &tag) {
         mark_dirty();
       }
       NativeMeshNoteDraw(bool(d.native_geometry));
+      NativeModelGeometryNoteDraw(d.geometry_load_owned && bool(d.native_geometry));
     }
     if (verify) {
       // What the replay would dispatch, kept for the interpreter's draws

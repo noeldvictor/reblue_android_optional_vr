@@ -58,22 +58,22 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest ownership checkpoint (2026-09-06): primitive/material recipes are now
-published at model-load completion and retired at the full graph destructor.
-Four consumers use immutable native-owned records instead of first-draw command
-discovery. With PSO precaching disabled, a desktop diagnostic records 114 model
-publications, one retirement, 488,116 lookup hits and zero missing/load failures;
-126,735 diffuse and 120,369 specular comparisons match. Host/material tests and
-120 source guards pass. Geometry-table associations and draw templates remain.
+Latest ownership checkpoint (2026-09-06): model loading now associates native GPU
+geometry with each primitive's material recipe. Four material/skin/reflection/
+shadow-policy consumers no longer read guest index/vertex association tables.
+The scoped desktop run loads 2,973 primitive geometries across 114 model
+publications, with zero load failures. Converted base-geometry replays reuse
+those handles; LOD/specialized paths and draw templates remain.
 
-The post-event field sample now passes after correcting loading-icon visibility,
-the 128-slot loader scan and the idle-state interpretation (0, not 4). Two idle
-samples after the opening event contain 15,124 new diffuse and 14,514 specular
-comparisons, all matching. This establishes scoped field material evidence,
-**not movement, new field pixels or full interactive/stereo qualification**.
-Water activity alone also occurs in the opening cinematic. No new Quest or
-speedup claim. [Reader fixes and evidence](research/20260906_1638_field-state-observations.md),
-[material ownership and remaining dependencies](research/20260906_1610_load-owned-model-materials.md).
+Two post-event field samples show 51,173 additional load-owned draws and 2,650
+fresh geometry identity checks, all matching. Another 15,253 diffuse /14,541
+specular comparisons match. Host build, Debug/Release CPU fixtures and 130 source
+guards pass. One 1920x1080 field sanity image was inspected; **movement, sequences,
+both eyes and full-game qualification remain open**. Native instances, independent
+layouts, source-index removal and direct scene/shadow submission are next.
+[Geometry implementation and evidence](research/20260906_1743_load-owned-model-geometry.md).
+The [corrected loader/field observations](research/20260906_1638_field-state-observations.md)
+remain the scenario gate; water activity alone is not a field identifier.
 
 The prior [Toon checkpoint](research/20260906_1505_native-toon-materials.md)
 retains a normal flat standing-scene image and desktop XR parameter comparisons.
@@ -88,7 +88,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
-| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; shared native GPU data, mip cooking, generated LOD support and bounded owners | Asset-level discovery/loading and scene associations, independent layouts, dynamic geometry and streaming/backpressure |
+| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; load-owned primitive geometry/material associations, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and texture associations, independent layouts, dynamic geometry and streaming/backpressure |
 | Scene submission | Host traversal/replay, native packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Native object storage and transforms; replace retained guest draw templates and remaining resource dependencies |
 | Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
@@ -114,11 +114,10 @@ identifies the existing load-time integration points and remaining template/data
 dependencies. The source-index tool now exposes indirect and hook boundaries;
 this tooling checkpoint does not itself convert additional rendering.
 
-1. Advance the mapped load-time geometry/material association contracts, using
-   the corrected post-event field check; add movement/authored-event checks as
-   their consumers are migrated.
-2. Complete one native static-object path from asset loading and material
-   association through native instances to scene/shadow submission.
+1. Extend the load-owned primitive records into native instance/update and
+   texture/pass contracts, with independent layouts and stable native handles.
+2. Complete one native static-object path through direct scene/shadow submission,
+   removing its retained draw templates; qualify movement and reload behavior.
 3. Complete character asset, pose, joint-palette and GPU skinning ownership.
 4. Finish dynamic geometry, effects, UI and remaining reflection/pass producers.
 5. Remove unused compatibility machinery and complete the representative desktop

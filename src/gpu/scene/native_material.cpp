@@ -6,6 +6,8 @@
  */
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
+#include "gpu/scene/native_model_geometry_source.h"
+#include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/reflection_texture_import.h"
 #include <cmath>
@@ -19,9 +21,12 @@
 #include "core/memory_helpers.h"
 #include "engine/game.h"
 #include "gpu/frame_stats.h"
+#include "gpu/host_resource_heap.h"
+#include "gpu/physical_buffers.h"
 #include "gpu/scene/guest_scene.h"
 
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
+REXCVAR_DECLARE(bool, bd_native_meshes);
 
 namespace bd::gpu::scene {
 namespace {
@@ -30,6 +35,9 @@ ModelMaterialRegistry &Models() {
   return models;
 }
 std::atomic<uint64_t> model_builds{0}, model_failures{0}, unsupported_meshes{0};
+std::atomic<uint64_t> geometry_loaded{0}, geometry_unconverted{0};
+std::atomic<uint64_t> geometry_hits{0}, geometry_misses{0};
+thread_local uint64_t geometry_draws = 0, geometry_checked = 0, geometry_wrong = 0;
 thread_local uint32_t checked[3]{}, wrong[3]{}, last_report = 0;
 thread_local uint32_t composed[3]{};
 
@@ -85,6 +93,71 @@ NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget) {
   }
   return result;
 }
+
+void LoadModelGeometry(ModelMaterialImport &mesh) {
+  auto &program = mesh.program;
+  program.geometries.resize(program.ranges.size());
+  mesh.source_bindings.resize(program.ranges.size());
+  // bdSceneGraphNodeProcess: mesh+4 counts 8-byte index records at +8;
+  // mesh+16 points to {count, 12-byte vertex records}. Each vertex record is
+  // {vertex count, declaration-cache slot, buffer}. The slot's declaration is
+  // at +12. Physical registration records the exact expanded byte length, so
+  // length / vertex count is the stride computed by the original loader.
+  const auto word = [](uint64_t address) -> std::optional<uint32_t> {
+    if (!address || address > UINT32_MAX - 3)
+      return {};
+    const auto *value = bd::mem::try_at<const be_u32>(uint32_t(address));
+    return value ? std::optional(uint32_t(*value)) : std::nullopt;
+  };
+  for (size_t i = 0; i < program.ranges.size(); ++i) {
+    const auto &range = program.ranges[i];
+    const auto source = ReadModelGeometrySource(mesh.source_mesh, range, word);
+    if (!source) {
+      ++geometry_unconverted;
+      continue;
+    }
+    auto &binding = mesh.source_bindings[i];
+    binding = source->binding;
+    const auto declaration = word(uint64_t(source->declaration_slot) + 12);
+    ResourceType type;
+    const auto *decl = declaration && HostResourceHeap::GetType(*declaration, &type) &&
+        type == ResourceType::VertexDeclaration
+        ? HostResourceHeap::FromGuest<GuestVertexDeclaration>(*declaration) : nullptr;
+    const auto buffer = [](uint32_t key, ResourceType expected) -> GuestBuffer * {
+      ResourceType type;
+      if (HostResourceHeap::GetType(key, &type))
+        return type == expected ? HostResourceHeap::FromGuest<GuestBuffer>(key) : nullptr;
+      auto *found = FindPhysicalBufferByStruct(key);
+      return found && found->type == expected ? found : nullptr;
+    };
+    const auto *index = buffer(binding.index_buffer, ResourceType::IndexBuffer);
+    const auto *vertex = buffer(binding.vertex_buffer, ResourceType::VertexBuffer);
+    bool one_stream = decl && decl->vertexStreams[0];
+    for (size_t stream = 1; decl && stream < 16; ++stream)
+      one_stream &= !decl->vertexStreams[stream];
+    if (!one_stream || !index || !vertex || index->ownsMirror || vertex->ownsMirror ||
+        vertex->dataSize % source->vertex_count || !REXCVAR_GET(bd_native_meshes)) {
+      ++geometry_unconverted;
+      continue;
+    }
+    binding.layout = decl->hash;
+    binding.stride = vertex->dataSize / source->vertex_count;
+    NativeMeshImport request;
+    request.persist = !REXCVAR_GET(bd_native_materials_verify);
+    request.declaration = decl;
+    request.index = index;
+    request.streams[0] = vertex;
+    request.strides[0] = binding.stride;
+    request.start_index = range.first_index;
+    request.count = range.index_count;
+    // Complete bdSceneNodeDrawIndexed: base vertex 0, triangle strip (6),
+    // StartIndex from operand 2 and count from operand 1 plus two.
+    request.primitive_type = 6;
+    program.geometries[i] = ImportNativeMesh(request);
+    ++(program.geometries[i] ? geometry_loaded : geometry_unconverted);
+  }
+}
+
 bool PublishModelMaterials(uint32_t graph) {
   // Called once after the graph builder completes, on the loader thread, with
   // all nodes and buffer/declaration tables ready. No optional PSO gate and no
@@ -121,6 +194,7 @@ bool PublishModelMaterials(uint32_t graph) {
     if (!program.valid)
       unsupported_meshes.fetch_add(1, std::memory_order_relaxed);
     meshes.push_back({mesh_va, std::move(program)});
+    LoadModelGeometry(meshes.back());
     if (!word_budget || ModelMaterialRegistry::RetainedBytes(meshes, meshes.capacity()) >
                             ModelMaterialRegistry::kMaxBytes)
       return false;
@@ -128,7 +202,7 @@ bool PublishModelMaterials(uint32_t graph) {
   return Models().Publish(graph, std::move(meshes));
 }
 
-std::shared_ptr<const NativeModelMaterialProgram> FindCommands(const NodeTag &tag) {
+std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {
   // Technique 11 selects visual-specific colours on texture tokens. Phase 1
   // rewrites colour/shininess commands. Their native recipes remain pending.
   if (tag.from_list || !tag.ctx_va || !tag.mesh_va || tag.tech == 11 ||
@@ -137,16 +211,40 @@ std::shared_ptr<const NativeModelMaterialProgram> FindCommands(const NodeTag &ta
   return Models().Find(bd::mem::try_load<uint32_t>(tag.ctx_va + 4), tag.mesh_va);
 }
 
-bool Matches(const NativeMaterialRange &range, uint32_t ib, uint32_t vb,
-             uint32_t index_va, uint32_t stream_va,
-             uint32_t first_index, uint32_t index_count) {
-  return range.first_index == first_index && range.index_count == index_count &&
-      range.stream == 0 && range.index_record != 0xffff &&
-      range.vertex_record != 0xffff &&
-      bd::mem::try_load<uint32_t>(ib + range.index_record * 8 + 4) == index_va &&
-      bd::mem::try_load<uint32_t>(vb + 4 + range.vertex_record * 12 + 8) == stream_va;
-}
 } // namespace
+
+std::shared_ptr<const NativeGeometry> FindLoadedNativeGeometry(
+    const NodeTag &tag, uint32_t index_va, uint32_t stream_va,
+    uint32_t first_index, uint32_t index_count, uint64_t layout, uint32_t stride) {
+  const auto model = FindCommands(tag);
+  std::shared_ptr<const NativeGeometry> found;
+  if (model) {
+    for (size_t i = 0; i < model->program.ranges.size(); ++i) {
+      const auto &binding = model->source_bindings[i];
+      if (!ModelPrimitiveMatches(model->program.ranges[i], binding, index_va,
+                                 stream_va, first_index, index_count))
+        continue;
+      const auto &geometry = model->program.geometries[i];
+      if (!geometry || binding.layout != layout || binding.stride != stride ||
+          (found && found != geometry)) {
+        ++geometry_misses;
+        return {};
+      }
+      found = geometry;
+    }
+  }
+  ++(found ? geometry_hits : geometry_misses);
+  return found;
+}
+
+void NativeModelGeometryCheck(bool same) {
+  ++geometry_checked;
+  geometry_wrong += !same;
+}
+
+void NativeModelGeometryNoteDraw(bool load_owned) {
+  geometry_draws += load_owned;
+}
 
 bool ModelOwnsReflectionBinding(const NodeTag &tag) {
   const uint32_t vtable = tag.visual_va
@@ -168,13 +266,11 @@ std::optional<NativeReflectionRecipe> ImportNativeReflectionRecipe(
   const auto commands = FindCommands(tag);
   if (!commands)
     return {};
-  const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
-  const uint32_t vb = bd::mem::try_load<uint32_t>(tag.mesh_va + 16);
-  if (!ib || !vb)
-    return {};
   std::optional<NativeReflectionRecipe> found;
-  for (const auto &range : commands->ranges) {
-    if (!Matches(range, ib, vb, index_va, stream_va, first_index, index_count))
+  for (size_t i = 0; i < commands->program.ranges.size(); ++i) {
+    const auto &range = commands->program.ranges[i];
+    if (!ModelPrimitiveMatches(range, commands->source_bindings[i], index_va,
+                               stream_va, first_index, index_count))
       continue;
     if (range.reflection.source == ReflectionTextureSource::Unknown ||
         (found && *found != range.reflection))
@@ -205,13 +301,11 @@ std::optional<NativeSkinBinding> ImportNativeSkinBinding(
   const auto commands = FindCommands(tag);
   if (!commands)
     return {};
-  const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
-  const uint32_t vb = bd::mem::try_load<uint32_t>(tag.mesh_va + 16);
-  if (!ib || !vb)
-    return {};
   std::optional<NativeSkinBinding> found;
-  for (const auto &range : commands->ranges) {
-    if (!Matches(range, ib, vb, index_va, stream_va, first_index, index_count))
+  for (size_t i = 0; i < commands->program.ranges.size(); ++i) {
+    const auto &range = commands->program.ranges[i];
+    if (!ModelPrimitiveMatches(range, commands->source_bindings[i], index_va,
+                               stream_va, first_index, index_count))
       continue;
     if (!range.skin || (found && *found != *range.skin))
       return {}; // geometry reused under different joint bindings is ambiguous
@@ -226,15 +320,12 @@ NativeMaterialHandle ImportNativeMaterial(
   const auto commands = FindCommands(tag);
   if (!commands)
     return {};
-  const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
-  const uint32_t vb = bd::mem::try_load<uint32_t>(tag.mesh_va + 16);
-  if (!ib || !vb)
-    return {};
   NativeMaterialHandle found;
-  for (size_t i = 0; i < commands->ranges.size(); ++i) {
-    if (!Matches(commands->ranges[i], ib, vb, index_va, stream_va, first_index, index_count))
+  for (size_t i = 0; i < commands->program.ranges.size(); ++i) {
+    if (!ModelPrimitiveMatches(commands->program.ranges[i], commands->source_bindings[i],
+                               index_va, stream_va, first_index, index_count))
       continue;
-    const auto &material = commands->materials[i];
+    const auto &material = commands->program.materials[i];
     if (!material || (found && found->id != material->id))
       return {}; // repeated geometry under different materials is ambiguous
     found = material;
@@ -248,16 +339,16 @@ std::optional<bool> ImportMaterialDisablesShadow(
   const auto commands = FindCommands(tag);
   if (!commands)
     return {};
-  const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
-  const uint32_t vb = bd::mem::try_load<uint32_t>(tag.mesh_va + 16);
   const uint32_t graph = bd::mem::try_load<uint32_t>(tag.ctx_va + 4);
   const auto *table_ptr = graph ? bd::mem::try_at<const be_u32>(graph + 8) : nullptr;
-  if (!ib || !vb || !table_ptr)
+  if (!table_ptr)
     return {};
   const uint32_t table = uint32_t(*table_ptr);
   std::optional<bool> found;
-  for (const auto &range : commands->ranges) {
-    if (!Matches(range, ib, vb, index_va, stream_va, first_index, index_count))
+  for (size_t i = 0; i < commands->program.ranges.size(); ++i) {
+    const auto &range = commands->program.ranges[i];
+    if (!ModelPrimitiveMatches(range, commands->source_bindings[i], index_va,
+                               stream_va, first_index, index_count))
       continue;
     bool disables = false;
     if (table && range.control_record != 0xffff) {
@@ -348,6 +439,12 @@ void NativeMaterialNoteReplay(uint32_t mask) {
             model_builds.load(), models.published, models.retired, models.live, models.bytes,
             model_failures.load(), unsupported_meshes.load(), models.refused,
             models.hits, models.misses);
+    BD_INFO("[native-model-geometry] {} load-owned primitives, {} unconverted; "
+            "{} replay lookups hit / {} unavailable; {} load-owned draws; "
+            "{} source checks wrong {}; buffer associations resolved at load",
+            geometry_loaded.load(), geometry_unconverted.load(),
+            geometry_hits.load(), geometry_misses.load(), geometry_draws,
+            geometry_checked, geometry_wrong);
     const auto assets = Library().Stats();
     BD_INFO("[native-material-assets] {} cooked, {} loaded, {} resident, {} memory hits; "
             "{} invalid, {} write failures, {} budget refusals; {} model recipe bytes",

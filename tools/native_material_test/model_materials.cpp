@@ -1,4 +1,5 @@
 #include "gpu/scene/native_model_materials.h"
+#include "gpu/scene/native_model_geometry_source.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -25,6 +26,8 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
   Require(EncodeNativeMaterial(asset, encoded), "fixture material encoding");
   program.materials.push_back(std::make_shared<const NativeMaterial>(
       NativeMaterial{NativeMaterialContentId(encoded), asset}));
+  program.geometries.resize(1);
+  mesh.source_bindings.push_back({100, 200, 300, 32});
   return mesh;
 }
 }
@@ -36,11 +39,11 @@ void TestNativeModelMaterials() {
   Require(registry.Publish(1, {Mesh(20), Mesh(10)}), "preload publication");
   auto first = registry.Find(1, 10);
   auto sibling = registry.Find(1, 20);
-  Require(first && sibling && first->materials[0]->id == sibling->materials[0]->id,
+  Require(first && sibling && first->program.materials[0]->id == sibling->program.materials[0]->id,
           "native identities do not depend on source keys");
-  Require(first->ranges[0].skin && first->ranges[0].skin->count == 0,
+  Require(first->program.ranges[0].skin && first->program.ranges[0].skin->count == 0,
           "explicit unskinned recipe survives publication");
-  const auto old_id = first->materials[0]->id;
+  const auto old_id = first->program.materials[0]->id;
   const auto old_bytes = registry.Stats().bytes;
   registry.Retire(1);
   Require(!registry.Find(1, 10) && registry.Stats().indexed == 0 &&
@@ -48,8 +51,8 @@ void TestNativeModelMaterials() {
           "retired leases remain owned and charged");
   Require(registry.Publish(1, {Mesh(10, 24)}), "source address reuse");
   auto replacement = registry.Find(1, 10);
-  Require(replacement && replacement->materials[0]->id != old_id &&
-          first->materials[0]->id == old_id && registry.Stats().live == 2,
+  Require(replacement && replacement->program.materials[0]->id != old_id &&
+          first->program.materials[0]->id == old_id && registry.Stats().live == 2,
           "old and new generations must not alias");
   first.reset();
   Require(registry.Stats().live == 2, "second mesh lease pins whole model");
@@ -68,6 +71,12 @@ void TestNativeModelMaterials() {
   auto malformed = Mesh(10);
   malformed.program.materials.clear();
   Require(!registry.Publish(4, {malformed}), "range/material count mismatch");
+  malformed = Mesh(10);
+  malformed.program.geometries.clear();
+  Require(!registry.Publish(4, {malformed}), "range/geometry count mismatch");
+  malformed = Mesh(10);
+  malformed.source_bindings.clear();
+  Require(!registry.Publish(4, {malformed}), "range/source association count mismatch");
   malformed = Mesh(10);
   malformed.program.valid = false;
   Require(!registry.Publish(4, {malformed}), "invalid program cannot carry ranges");
@@ -96,13 +105,13 @@ void TestNativeModelMaterials() {
   std::vector<ModelMaterialImport> too_many(ModelMaterialRegistry::kMaxMeshes + 1);
   Require(!registry.Publish(8, std::move(too_many)), "mesh count bound");
 
-  std::shared_ptr<const NativeModelMaterialProgram> surviving;
+  std::shared_ptr<const ModelMaterialImport> surviving;
   {
     ModelMaterialRegistry temporary;
     Require(temporary.Publish(9, {Mesh(10)}), "temporary owner");
     surviving = temporary.Find(9, 10);
   }
-  Require(surviving && surviving->materials[0]->id == old_id,
+  Require(surviving && surviving->program.materials[0]->id == old_id,
           "lease outlives registry without dangling accounting");
   surviving.reset();
 
@@ -110,18 +119,18 @@ void TestNativeModelMaterials() {
   Require(registry.Publish(1, {Mesh(10)}), "concurrent initial model");
   std::barrier rendezvous(2);
   bool valid = false;
-  std::thread reader([&] {
+  std::thread reader_thread([&] {
     auto lease = registry.Find(1, 10);
     rendezvous.arrive_and_wait();
     rendezvous.arrive_and_wait();
     auto fresh = registry.Find(1, 10);
-    valid = lease && fresh && lease->materials[0]->id == old_id &&
-            fresh->materials[0]->id != old_id;
+    valid = lease && fresh && lease->program.materials[0]->id == old_id &&
+            fresh->program.materials[0]->id != old_id;
   });
   rendezvous.arrive_and_wait();
   const bool published = registry.Publish(1, {Mesh(10, 24)});
   rendezvous.arrive_and_wait();
-  reader.join();
+  reader_thread.join();
   Require(published && valid, "loader/render ownership overlap");
   registry.Retire(1);
   Require(registry.Stats().live == 0 && registry.Stats().bytes == 0,
@@ -150,5 +159,65 @@ void TestNativeModelMaterials() {
   Require(!CollectModelMaterialSources(1, read, sources), "aliased tree node refused");
   Require(CollectModelMaterialSources(0, read, sources) && sources.empty(),
           "empty model is valid");
+
+  // Read the source table once, then destroy it. Native associations and
+  // material selection remain usable without a source reader or GPU/runtime.
+  std::unordered_map<uint32_t, uint32_t> words{
+      {104, 2}, {108, 200}, {116, 300}, {300, 2},
+      {212, 1000}, {316, 12}, {320, 400}, {324, 2000}};
+  auto reader = [&](uint32_t address) -> std::optional<uint32_t> {
+    const auto it = words.find(address);
+    return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  auto imported = Mesh(10);
+  auto &range = imported.program.ranges[0];
+  range.index_record = range.vertex_record = 1;
+  const auto decoded = ReadModelGeometrySource(100, range, reader);
+  Require(decoded && decoded->binding.index_buffer == 1000 &&
+          decoded->binding.vertex_buffer == 2000 && decoded->vertex_count == 12 &&
+          decoded->declaration_slot == 400, "load-time index/vertex/decl association");
+  auto bad_range = range;
+  bad_range.vertex_record = 2;
+  Require(!ReadModelGeometrySource(100, bad_range, reader), "vertex table bound");
+  bad_range = range;
+  bad_range.index_record = 2;
+  Require(!ReadModelGeometrySource(100, bad_range, reader), "index table bound");
+  bad_range = range;
+  bad_range.stream = 1;
+  Require(!ReadModelGeometrySource(100, bad_range, reader), "unconverted stream explicit");
+  Require(!ReadModelGeometrySource(UINT32_MAX - 4, range, reader), "source offset overflow");
+  words[108] = UINT32_MAX - 3;
+  Require(!ReadModelGeometrySource(100, range, reader), "index record address overflow");
+  words[108] = 200;
+  words[316] = 0;
+  Require(!ReadModelGeometrySource(100, range, reader), "zero vertex count");
+  words[316] = 12;
+  words.erase(324);
+  Require(!ReadModelGeometrySource(100, range, reader), "missing buffer word");
+  imported.source_bindings[0] = decoded->binding;
+  auto second_primitive = Mesh(10, 24);
+  // Identical geometry may have different materials; keep primitive ordinals,
+  // not a map that overwrites one material under the shared geometry key.
+  imported.program.ranges.push_back(range);
+  imported.program.materials.push_back(second_primitive.program.materials[0]);
+  imported.program.geometries.resize(2);
+  imported.source_bindings.push_back(decoded->binding);
+  Require(registry.Publish(50, {std::move(imported)}), "native primitive publication");
+  words.clear();
+  const auto owned = registry.Find(50, 10);
+  Require(owned && ModelPrimitiveMatches(owned->program.ranges[0], owned->source_bindings[0],
+      1000, 2000, 0, 3), "source-free primitive lookup after source destruction");
+  Require(owned->program.materials[0]->id != owned->program.materials[1]->id,
+          "reused geometry preserves distinct materials");
+  Require(!ModelPrimitiveMatches(owned->program.ranges[0], owned->source_bindings[0],
+      1000, 2000, 1, 3), "draw range is part of association");
+  Require(!ModelPrimitiveMatches(owned->program.ranges[0], {}, 0, 0, 0, 3),
+          "unknown source is not a binding");
+  registry.Retire(50);
+  Require(registry.Publish(50, {Mesh(10)}), "primitive source reuse");
+  Require(owned->source_bindings[0].index_buffer == 1000 &&
+          registry.Find(50, 10)->source_bindings[0].index_buffer == 100,
+          "retired primitive association cannot be repointed by source reuse");
+  registry.Retire(50);
   std::cout << "native model material ownership, budgets, reload and concurrent leases passed\n";
 }

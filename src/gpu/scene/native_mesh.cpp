@@ -66,7 +66,7 @@ NativeMeshDiskCache &DiskCache() {
 
 u32 Align(u32 n) { return (n + 15u) & ~15u; }
 
-std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &data) {
+std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &data, u64 key) {
   u32 bytes = Align(u32(data.indices.size() * 4));
   for (const auto &stream : data.streams)
     bytes += Align(u32(stream.bytes.size()));
@@ -93,6 +93,8 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   if (!mapped)
     return {};
   auto result = std::make_shared<NativeGeometry>();
+  result->id = key;
+  result->layout = data.layout;
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
   result->start_index = chunk.used / 4;
@@ -103,6 +105,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   std::memcpy(mapped + chunk.used, data.indices.data(), data.indices.size() * 4);
   chunk.used += Align(u32(data.indices.size() * 4));
   for (const auto &stream : data.streams) {
+    result->strides[stream.slot] = stream.stride;
     result->streams[stream.slot] = plume::RenderVertexBufferView(
         chunk.buffer->at(chunk.used), u32(stream.bytes.size()));
     result->stream_mask |= 1u << stream.slot;
@@ -210,7 +213,7 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
     if (!ValidateNativeMesh(data))
       return {};
   }
-  auto result = Upload(s, data);
+  auto result = Upload(s, data, key);
   if (!result)
     return {};
   if (loaded)
@@ -218,7 +221,8 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   else {
     // Persistence refusal never discards usable native GPU geometry or routes
     // this draw back through the guest. Keep one bounded resident result.
-    DiskCache().Write(key, data);
+    if (r.persist)
+      DiskCache().Write(key, data);
     ++s.built;
   }
   s.meshes.emplace(key, result);

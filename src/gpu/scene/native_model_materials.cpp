@@ -34,6 +34,8 @@ size_t ModelMaterialRegistry::RetainedBytes(
   for (const auto &mesh : meshes) {
     add(mesh.program.ranges.capacity(), sizeof(NativeMaterialRange));
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
+    add(mesh.program.geometries.capacity(), sizeof(std::shared_ptr<const NativeGeometry>));
+    add(mesh.source_bindings.capacity(), sizeof(ModelPrimitiveSourceBinding));
   }
   return bytes;
 }
@@ -59,6 +61,8 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   for (const auto &mesh : meshes) {
     if (!mesh.source_mesh || mesh.source_mesh == previous ||
         mesh.program.ranges.size() != mesh.program.materials.size() ||
+        mesh.program.ranges.size() != mesh.program.geometries.size() ||
+        mesh.program.ranges.size() != mesh.source_bindings.size() ||
         (!mesh.program.valid && !mesh.program.ranges.empty())) {
       ++stats_.refused;
       return false;
@@ -82,7 +86,7 @@ void ModelMaterialRegistry::Retire(uint32_t source_model) {
     ++stats_.retired;
 }
 
-std::shared_ptr<const NativeModelMaterialProgram> ModelMaterialRegistry::Find(
+std::shared_ptr<const ModelMaterialImport> ModelMaterialRegistry::Find(
     uint32_t source_model, uint32_t source_mesh) {
   std::lock_guard lock(mutex_);
   const auto it = models_.find(source_model);
@@ -93,7 +97,7 @@ std::shared_ptr<const NativeModelMaterialProgram> ModelMaterialRegistry::Find(
     if (mesh != meshes.end() && mesh->source_mesh == source_mesh &&
         mesh->program.valid) {
       ++stats_.hits;
-      return {it->second, &mesh->program};
+      return {it->second, &*mesh};
     }
   }
   ++stats_.misses;

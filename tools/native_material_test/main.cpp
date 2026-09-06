@@ -16,7 +16,7 @@ void Check(bool good) {
   if (!good)
     throw std::runtime_error("native material check failed");
 }
-int main(int argc, char **argv) {
+static int RunTests(int argc, char **argv) {
   // 0xff inside bone/colour operands must not terminate the stream. Two
   // strips share geometry records but carry different material properties.
   const std::vector<uint16_t> words = {
@@ -101,4 +101,14 @@ int main(int argc, char **argv) {
   Check(!MaterialControlDisablesShadow(1, 7));
   Check(MaterialControlDisablesShadow(1, 8) && MaterialControlDisablesShadow(3, 15));
   std::cout << "native material decoding and composition passed\n";
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  try {
+    return RunTests(argc, argv);
+  } catch (const std::exception &error) {
+    std::cerr << "FAIL: " << error.what() << '\n';
+    return 1;
+  }
 }

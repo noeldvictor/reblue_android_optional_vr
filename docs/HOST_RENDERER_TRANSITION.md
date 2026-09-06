@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after load-owned materials and corrected field observations. These milestones organize the
+Updated 2026-09-06 after load-owned geometry/material associations. These milestones organize the
 unchanged completion requirements above; none is a substitute for the full gate.
 
 1. **Scene/material dependency map and targeted verification.** Start from
@@ -44,8 +44,10 @@ unchanged completion requirements above; none is a substitute for the full gate.
    conservative host-hook declaration boundaries; linked activation and indirect
    targets still need review. Load-owned primitive/material programs now feed
    four consumers independently of PSO precaching, with full graph retirement.
-   Geometry/control/texture associations, source-key adapter and draw templates
-   remain. Next are native geometry bindings, instance updates and direct draws.
+   Geometry/buffer associations now resolve during load, and converted base
+   geometry replays consume load-owned GPU handles. Control/texture/pass inputs,
+   independent layouts, source-key adapter and draw templates remain. Next are
+   native instance updates and direct draws, not another first-draw cache.
    Scenario checks must establish feature execution; empty queues are untested.
    The loader visibility/slot readers and idle-state contract are corrected:
    two post-event state-0 samples now pass with positive material/lookup deltas.
@@ -60,8 +62,8 @@ unchanged completion requirements above; none is a substitute for the full gate.
    adapters need explicit removal conditions, not permanent address identities.
    Native mesh disk retention is now independently bounded (256 MiB /16,384
    files, free-space reserve and writer lease). The existing GPU arena remains
-   separate; eager load-time geometry production and native instance ownership
-   are not implemented by that storage prerequisite.
+   separate. Load-time base-geometry production is now active; native instance
+   ownership, independent layouts and direct submission are still required.
 3. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
    and verify characters in the relevant field/battle/cutscene/shadow paths.
@@ -83,13 +85,29 @@ multiplier is established.
 
 ## Latest qualified checkpoint
 
+Load-owned geometry (2026-09-06): the model-load hook resolves primitive buffer/
+declaration associations and produces GPU geometry before publication. Four
+material/skin/reflection/shadow-policy consumers stop reading guest buffer tables;
+converted base-geometry replays use load-owned handles. All 130 source guards,
+Debug/Release material fixtures and host build 47 pass. PSO-off flat run 893 loads
+2,973 primitives with no load/geometry budget failures. Two post-event field
+samples add 51,173 native-handle draws, 2,650 matching geometry checks and matching
+15,253 diffuse /14,541 specular checks. A bounded full-size JPEG sanity image was
+inspected; it does not qualify sequences, movement, authored effects or both eyes.
+761 unavailable replay lookups still take the unconverted import path. LOD and
+other specialized paths, original load adapter, source index, templates, shader
+ABI, native instances and direct scene/shadow submission remain. No new cooked
+files or raw frames; diagnostics suppress mesh writes. Default persistence keeps
+the existing bounded policy. Evidence: `research/20260906_1743_load-owned-model-geometry.md`.
+
 Native mesh storage (2026-09-06): the active importer now uses a bounded disk
 cache with independent byte/file/reserve limits, non-waiting writer ownership,
 valid-payload reuse/conflict protection and checked repairs. Persistence refusal
 does not discard the already-uploaded native geometry. Host build 43, expanded
 mesh CPU fixture, all 124 source guards and read-only loading of 3,510 existing
 files /36,510,144 B pass. Format, keys and cache payloads are unchanged. No new
-game/VR/pixel run; native geometry/instance/direct submission still remains.
+game/VR/pixel run at that storage checkpoint; geometry follows above, while
+native instance/direct submission still remains.
 Evidence: `research/20260906_1701_native-mesh-storage.md`.
 
 Field observations (2026-09-06): loading visibility now observes fade/task/strip

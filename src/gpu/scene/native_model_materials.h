@@ -12,14 +12,38 @@
 
 namespace bd::gpu::scene {
 
+struct NativeGeometry;
+
 // No captured register state or source-memory pointers. The record indices in
 // NativeMaterialRange are import recipes, not the finished geometry/texture API.
 // Materials already have persistent content identities in NativeMaterialLibrary.
 struct NativeModelMaterialProgram {
   std::vector<NativeMaterialRange> ranges;
   std::vector<NativeMaterialHandle> materials;
+  // The same primitive ordinal selects its material and owned GPU geometry.
+  // Null is explicitly unconverted, never permission to discover it in this core.
+  std::vector<std::shared_ptr<const NativeGeometry>> geometries;
   bool valid = false;
 };
+
+// Temporary replay-to-primitive lookup only. Resolve these associations once
+// during model loading; never re-read source buffer tables at submission.
+// Keep source identities outside the native program, and delete this adapter
+// when native model/instance handles reach the direct submission path.
+struct ModelPrimitiveSourceBinding {
+  uint32_t index_buffer = 0, vertex_buffer = 0;
+  uint64_t layout = 0;
+  uint32_t stride = 0;
+};
+
+inline bool ModelPrimitiveMatches(const NativeMaterialRange &range,
+                                 const ModelPrimitiveSourceBinding &source,
+                                 uint32_t index_buffer, uint32_t vertex_buffer,
+                                 uint32_t first_index, uint32_t index_count) {
+  return source.index_buffer && source.vertex_buffer &&
+      source.index_buffer == index_buffer && source.vertex_buffer == vertex_buffer &&
+      range.first_index == first_index && range.index_count == index_count;
+}
 
 // Only the temporary loader/consumer index uses source keys. They are never
 // persisted or used as native asset identities. Remove this index when native
@@ -27,6 +51,7 @@ struct NativeModelMaterialProgram {
 struct ModelMaterialImport {
   uint32_t source_mesh = 0;
   NativeModelMaterialProgram program;
+  std::vector<ModelPrimitiveSourceBinding> source_bindings;
 };
 
 struct ModelMaterialRegistryStats {
@@ -82,11 +107,12 @@ public:
                                  size_t max_models = 4096);
   bool Publish(uint32_t source_model, std::vector<ModelMaterialImport> meshes);
   void Retire(uint32_t source_model);
-  std::shared_ptr<const NativeModelMaterialProgram> Find(
+  std::shared_ptr<const ModelMaterialImport> Find(
       uint32_t source_model, uint32_t source_mesh);
   ModelMaterialRegistryStats Stats() const;
   // Logical retained vector storage plus a conservative per-model bookkeeping
-  // allowance. Shared material assets have their own library budget.
+  // allowance. Shared material assets and geometry have their own library/GPU
+  // arena budgets; retired geometry currently remains in the bounded GPU cache.
   static size_t RetainedBytes(std::span<const ModelMaterialImport> meshes,
                               size_t mesh_capacity);
 

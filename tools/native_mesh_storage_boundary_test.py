@@ -18,7 +18,7 @@ class MeshStorageBoundaryTest(unittest.TestCase):
         self.assertNotIn("void WriteFile(", self.bridge)
 
     def test_failed_persistence_does_not_discard_native_geometry(self):
-        publish = self.bridge.split("auto result = Upload(s, data);", 1)[1]
+        publish = self.bridge.split("auto result = Upload(s, data, key);", 1)[1]
         self.assertIn("DiskCache().Write(key, data);", publish)
         self.assertLess(publish.index("DiskCache().Write(key, data);"),
                         publish.index("s.meshes.emplace(key, result);"))
