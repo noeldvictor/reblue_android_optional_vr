@@ -253,9 +253,14 @@ including temporary outputs that exist only while a job is running.
   paths where possible; do not rely on reaching the final step of a successful
   run. On resumption, check for leftover capture overrides before another launch.
 - Keep the current baseline, current flat/VR verification and evidence needed
-  for unresolved failures. For superseded experiments, retain small reports,
-  logs and representative images; losslessly compress or remove redundant raw
-  outputs once their investigation no longer needs the complete sequence.
+  for unresolved failures. Retain evidence by verification purpose, not by
+  commit or timestamp: normally keep one passing capture set per required
+  configuration, plus the minimum evidence needed for each unresolved failure.
+  Verify a replacement before retiring its predecessor; do not accumulate a
+  full archive for every small source change. For superseded experiments,
+  retain small reports, logs and representative images; losslessly compress or
+  remove redundant raw outputs once their investigation no longer needs the
+  complete sequence.
   Storage limits must not silently reduce the renderer's verification gate.
 - At each experiment checkpoint, identify which artifacts remain the baseline,
   current verification or unresolved-failure evidence, and which are superseded.
