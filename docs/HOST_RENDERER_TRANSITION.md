@@ -30,6 +30,20 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native scene resolve integration (2026-09-05, **local uncommitted renderer work**):
+scene MSAA now writes separately owned native colour/depth resolve images with
+generation-safe keys, bounded residency and fence-gated descriptor/image lifetime.
+Normal native post skips the initial colour copy; empty/refused/disabled post and
+unconsumed normal views explicitly recover the required getter publication.
+Initial depth and final UI/getter publications remain. The desktop host build,
+30 CPU tests and 46 source guards pass. Normal/recovery diagnostics verify
+3,600 deferred colours with zero/all recovered respectively; one bounded window
+PNG was inspected, not a new sequence/VR qualification. Live multiview state
+ordering, full image/game gates and the remaining ownership conversion are open.
+Publishing the required Plume dependency still needs owner approval; neither the
+integration code nor its parent gitlink is committed. No raw captures or Quest
+work. Evidence: `research/20260905_2206_native-scene-resolve-ownership.md`.
+
 Native sampled-image inputs (2026-09-05): scene completion, native atlas,
 composite and directional-bloom scene/depth reads now carry native texture and
 descriptor identities with the owner's live layout record, without GuestTexture
@@ -40,11 +54,12 @@ host build, 30 native texture/post CTests and 43 post/scene source guards pass.
 Two capture-disabled flat diagnostics (default MSAA and no MSAA) each record
 3,601 native post scopes, zero scene-image imports/original scopes/refusals;
 the latter exercises direct source images. No new pixel or VR qualification.
-Initial scene publication copies, output/optical-image adapters, native resolve
-producer wiring and full-frame/game gates remain. No captures, downloads or
-Quest work. Evidence: `research/20260905_2129_native-scene-attachment-images.md`.
+At that checkpoint, initial scene publication copies, output/optical-image
+adapters, native resolve producer wiring and full-frame/game gates remained.
+No captures, downloads or Quest work. Evidence:
+`research/20260905_2129_native-scene-attachment-images.md`.
 
-Native attachment-resolve prerequisite (2026-09-05, not yet scene-integrated):
+Native attachment-resolve prerequisite (2026-09-05, before scene integration):
 local Plume commit `a8b3c15` adds layered colour/depth MSAA resolve attachments,
 mode/capability preflight and clear/discard handling. Test commit `465c2ad` also
 covers actual FP16 HDR/D32_FLOAT_S8_UINT scene formats, depth MIN/SAMPLE_ZERO
@@ -52,9 +67,9 @@ with stencil NONE, resumed LOAD and held clears. Its 8x8 real-GPU test
 passes mono/two-eye sample averaging, depth MIN versus SAMPLE_ZERO, LOAD,
 DISCARD, pending/held zero-draw clears and eighteen-attachment readbacks with
 core/synchronization validation (zero API errors/warnings). The existing 30 CPU
-tests also pass, without rebuilding them. This does not remove the scene's
-current publication copies: native producer wiring, exposure/alpha/extent
-semantics and full-frame pixel verification remain. The dependency push was
+tests also passed without rebuilding them. That prerequisite did not remove
+scene publication copies: native producer wiring, exposure/alpha/extent
+semantics and full-frame pixel verification remained. The dependency push was
 blocked by auto-review pending explicit owner approval; the parent gitlink is
 not committed. No main-game build, capture or Quest run. Exact evidence and
 small-tool storage accounting: `research/20260905_2047_native-attachment-resolves.md`.

@@ -97,11 +97,14 @@ Quest-ready release.
 | Desktop verification | All 30 material/texture/state/camera/post CTests and 45 source guards pass; scene-result normal flat/VR have zero post getter imports/fallbacks, 0/119 large changes, no cyan hits and correctly crossed first/last VR depth; both eyes inspected | Authored effect events, multi-root/HDR/nested-view GPU cases, title artwork, distant VR blur, per-eye flare optics and VR character-shadow/full-game coverage remain unqualified; earlier late-scene failures are not superseded |
 | Android / Quest 2 | ARM64 build/APK and OpenXR/controller foundations exist from earlier work | Full desktop completion gate, then fresh device qualification and optimization |
 
-Newer [native sampled-image work](research/20260905_2129_native-scene-attachment-images.md)
-removes guest resource headers from scene/post inputs and extends native resolve
-GPU tests to the scene's HDR/depth formats. The host build, CPU/input checks and
-capture-disabled flat diagnostics pass; native resolve producer wiring and fresh
-full-frame pixel verification remain unfinished.
+Newer [local native-resolve integration](research/20260905_2206_native-scene-resolve-ownership.md)
+gives scene MSAA native colour/depth resolve images and removes the initial colour
+copy from normal native post. Host builds, 30 CPU tests, 46 source guards and
+normal/post-disabled recovery diagnostics pass; one bounded desktop window image
+was inspected. Depth/getter publications, multiview state ordering and full-frame
+pixel/game qualification remain unfinished. This integration is **not yet committed
+or published**: dependency publication needs owner approval before its parent
+gitlink can be committed. The table above describes earlier checkpoints.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
