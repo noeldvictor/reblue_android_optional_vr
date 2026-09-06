@@ -35,8 +35,13 @@ class Window;
 namespace bd::gpu {
 
 namespace scene { struct NativeTextureGpuStore; struct NativeTextureBinding; }
+namespace scene { struct NativeSceneResolveStore; }
+namespace scene { class NativeSceneFramebufferStore; }
 namespace scene { struct AlphaState; }
 struct SceneImage;
+class NativePostImagePool;
+class NativeTargetImageStore;
+struct NativePostImage;
 
 class Video {
 public:
@@ -246,6 +251,21 @@ public:
   static bool PublishSceneOutput(GuestTexture *source, GuestTexture *destination,
                                  float exposure, bool publish_post_chain = true,
                                  SceneImage *sampled = nullptr);
+
+  // Temporary final UI/getter boundary, borrowing native post storage without
+  // a resolve link or copy. Preflight is required before recording post work.
+  static bool CanPublishNativePostOutput(GuestTexture *destination);
+  static bool PublishNativePostOutput(const std::shared_ptr<const NativePostImage> &source,
+                                      GuestTexture *destination);
+  // Borrow an already completed native image; no allocation, copy, resolve link
+  // or tile publication for depth. Retains its owner's shared layout record.
+  // AdoptSource is explicit whole-output replacement: update the adapter's
+  // dimensions/layers only after retiring its old backing. No resampling.
+  static bool CanPublishNativeImage(const NativeImageLease &source, GuestTexture *destination,
+      NativeImageExtentPolicy extent = NativeImageExtentPolicy::MatchDestination);
+  static bool PublishNativeImage(const NativeImageLease &source, GuestTexture *destination,
+      bool publish_post_chain = false,
+      NativeImageExtentPolicy extent = NativeImageExtentPolicy::MatchDestination);
 
   // The other in-flight list may still reference it. Freed by DrainSlot. Takes
   // state().mutex.
@@ -689,6 +709,10 @@ struct VideoState {
 
   // Native asset residency is device-owned, independent of guest wrappers.
   std::shared_ptr<scene::NativeTextureGpuStore> native_texture_gpu;
+  std::shared_ptr<scene::NativeSceneResolveStore> native_scene_resolves;
+  std::shared_ptr<scene::NativeSceneFramebufferStore> native_scene_framebuffers;
+  std::shared_ptr<NativePostImagePool> native_post_images;
+  std::shared_ptr<NativeTargetImageStore> native_target_images;
 
   // Cleared in DrainSlot on the slot's fence, which on a single queue also
   // covers the other slot's earlier submission.
@@ -696,6 +720,8 @@ struct VideoState {
       texture_graveyard[kNumFrames];
   std::vector<std::unique_ptr<plume::RenderTextureView>>
       texture_view_graveyard[kNumFrames];
+  std::vector<std::unique_ptr<plume::RenderFramebuffer>>
+      framebuffer_graveyard[kNumFrames];
 
   // Host-owned VB/IB plume objects released while this slot recorded, held one
   // extra cycle for the same reason as texture_graveyard. Physical and

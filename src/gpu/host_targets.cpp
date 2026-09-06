@@ -38,6 +38,8 @@
 #include "gpu/frame.h"
 #include "gpu/frame_stats.h"
 #include "gpu/resources.h"
+#include "gpu/native_target_images.h"
+#include "gpu/host_resource_heap.h"
 #include "gpu/surface_pool.h"
 
 REXCVAR_DECLARE(bool, bd_host_targets);
@@ -54,10 +56,13 @@ struct Slot {
   u32 sample_count = 0;
   u32 recreated = 0;
   u32 readers = 0;
+  const plume::RenderTexture *native_image = nullptr;
+  u64 image_identity = 0;
 };
 
 std::mutex g_mutex;
 Slot g_slots[static_cast<u32>(HostTargetClass::Count)];
+u64 g_image_identity = 0;
 
 Slot &SlotFor(HostTargetClass cls) { return g_slots[static_cast<u32>(cls)]; }
 
@@ -88,10 +93,6 @@ const char *HostTargetClassName(HostTargetClass cls) {
     return "reflection colour";
   case HostTargetClass::ReflectionDepth:
     return "reflection depth";
-  case HostTargetClass::PostColor:
-    return "post colour";
-  case HostTargetClass::PostColorAlternate:
-    return "alternate post colour";
   default:
     return "none";
   }
@@ -165,6 +166,8 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
     slot.height = height;
     slot.guest_format = guest_format;
     slot.sample_count = sample_count;
+    slot.native_image = t->texture;
+    slot.image_identity = ++g_image_identity;
     BD_INFO("[targets] {} {}x{} fmt 0x{:X} s{} layers {}: host-owned",
             HostTargetClassName(cls), width, height, guest_format,
             sample_count, t->layers);
@@ -184,10 +187,80 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
   return t;
 }
 
+GuestTexture *HostTargetAcquireNative(HostTargetClass cls, const NativeTargetShape &shape) {
+  const bool depth = cls == HostTargetClass::SceneDepth;
+  if ((cls != HostTargetClass::SceneColor && !depth) ||
+      shape.format != (depth ? plume::RenderFormat::D32_FLOAT_S8_UINT :
+          plume::RenderFormat::R16G16B16A16_FLOAT) || !shape.Bytes(512ull << 20)) return nullptr;
+  std::lock_guard lock(g_mutex);
+  auto &slot = SlotFor(cls);
+  auto *target = slot.target;
+  if (slot.readers || (target && target->hostTargetLive)) return nullptr;
+  if (target && (!target->nativeTarget || target->nativeTarget->shape != shape)) {
+    Disown(target);
+    target = slot.target = nullptr;
+    ++slot.recreated;
+  }
+  const auto identity = target ? slot.image_identity : ++g_image_identity;
+  // Host-slot -> video lock order. Native creation never calls back into slots.
+  auto image = AcquireNativeTargetImage(identity, shape);
+  if (!image) return nullptr;
+  if (!target) {
+    target = HostResourceHeap::Alloc<GuestTexture>(
+        depth ? ResourceType::DepthStencil : ResourceType::RenderTarget);
+    if (!target) return nullptr; // unused native image remains fence-retired
+    target->nativeTarget = image;
+    target->texture = image->image.get();
+    target->width = shape.width;
+    target->height = shape.height;
+    target->layers = shape.layers;
+    target->format = shape.format;
+    // Encode only the remaining GetDesc ABI response. This does not select
+    // image storage, allocation, sample count or residency.
+    target->guestFormat = static_cast<u32>(depth ? D3DFormat::kD24S8 : D3DFormat::kA16B16G16R16FAlt);
+    target->viewDimension = plume::RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+    target->sampleCount = static_cast<plume::RenderSampleCounts>(shape.samples);
+    target->descriptorIndex = image->descriptor;
+    target->textureViewOf = target->texture;
+    target->textureViewLayers = shape.layers;
+    target->layout.Bind(image->layout);
+    target->hostOwned = true;
+    target->hostTargetClass = static_cast<u8>(cls);
+    slot.target = target;
+    slot.width = shape.width;
+    slot.height = shape.height;
+    slot.sample_count = shape.samples;
+    slot.guest_format = 0; // not a console-format allocator request
+    slot.native_image = target->texture;
+    slot.image_identity = identity;
+    BD_INFO("[targets] native {} {}x{} layers {} samples {} generation {}; header-only binding adapter",
+        HostTargetClassName(cls), shape.width, shape.height, shape.layers, shape.samples, identity);
+  }
+  InitResourceHeader(target->x360.as_surface.resource, D3DResourceType::kSurface);
+  target->surfaceDrawn = false;
+  target->pendingDestroy = target->pendingGPURead = target->resolveSourceFallback = false;
+  target->hostTargetLive = true;
+  return target;
+}
+
 void HostTargetReleased(GuestTexture *target) {
   if (!target)
     return;
   target->hostTargetLive = false;
+}
+
+u64 HostTargetImageIdentity(GuestTexture *target) {
+  if (!target || !target->hostOwned || !target->texture) return 0;
+  const auto cls = static_cast<HostTargetClass>(target->hostTargetClass);
+  if (cls == HostTargetClass::None || cls >= HostTargetClass::Count) return 0;
+  std::lock_guard lock(g_mutex);
+  auto &slot = SlotFor(cls);
+  if (slot.target != target || !target->hostTargetLive) return 0;
+  if (slot.native_image != target->texture) {
+    slot.native_image = target->texture;
+    slot.image_identity = ++g_image_identity;
+  }
+  return slot.image_identity;
 }
 
 bool HostTargetPin(GuestTexture *target) {

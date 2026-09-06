@@ -836,3 +836,44 @@ order/model tests, within the tools reservation; final host binary +20,480 B.
 Post-cleanup drive-wide use +12,492,800 B since 13:12, +196,280,320 B from the
 original baseline, including unrelated volume activity/metadata. Later docs/
 Git writes count. No push retry or unpublished dependency gitlink staging.
+
+## Integration review and publication, 13:42
+
+The owner has since explicitly authorized normal commits/pushes to the two
+named GitHub forks. Root `d834754` and Plume `3094b35` are published, with the
+parent gitlink already naming that dependency. Earlier rejection notes above
+remain historical evidence, not a current publication blocker.
+
+Reviewed the remaining 29 source/test integration files as one connected
+checkpoint: device-owned scene/post stores; native single-sample and attachment
+resolve framebuffers; scene commands/clears and precision getter publication;
+snapshot leases; shared descriptor/layout publication; post shader alpha/exposure
+handling; bindless, surface-pool and fence retirement adapters; source and CPU
+tests. No implementation change was needed during review. In particular,
+`VulkanDevice::createFramebuffer` already returns null unless both framebuffer
+and render-pass handles are valid. Allocation failure cannot publish the
+null-backed wrapper suspected during initial inspection. Descriptor allocation
+precedes publication, and framebuffers/resolve owners retain their source images.
+
+Reused evidence rather than rebuilding for a commit hash: host build 34 remains
+47,759,360 B, SHA256
+`08d36713f496081309fe3d537ef85a821f98f110c939b229eed59c34bbcb47a7`;
+CPU suite 27 is 31/31 in 3.98 s. The 103 source guards were rerun successfully
+with `python -B`, and the diff whitespace check passes. Flat log 880 records
+3,600 completed/consumed native scene results, 3,600 native clears and depth
+publications, zero compatibility clears/depth publications, and 3,601 final
+post publications with zero scene-image imports. Existing XR log 881 and the
+inspected flat field image are documented in `20260906_1323_native-visual-schedule.md`.
+Strict GPU snapshot/resolve fixtures remain passing evidence from
+`20260906_0629_native-scene-snapshots.md`; no new GPU/game run was made here.
+These counters are periodic samples, not whole-frame ownership or broad
+desktop/both-eye qualification. Authored snapshot and deferred execution still
+need runtime coverage. Preserve the existing images, logs and failure evidence.
+
+Same cumulative storage budget, no reset. Review preflight free 65,264,644,096 B;
+no active build/test/game producer, and the owner's five-line profile is intact.
+Retained diagnostics remain 64,407,085 B, including 94 build logs / 138,226 B.
+No new binary, cache, capture, tool, asset or diagnostic output; no cleanup was
+needed for this evidence-reuse checkpoint and no reclaimed bytes are claimed.
+Only source/documentation and normal Git metadata are added; the final inline
+handoff records ending free space and drive-wide change after commit/push.

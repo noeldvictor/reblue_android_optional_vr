@@ -10,7 +10,7 @@
 //
 // Native heat coordinate selection follows DoF and precedes weighted bloom.
 // Its depth veto prevents foreground bleeding. Bloom stays at original UV.
-// Explicit 224-byte native layout, not a console pixel-register array.
+// Explicit 240-byte native layout, not a console pixel-register array.
 #include "copy_common.hlsli"
 #include "src/gpu/post_heat.h"
 
@@ -27,6 +27,7 @@
     float4 g_Heat; // amplitudes xy, noise scale, depth exponent
     float4 g_HeatAnimation;
     uint4 g_HeatImage; // enabled, image, sampler, reserved
+    uint4 g_SceneOptions; // force opaque scene alpha; remaining lanes reserved
 };
 
 static uint g_ViewId = 0u;
@@ -99,7 +100,8 @@ float4 main(in float4 position : SV_Position, in float2 texCoord : TEXCOORD,
     // g_Dof.w: the scene's resolve scale when it is an alias of the
     // unscaled surface, 0 = 1.
     const float sceneScale = g_Dof.w > 0.0 ? g_Dof.w : 1.0;
-    const float4 scene = Tap(g_PushConstants.ResourceDescriptorIndex, scene_uv) * sceneScale;
+    float4 scene = Tap(g_PushConstants.ResourceDescriptorIndex, scene_uv) * sceneScale;
+    if (g_SceneOptions.x != 0) scene.a = 1.0;
     const float depth = Tap(depthIdx, scene_uv).x;
 
     // The guest's pow(x, 1/8) through log2/exp2, with its clamps.

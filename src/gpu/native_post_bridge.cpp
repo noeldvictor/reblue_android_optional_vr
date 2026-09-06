@@ -15,10 +15,9 @@
 #include "gpu/scene/native_transform_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/native_texture_mirror.h"
+#include "gpu/native_post_images.h"
 #include "gpu/device.h"
-#include "gpu/host_targets.h"
 #include "gpu/host_resource_heap.h"
-#include "gpu/resource_bridge.h"
 #include "gpu/frame_stats.h"
 #include "core/memory_helpers.h"
 #include "core/logging.h"
@@ -161,14 +160,14 @@ GuestTexture *SceneOutput(uint32_t container) {
 }
 struct PostEffects {
   HeatShimmerParameters heat;
-  GuestTexture *heat_image = nullptr;
+  SampledImage heat_image;
   PostAdjustments adjustments;
   ScanlineParameters scanline;
   GradeParameters grade;
   bool grade_scope = false;
-  GuestTexture *grain_image = nullptr;
+  SampledImage grain_image;
   LensFlareParameters flare;
-  std::array<GuestTexture *, 4> flare_images{};
+  std::array<SampledImage, 4> flare_images{};
 };
 struct PostPlan {
   uint32_t owner = 0; // authored-property/getter adapter, not the GPU stage identity
@@ -177,12 +176,12 @@ struct PostPlan {
   bool has_dof = false;
   PostEffects tail;
 };
+struct PostTarget {
+  NativePostImageHandle image;
+  HostPostOutput native;
+};
 struct PostTargets {
-  std::array<GuestTexture *, 2> images{};
-  ~PostTargets() {
-    for (auto *image : images)
-      if (image) ReleaseResourceAdapter(image->selfVa);
-  }
+  std::array<PostTarget, 2> images{};
 };
 thread_local const PostEffects *lens_comparison = nullptr;
 thread_local uint32_t lens_comparison_owner = 0, lens_comparison_index = 0;
@@ -228,7 +227,8 @@ bool ReadLensFlare(uint32_t owner, uint32_t bank, bool enabled, PostEffects &tai
     // Optical assets are engine-owned texture headers, not HostResourceHeap
     // allocations. Resolve their eagerly imported/cooked native mirrors;
     // never call a texture setter or infer a draw's retained slot.
-    tail.flare_images[i] = ResolveGuestTexture(bd::mem::load<uint32_t>(owner + 712 + i * 32));
+    tail.flare_images[i] = BorrowPostImage(
+        ResolveGuestTexture(bd::mem::load<uint32_t>(owner + 712 + i * 32)));
     if (!tail.flare_images[i]) return refuse("optical image", i);
   }
   return true;
@@ -269,7 +269,8 @@ bool ReadPlan(uint32_t owner, DofParameters &dof, BloomParameters &bloom,
       heat.noise_scale = 1;
       heat.depth_power = 1;
     }
-    tail.heat_image = ResolveGuestTexture(bd::mem::load<uint32_t>(owner + 2712 + 616));
+    tail.heat_image = BorrowPostImage(
+        ResolveGuestTexture(bd::mem::load<uint32_t>(owner + 2712 + 616)));
     if (!tail.heat_image) return RefuseInput("heat image", owner);
   }
   tail.grade_scope = bd::mem::load<uint8_t>(owner + 48 + bank) != 0 ||
@@ -320,8 +321,8 @@ bool ReadPlan(uint32_t owner, DofParameters &dof, BloomParameters &bloom,
     AnimateGradeGrain(grade, FrameStatFrameCount(), grade_preview == 3);
   }
   if (grade.grain) {
-    tail.grain_image = ResolveGuestTexture(bd::mem::load<uint32_t>(
-        owner + 7792 + 672 + grade.grain_image * 32));
+    tail.grain_image = BorrowPostImage(ResolveGuestTexture(bd::mem::load<uint32_t>(
+        owner + 7792 + 672 + grade.grain_image * 32)));
     if (!tail.grain_image) return RefuseInput("grain image", owner);
   }
   if (!ReadLensFlare(owner + 8660, bank, flag(32), tail)) {
@@ -399,11 +400,17 @@ bool ReadPlan(uint32_t owner, DofParameters &dof, BloomParameters &bloom,
   return true;
 }
 bool RenderPostPlan(const PostPlan &plan, const HostPostInputs &inputs,
-                    GuestTexture *target) {
+                    const PostTarget &target) {
   const auto &tail = plan.tail;
-  if (HostPostRender(inputs, target, plan.dof, plan.bloom, tail.flare, tail.flare_images,
-                     tail.adjustments, tail.scanline, tail.grade, tail.grain_image,
-                     tail.heat, tail.heat_image)) {
+  bool rendered = false;
+  {
+    auto &s = state();
+    std::lock_guard lock(s.mutex);
+    rendered = HostPostRender(s, inputs, target.native, plan.dof, plan.bloom,
+        tail.flare, tail.flare_images, tail.adjustments, tail.scanline, tail.grade,
+        tail.grain_image, tail.heat, tail.heat_image);
+  }
+  if (rendered) {
     if (plan.has_dof)
       PublishDofProducerProperties(plan.owner + 3440);
     stats.flare_frames += tail.flare.count != 0;
@@ -425,25 +432,29 @@ bool RenderPostPlan(const PostPlan &plan, const HostPostInputs &inputs,
   }
   return false;
 }
-void PublishPostOutput(GuestTexture *completed, GuestTexture *scene_output) {
+void PublishPostOutput(const PostTarget &completed, GuestTexture *scene_output) {
   // UI/getter compatibility publication belongs only at the completed boundary,
   // never between native roots. A failed publication cannot replay rendered work.
-  if (!Video::PublishSceneOutput(completed, scene_output, 1.0f))
+  if (!Video::PublishNativePostOutput(completed.image, scene_output))
     throw std::runtime_error("Native post output publication failed");
   ++stats.final_publications;
 }
 bool AcquirePostTargets(GuestTexture *scene, const SampledImage &depth, uint32_t count,
                         PostTargets &targets) {
-  if (!scene || !scene->texture || !depth || !count || count > 2)
+  if (!Video::CanPublishNativePostOutput(scene) || !depth || !count || count > 2)
     return false;
-  constexpr std::array roles{HostTargetClass::PostColor, HostTargetClass::PostColorAlternate};
   for (uint32_t i = 0; i < count; ++i) {
-    targets.images[i] = HostTargetAcquire(roles[i], scene->width, scene->height, 0x1A2201BF, 1);
-    if (!targets.images[i]) return false;
+    auto &target = targets.images[i];
+    target.image = AcquireNativePostImage(scene->width, scene->height, scene->layers);
+    if (!target.image) return false;
+    target.native = target.image->Output();
+    if (!target.native) return false;
   }
   return true;
 }
-bool RunEffectSequence(uint32_t list, HostPostInputs inputs, GuestTexture *scene) {
+bool RunEffectSequence(uint32_t list, HostPostInputs inputs, GuestTexture *scene,
+                       bool *published = nullptr) {
+  if (published) *published = false;
   if (!REXCVAR_GET(bd_native_post) || REXCVAR_GET(bd_native_post_verify) ||
       !REXCVAR_GET(bd_host_targets) || !REXCVAR_GET(bd_native_dof) ||
       REXCVAR_GET(bd_native_dof_verify))
@@ -500,7 +511,10 @@ bool RunEffectSequence(uint32_t list, HostPostInputs inputs, GuestTexture *scene
     // Later roots must observe that ordered update, not their preflight value.
     if (i && plan.has_dof && !ReadDofProducerParameters(plan.owner + 3440, plan.dof))
       throw std::runtime_error("Native effect sequence lost its preflighted focus input");
-    if (i) inputs.scene = BorrowPostImage(targets.images[sequence->Output(i - 1)]);
+    if (i) {
+      inputs.scene = targets.images[sequence->Output(i - 1)].native.image;
+      inputs.opaque_scene_alpha = false; // the preceding root already produced its own alpha
+    }
     inputs.exposure = sequence->Exposure(i, exposure);
     if (!RenderPostPlan(plan, inputs, targets.images[sequence->Output(i)])) {
       if (i) throw std::runtime_error("Native effect sequence refused after a completed root");
@@ -508,6 +522,7 @@ bool RunEffectSequence(uint32_t list, HostPostInputs inputs, GuestTexture *scene
     }
   }
   PublishPostOutput(targets.images[sequence->Output(sequence->count - 1)], scene);
+  if (published) *published = true;
   stats.direct_image_edges += sequence->count - 1;
   ++stats.sequences;
   stats.sequence_roots += sequence->count;
@@ -732,7 +747,7 @@ REX_HOOK_RAW(sub_8221B1D8) {
     if (stats.inputs < 8)
       BD_WARN("[native-post] render refusal frame {} scene {:08X} depth {:08X} target {}",
               FrameStatFrameCount(), scene ? scene->selfVa : 0, depth ? depth->selfVa : 0,
-              targets.images[0] != nullptr);
+              bool(targets.images[0].image));
     ++stats.inputs;
   }
   ++stats.original;
@@ -759,7 +774,10 @@ bool bdNativeScenePostHook(PPCRegister &view) {
   bool handled = false;
   if (auto completed = scene::TakeCompletedSceneImages(view.u32)) {
     ++stats.completed_scene_inputs;
-    handled = RunEffectSequence(kEffectList, completed->inputs, completed->output);
+    bool published = false;
+    handled = RunEffectSequence(kEffectList, completed->inputs, completed->output, &published);
+    if (published) completed->pending_scene_color = false;
+    else completed->PublishPendingColor(); // includes handled-but-empty sequences
     // The local owns both native source pins through all stage submissions and
     // final publication. Scope exit also releases them on refusal/exception.
   } else if (Words(view.u32, 8)) {

@@ -17,6 +17,7 @@
 #include "core/logging.h"
 #include "gpu/bindless_allocator.h"
 #include "gpu/scene/native_texture_gpu.h"
+#include "gpu/native_target_images.h"
 
 namespace bd::gpu {
 
@@ -75,7 +76,7 @@ void ReleaseTextureSRVLocked(VideoState &s, GuestTexture *tex) {
   tex->descriptorIndex = kInvalidDescriptorIndex;
   // This adapter borrowed the native binding. Other wrappers/scene handles
   // may still use it; only the native store can retire the descriptor.
-  if (tex->nativeGpu)
+  if (tex->nativeGpu || tex->nativeImage.owner || tex->nativeTarget)
     return;
   u32 null_index = kNullTexture2DDescriptorIndex;
   switch (tex->viewDimension) {
@@ -94,6 +95,18 @@ void ReleaseTextureSRVLocked(VideoState &s, GuestTexture *tex) {
 u32 BindTextureSRVLocked(VideoState &s, GuestTexture *tex) {
   if (!tex || !tex->texture || !s.texture_descriptor_set) {
     return kInvalidDescriptorIndex;
+  }
+  if (tex->nativeTarget) {
+    const auto &target = *tex->nativeTarget;
+    if (tex->texture != target.image.get()) return kInvalidDescriptorIndex;
+    tex->descriptorIndex = target.descriptor;
+    return target.descriptor;
+  }
+  if (tex->nativeImage.owner) {
+    const auto &lease = tex->nativeImage;
+    if (!lease || tex->texture != lease.image.texture) return kInvalidDescriptorIndex;
+    tex->descriptorIndex = lease.image.descriptor_index;
+    return lease.image.descriptor_index;
   }
   if (tex->nativeGpu) {
     const auto &gpu = *tex->nativeGpu;

@@ -39,6 +39,9 @@ void ParkTextureGPUObjects(GuestTexture *tex) {
   // Dropping one adapter is not an image/descriptor release. The native store
   // observes the last handle at slot-end and awaits that slot's next fence.
   tex->nativeGpu.reset();
+  tex->layout.Unbind();
+  tex->nativeImage = {};
+  tex->nativeTarget.reset();
   if (tex->textureHolder) {
     Video::ParkTextureUntilFence(std::move(tex->textureHolder));
   }

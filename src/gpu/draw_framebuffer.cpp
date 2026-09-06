@@ -16,6 +16,7 @@
 #include "gpu/occlusion_cull.h"
 #include "gpu/frame.h"
 #include "gpu/host_targets.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 
 #include <mutex>
 #include <utility>
@@ -45,6 +46,8 @@ namespace bd::gpu {
 // a fresh pointer and misses.
 plume::RenderFramebuffer *GetFramebuffer(VideoState &s, GuestTexture *rt,
                                          GuestTexture *ds) {
+  if (auto *native = scene::ActiveNativeSceneFramebuffer(rt ? rt->texture : nullptr, ds ? ds->texture : nullptr))
+    return native;
   // An alias draws into its root's texture; the cache lives on the root so
   // the two hand plume the same framebuffer object, and a pass on the shared
   // image continues across the guest's surface change instead of ending.
@@ -356,7 +359,7 @@ bool AliasFreshTargetToChainHeadLocked(VideoState &s, GuestTexture *rt) {
     chain[chain_len++] = next;
   }
   if (!root->texture || root == rt || root == s.back_buffer_surface ||
-      root->hostOwned)
+      root->hostOwned || root->nativeImage.owner || root->nativeTarget)
     return false; // a host target is nobody's tile
   if (!FullscreenChainClassLocked(s, head))
     return false;
@@ -585,6 +588,7 @@ bool Video::BindDrawFramebufferLocked() {
   GuestTexture *rt = nullptr;
   GuestTexture *ds = nullptr;
   ResolveEffectiveTargets(s, rt, ds);
+  auto *native_commands = scene::ActiveNativeSceneCommands(rt ? rt->texture : nullptr, ds ? ds->texture : nullptr);
 
   // Deferred resolves whose source this draw overwrites must copy out first,
   // and a dst being drawn over must absorb its pending content. Must run before
@@ -656,51 +660,55 @@ bool Video::BindDrawFramebufferLocked() {
     return false;
   }
 
-  // The console's tile model, before any transition: a fresh full-screen
-  // surface after the chain head shares the head's texture (see
-  // AliasFreshTargetToChainHeadLocked). It then carries the head's layout and
-  // is not discarded or seeded below.
-  if (REXCVAR_GET(bd_chain_alias) && !s.bind_overwrites)
-    AliasFreshTargetToChainHeadLocked(s, rt);
-
   bool discard_rt = false;
   bool discard_ds = false;
-  TransitionTargetsToWrite(s, rt, ds, discard_rt, discard_ds);
-
   const u32 slot = s.recording_slot();
-  const bool full_screen = FullscreenChainClassLocked(s, rt);
-  if (discard_rt && rt->sampleCount != plume::RenderSampleCount::COUNT_1) {
-    // An MSAA target cannot be seeded (CopySurfaceToTextureLocked needs a
-    // single-sample dst) and does not need to be: the MSAA pass reaching here
-    // is the scene, the chain source, which writes the whole tile fresh.
-    s.command_list->discardTexture(rt->texture);
-  } else if (discard_rt && (s.bind_overwrites || rt->hostOwned)) {
-    // The host composite writes the whole target; nothing to inherit. A
-    // host-owned target is fresh only once, before its first clear.
-    s.command_list->discardTexture(rt->texture);
-  } else if (discard_rt && REXCVAR_GET(bd_seed_targets) &&
-             rt != s.held_clear_rt) {
-    // (A target with a held guest clear is about to be cleared by its pass's
-    // load op; seeding it would copy a surface the clear then discards.)
-    // Seeding copies a previous surface into a freshly acquired one so a pass
-    // reading untouched pixels sees what a Xenon's EDRAM tile would have held.
-    // It is 14 full-surface copies a frame and the bulk of the resolve
-    // category's 19% of GPU time - a copy that exists only to reproduce the
-    // persistence of a tile buffer that is not there.
-    //
-    // The cvar is a measurement handle, not a feature: turned off the frame is
-    // wrong wherever a pass genuinely relied on inherited content. Pair it with
-    // bd_ab_flag to get the cost without having to keep the wrong image.
-    SeedFreshColorTarget(s, rt, slot, full_screen);
+  if (!native_commands) {
+    // Only unconverted producers use the console's tile model. Native scene
+    // commands own write layouts, initial discards and clears independently.
+    // The console's tile model, before any transition: a fresh full-screen
+    // surface after the chain head shares the head's texture (see
+    // AliasFreshTargetToChainHeadLocked). It then carries the head's layout and
+    // is not discarded or seeded below.
+    if (REXCVAR_GET(bd_chain_alias) && !s.bind_overwrites)
+      AliasFreshTargetToChainHeadLocked(s, rt);
+
+    TransitionTargetsToWrite(s, rt, ds, discard_rt, discard_ds);
+
+    const bool full_screen = FullscreenChainClassLocked(s, rt);
+    if (discard_rt && rt->sampleCount != plume::RenderSampleCount::COUNT_1) {
+      // An MSAA target cannot be seeded (CopySurfaceToTextureLocked needs a
+      // single-sample dst) and does not need to be: the MSAA pass reaching here
+      // is the scene, the chain source, which writes the whole tile fresh.
+      s.command_list->discardTexture(rt->texture);
+    } else if (discard_rt && (s.bind_overwrites || rt->hostOwned)) {
+      // The host composite writes the whole target; nothing to inherit. A
+      // host-owned target is fresh only once, before its first clear.
+      s.command_list->discardTexture(rt->texture);
+    } else if (discard_rt && REXCVAR_GET(bd_seed_targets) &&
+               rt != s.held_clear_rt) {
+      // (A target with a held guest clear is about to be cleared by its pass's
+      // load op; seeding it would copy a surface the clear then discards.)
+      // Seeding copies a previous surface into a freshly acquired one so a pass
+      // reading untouched pixels sees what a Xenon's EDRAM tile would have
+      // held. It is 14 full-surface copies a frame and the bulk of the resolve
+      // category's 19% of GPU time - a copy that exists only to reproduce the
+      // persistence of a tile buffer that is not there.
+      //
+      // The cvar is a measurement handle, not a feature: turned off the frame
+      // is wrong wherever a pass genuinely relied on inherited content. Pair it
+      // with bd_ab_flag to get the cost without having to keep the wrong image.
+      SeedFreshColorTarget(s, rt, slot, full_screen);
+    }
+    // Every fullscreen class bind advances the head, fresh or persistent: EDRAM
+    // tile content is whatever the last pass wrote, so a never-discarded scene
+    // surface must still become the head or the 2D layer seeds from its own
+    // previous frame.
+    if (full_screen)
+      s.fullscreen_chain_head[slot] = rt;
+    if (discard_ds)
+      s.command_list->discardTexture(ds->texture);
   }
-  // Every fullscreen class bind advances the head, fresh or persistent: EDRAM
-  // tile content is whatever the last pass wrote, so a never-discarded scene
-  // surface must still become the head or the 2D layer seeds from its own
-  // previous frame.
-  if (full_screen)
-    s.fullscreen_chain_head[slot] = rt;
-  if (discard_ds)
-    s.command_list->discardTexture(ds->texture);
 
   {
     // What does the depth-tested scene pass actually bind? Every layered
@@ -726,7 +734,7 @@ bool Video::BindDrawFramebufferLocked() {
     ResolveMultiviewSurfaceLocked(s, s.bound_fb_rt);
   }
 
-  plume::RenderFramebuffer *fb = GetFramebuffer(s, rt, ds);
+  plume::RenderFramebuffer *fb = native_commands ? native_commands->Framebuffer() : GetFramebuffer(s, rt, ds);
   if (!fb)
     return false;
   // Anything queued was recorded against the outgoing framebuffer, so it leaves
@@ -738,7 +746,10 @@ bool Video::BindDrawFramebufferLocked() {
   // ends here, so the barrier is at a boundary.
   TransitionResolveSources(s, rt, ds, /*skip_bound=*/false);
 
-  s.command_list->setFramebuffer(fb);
+  if (native_commands)
+    scene::BindNativeSceneCommands(s, *native_commands);
+  else
+    s.command_list->setFramebuffer(fb);
   s.plume_framebuffer_bound = (fb != nullptr);
   // Everything recorded from here belongs to this target, for the per-target
   // GPU time in the census.
@@ -795,6 +806,8 @@ bool Video::BindDrawFramebufferLocked() {
   s.dirtyStates.viewport = true;
   s.dirtyStates.scissorRect = true;
   Video::FlushViewport();
+  if (native_commands)
+    scene::ApplyNativeSceneClear(s, *native_commands);
   // A partial-coverage pixel keeps samples geometry never writes, so every
   // sample of a freshly discarded MSAA target has to be defined before the /N
   // resolve averages them. A guest color clear draining below already does it.

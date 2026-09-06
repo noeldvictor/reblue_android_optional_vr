@@ -29,6 +29,12 @@ class NativePostBoundaryTest(unittest.TestCase):
         cls.bloom_shader = (root / "src/gpu/shaders/hlsl/post_bloom_direction_ps.hlsl").read_text(encoding="utf-8")
         cls.images = (root / "src/gpu/host_post_inputs.h").read_text(encoding="utf-8")
         cls.sampled = (root / "src/gpu/sampled_image.h").read_text(encoding="utf-8")
+        cls.output = (root / "src/gpu/host_post_output.h").read_text(encoding="utf-8")
+        cls.pool = (root / "src/gpu/native_post_images.h").read_text(encoding="utf-8")
+        cls.pool_gpu = (root / "src/gpu/native_post_images.cpp").read_text(encoding="utf-8")
+        cls.resolve = (root / "src/gpu/resolve.cpp").read_text(encoding="utf-8")
+        cls.ring = (root / "src/gpu/frame_ring.cpp").read_text(encoding="utf-8")
+        cls.bindless = (root / "src/gpu/bindless.cpp").read_text(encoding="utf-8")
 
     def test_native_inputs_prepare_their_own_sampling_descriptors(self):
         helper = self.post.split("bool PrepareReadable(", 1)[1].split("GuestTexture *NativeSource(", 1)[0]
@@ -58,12 +64,92 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("SampledImage scene", self.images)
         self.assertIn("SampledImage depth", self.images)
         self.assertIn("plume::RenderTextureLayout *layout", self.sampled)
-        self.assertIn("&t->layout", self.post)
+        self.assertIn("&t->layout.Get()", self.post)
         render = self.post.split("bool HostPostRender(", 1)[1].split("bool HostPostPrepareDof(", 1)[0]
-        self.assertIn("inputs.CanRenderTo(output->texture, output->layers)", render)
-        self.assertLess(render.index("inputs.CanRenderTo("), render.index("Video::OpenCommandListLocked()"))
+        self.assertIn("target.CanRender(inputs)", render)
+        self.assertLess(render.index("target.CanRender("), render.index("Video::OpenCommandListLocked()"))
         for name in ("source->selfVa", "z->selfVa", "PrepareReadable(s, source)", "PrepareReadable(s, z)"):
             self.assertNotIn(name, render)
+
+    def test_native_output_and_optical_rendering_have_no_resource_headers(self):
+        render = self.post.split("bool HostPostRender(", 1)[1].split("bool HostPostPrepareDof(", 1)[0]
+        flare = self.post.split("bool RenderLensFlare(", 1)[1].split("} // namespace", 1)[0]
+        for body in (self.output, render, flare):
+            for name in ("GuestTexture", "selfVa", "sourceSurface", "resolveScale", "descriptorIndex",
+                         "surfaceDrawn", "BindTextureSRVLocked", "HostTargetDropLinks", "nativeGpu"):
+                self.assertNotIn(name, body)
+        self.assertIn("const HostPostOutput &target", render)
+        self.assertIn("const std::array<SampledImage, 4> &flare_images", render)
+        self.assertIn("*output->layout", render)
+        self.assertEqual(render.count("target.CanSampleMono(image)"), 2)
+        self.assertLess(render.index("prepare_noise(heat_image"), render.index("Video::OpenCommandListLocked()"))
+        self.assertIn("source.texture != image.texture", self.output)
+        self.assertIn("R16G16B16A16_FLOAT", self.output)
+        for dimension in ("Width", "Height"):
+            self.assertIn(f"framebuffer->get{dimension}() == image.{dimension.lower()}", self.output)
+
+    def test_native_output_does_not_mutate_resource_headers_per_root(self):
+        body = self.scheduler.split("bool RenderPostPlan(", 1)[1].split("void PublishPostOutput(", 1)[0]
+        self.assertLess(body.index("lock(s.mutex)"), body.index("HostPostRender("))
+        self.assertLess(body.index("HostPostRender("), body.index("if (rendered)"))
+        for name in ("HostTargetDropLinks", "surfaceDrawn", "target.adapter", "PublishNativePostOutput"):
+            self.assertNotIn(name, body)
+        self.assertNotIn("BorrowPostImage(", body)
+        render = self.post.split("bool HostPostRender(", 1)[1].split("bool HostPostPrepareDof(", 1)[0]
+        self.assertNotIn("lock(s.mutex)", render)  # caller owns the complete boundary transaction
+        effects = self.scheduler.split("struct PostEffects", 1)[1].split("struct PostPlan", 1)[0]
+        self.assertNotIn("GuestTexture", effects)
+
+    def test_native_output_pool_has_no_header_allocator_or_guest_target_roles(self):
+        for body in (self.pool, self.pool_gpu):
+            for name in ("GuestTexture", "HostResourceHeap", "HostTargetAcquire", "D3D", "selfVa", "0x1A2201BF"):
+                if name != "D3D":  # only the existing backend compilation guard is permitted
+                    self.assertNotIn(name, body)
+        self.assertIn("entry.handle.use_count() == 1", self.pool)
+        self.assertIn("result->layout = plume::RenderTextureLayout::UNKNOWN", self.pool)
+        self.assertIn("pixels > budget_ / stride", self.pool)
+        self.assertIn("256ull << 20", self.pool)
+        self.assertIn("64", self.pool)
+        self.assertIn("TEXTURE_2D_ARRAY", self.pool_gpu)
+        self.assertIn("recipe.layers == 2 ? 3u : 0u", self.pool_gpu)
+        self.assertLess(self.pool_gpu.index("AllocateSlot(s)"), self.pool_gpu.index("WriteTextureDescriptor(s, result->descriptor"))
+        self.assertLess(self.ring.index("framebuffer_graveyard[slot].clear()"), self.ring.index("DrainNativePostImagesLocked(s, slot)"))
+        self.assertLess(self.ring.index("DrainNativePostImagesLocked(s, slot)"), self.ring.index("MarkUnusedNativePostImagesLocked(s, slot)"))
+
+    def test_native_output_publication_borrows_without_copy_or_new_resource(self):
+        body = self.resolve.split("bool Video::PublishNativePostOutput(", 1)[1].split("bool Video::PublishSceneOutput(", 1)[0]
+        for name in ("copyTexture", "CopySurfaceToTexture", "HostResourceHeap", "CreateHostTexture", "AllocateSlot", "sourceSurface ="):
+            self.assertNotIn(name, body)
+        self.assertIn("PublishNativeImage({source, source->Output().image}, dst, true)", body)
+        self.assertIn("dst->nativeImage = lease", body)
+        self.assertIn("dst->descriptorIndex = image.descriptor_index", body)
+        self.assertIn("dst->format = image.format", body)
+        self.assertIn("DetachSourceSurfaceLocked(s, dst)", body)
+        self.assertIn("framebuffer_graveyard[slot].push_back", body)
+        self.assertLess(body.index("ReleaseTextureSRVLocked(s, dst)"), body.index("dst->nativeImage = lease"))
+        self.assertIn("tex->nativeGpu || tex->nativeImage.owner", self.bindless)
+        self.assertIn("tex->texture != lease.image.texture", self.bindless)
+        framebuffer = (self.root / "src/gpu/draw_framebuffer.cpp").read_text(encoding="utf-8")
+        self.assertIn("root->hostOwned || root->nativeImage.owner", framebuffer)
+
+    def test_native_boundary_uses_one_live_layout_record_and_releases_it_before_owner(self):
+        body = self.resolve.split("bool Video::PublishNativeImage(", 1)[1].split("bool Video::PublishSceneOutput(", 1)[0]
+        self.assertLess(body.index("dst->layout.Unbind()"), body.index("dst->nativeImage = lease"))
+        self.assertLess(body.index("dst->nativeImage = lease"), body.index("dst->layout.Bind(*image.layout)"))
+        self.assertIn("if (image.texture != dst->texture)", body)
+        self.assertIn("if (publish_post_chain)", body)
+        self.assertEqual(body.count("NoteTileContentLocked("), 1)
+        condition = self.resolve.split("bool NativeImageDestination(", 1)[1].split("} // namespace", 1)[0]
+        for check in ("source.CanPublishExtent(dst->width, dst->height, dst->layers, extent)",
+                      "IsDepthFormat(source.image.format) != IsDepthFormat(dst->format)",
+                      "dst->nativeImage.owner == source.owner",
+                      "dst->nativeImage.image.layout == source.image.layout"):
+            self.assertIn(check, condition)
+        for axis in ("width", "height", "layers"):
+            self.assertIn(f"dst->{axis} = image.{axis}", body)
+            self.assertLess(body.index("ReleaseTextureSRVLocked(s, dst)"), body.index(f"dst->{axis} = image.{axis}"))
+        graveyard = (self.root / "src/gpu/graveyard.cpp").read_text(encoding="utf-8")
+        self.assertLess(graveyard.index("tex->layout.Unbind()"), graveyard.index("tex->nativeImage = {}"))
 
     def test_directional_bloom_imports_intent_without_original_mask_production(self):
         body = self.scheduler.split("bool ReadPlan(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
@@ -81,7 +167,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("MakeBloomAtlasStep(iteration, direction)", body)
         self.assertIn("atlases[step.input]->slot, step.source_half", body)
         self.assertIn("sizeof(kernel) == 32", body)
-        self.assertIn("bright, parameters, {}, nullptr, 0, {}, true", body)
+        self.assertIn("bright, parameters, {}, {}, 0, {}, true", body)
         self.assertIn("if (directional.iterations == 0) return {atlases[0], false}", body)
         for name in ("s.render_target", "s.textures[", "GuestPixelConstant", "ResolveRtToTexture", "copyTexture"):
             self.assertNotIn(name, body)
@@ -123,7 +209,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertNotIn("scene_uv", bloom)
         self.assertIn("float3(noise_uv.u, noise_uv.v, 0)", shader)
         self.assertIn("float3(uv, float(g_ViewId))", shader)
-        self.assertIn("sizeof(CompositeConstants) == 224", self.post)
+        self.assertIn("sizeof(CompositeConstants) == 240", self.post)
 
     def test_grade_uses_authored_inputs_and_not_packed_draw_state(self):
         body = self.scheduler.split("bool ReadPlan(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
@@ -235,12 +321,12 @@ class NativePostBoundaryTest(unittest.TestCase):
 
     def test_native_scheduler_has_explicit_completed_output(self):
         body = self.scheduler.split("bool RenderPostPlan(", 1)[1].split("void PublishPostOutput(", 1)[0]
-        self.assertIn("HostPostRender(inputs, target,", body)
+        self.assertIn("HostPostRender(s, inputs, target.native,", body)
         self.assertNotIn("PublishSceneOutput", body)
         for name in ("__imp__", "sub_8221E758", "sub_8221CB38", "sub_822166E8"):
             self.assertNotIn(name, body)
         publication = self.scheduler.split("void PublishPostOutput(", 1)[1].split("bool AcquirePostTargets(", 1)[0]
-        self.assertIn("Video::PublishSceneOutput(completed, scene_output, 1.0f)", publication)
+        self.assertIn("Video::PublishNativePostOutput(completed.image, scene_output)", publication)
 
     def test_native_sequence_uses_explicit_depth_without_global_publication(self):
         body = self.scheduler.split("bool RunEffectSequence(", 1)[1].split("void VerifyAdjustmentPublication", 1)[0]
@@ -276,7 +362,8 @@ class NativePostBoundaryTest(unittest.TestCase):
         loop, publication = execution.split("\n  PublishPostOutput(", 1)
         self.assertNotIn("Publish", loop)
         self.assertNotIn("HostPostImportInputs", loop)
-        self.assertIn("inputs.scene = BorrowPostImage(targets.images[sequence->Output(i - 1)])", loop)
+        self.assertIn("inputs.scene = targets.images[sequence->Output(i - 1)].native.image", loop)
+        self.assertNotIn("BorrowPostImage(", loop)
         self.assertIn("inputs.exposure = sequence->Exposure(i, exposure)", loop)
         self.assertIn("RenderPostPlan(plan, inputs,", loop)
         self.assertTrue(publication.startswith("targets.images[sequence->Output(sequence->count - 1)], scene)"))
@@ -304,7 +391,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn("handled = RunImportedEffectSequence(kEffectList, scene, depth)", body)
         native = body.split("} else if (Words(", 1)[0]
         self.assertIn("scene::TakeCompletedSceneImages(view.u32)", native)
-        self.assertIn("RunEffectSequence(kEffectList, completed->inputs, completed->output)", native)
+        self.assertIn("RunEffectSequence(kEffectList, completed->inputs, completed->output, &published)", native)
         for name in ("SceneOutput(", "Texture(", "bd::mem::", "HostPostImportInputs("):
             self.assertNotIn(name, native)
         self.assertIn("return handled", body)
@@ -322,6 +409,16 @@ class NativePostBoundaryTest(unittest.TestCase):
             "after_instruction = false", "jump_address_on_true = 0x821867E8"])
         device = (self.root / "src/gpu/hooks/device.cpp").read_text(encoding="utf-8")
         self.assertIn("BD_NOOP(D3DDevice_SetShaderGPRAllocation)", device)
+
+    def test_initial_scene_colour_is_recovered_unless_post_actually_published(self):
+        sequence = self.scheduler.split("bool RunEffectSequence(", 1)[1].split("bool RunImportedEffectSequence(", 1)[0]
+        self.assertLess(sequence.index("if (published) *published = false"), sequence.index("return false"))
+        self.assertEqual(sequence.count("*published = true"), 1)
+        self.assertLess(sequence.index("PublishPostOutput("), sequence.index("*published = true"))
+        hook = self.scheduler.split("bool bdNativeScenePostHook(", 1)[1]
+        self.assertIn("if (published) completed->pending_scene_color = false", hook)
+        self.assertIn("else completed->PublishPendingColor()", hook)
+        self.assertLess(hook.index("PublishPendingColor()"), hook.index("return handled"))
 
     def test_owned_generated_scene_handoff_instruction_contract(self):
         # Optional owned-game evidence. Generated code stays generated; this
@@ -362,8 +459,11 @@ class NativePostBoundaryTest(unittest.TestCase):
         self.assertIn('if (i) throw std::runtime_error', body)
         self.assertIn('phase != 3', body)
         acquisition = self.scheduler.split('bool AcquirePostTargets(', 1)[1].split('bool RunEffectSequence(', 1)[0]
-        self.assertIn('HostTargetClass::PostColorAlternate', acquisition)
-        self.assertIn('ReleaseResourceAdapter(image->selfVa)', self.scheduler)
+        self.assertIn('AcquireNativePostImage(scene->width, scene->height, scene->layers)', acquisition)
+        self.assertLess(acquisition.index('CanPublishNativePostOutput('), acquisition.index('AcquireNativePostImage('))
+        for name in ('HostTargetClass::PostColor', 'ReleaseResourceAdapter(', 'HostTargetAcquire(', 'BorrowPostOutput('):
+            self.assertNotIn(name, self.scheduler)
+        self.assertIn('NativePostImageHandle image', self.scheduler)
 
     def test_native_prepare_has_no_console_parameter_or_resource_producer(self):
         body = self.post.split("bool HostPostPrepareDof(", 1)[1].split("bool HostPostProducerSkip(", 1)[0]

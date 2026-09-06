@@ -802,7 +802,9 @@ GuestTexture *SurfacePool::CreateUnpooled(u32 width, u32 height,
 }
 
 bool SurfacePool::Return(GuestTexture *surface) {
-  if (!surface || !surface->texture)
+  // A native image lease is not a pool-owned allocation. Reusing its former
+  // adapter could overwrite backing still retained by another native reader.
+  if (!surface || !surface->texture || surface->nativeImage.owner || surface->nativeGpu || surface->nativeTarget)
     return false;
   std::vector<GuestTexture *> evicted;
   const bool parked = ReturnLocked(surface, evicted);

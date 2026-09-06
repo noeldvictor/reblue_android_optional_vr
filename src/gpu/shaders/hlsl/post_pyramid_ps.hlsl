@@ -9,8 +9,8 @@
 // call (2026-09-02).
 //
 // Push block: ResourceDescriptorIndex = the scene, ResourceDescriptorIndex2 =
-// the level, Param0 = the blur scale (bd_host_post_blur), Param1 = the
-// scene's resolve scale (0 for 1).
+// the level with bit 31 requesting opaque scene alpha, Param0 = blur scale,
+// Param1 = scene exposure (0 for 1). Opacity is independent of RGB exposure.
 #include "copy_common.hlsli"
 
 [[vk::binding(0, 0)]] Texture2DArray<float4> g_Texture2DDescriptorHeap[] : register(t0, space0);
@@ -23,7 +23,8 @@ float4 main(in float4 position : SV_Position, in float2 texCoord : TEXCOORD,
     SamplerState smp = g_SamplerDescriptorHeap[0];
     uint w, h, layers;
     src.GetDimensions(w, h, layers);
-    const uint level = g_PushConstants.ResourceDescriptorIndex2;
+    const uint level = g_PushConstants.ResourceDescriptorIndex2 & 0x7FFFFFFFu;
+    const bool opaque = (g_PushConstants.ResourceDescriptorIndex2 & 0x80000000u) != 0;
     const float blur = max(g_PushConstants.Param0, 0.25);
     // Level k of the chain: the dual downsample's 2-texel reach at each of
     // k+1 halvings is 2^(k+1) scene texels.
@@ -44,5 +45,5 @@ float4 main(in float4 position : SV_Position, in float2 texCoord : TEXCOORD,
     }
     acc /= 81.0; // sum of (3-|x|)(3-|y|) over the 5x5 grid
     const float scale = g_PushConstants.Param1 > 0.0 ? g_PushConstants.Param1 : 1.0;
-    return acc * scale;
+    return float4(acc.rgb * scale, opaque ? 1.0 : acc.a * scale);
 }

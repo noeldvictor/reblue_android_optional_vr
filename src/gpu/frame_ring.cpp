@@ -32,6 +32,10 @@
 #include "gpu/host_resource_heap.h"
 #include "gpu/native_texture_mirror.h"
 #include "gpu/scene/native_texture_gpu.h"
+#include "gpu/scene/native_scene_resolves.h"
+#include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/native_post_images.h"
+#include "gpu/native_target_images.h"
 #include "gpu/physical_buffers.h"
 #include "gpu/surface_pool.h"
 
@@ -197,7 +201,12 @@ void DrainSlot(VideoState &s, u32 slot) {
   // before any park.
   {
     std::lock_guard lock(s.mutex);
+    s.framebuffer_graveyard[slot].clear();
+    DrainNativePostImagesLocked(s, slot);
     scene::DrainNativeTextureGpuLocked(s, slot);
+    scene::DrainNativeSceneResolvesLocked(s, slot);
+    scene::DrainNativeSceneFramebuffersLocked(s, slot);
+    DrainNativeTargetImagesLocked(s, slot);
     s.texture_view_graveyard[slot].clear();
     s.texture_graveyard[slot].clear();
     s.buffer_graveyard[slot].clear();
@@ -254,6 +263,10 @@ void DrainSlot(VideoState &s, u32 slot) {
   {
     std::lock_guard lock(s.mutex);
     scene::MarkUnusedNativeTextureGpuLocked(s, slot);
+    scene::MarkUnusedNativeSceneResolvesLocked(s, slot);
+    scene::MarkUnusedNativeSceneFramebuffersLocked(s, slot);
+    MarkUnusedNativePostImagesLocked(s, slot);
+    MarkUnusedNativeTargetImagesLocked(s, slot);
   }
 }
 

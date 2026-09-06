@@ -20,6 +20,7 @@ namespace bd::gpu {
 
 struct GuestTexture;
 struct VideoState;
+struct NativeTargetShape;
 
 enum class HostTargetClass : u8 {
   None = 0,
@@ -28,8 +29,6 @@ enum class HostTargetClass : u8 {
   SceneDepth,
   ReflectionColor,
   ReflectionDepth,
-  PostColor,
-  PostColorAlternate,
   Count
 };
 
@@ -47,6 +46,10 @@ HostTargetClass ClassifyHostTarget(u32 width, u32 height, u32 guest_format,
 GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
                                 u32 guest_format, u32 sample_count);
 
+// Explicit native scene recipe. Allocates the image in the native store, then
+// creates only the temporary header required by unconverted binding consumers.
+GuestTexture *HostTargetAcquireNative(HostTargetClass cls, const NativeTargetShape &shape);
+
 // The guest released its handle: the target stays, the handle can be handed
 // out again.
 void HostTargetReleased(GuestTexture *target);
@@ -56,6 +59,11 @@ void HostTargetReleased(GuestTexture *target);
 // releases its pin. Calls occur outside the video mutex, on the render thread.
 bool HostTargetPin(GuestTexture *target);
 void HostTargetUnpin(GuestTexture *target);
+
+// Native allocation generation, independent of the guest header/address. A
+// recreated physical image never reuses its predecessor's identity. Call before
+// acquiring the video mutex; zero means the target is not a live native slot.
+u64 HostTargetImageIdentity(GuestTexture *target);
 
 // The guest's Clear on a bound host target, kept on the target until its
 // pass binds. Returns false if the target is not host-owned.

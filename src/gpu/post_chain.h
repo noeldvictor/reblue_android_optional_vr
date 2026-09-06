@@ -11,7 +11,7 @@
 #pragma once
 #include <rex/types.h>
 #include <array>
-#include "gpu/host_post_inputs.h"
+#include "gpu/host_post_output.h"
 
 namespace bd::gpu {
 
@@ -34,16 +34,17 @@ SampledImage BorrowPostImage(GuestTexture *image);
 bool HostPostImportInputs(GuestTexture *scene, GuestTexture *depth, HostPostInputs &inputs);
 
 // Whole native atlas + folded bloom/composite + instanced optical sprites.
-// The caller supplies an explicit attachment and native optical image mirrors.
+// The caller holds s.mutex and supplies a native attachment and sampled optical
+// images. Resource-header preparation/publication stays outside this renderer.
 // No draw interception, shader-register import or tile allocation. False is
 // a preflight refusal; failures after GPU work starts are fatal, not replayed.
-bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
+bool HostPostRender(VideoState &s, const HostPostInputs &inputs, const HostPostOutput &target,
                     const DofParameters &dof, const BloomParameters &bloom,
                     const LensFlareParameters &flare,
-                    const std::array<GuestTexture *, 4> &flare_images,
+                    const std::array<SampledImage, 4> &flare_images,
                     const PostAdjustments &adjustments, const ScanlineParameters &scanline,
-                    const GradeParameters &grade, GuestTexture *grain_image,
-                    const HeatShimmerParameters &heat, GuestTexture *heat_image);
+                    const GradeParameters &grade, const SampledImage &grain_image,
+                    const HeatShimmerParameters &heat, const SampledImage &heat_image);
 
 // Authored-property adapters shared by direct scheduling and the transitional
 // DoF entry pair. No original rendering code executes in these functions.

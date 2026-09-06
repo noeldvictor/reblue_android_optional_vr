@@ -14,6 +14,7 @@ struct HostPostInputs {
   SampledImage scene;
   SampledImage depth;
   float exposure = 1.0f;
+  bool opaque_scene_alpha = false; // native MSAA scene opacity, independent of RGB exposure
 
   bool CanRenderTo(plume::RenderTexture *output, uint32_t output_layers) const {
     return scene && depth && output && std::isfinite(exposure) && exposure > 0 &&

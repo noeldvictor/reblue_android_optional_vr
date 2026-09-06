@@ -6,6 +6,8 @@
  */
 #include "gpu/scene/native_scene_pass.h"
 #include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/scene/scene_precision_import.h"
 #include "gpu/scene_image.h"
 #include "gpu/scene/native_pass_bridge.h"
 #include "gpu/scene/native_view_bridge.h"
@@ -13,8 +15,11 @@
 #include "core/memory_helpers.h"
 #include "gpu/device.h"
 #include "gpu/frame_stats.h"
+#include "gpu/frame.h"
 #include "gpu/host_resource_heap.h"
 #include "gpu/host_targets.h"
+#include "gpu/native_target_images.h"
+#include "gpu/foveation.h"
 #include "gpu/resource_bridge.h"
 #include <rex/cvar.h>
 #include <rex/hook.h>
@@ -34,6 +39,7 @@ REX_EXTERN(sub_82179868);
 REXCVAR_DECLARE(bool, bd_native_scene_passes);
 REXCVAR_DECLARE(bool, bd_host_targets);
 REXCVAR_DECLARE(i32, bd_render_scale);
+REXCVAR_DECLARE(bool, bd_stereo_multiview);
 
 namespace bd::gpu::scene {
 namespace {
@@ -52,13 +58,15 @@ constexpr uint32_t kSecondary = (uint32_t(-32137) << 16) + 28452;
 constexpr uint32_t kHdr = (uint32_t(-32136) << 16) + 14888 + 12;
 constexpr uint32_t kOne = (uint32_t(-32251) << 16) + 20908;
 constexpr uint32_t kPhase = (uint32_t(-32137) << 16) + 16476;
-// Header formats belong only to the existing texture/getter adapter. Roles are
-// explicit even for a square scene, no-MSAA scene, or small offscreen scene.
-constexpr uint32_t kColorFormat = 0x1A2201BF, kDepthFormat = 0x2D200196;
+constexpr uint32_t kDevice = (uint32_t(-32133) << 16) - 31532;
 struct ScenePass {
   uint32_t source = 0;
   GuestTexture *color = nullptr, *depth = nullptr;
   std::size_t nesting = 0;
+  NativeSceneResolveHandle resolves;
+  std::array<NativeImageLease, 2> source_images;
+  NativeSceneFramebufferHandle framebuffer;
+  std::optional<NativeSceneCommands> commands;
 };
 thread_local std::vector<ScenePass> scenes;
 thread_local NativeSceneResultScope *current_result = nullptr;
@@ -67,6 +75,11 @@ struct Stats {
   uint64_t refused = 0, outputs = 0, null_outputs = 0, checked = 0, wrong = 0;
   uint64_t camera_calls = 0, state308_calls = 0, parameters = 0, empty_clears = 0;
   uint64_t completed = 0, consumed = 0, materialized_color = 0, materialized_depth = 0;
+  uint64_t native_resolve_results = 0;
+  uint64_t deferred_color = 0, recovered_color = 0;
+  uint64_t native_depth_publications = 0, compatibility_depth_publications = 0;
+  uint64_t command_binds = 0, native_clears = 0, compatibility_clears = 0;
+  uint64_t precision_getters = 0;
   uint32_t frame = 0;
 };
 thread_local Stats stats;
@@ -85,6 +98,15 @@ void Report() {
   BD_INFO("[native-scene] completed image results {} consumed {}; materialized colour {} depth {}; "
           "per-view native pins, single-use inputs; output/resource publications remain",
           stats.completed, stats.consumed, stats.materialized_color, stats.materialized_depth);
+  BD_INFO("[native-scene] native attachment resolve results {}; initial colour deferred {} recovered {}; "
+          "depth getter and final UI boundaries remain",
+          stats.native_resolve_results, stats.deferred_color, stats.recovered_color);
+  BD_INFO("[native-scene] depth publications native {} compatibility {}; "
+          "native depth borrows its image/descriptor/layout, no copy or resolve link",
+          stats.native_depth_publications, stats.compatibility_depth_publications);
+  BD_INFO("[native-scene] command binds {} native clears {} compatibility clears {}; "
+          "precision getters {}; native write layouts and scope-owned clears, no scene clear flags or seed copies",
+          stats.command_binds, stats.native_clears, stats.compatibility_clears, stats.precision_getters);
   stats.frame = frame;
 }
 bool Range(uint64_t address, uint64_t bytes) {
@@ -142,7 +164,7 @@ struct CallFrame {
 void SetState(PPCContext &ctx, uint8_t *base, uint32_t offset, uint32_t value) {
   ctx.r3.u64 = offset;
   ctx.r4.u64 = value;
-  bdSetRenderState(ctx, base); // native state producers, except counted offset 308
+  bdSetRenderState(ctx, base); // existing native raster/alpha/blend producers
   stats.state308_calls += offset == 308;
 }
 void Parameters(PPCContext &ctx, uint8_t *base, uint32_t source) {
@@ -152,7 +174,12 @@ void Parameters(PPCContext &ctx, uint8_t *base, uint32_t source) {
 }
 bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
   if (!REXCVAR_GET(bd_native_scene_passes) || !REXCVAR_GET(bd_host_targets) ||
-      !Words(source, 40) || !Words(kSettings, 4) || !CanEnterNativePass())
+      !Words(source, 40) || !Words(kSettings, 4) || !CanEnterNativePass() ||
+      !Words(kDevice, 4) || !Words(kScenePrecisionCache, 4))
+    return false;
+  const auto precision_device = bd::mem::load<uint32_t>(kDevice);
+  if (!Words(precision_device, kScenePrecisionRequest + 4) ||
+      bd::mem::load<uint32_t>(precision_device + kScenePrecisionDeviceSlot) != kScenePrecisionSetter)
     return false;
   const auto settings = bd::mem::load<uint32_t>(kSettings);
   const auto camera = bd::mem::load<uint32_t>(source + 12);
@@ -180,17 +207,62 @@ bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
   if (!extent)
     return false;
   const auto samples = uint32_t(Video::CvarMSAASampleCount());
-  auto *color = HostTargetAcquire(HostTargetClass::SceneColor, extent->width,
-                                  extent->height, kColorFormat, samples);
-  auto *depth = HostTargetAcquire(HostTargetClass::SceneDepth, extent->width,
-                                  extent->height, kDepthFormat, samples);
+  const auto layers = REXCVAR_GET(bd_stereo_multiview) ? 2u : 1u;
+  auto *color = HostTargetAcquireNative(HostTargetClass::SceneColor,
+      {extent->width, extent->height, layers, plume::RenderFormat::R16G16B16A16_FLOAT, samples});
+  auto *depth = HostTargetAcquireNative(HostTargetClass::SceneDepth,
+      {extent->width, extent->height, layers, plume::RenderFormat::D32_FLOAT_S8_UINT, samples});
   if (!color || !depth) {
     if (color) ReleaseResourceAdapter(color->selfVa);
     if (depth) ReleaseResourceAdapter(depth->selfVa);
     return false;
   }
+  NativeSceneResolveHandle resolves;
+  std::array<NativeImageLease, 2> source_images;
+  NativeSceneFramebufferHandle framebuffer;
+  plume::RenderTexture *density_map = nullptr;
+  {
+    // Foveation readiness changes only at frame boundaries. The map store
+    // retains these images for device lifetime, independently of binding headers.
+    std::lock_guard lock(state().mutex);
+    FoveationEnsure(color->width, color->height, color->layers);
+    if (FoveationWanted(color->width, color->height, color->layers))
+      density_map = FoveationMapFor(color->width, color->height);
+  }
+  if (samples > 1) {
+    SceneResolveSources sources{color->texture, depth->texture,
+        HostTargetImageIdentity(color), HostTargetImageIdentity(depth),
+        color->width, color->height, color->layers, samples, color->format, depth->format};
+    sources.density_map = density_map;
+    resolves = AcquireNativeSceneResolves(sources, {color->nativeTarget, depth->nativeTarget});
+    if (!resolves) {
+      ReleaseResourceAdapter(color->selfVa);
+      ReleaseResourceAdapter(depth->selfVa);
+      throw std::runtime_error("Native scene attachment resolve capability or residency refused");
+    }
+  } else {
+    framebuffer = AcquireNativeSceneFramebuffer({color->nativeTarget, depth->nativeTarget}, density_map);
+    source_images = {NativeImageLease{color->nativeTarget, color->nativeTarget->Sampled()},
+        NativeImageLease{depth->nativeTarget, depth->nativeTarget->Sampled()}};
+    if (!framebuffer || !source_images[0] || !source_images[1]) {
+      ReleaseResourceAdapter(color->selfVa);
+      ReleaseResourceAdapter(depth->selfVa);
+      throw std::runtime_error("Native single-sample scene framebuffer or ownership refused");
+    }
+  }
   // From here the native pair owns the scope. Never run the original begin a
   // second time after an observable state/resource publication.
+  const bool primary = bd::mem::load<uint32_t>(kView) == 0;
+  const auto clear = SceneClearColor(bd::mem::load<uint32_t>(camera + 8), primary);
+  const auto resolved = resolves ? resolves->Sampled(1.f) : HostPostInputs{};
+  auto commands = NativeSceneCommands::Create({color->nativeTarget, depth->nativeTarget},
+      resolves ? resolves->framebuffer.get() : framebuffer->framebuffer.get(),
+      {resolved.scene, resolved.depth}, {ArgbToRenderColor(clear), 1.f, 0});
+  if (!commands) {
+    ReleaseResourceAdapter(color->selfVa);
+    ReleaseResourceAdapter(depth->selfVa);
+    throw std::runtime_error("Native scene command recipe refused");
+  }
   CallFrame frame(ctx);
   bd::mem::store<uint32_t>(source + 20, bd::mem::load<uint32_t>(reference));
   SetState(ctx, base, 60, 1);
@@ -207,12 +279,29 @@ bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
   bd::mem::store<uint32_t>(source + 36, depth->selfVa);
   uint32_t result = 0;
   Check(EnterNativePass(color, depth, result), "Native scene could not enter its preflighted pass");
-  scenes.push_back({source, color, depth, NativePassDepth()});
-  const bool primary = bd::mem::load<uint32_t>(kView) == 0;
-  const auto clear = SceneClearColor(bd::mem::load<uint32_t>(camera + 8), primary);
-  SetState(ctx, base, 308, 0);
-  Video::RequestClear(0x31, clear, 1.0f, 0);
-  SetState(ctx, base, 308, 1);
+  scenes.push_back({source, color, depth, NativePassDepth(), std::move(resolves),
+      std::move(source_images), std::move(framebuffer), std::move(commands)});
+  {
+    auto &s = state();
+    std::lock_guard lock(s.mutex);
+    // Temporary frame/getter bridge, not a clear request. Open recording without
+    // touching another framebuffer; the native scope holds its clear until bind.
+    s.frame_present_committed = false;
+    BeginCommandList(s);
+    Check(s.command_list_open, "Native scene cannot record commands");
+    s.draw_framebuffer_bound = false; // a new scope must consume its own clear
+    // Prior compatibility readers have completed before this full scene rewrite.
+    HostTargetDropLinks(s, color);
+    HostTargetDropLinks(s, depth);
+    s.clear_pending = false;
+    s.clear_flags = 0;
+  }
+  // Native storage/clears never switch console surface encodings. Publish only
+  // the final getter state for remaining engine clients, without guest dispatch.
+  PublishScenePrecisionGetters(precision_device, [](uint32_t address, uint32_t value) {
+    bd::mem::store<uint32_t>(address, value);
+  });
+  ++stats.precision_getters;
   SetState(ctx, base, 212, SceneColorWriteMask(primary));
   ctx.r3.u64 = 0;
   ctx.r4.u64 = camera + 160;
@@ -273,31 +362,84 @@ bool End(PPCContext &ctx, uint32_t source) {
         "Native scene output adapter no longer names a live texture");
   // An empty pass still publishes its clear, never the persistent image's old
   // contents. Binding consumes the pair's held clears before any output read.
-  if (pass.color->hostClearFlags || pass.depth->hostClearFlags) {
+  if (pass.commands->ClearPending() || pass.color->hostClearFlags || pass.depth->hostClearFlags) {
     Check(Video::BindDrawFramebuffer(), "Native scene clear could not bind its attachments");
     ++stats.empty_clears;
   }
+  // Complete native resolves before publishing either image to external readers.
+  // No redundant shader depth resolve is needed for matching native depth getters.
+  {
+    auto &s = state();
+    std::lock_guard lock(s.mutex);
+    DrawQueueFlush(s.command_list);
+    if (pass.resolves) FinishNativeSceneResolves(s, *pass.resolves);
+    else {
+      // Flush the pass (including zero-draw clears), then expose the actual
+      // single-sample images. There is no copy, getter import or resolve here.
+      s.command_list->setFramebuffer(nullptr);
+      std::array<plume::RenderTextureBarrier, 2> barriers;
+      uint32_t count = 0;
+      for (const auto &lease : pass.source_images) {
+        const auto &image = lease.image;
+        if (*image.layout != plume::RenderTextureLayout::SHADER_READ) {
+          barriers[count++] = {image.texture, plume::RenderTextureLayout::SHADER_READ};
+          *image.layout = plume::RenderTextureLayout::SHADER_READ;
+        }
+      }
+      if (count) {
+        s.command_list->barriers(plume::RenderBarrierStage::GRAPHICS, barriers.data(), count);
+        NoteBarrierCall(count, BarrierSite::Resolve);
+      }
+    }
+    s.plume_framebuffer_bound = false;
+    s.draw_framebuffer_bound = false;
+    s.bound_fb_rt = s.bound_fb_ds = nullptr;
+  }
   const float exposure = SceneOutputExposure(bd::mem::load<uint8_t>(kHdr) != 0);
+  const HostPostInputs native_inputs = pass.resolves ? pass.resolves->Sampled(exposure) :
+      HostPostInputs{pass.source_images[0].image, pass.source_images[1].image, exposure};
+  const bool complete_scene = current_result && Words(kPhase, 4) &&
+      bd::mem::load<int32_t>(kPhase) == 3;
+  // A final native result retains its exact source until post either publishes
+  // a replacement or explicitly recovers this colour. Other views still publish
+  // immediately. Depth's remaining getter readers borrow the native image below.
+  const bool deferred_color = complete_scene &&
+      current_result->Complete(bd::mem::load<uint32_t>(source + 4),
+          bd::mem::load<uint32_t>(source + 8), native_inputs,
+          pass.color, pass.depth, color_output, depth_output, pass.resolves, true);
+  stats.deferred_color += deferred_color;
   SceneImage sampled_color, sampled_depth;
   if (depth_output) {
-    Check(Video::PublishSceneOutput(pass.depth, depth_output, 1.0f, true, &sampled_depth),
-          "Native scene depth publication failed");
+    const NativeImageLease depth_image = pass.resolves ?
+        NativeImageLease{pass.resolves, pass.resolves->Sampled(1.f).depth} : pass.source_images[1];
+    if (Video::CanPublishNativeImage(depth_image, depth_output)) {
+      Check(Video::PublishNativeImage(depth_image, depth_output),
+            "Native depth image lost its preflighted getter");
+      sampled_depth = {depth_output, 1.f};
+      ++stats.native_depth_publications;
+    } else {
+      // Scaled/other-format adapters remain counted until their own
+      // image owners and consumers are migrated; never silently drop depth.
+      Check(Video::PublishSceneOutput(pass.depth, depth_output, 1.0f, true, &sampled_depth),
+            "Compatibility scene depth publication failed");
+      ++stats.compatibility_depth_publications;
+    }
     ++stats.outputs;
   } else ++stats.null_outputs;
-  if (color_output) {
+  if (color_output && !deferred_color) {
     Check(Video::PublishSceneOutput(pass.color, color_output, exposure, true, &sampled_color),
           "Native scene colour publication failed");
     ++stats.outputs;
-  } else ++stats.null_outputs;
+  } else if (!color_output) ++stats.null_outputs;
   uint32_t result = 0;
   Check(LeaveNativePass(result), "Native scene could not restore its previous pass");
   // Final phase 3 ends through this vtable entry before the caller's focus and
   // post tail. Publish exact images while the native attachments are still held.
-  if (current_result && Words(kPhase, 4) && bd::mem::load<int32_t>(kPhase) == 3)
+  if (complete_scene && !deferred_color)
     current_result->Complete(bd::mem::load<uint32_t>(source + 4),
         bd::mem::load<uint32_t>(source + 8),
-        {BorrowPostImage(sampled_color.image), BorrowPostImage(sampled_depth.image), sampled_color.exposure},
-        pass.color, pass.depth, color_output, depth_output);
+        native_inputs,
+        pass.color, pass.depth, color_output, depth_output, pass.resolves);
   ReleaseResourceAdapter(pass.color->selfVa);
   bd::mem::store<uint32_t>(source + 28, 0);
   ctx.r3.u64 = ReleaseResourceAdapter(pass.depth->selfVa);
@@ -309,6 +451,42 @@ bool End(PPCContext &ctx, uint32_t source) {
 }
 } // namespace
 
+const NativeSceneResolves *ActiveNativeSceneResolves(plume::RenderTexture *color,
+                                                     plume::RenderTexture *depth) {
+  if (scenes.empty()) return nullptr;
+  const auto &pass = scenes.back();
+  return pass.resolves && pass.resolves->sources.color == color && pass.resolves->sources.depth == depth
+      ? pass.resolves.get() : nullptr;
+}
+
+plume::RenderFramebuffer *ActiveNativeSceneFramebuffer(plume::RenderTexture *color,
+                                                      plume::RenderTexture *depth) {
+  if (const auto *resolved = ActiveNativeSceneResolves(color, depth))
+    return resolved->framebuffer.get();
+  if (scenes.empty()) return nullptr;
+  const auto &pass = scenes.back();
+  return pass.framebuffer && pass.framebuffer->Matches(color, depth)
+      ? pass.framebuffer->framebuffer.get() : nullptr;
+}
+
+NativeSceneCommands *ActiveNativeSceneCommands(plume::RenderTexture *color, plume::RenderTexture *depth) {
+  if (scenes.empty() || !scenes.back().commands) return nullptr;
+  auto &commands = *scenes.back().commands;
+  return commands.Matches(color, depth) ? &commands : nullptr;
+}
+void BindNativeSceneCommands(VideoState &s, NativeSceneCommands &commands) {
+  const auto barriers = commands.Bind(*s.command_list);
+  if (barriers) NoteBarrierCall(barriers, BarrierSite::DrawFb);
+  ++stats.command_binds;
+}
+void ApplyNativeSceneClear(VideoState &s, NativeSceneCommands &commands) {
+  stats.native_clears += commands.ApplyClear(*s.command_list);
+  // Other, not-yet-converted clear producers remain counted at this boundary.
+  stats.compatibility_clears += s.clear_pending ||
+      (s.render_target && s.render_target->hostClearFlags) ||
+      (s.depth_stencil && s.depth_stencil->hostClearFlags);
+}
+
 CompletedSceneImages::CompletedSceneImages(CompletedSceneImages &&other) noexcept {
   *this = std::move(other);
 }
@@ -316,20 +494,31 @@ CompletedSceneImages &CompletedSceneImages::operator=(CompletedSceneImages &&oth
   if (this != &other) {
     Reset();
     inputs = std::exchange(other.inputs, {});
+    resolves = std::move(other.resolves);
     output = std::exchange(other.output, nullptr);
+    pending_scene_color = std::exchange(other.pending_scene_color, false);
     source_pins = std::exchange(other.source_pins, {});
     output_references = std::exchange(other.output_references, {});
   }
   return *this;
 }
 CompletedSceneImages::~CompletedSceneImages() { Reset(); }
+void CompletedSceneImages::PublishPendingColor() {
+  if (!pending_scene_color) return;
+  Check(Video::PublishSceneOutput(source_pins[0], output, inputs.exposure),
+        "Unconsumed native scene colour publication failed");
+  pending_scene_color = false;
+  ++stats.recovered_color;
+}
 void CompletedSceneImages::Reset() {
   for (auto &address : output_references)
     if (address) ReleaseResourceAdapter(std::exchange(address, 0));
   for (auto &image : source_pins)
     if (image) HostTargetUnpin(std::exchange(image, nullptr));
   inputs = {};
+  resolves.reset();
   output = nullptr;
+  pending_scene_color = false;
 }
 NativeSceneResultScope::NativeSceneResultScope(uint32_t view)
     : previous_(current_result), view_(view), frame_(FrameStatFrameCount()) {
@@ -341,21 +530,27 @@ NativeSceneResultScope::NativeSceneResultScope(uint32_t view)
   current_result = this;
 }
 NativeSceneResultScope::~NativeSceneResultScope() {
-  // The optional result releases pins/references even on disabled post or an
-  // exception. Nested views restore their parent's separate completion slot.
+  // Normal view return calls Clear explicitly, so skipped post still publishes.
+  // An exception releases owners here without recording GPU work while unwinding.
   current_result = previous_;
 }
-void NativeSceneResultScope::Complete(uint32_t color_getter, uint32_t depth_getter,
+void NativeSceneResultScope::Clear() {
+  if (auto pending = result_.Take(frame_)) pending->PublishPendingColor();
+}
+bool NativeSceneResultScope::Complete(uint32_t color_getter, uint32_t depth_getter,
     const HostPostInputs &inputs, GuestTexture *color, GuestTexture *depth,
-    GuestTexture *output, GuestTexture *depth_output) {
-  result_.Clear();
+    GuestTexture *output, GuestTexture *depth_output, NativeSceneResolveHandle resolves,
+    bool pending_scene_color) {
+  Clear();
   if (frame_ != FrameStatFrameCount() || !color_getter_ || !depth_getter_ ||
       color_getter != color_getter_ || depth_getter != depth_getter_ ||
       !inputs.scene || !inputs.depth || !output || !depth_output)
-    return;
+    return false;
   CompletedSceneImages result;
   result.inputs = inputs;
+  result.resolves = std::move(resolves);
   result.output = output;
+  result.pending_scene_color = pending_scene_color;
   const std::array sources{color, depth};
   const std::array outputs{output, depth_output};
   for (size_t i = 0; i < sources.size(); ++i) {
@@ -367,11 +562,17 @@ void NativeSceneResultScope::Complete(uint32_t color_getter, uint32_t depth_gett
   }
   stats.materialized_color += inputs.scene.texture != color->texture;
   stats.materialized_depth += inputs.depth.texture != depth->texture;
+  stats.native_resolve_results += bool(result.resolves);
   result_.Complete(frame_, std::move(result));
   ++stats.completed;
+  return true;
 }
 std::optional<CompletedSceneImages> NativeSceneResultScope::Take(uint32_t view) {
   if (view != view_) return {}; // a nested/foreign caller cannot consume this view
+  if (frame_ != FrameStatFrameCount()) {
+    Clear(); // retain getter correctness even when a stale result cannot feed post
+    return {};
+  }
   auto result = result_.Take(FrameStatFrameCount());
   stats.consumed += result.has_value();
   return result;

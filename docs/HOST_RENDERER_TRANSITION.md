@@ -33,9 +33,17 @@ All of these remain required; shipping an intermediate component is not completi
 Publication follow-up (2026-09-06): the owner granted standing normal commit/
 push approval for `noeldvictor/reblue_android_optional_vr:main` and
 `noeldvictor/plume:main`. Plume is published through `3094b35`, now recorded
-by the parent dependency reference. The existing uncommitted scene/post renderer
-integration still requires scoped review and a coherent commit. Earlier dated
+by the parent dependency reference. The scene/post image integration is now
+reviewed as one coherent source checkpoint: native source allocations, MSAA and
+single-sample framebuffers, snapshot leases, post images and getter publication
+share fence-retained ownership and layout state. Review confirmed the dependency
+factory rejects null-backed Vulkan framebuffers before they enter native caches.
+All 103 source guards pass again; existing host build 34, CPU suite 27, flat/XR
+logs 880/881 and strict tiny GPU fixtures supply the unchanged integration's
+verification. No new build, runtime or capture was needed. Broad desktop/both-eye
+and authored snapshot/deferred-effect qualification remain open. Earlier dated
 approval-blocked notes are historical, not the current publication constraint.
+Review details: `research/20260906_0333_native-scene-state-bridge.md` (13:42 entry).
 
 Sorted visual scheduling (2026-09-06): the complete `Visual__DrawSortedQueues`
 now owns model/primitive order and dispatch on the host, using one bounded

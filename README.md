@@ -53,12 +53,12 @@ not replace the host-renderer goal.
 
 ## Current state
 
-Snapshot: 2026-09-06; the table records earlier checkpoints, with newer local work below.
+Snapshot: 2026-09-06; the table records earlier checkpoints, with newer work below.
 
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
 
-Latest local checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
+Latest implementation checkpoint: [native sorted visual scheduling](research/20260906_1323_native-visual-schedule.md)
 moves the complete model/primitive scheduler and its sorting storage onto the
 host, following native immediate vertex submission. Build, 31 CPU tests and
 103 source guards pass. Bounded flat/XR checks record 78,861/36,784 scheduled
@@ -92,10 +92,16 @@ limitations are in the checkpoint report above.
 
 The owner granted standing commit/push approval on 2026-09-06 for
 `noeldvictor/reblue_android_optional_vr:main` and `noeldvictor/plume:main`.
-Plume's four pending commits are published through `3094b35`; the parent now
-records that dependency revision. The existing uncommitted scene/post renderer
-integration still needs a scoped review and coherent commit. Historical reports
-retain the earlier approval blocker; it is no longer the publication constraint.
+Plume is published through `3094b35`, and the reviewed scene/post integration
+uses that dependency: native scene allocations, framebuffers, attachment MSAA
+resolves, snapshots and post outputs retain their own images/descriptors/layouts
+through GPU fences. Matching depth and final post getters borrow those images
+without a copy. The retained flat check records 3,600 native scene clears and
+depth publications with zero compatibility clears/depth publications. Getter
+adapters, unconverted scopes and full desktop qualification remain; this is not
+a fully host-owned frame. The integration reuses the existing build/CPU/GPU and
+flat/XR evidence, not a new verification run. Publication review:
+[scene integration ledger](research/20260906_0333_native-scene-state-bridge.md#integration-review-and-publication-1342).
 
 | Area | Implemented | Still required |
 | --- | --- | --- |

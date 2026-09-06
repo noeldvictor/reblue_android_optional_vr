@@ -28,6 +28,7 @@
 #include "gpu/frame_stats.h"
 #include "gpu/gpu_timing.h"
 #include "gpu/post_chain.h"
+#include "gpu/native_post_images.h"
 #include "gpu/scene_image.h"
 #include "gpu/settings.h"
 
@@ -725,7 +726,106 @@ void NoteTileContentLocked(VideoState &s, GuestTexture *dst, bool pass_end) {
   }
 }
 
+bool NativeOutputDestination(const GuestTexture *dst) {
+  return dst && dst->texture && dst->type == ResourceType::Texture && dst->width && dst->height &&
+      dst->layers && dst->layers <= 2 && dst->mipLevels == 1 && dst->sampleCount == 1 &&
+      dst->format != plume::RenderFormat::UNKNOWN &&
+      !dst->hostOwned && !dst->nativeGpu &&
+      !dst->aliasOf && !dst->aliasedBy && !dst->pendingDestroy && !dst->mappedMemory &&
+      !dst->companion2D && !dst->companionCube && !dst->resolvedTexture &&
+      (dst->viewDimension == plume::RenderTextureViewDimension::UNKNOWN ||
+       dst->viewDimension == plume::RenderTextureViewDimension::TEXTURE_2D ||
+       dst->viewDimension == plume::RenderTextureViewDimension::TEXTURE_2D_ARRAY);
+}
+
+bool NativeImageDestination(const NativeImageLease &source, const GuestTexture *dst,
+                            NativeImageExtentPolicy extent) {
+  if (!NativeOutputDestination(dst) || !source.CanPublishExtent(dst->width, dst->height, dst->layers, extent) ||
+      IsDepthFormat(source.image.format) != IsDepthFormat(dst->format)) return false;
+  // Re-publishing the same scene depth is a metadata handoff, not a new backing.
+  return source.image.texture != dst->texture ||
+      (dst->nativeImage.owner == source.owner && dst->nativeImage.image.layout == source.image.layout &&
+       dst->nativeImage.image.descriptor_index == source.image.descriptor_index);
+}
+
 } // namespace
+
+bool Video::CanPublishNativePostOutput(GuestTexture *dst) {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  const bool valid = s.ready && NativeOutputDestination(dst) && !IsDepthFormat(dst->format);
+  static u32 refused = 0;
+  if (!valid && dst && refused++ < 8)
+    BD_WARN("[native-post-images] destination refusal type {} {}x{} layers {} mips {} samples {}; "
+            "host {} asset {} alias {} reader {} pending {}",
+        u32(dst->type), dst->width, dst->height, dst->layers, dst->mipLevels, dst->sampleCount,
+        dst->hostOwned, bool(dst->nativeGpu), bool(dst->aliasOf), bool(dst->aliasedBy), dst->pendingDestroy);
+  return valid;
+}
+bool Video::PublishNativePostOutput(const NativePostImageHandle &source, GuestTexture *dst) {
+  if (!source || !source->Output()) return false;
+  return PublishNativeImage({source, source->Output().image}, dst, true);
+}
+bool Video::CanPublishNativeImage(const NativeImageLease &source, GuestTexture *dst, NativeImageExtentPolicy extent) {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  return s.ready && NativeImageDestination(source, dst, extent);
+}
+bool Video::PublishNativeImage(const NativeImageLease &source, GuestTexture *dst, bool publish_post_chain,
+                               NativeImageExtentPolicy extent) {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  if (!s.ready || !NativeImageDestination(source, dst, extent) ||
+      (publish_post_chain && source.image.texture == dst->texture)) return false;
+  const auto lease = source; // retain even if the caller passed dst's current lease
+  const auto &image = lease.image;
+  // Native rendering has completed its queued draws. Retire any old framebuffer
+  // referring to the replaced backing before its image/views can die; never
+  // rewrite a descriptor that an in-flight frame may still be sampling.
+  if (image.texture != dst->texture) {
+    const auto slot = RetireSlot("native image publication");
+    for (auto *owner : s.framebuffer_owners) {
+      for (auto it = owner->framebuffers.begin(); it != owner->framebuffers.end();) {
+        if (owner == dst || it->first == dst->texture) {
+          s.framebuffer_graveyard[slot].push_back(std::move(it->second));
+          it = owner->framebuffers.erase(it);
+        } else ++it;
+      }
+    }
+    ReleaseTextureSRVLocked(s, dst);
+    if (dst->textureView)
+      s.texture_view_graveyard[slot].push_back(std::move(dst->textureView));
+    if (dst->textureHolder)
+      s.texture_graveyard[slot].push_back(std::move(dst->textureHolder));
+  }
+  DetachSourceSurfaceLocked(s, dst);
+  dst->layout.Unbind(); // before dropping the prior owner/layout lifetime
+  dst->nativeImage = lease;
+  dst->texture = image.texture;
+  dst->textureViewOf = image.texture;
+  dst->textureViewLayers = image.layers;
+  dst->width = image.width;
+  dst->height = image.height;
+  dst->layers = image.layers;
+  dst->format = image.format;
+  dst->contentHash = 0;
+  dst->alphaOpaque = 0;
+  dst->viewDimension = plume::RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  dst->descriptorIndex = image.descriptor_index;
+  dst->layout.Bind(*image.layout);
+  dst->resolveScale = 1.f;
+  dst->resolveLevel = dst->resolveFace = 0;
+  dst->resolveClearToFar = dst->resolveSourceFallback = dst->selfReadDeferred = false;
+  dst->surfaceDrawn = true;
+  if (publish_post_chain) {
+    s.last_resolved_dst = dst;
+    NoteTileContentLocked(s, dst, true); // remaining UI scheduling boundary only
+  }
+  s.texture_bindings_dirty = true;
+  s.plume_framebuffer_bound = s.draw_framebuffer_bound = false;
+  s.bound_fb_rt = s.bound_fb_ds = nullptr;
+  return true;
+}
 
 bool Video::PublishSceneOutput(GuestTexture *src, GuestTexture *dst, float exposure,
                                bool publish_post_chain, SceneImage *sampled) {

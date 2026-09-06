@@ -21,6 +21,7 @@
 #include <plume_render_interface.h>
 
 #include "gpu/d3d.h"
+#include "gpu/native_image_lease.h"
 #include "gpu/shaders/shader_cache.h"
 
 namespace bd::gpu {
@@ -47,6 +48,7 @@ union GuestTextureX360 {
 static_assert(sizeof(GuestTextureX360) == 52);
 
 namespace scene { struct NativeTextureGpu; }
+struct NativeTargetImage;
 
 struct GuestTexture {
   // First 52 bytes: X360 header layout the engine reads. Never read past 52.
@@ -59,6 +61,12 @@ struct GuestTexture {
   // Non-owning guest-facing adapter to a shared native image/view/descriptor.
   // The device's native store, not this wrapper, owns fence-gated residency.
   std::shared_ptr<const scene::NativeTextureGpu> nativeGpu;
+  // Boundary only: native post/scene stores own the image/view/descriptor.
+  // Holding this lease also excludes reuse by exclusive native post writers.
+  NativeImageLease nativeImage;
+  // Source attachments may be multisampled; never expose them as a valid
+  // single-sample NativeImageLease. Binding adapters do not own GPU allocations.
+  std::shared_ptr<const NativeTargetImage> nativeTarget;
   plume::RenderTexture *texture = nullptr;
   std::unique_ptr<plume::RenderTextureView> textureView;
   // --- tile aliasing --------------------------------------------------------
@@ -152,7 +160,7 @@ struct GuestTexture {
   // ~0u when not registered in the bindless texture heap. Set lazily by
   // BindTextureSRV at draw time.
   u32 descriptorIndex = ~u32{0};
-  plume::RenderTextureLayout layout = plume::RenderTextureLayout::UNKNOWN;
+  ImageLayoutRecord layout;
   plume::RenderTextureViewDimension viewDimension =
       plume::RenderTextureViewDimension::UNKNOWN;
   plume::RenderSampleCounts sampleCount = plume::RenderSampleCount::COUNT_1;

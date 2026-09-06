@@ -21,12 +21,16 @@ set(reblue_backend_only
     gpu/hooks/shader.cpp
     gpu/multiview_resolve.cpp
     gpu/post_chain.cpp
+    gpu/native_post_images.cpp
+    gpu/native_target_images.cpp
     gpu/imgui_overlay_drawer.cpp
     gpu/occlusion.cpp
     gpu/pipeline/pipeline_cache.cpp
     gpu/present.cpp
     gpu/resolve.cpp
     gpu/sampler_cache.cpp
+    gpu/scene/native_scene_resolves.cpp
+    gpu/scene/native_scene_framebuffer.cpp
     gpu/scene/native_texture_gpu.cpp
     gpu/shaders/guest_shaders.cpp
     gpu/texture_upload.cpp

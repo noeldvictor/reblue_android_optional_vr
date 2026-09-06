@@ -64,7 +64,6 @@
 #include "gpu/frame_stats.h"
 #include "gpu/host_targets.h"
 #include "gpu/resources.h"
-#include "gpu/scene/native_texture_gpu.h"
 
 #if defined(REBLUE_D3D12)
 #include "src/gpu/shaders/hlsl/post_blur_ps.hlsl.dxil.h"
@@ -153,11 +152,13 @@ struct CompositeConstants {
   float heat[4]; // amplitudes xy, noise scale, depth exponent
   float heat_animation[4]; // render-frame phase
   u32 heat_image[4]; // enabled, native image, explicit sampler, reserved
+  u32 scene_options[4]; // force opaque scene alpha; remaining lanes reserved
 };
-static_assert(sizeof(CompositeConstants) == 224);
+static_assert(sizeof(CompositeConstants) == 240);
 static_assert(offsetof(CompositeConstants, heat) == 176);
 static_assert(offsetof(CompositeConstants, heat_animation) == 192);
 static_assert(offsetof(CompositeConstants, heat_image) == 208);
+static_assert(offsetof(CompositeConstants, scene_options) == 224);
 
 struct Scratch {
   std::unique_ptr<plume::RenderTexture> texture;
@@ -193,6 +194,7 @@ struct DofInputs {
   Scratch *atlas = nullptr;
   float rects[5][4] = {};
   float scene_scale = 1.0f; // what the composite multiplies the scene tap by
+  bool opaque_scene_alpha = false;
   DofParameters parameters;
   bool valid = false;
 };
@@ -410,7 +412,7 @@ bool Readable(GuestTexture *t) {
 
 SampledImage Snapshot(GuestTexture *t) {
   if (!t) return {};
-  return {t->texture, &t->layout, t->width, t->height, t->layers,
+  return {t->texture, &t->layout.Get(), t->width, t->height, t->layers,
           t->format, t->descriptorIndex, t->sampleCount};
 }
 bool Readable(const SampledImage &image) { return bool(image); }
@@ -514,6 +516,7 @@ bool BuildDofAtlas(VideoState &s, Chain &c, const HostPostInputs &inputs,
   if (!pyr || !atlas)
     return false;
   c.dof.scene_scale = inputs.exposure;
+  c.dof.opaque_scene_alpha = inputs.opaque_scene_alpha;
   c.dof.scene_src = *scene;
   Transition(s, atlas->texture.get(), atlas->layout, plume::RenderTextureLayout::COLOR_WRITE);
   u32 x = 0;
@@ -522,7 +525,7 @@ bool BuildDofAtlas(VideoState &s, Chain &c, const HostPostInputs &inputs,
     const u32 w = std::max(1u, scene->width >> shift);
     const u32 h = std::max(1u, scene->height >> shift);
     PassAt(s, pyr, atlas->framebuffer.get(), x, 0, w, h,
-           PostPush{scene->descriptor_index, level,
+           PostPush{scene->descriptor_index, level | (inputs.opaque_scene_alpha ? 0x80000000u : 0u),
                     float(REXCVAR_GET(bd_host_post_blur)), inputs.exposure},
            /*keep_bound=*/level + 1 < 5);
     c.dof.rects[level][0] = float(x) / float(atlas->width);
@@ -670,10 +673,14 @@ PostAttachment Attachment(Scratch *target) {
   return {target->texture.get(), target->framebuffer.get(),
           target->width, target->height, target->layers, target->format};
 }
+PostAttachment Attachment(const HostPostOutput &target) {
+  const auto &image = target.image;
+  return {image.texture, target.framebuffer, image.width, image.height, image.layers, image.format};
+}
 bool HostComposite(VideoState &s, Chain &c, const SampledImage *scene,
                    GuestTexture *bloom, const PostAttachment &rt,
                    const BloomParameters &parameters,
-                   const HeatShimmerParameters &heat = {}, GuestTexture *heat_image = nullptr,
+                   const HeatShimmerParameters &heat = {}, const SampledImage &heat_image = {},
                    u32 heat_sampler = 0, const BloomMaskView &directional = {},
                    bool bright_stage = false) {
 #if defined(REBLUE_D3D12)
@@ -703,6 +710,7 @@ bool HostComposite(VideoState &s, Chain &c, const SampledImage *scene,
   if (!depth)
     return bail("depth not readable");
   CompositeConstants k{};
+  k.scene_options[0] = c.dof.opaque_scene_alpha;
   if (heat.enabled) {
     const auto *noise = NativeSource(s, heat_image);
     if (!noise || !heat_sampler) return bail("heat noise image/sampler");
@@ -712,7 +720,7 @@ bool HostComposite(VideoState &s, Chain &c, const SampledImage *scene,
     k.heat[3] = heat.depth_power;
     k.heat_animation[0] = heat.phase;
     k.heat_image[0] = 1;
-    k.heat_image[1] = noise->descriptorIndex;
+    k.heat_image[1] = noise->descriptor_index;
     k.heat_image[2] = heat_sampler;
   }
   k.dof[0] = c.dof.parameters.aperture;
@@ -790,7 +798,7 @@ BloomMaskView BuildDirectionalBloom(VideoState &s, Chain &c, const SampledImage 
   bright.width /= 2; // only the left half is initialized; both directions start here
   Transition(s, atlases[0]->texture.get(), atlases[0]->layout,
              plume::RenderTextureLayout::COLOR_WRITE);
-  if (!HostComposite(s, c, scene, nullptr, bright, parameters, {}, nullptr, 0, {}, true))
+  if (!HostComposite(s, c, scene, nullptr, bright, parameters, {}, {}, 0, {}, true))
     throw std::runtime_error("Native directional bloom preparation failed");
   s.command_list->setFramebuffer(nullptr);
   Transition(s, atlases[0]->texture.get(), atlases[0]->layout,
@@ -823,24 +831,23 @@ BloomMaskView BuildDirectionalBloom(VideoState &s, Chain &c, const SampledImage 
 
 bool RenderLensFlare(VideoState &s, Chain &c, const PostAttachment &output,
                      const LensFlareParameters &parameters,
-                     const std::array<GuestTexture *, 4> &images) {
+                     const std::array<SampledImage, 4> &images) {
   if (!parameters.count)
     return true;
   auto sprites = parameters.sprites;
   static bool reported_images = false;
   if (!reported_images) {
     for (u32 i = 0; i < images.size(); ++i) {
-      const auto *asset = images[i];
-      BD_INFO("[native-post] explicit optical image {} {}x{} descriptor {} native {:016X}",
-          i, asset->width, asset->height, asset->descriptorIndex,
-          asset->nativeGpu ? asset->nativeGpu->asset->id : 0);
+      const auto &asset = images[i];
+      BD_INFO("[native-post] native sampled optical image {} {}x{} descriptor {}",
+          i, asset.width, asset.height, asset.descriptor_index);
     }
     reported_images = true;
   }
-  for (auto *image : images)
+  for (const auto &image : images)
     if (!NativeSource(s, image)) return false;
   for (u32 i = 0; i < parameters.count; ++i)
-    sprites[i].texture = images[sprites[i].texture]->descriptorIndex;
+    sprites[i].texture = images[sprites[i].texture].descriptor_index;
   const auto allocation = UploadHostConstants(sprites.data(), sizeof(sprites));
   auto *pipeline = Pipeline(s, c, Shader::LensFlare, output.format, output.layers > 1);
   auto *framebuffer = output.framebuffer;
@@ -879,54 +886,48 @@ SampledImage BorrowPostImage(GuestTexture *image) {
   return s.ready && PrepareReadable(s, image) ? Snapshot(image) : SampledImage{};
 }
 
-bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
+bool HostPostRender(VideoState &s, const HostPostInputs &inputs, const HostPostOutput &target,
                     const DofParameters &dof, const BloomParameters &bloom,
                     const LensFlareParameters &flare,
-                    const std::array<GuestTexture *, 4> &flare_images,
+                    const std::array<SampledImage, 4> &flare_images,
                     const PostAdjustments &adjustments, const ScanlineParameters &scanline,
-                    const GradeParameters &grade, GuestTexture *grain_image,
-                    const HeatShimmerParameters &heat, GuestTexture *heat_image) {
+                    const GradeParameters &grade, const SampledImage &grain_image,
+                    const HeatShimmerParameters &heat, const SampledImage &heat_image) {
 #if defined(REBLUE_D3D12)
   return false;
 #else
   if (!REXCVAR_GET(bd_host_post) || !REXCVAR_GET(bd_host_post_composite) ||
       !REXCVAR_GET(bd_host_post_atlas) || !REXCVAR_GET(bd_host_post_bloom_fold))
     return false;
-  auto &s = state();
-  std::lock_guard lock(s.mutex);
   auto &c = chain();
   const auto *source = &inputs.scene;
   const auto *z = &inputs.depth;
+  const auto *output = &target.image;
   if (!s.ready || c.failed || !std::isfinite(inputs.exposure) || inputs.exposure <= 0)
     return false;
-  if (!output || !inputs.CanRenderTo(output->texture, output->layers)) {
+  if (!target.CanRender(inputs)) {
     static u32 refused = 0;
     if (refused++ < 8)
       BD_WARN("[native-post] image preflight frame {} ready {} failed {}; "
               "source texture {} slot {} layers {}; depth texture {} slot {} layers {}; "
-              "output {:08X} texture {} layers {}",
+              "output texture {} layers {} framebuffer {}",
               FrameStatFrameCount(), s.ready, c.failed,
               bool(source->texture), source->descriptor_index, source->layers,
               bool(z->texture), z->descriptor_index, z->layers,
-              output ? output->selfVa : 0, output && output->texture, output ? output->layers : 0);
+              bool(output->texture), output->layers, bool(target.framebuffer));
     return false;
   }
   if (flare.count > flare.sprites.size()) return false;
   if (flare.count) {
-    for (auto *image : flare_images) {
-      if (auto *asset = image; asset && asset->texture)
-        BindTextureSRVLocked(s, asset);
-      if (!Readable(image) || image == output || image->layers != 1) return false;
-    }
+    for (const auto &image : flare_images)
+      if (!target.CanSampleMono(image)) return false;
     for (u32 i = 0; i < flare.count; ++i)
       if (flare.sprites[i].texture >= flare_images.size()) return false;
   }
   u32 grain_sampler = 0;
   u32 heat_sampler = 0;
-  const auto prepare_noise = [&](GuestTexture *image, u32 &sampler) {
-    auto *asset = image;
-    if (asset && asset->texture) BindTextureSRVLocked(s, asset);
-    if (!Readable(asset) || asset == output || asset->layers != 1) return false;
+  const auto prepare_noise = [&](const SampledImage &image, u32 &sampler) {
+    if (!target.CanSampleMono(image)) return false;
     plume::RenderSamplerDesc recipe;
     recipe.minFilter = recipe.magFilter = plume::RenderFilter::LINEAR;
     recipe.mipmapMode = plume::RenderMipmapMode::LINEAR;
@@ -957,7 +958,7 @@ bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
     scratch[i] = GetScratch(s, c, output->width, output->height, output->format, 3 + i, output->layers);
     if (!scratch[i]) return false;
   }
-  const auto destination = Attachment(s, output);
+  const auto destination = Attachment(target);
   const auto attachment = [&](u32 index) {
     return index == PostPasses::kOutput ? destination : Attachment(scratch[index]);
   };
@@ -968,13 +969,12 @@ bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
     return false;
   if (s.plume_framebuffer_bound)
     DrawQueueFlush(s.command_list);
-  HostTargetDropLinks(s, output);
   if (!BuildDofAtlas(s, c, inputs, dof) || !c.dof.valid)
     throw std::runtime_error("Native post atlas production failed");
   const auto directional = BuildDirectionalBloom(s, c, source, bloom, bloom_atlases);
   const auto write_attachment = [&](u32 index) {
     if (index == PostPasses::kOutput)
-      Transition(s, output->texture, output->layout, plume::RenderTextureLayout::COLOR_WRITE);
+      Transition(s, output->texture, *output->layout, plume::RenderTextureLayout::COLOR_WRITE);
     else
       Transition(s, scratch[index]->texture.get(), scratch[index]->layout,
                  plume::RenderTextureLayout::COLOR_WRITE);
@@ -1007,7 +1007,7 @@ bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
       if (grade.grain) {
         auto *noise = NativeSource(s, grain_image);
         if (!noise) throw std::runtime_error("Native grading grain image failed");
-        push.src2 = noise->descriptorIndex;
+        push.src2 = noise->descriptor_index;
       }
       struct GradeConstants {
         float gain_gamma[4], bias_saturation[4], target_blend[4], strength_phase[4];
@@ -1031,12 +1031,11 @@ bool HostPostRender(const HostPostInputs &inputs, GuestTexture *output,
     if (!pipeline) throw std::runtime_error("Native post effect pipeline failed");
     Pass(s, pipeline, target.framebuffer, target.width, target.height, push, true);
   }
-  output->surfaceDrawn = true;
   // Caller carries the completed output directly; there is no per-root getter
   // publication or mutation of an input's resolve associations here.
   c.dof.valid = false;
   s.command_list->setFramebuffer(nullptr);
-  Transition(s, output->texture, output->layout, plume::RenderTextureLayout::SHADER_READ);
+  Transition(s, output->texture, *output->layout, plume::RenderTextureLayout::SHADER_READ);
   s.plume_framebuffer_bound = false;
   s.draw_framebuffer_bound = false;
   s.bound_fb_rt = nullptr;
