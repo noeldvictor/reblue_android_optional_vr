@@ -108,6 +108,14 @@ full-frame pixel/game qualification remain unfinished. The scene integration is 
 or published**: dependency publication needs owner approval before its parent
 gitlink can be committed. The table above describes earlier checkpoints.
 
+The latest [native post-resource boundary](research/20260905_2351_native-post-resource-contract.md)
+removes output and optical-image headers from post rendering, retaining native
+HDR images between roots. Its independent contract/test is checkpointed locally;
+renderer wiring remains pending with the scene integration. The host build,
+31 CPU tests, 48 source guards and capture-disabled flat/XR optical diagnostics
+pass. Temporary output allocation and final UI/depth publication still need
+conversion; these diagnostics are not new pixel or full-game qualification.
+
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.
 Six superseded normal raw sets and their automatic copies/links were removed,

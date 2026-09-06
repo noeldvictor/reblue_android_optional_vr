@@ -30,6 +30,20 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native post output/optical contract (2026-09-06): the rendering core now accepts
+native HDR attachments and sampled optical images; it no longer reads output,
+flare, heat or grain resource headers. Native inter-root reads carry the completed
+image directly. The independent output contract/test is locally checkpointed;
+renderer wiring remains uncommitted alongside the unpublished scene integration.
+The host build, 31 CPU tests and 48 source guards pass. Capture-disabled XR with
+synthetic flare/heat/animated grain and normal non-MSAA flat runs record
+8,401/3,601 native post scopes with zero imports/original scopes/refusals.
+Both profiles were restored. This removes core header dependencies, not the
+temporary output allocator, final UI/depth publications or remaining frame/game
+gates; no new pixel qualification or Quest work. Thirteen superseded small
+diagnostics were removed (888,832 B measured reclaimed). Evidence:
+`research/20260905_2351_native-post-resource-contract.md`.
+
 Native Vulkan multiview state ordering (2026-09-05, local Plume `81bdca8`):
 lazy native pass begin now reestablishes current native bindings, including
 descriptor offsets and incremental push values, with layout-disturbance and
