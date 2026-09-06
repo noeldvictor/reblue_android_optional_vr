@@ -30,6 +30,21 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Native post-image ownership (2026-09-06, local renderer integration): post
+outputs now have their own bounded FP16 image/view/framebuffer pool, not
+`PostColor` resource-header allocations. Native write leases exclude live
+readers; the final UI/getter borrows the completed image and descriptor without
+a copy or resolve link. Old backing/framebuffers retire behind a fence. The
+host build, 31 CPU tests and 50 source guards pass. Normal flat, optical XR and
+non-MSAA flat diagnostics record 3,601/7,501/3,601 native scopes and zero imports,
+original scopes or refusals; residency settles at two post images. One existing
+normal-flat PNG was inspected without obvious full-frame corruption, not a new
+sequence/stereo qualification. The independent pool/test is the local checkpoint;
+GPU creation/publication wiring and the required Plume gitlink remain uncommitted
+pending dependency publication approval. Initial depth publication, UI scheduling,
+remaining guest frame/game gates and Quest qualification remain open. Evidence:
+`research/20260906_0014_native-post-image-ownership.md`.
+
 Native post output/optical contract (2026-09-06): the rendering core now accepts
 native HDR attachments and sampled optical images; it no longer reads output,
 flare, heat or grain resource headers. Native inter-root reads carry the completed

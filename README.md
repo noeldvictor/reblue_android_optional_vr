@@ -53,7 +53,7 @@ not replace the host-renderer goal.
 
 ## Current state
 
-Snapshot: 2026-09-05.
+Snapshot: 2026-09-06; the table records earlier checkpoints, with newer local work below.
 
 This is an unfinished renderer migration, not a fully native-rendering or
 Quest-ready release.
@@ -108,13 +108,24 @@ full-frame pixel/game qualification remain unfinished. The scene integration is 
 or published**: dependency publication needs owner approval before its parent
 gitlink can be committed. The table above describes earlier checkpoints.
 
-The latest [native post-resource boundary](research/20260905_2351_native-post-resource-contract.md)
+The [native post-resource boundary](research/20260905_2351_native-post-resource-contract.md)
 removes output and optical-image headers from post rendering, retaining native
 HDR images between roots. Its independent contract/test is checkpointed locally;
 renderer wiring remains pending with the scene integration. The host build,
 31 CPU tests, 48 source guards and capture-disabled flat/XR optical diagnostics
-pass. Temporary output allocation and final UI/depth publication still need
-conversion; these diagnostics are not new pixel or full-game qualification.
+pass. At that checkpoint temporary output allocation and final UI/depth
+publication still needed conversion; these were not new pixel qualifications.
+
+The latest [native post-image ownership](research/20260906_0014_native-post-image-ownership.md)
+replaces the post output allocator with a bounded native FP16 pool. The final
+getter borrows the completed image/descriptor without a copy or resolve link;
+live readers prevent write-lease reuse and destruction is fence-gated. The host
+build, 31 CPU tests and 50 source guards pass. Normal flat, optical XR and
+non-MSAA diagnostics have zero post imports/fallbacks/refusals and settle at two
+resident post images. One normal-flat window PNG was inspected, not a new
+flat/VR sequence qualification. The independent pool/test is locally checkpointed;
+GPU integration remains uncommitted pending dependency publication approval.
+Initial depth publication, UI scheduling and full-frame/game gates remain open.
 
 The last pixel-verified [native scene-result evidence](research/20260905_1958_native-scene-image-result.md)
 records scoped image ownership, exact binary/settings and flat/both-eye checks.

@@ -1,5 +1,6 @@
 // CPU contract checks: native interface doubles, no GPU allocation/submission.
 #include "gpu/host_post_output.h"
+#include "gpu/native_post_images.h"
 #include "gpu/post_sequence.h"
 #include <array>
 #ifdef NDEBUG
@@ -94,5 +95,110 @@ void OutputContract() {
     }
   }
 }
+
+struct ImageLife {
+  bool image = false, view = false, framebuffer = false, descriptor = true;
+};
+struct PoolImage : RenderTexture {
+  std::shared_ptr<ImageLife> life;
+  explicit PoolImage(std::shared_ptr<ImageLife> value) : life(std::move(value)) { life->image = true; }
+  ~PoolImage() override {
+    assert(!life->descriptor && !life->framebuffer && !life->view);
+    life->image = false;
+  }
+  std::unique_ptr<RenderTextureView> createTextureView(const RenderTextureViewDesc &) const override { return {}; }
+  void setName(const std::string &) override {}
+};
+struct PoolView : RenderTextureView {
+  std::shared_ptr<ImageLife> life;
+  explicit PoolView(std::shared_ptr<ImageLife> value) : life(std::move(value)) { life->view = true; }
+  ~PoolView() override {
+    assert(!life->descriptor && !life->framebuffer && life->image);
+    life->view = false;
+  }
+};
+struct PoolFramebuffer : RenderFramebuffer {
+  NativePostRecipe recipe;
+  std::shared_ptr<ImageLife> life;
+  PoolFramebuffer(NativePostRecipe shape, std::shared_ptr<ImageLife> value)
+      : recipe(shape), life(std::move(value)) { life->framebuffer = true; }
+  ~PoolFramebuffer() override {
+    assert(!life->descriptor && life->view && life->image);
+    life->framebuffer = false;
+  }
+  uint32_t getWidth() const override { return recipe.width; }
+  uint32_t getHeight() const override { return recipe.height; }
+};
+void PoolOwnership() {
+  NativePostImagePool pool(2048, 2); // two 16x8 mono outputs, or one stereo output
+  std::vector<std::shared_ptr<ImageLife>> lives;
+  const NativePostRecipe recipe{16, 8, 1};
+  const auto acquire = [&](const NativePostRecipe &shape) {
+    return pool.Acquire(shape, [&] {
+      auto result = std::make_shared<NativePostImage>();
+      auto life = std::make_shared<ImageLife>();
+      result->recipe = shape;
+      result->descriptor = uint32_t(lives.size());
+      lives.push_back(life);
+      result->image = std::make_unique<PoolImage>(life);
+      result->view = std::make_unique<PoolView>(life);
+      result->framebuffer = std::make_unique<PoolFramebuffer>(shape, life);
+      return result;
+    });
+  };
+  const auto retire = [&](const NativePostImage &image) {
+    auto &life = *lives[image.descriptor];
+    assert(life.image && life.view && life.framebuffer && life.descriptor);
+    life.descriptor = false;
+  };
+  for (const NativePostRecipe invalid : {
+           NativePostRecipe{}, {0, 8, 1}, {16, 0, 1}, {16, 8, 0}, {16, 8, 3},
+           {UINT32_MAX, UINT32_MAX, 2}, {17, 8, 2}}) {
+    assert(!acquire(invalid));
+    assert(lives.empty()); // bad shape/overflow rejected before allocation
+  }
+  auto first = acquire(recipe);
+  assert(first && first->Output() && first->Output().image.descriptor_index == 0);
+  auto reader = first; first.reset();
+  auto second = acquire(recipe);
+  assert(second && second->image != reader->image && lives.size() == 2);
+  assert(!acquire(recipe)); // neither live published/read lease can be overwritten
+  assert(pool.Stats().bytes == 2048 && pool.Stats().refused == 1);
+  pool.MarkUnused(0); pool.AfterFence(0, retire);
+  assert(pool.Stats().resident == 2); // even a proven fence does not invalidate readers
+  const auto *old = reader->image.get();
+  reader->layout = RenderTextureLayout::SHADER_READ;
+  reader.reset();
+  first = acquire(recipe);
+  assert(first->image.get() == old && lives.size() == 2);
+  assert(first->layout == RenderTextureLayout::UNKNOWN); // next writer must issue a barrier
+  *first->Output().image.layout = RenderTextureLayout::COLOR_WRITE;
+  assert(first->layout == RenderTextureLayout::COLOR_WRITE);
+  second.reset(); first.reset();
+  pool.MarkUnused(1); pool.AfterFence(0, retire);
+  assert(pool.Stats().resident == 2 && lives[0]->descriptor && lives[1]->descriptor);
+  first = acquire(recipe); // reuse cancels this image's pending retirement
+  pool.AfterFence(1, retire);
+  assert(pool.Stats().resident == 1 && first->image.get() == old);
+  assert(!lives[1]->image && !lives[1]->descriptor);
+  int density_identity = 0;
+  auto different = recipe;
+  different.density_map = reinterpret_cast<RenderTexture *>(&density_identity);
+  second = acquire(different);
+  assert(second && second->image != first->image && lives.size() == 3);
+  first.reset(); second.reset();
+  pool.MarkUnused(0); pool.AfterFence(1, retire);
+  assert(pool.Stats().bytes == 2048); // pending retirements still consume the budget
+  assert(!acquire({16, 8, 2}));
+  pool.AfterFence(0, retire);
+  assert(pool.Stats().bytes == 0 && pool.Stats().retired == 3);
+  first = acquire({16, 8, 2});
+  assert(first && first->Output().image.layers == 2 && pool.Stats().bytes == 2048);
+  first.reset(); pool.MarkUnused(0); pool.AfterFence(0, retire);
+  for (const auto &life : lives)
+    assert(!life->descriptor && !life->image && !life->view && !life->framebuffer);
+  auto failure = pool.Acquire(recipe, [] { return NativePostImageHandle{}; });
+  assert(!failure && pool.Stats().failed == 1 && pool.Stats().bytes == 0);
+}
 } // namespace
-int main() { OutputContract(); }
+int main() { OutputContract(); PoolOwnership(); }
