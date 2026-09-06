@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after the Toon checkpoint. These milestones organize the
+Updated 2026-09-06 after load-owned model materials. These milestones organize the
 unchanged completion requirements above; none is a substitute for the full gate.
 
 1. **Scene/material dependency map and targeted verification.** Start from
@@ -42,9 +42,14 @@ unchanged completion requirements above; none is a substitute for the full gate.
    traces request/build/registration/lifetime/draw boundaries. The existing call
    graph now exposes direct/original/indirect/instruction-hook sites and
    conservative host-hook declaration boundaries; linked activation and indirect
-   targets still need review. Next is the load-time native model/primitive record
-   producer, independent of optional PSO precaching, then native consumption.
+   targets still need review. Load-owned primitive/material programs now feed
+   four consumers independently of PSO precaching, with full graph retirement.
+   Geometry/control/texture associations, source-key adapter and draw templates
+   remain. Next are native geometry bindings, instance updates and direct draws.
    Scenario checks must establish feature execution; empty queues are untested.
+   The new field gate correctly refuses Loading / state 0; reconcile those
+   existing state readers against generated writers before another attempt.
+   Water updates also occur in the opening cinematic, so they are not a field ID.
 2. **Complete native static-object path.** Reuse the existing native asset
    libraries and submission backend. Move asset/mesh/material association and
    instance storage above draw submission, using stable native handles. Replace
@@ -70,6 +75,20 @@ repeated investigation/boot work over introducing a new build system. No overall
 development-speed multiplier is established.
 
 ## Latest qualified checkpoint
+
+Load-owned model materials (2026-09-06): host/material fixtures and 120 source
+guards pass; PSO-off diagnostics exercise 114 publications and one retirement,
+488,116 lookup hits with no missing/load/input/budget failures, and matching
+126,735 diffuse /120,369 specular comparisons. An opening-cinematic image was
+inspected, not an interactive field. The stronger field-scenario check fails
+its bounded wait because existing readers report Loading / state 0; this is
+not a successful field/normal-mode/stereo qualification. Reflection has zero
+checks. Old normal flat/XR and failure evidence remains. Geometry, instances,
+source/resource/recipe adapters and retained templates still prevent claiming
+the complete native static-object path. Details and the corrected water-marker
+inference: `research/20260906_1610_load-owned-model-materials.md`.
+
+Prior qualified component evidence (scene labels subject to that correction):
 
 Toon material callbacks (2026-09-06): complete update/begin/end replacements
 own texture animation and edge-parameter production. Pass dispatch directly

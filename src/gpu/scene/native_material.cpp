@@ -5,32 +5,31 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_material.h"
+#include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/reflection_texture_import.h"
 #include <cmath>
 #include <cstring>
+#include <exception>
 #include <limits>
-#include <unordered_map>
+#include <rex/cvar.h>
+#include <rex/hook.h>
 #include <rex/runtime.h>
 #include "core/logging.h"
 #include "core/memory_helpers.h"
+#include "engine/game.h"
 #include "gpu/frame_stats.h"
-#include "gpu/physical_buffers.h"
 #include "gpu/scene/guest_scene.h"
+
+REXCVAR_DECLARE(bool, bd_native_materials_verify);
 
 namespace bd::gpu::scene {
 namespace {
-struct Decoded {
-  std::vector<NativeMaterialRange> ranges;
-  std::vector<NativeMaterialHandle> materials;
-  bool valid = false;
-};
-// Only this temporary discovery cache indexes by guest address. Material
-// ownership and persistent identities live in the independent native library.
-thread_local std::unordered_map<uint32_t, Decoded> decoded;
-thread_local size_t discovery_bytes = 0;
-constexpr size_t kDiscoveryBudget = 8u << 20;
-thread_local uint64_t generation = 0;
+ModelMaterialRegistry &Models() {
+  static ModelMaterialRegistry models;
+  return models;
+}
+std::atomic<uint64_t> model_builds{0}, model_failures{0}, unsupported_meshes{0};
 thread_local uint32_t checked[3]{}, wrong[3]{}, last_report = 0;
 thread_local uint32_t composed[3]{};
 
@@ -46,13 +45,15 @@ NativeMaterialLibrary &Library() {
   return library;
 }
 
-Decoded ReadCommands(uint32_t source) {
-  Decoded result;
+NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget) {
+  NativeModelMaterialProgram result;
   std::vector<uint16_t> words;
   if (!source)
     return result;
   while (words.size() < 65536) {
     auto read = [&]() {
+      if (!word_budget)
+        return false;
       const uint64_t address = uint64_t(source) + words.size() * 2;
       if (address > std::numeric_limits<uint32_t>::max())
         return false;
@@ -60,6 +61,7 @@ Decoded ReadCommands(uint32_t source) {
       if (!word)
         return false;
       words.push_back(uint16_t(*word));
+      --word_budget;
       return true;
     };
     if (!read())
@@ -83,36 +85,56 @@ Decoded ReadCommands(uint32_t source) {
   }
   return result;
 }
-Decoded *FindCommands(const NodeTag &tag) {
+bool PublishModelMaterials(uint32_t graph) {
+  // Called once after the graph builder completes, on the loader thread, with
+  // all nodes and buffer/declaration tables ready. No optional PSO gate and no
+  // first-draw snapshot. The original builder remains a temporary load adapter.
+  Models().Retire(graph);
+  if (!graph || graph > UINT32_MAX - 19)
+    return false;
+  const auto *root = bd::mem::try_at<const be_u32>(graph + 16);
+  if (!root)
+    return false;
+  std::vector<uint32_t> mesh_keys;
+  if (!CollectModelMaterialSources(uint32_t(*root), [](uint32_t node_va)
+      -> std::optional<ModelMaterialSourceNode> {
+        if (!node_va || node_va > UINT32_MAX - sizeof(GuestDrawNode) + 1 ||
+            !bd::mem::try_at<const uint8_t>(node_va + sizeof(GuestDrawNode) - 1))
+          return {};
+        const auto *node = bd::mem::try_at<const GuestDrawNode>(node_va);
+        if (!node)
+          return {};
+        // Visibility is live instance state. Include initially hidden/pruned
+        // nodes too, rather than freezing visibility into material ownership.
+        return ModelMaterialSourceNode{uint32_t(node->child), uint32_t(node->sibling),
+            uint32_t(node->mesh), bool(uint32_t(node->flags) & kNodeHasGeometry)};
+      }, mesh_keys, ModelMaterialRegistry::kMaxMeshes))
+    return false;
+  std::vector<ModelMaterialImport> meshes;
+  meshes.reserve(mesh_keys.size());
+  size_t word_budget = 1u << 20; // aggregate source work, not per mesh
+  for (uint32_t mesh_va : mesh_keys) {
+    const auto *commands = bd::mem::try_at<const be_u32>(mesh_va);
+    if (!commands)
+      return false;
+    auto program = ReadCommands(uint32_t(*commands), word_budget);
+    if (!program.valid)
+      unsupported_meshes.fetch_add(1, std::memory_order_relaxed);
+    meshes.push_back({mesh_va, std::move(program)});
+    if (!word_budget || ModelMaterialRegistry::RetainedBytes(meshes, meshes.capacity()) >
+                            ModelMaterialRegistry::kMaxBytes)
+      return false;
+  }
+  return Models().Publish(graph, std::move(meshes));
+}
+
+std::shared_ptr<const NativeModelMaterialProgram> FindCommands(const NodeTag &tag) {
   // Technique 11 selects visual-specific colours on texture tokens. Phase 1
   // rewrites colour/shininess commands. Their native recipes remain pending.
   if (tag.from_list || !tag.ctx_va || !tag.mesh_va || tag.tech == 11 ||
       bd::mem::try_load<uint32_t>(tag.ctx_va + 16, uint32_t(-1)) != 0)
     return {};
-  const uint64_t now = PhysicalBufferGeneration();
-  if (generation != now) {
-    decoded.clear();
-    discovery_bytes = 0;
-    generation = now;
-  }
-  const uint32_t tokens = bd::mem::try_load<uint32_t>(tag.mesh_va);
-  auto it = decoded.find(tokens);
-  if (it == decoded.end()) {
-    auto imported = ReadCommands(tokens);
-    const size_t bytes = imported.ranges.capacity() * sizeof(NativeMaterialRange) +
-                         imported.materials.capacity() * sizeof(NativeMaterialHandle);
-    if (bytes > kDiscoveryBudget)
-      return {};
-    if (decoded.size() >= 4096 || discovery_bytes + bytes > kDiscoveryBudget) {
-      decoded.clear();
-      discovery_bytes = 0;
-    }
-    discovery_bytes += bytes;
-    it = decoded.emplace(tokens, std::move(imported)).first;
-  }
-  if (!it->second.valid)
-    return {};
-  return &it->second;
+  return Models().Find(bd::mem::try_load<uint32_t>(tag.ctx_va + 4), tag.mesh_va);
 }
 
 bool Matches(const NativeMaterialRange &range, uint32_t ib, uint32_t vb,
@@ -143,7 +165,7 @@ std::optional<NativeReflectionRecipe> ImportNativeReflectionRecipe(
     uint32_t first_index, uint32_t index_count) {
   if (!ModelOwnsReflectionBinding(tag))
     return {};
-  const auto *commands = FindCommands(tag);
+  const auto commands = FindCommands(tag);
   if (!commands)
     return {};
   const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
@@ -180,7 +202,7 @@ std::optional<NativeSkinBinding> ImportNativeSkinBinding(
     }
     return DecodeNativeSkinBinding(std::span(joints).first(tag.bone_count));
   }
-  const auto *commands = FindCommands(tag);
+  const auto commands = FindCommands(tag);
   if (!commands)
     return {};
   const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
@@ -201,7 +223,7 @@ std::optional<NativeSkinBinding> ImportNativeSkinBinding(
 NativeMaterialHandle ImportNativeMaterial(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,
     uint32_t first_index, uint32_t index_count) {
-  const auto *commands = FindCommands(tag);
+  const auto commands = FindCommands(tag);
   if (!commands)
     return {};
   const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
@@ -223,7 +245,7 @@ NativeMaterialHandle ImportNativeMaterial(
 std::optional<bool> ImportMaterialDisablesShadow(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,
     uint32_t first_index, uint32_t index_count) {
-  const auto *commands = FindCommands(tag);
+  const auto commands = FindCommands(tag);
   if (!commands)
     return {};
   const uint32_t ib = bd::mem::try_load<uint32_t>(tag.mesh_va + 8);
@@ -302,16 +324,34 @@ void NativeMaterialNoteReplay(uint32_t mask) {
       ++composed[field];
   const uint32_t frame = FrameStatFrameCount();
   if (frame - last_report >= 300) {
+    const auto models = Models().Stats();
+    if (REXCVAR_GET(bd_native_materials_verify)) {
+      // A water/update count also fires in the opening cinematic. Report the
+      // existing semantic state readers so checks can identify their scenario.
+      const auto &game = bd::engine::Game::Get();
+      BD_INFO("[native-material-context] frame {} mode {} field-state {} stage {} "
+              "player {} event {} movie {}",
+              frame, bd::engine::ToString(game.Mode()), game.FieldState(),
+              game.Stage().Name(), game.Field().HasPlayer() ? 1 : 0,
+              bd::engine::EventScenePlaying() ? 1 : 0,
+              bd::engine::SofdecMoviePlaying() ? 1 : 0);
+    }
     BD_INFO("[native-material] source checks (wrong/checked): diffuse {}/{}, "
-            "specular {}/{}, reflection {}/{}; {} decoded streams; "
+            "specular {}/{}, reflection {}/{}; {} load-owned models; "
             "replay fields composed {}/{}/{}",
             wrong[0], checked[0], wrong[1], checked[1], wrong[2], checked[2],
-            decoded.size(), composed[0], composed[1], composed[2]);
+            models.indexed, composed[0], composed[1], composed[2]);
+    BD_INFO("[native-model-materials] {} builds, {} published, {} retired, {} live / {} bytes; "
+            "{} load failures, {} unsupported meshes, {} budget/input refusals; "
+            "{} lookups hit / {} missing; no draw-time command discovery",
+            model_builds.load(), models.published, models.retired, models.live, models.bytes,
+            model_failures.load(), unsupported_meshes.load(), models.refused,
+            models.hits, models.misses);
     const auto assets = Library().Stats();
     BD_INFO("[native-material-assets] {} cooked, {} loaded, {} resident, {} memory hits; "
-            "{} invalid, {} write failures, {} budget refusals; {} discovery bytes",
+            "{} invalid, {} write failures, {} budget refusals; {} model recipe bytes",
             assets.cooked, assets.loaded, assets.resident, assets.memory_hits,
-            assets.invalid, assets.write_failures, assets.budget_refusals, discovery_bytes);
+            assets.invalid, assets.write_failures, assets.budget_refusals, models.bytes);
     BD_INFO("[native-material-disk] {} budget refusals; last write inventory {} files / {} logical bytes, complete {}; "
             "disk-full keeps native resident data, never evicts files",
             assets.disk_budget_refusals, assets.disk_files, assets.disk_bytes,
@@ -320,3 +360,28 @@ void NativeMaterialNoteReplay(uint32_t mask) {
   }
 }
 } // namespace bd::gpu::scene
+
+REX_EXTERN(__imp__bdSceneGraphBuild);
+REX_EXTERN(__imp__sub_8227EBE8);
+
+REX_HOOK_RAW(bdSceneGraphBuild) {
+  __imp__bdSceneGraphBuild(ctx, base);
+  using namespace bd::gpu::scene;
+  if (!ctx.r3.u32)
+    return;
+  model_builds.fetch_add(1, std::memory_order_relaxed);
+  try {
+    if (!PublishModelMaterials(ctx.r3.u32))
+      model_failures.fetch_add(1, std::memory_order_relaxed);
+  } catch (const std::exception &error) {
+    model_failures.fetch_add(1, std::memory_order_relaxed);
+    BD_WARN("[native-model-materials] load import failed: {}", error.what());
+  }
+}
+
+REX_HOOK_RAW(sub_8227EBE8) {
+  // Complete destructor entry, before node/declaration release. Unlike the
+  // physical-block free hook, this also covers graphs with no physical block.
+  bd::gpu::scene::Models().Retire(ctx.r3.u32);
+  __imp__sub_8227EBE8(ctx, base);
+}

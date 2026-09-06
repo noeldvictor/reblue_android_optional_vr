@@ -58,21 +58,30 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest qualified change (2026-09-06): native Toon texture animation and edge
-parameter production replace three complete callbacks. Material-pass dispatch
-calls the native participants directly: normal flat / diagnostic desktop XR
-samples record 13,280 / 3,020 native participant calls and zero guest participant
-calls at that dispatcher. Fresh field-camera XR samples match 1,510 original
-Toon publications and 2,627,009 native parameter blocks, with no mismatch or
-Toon fallback/refusal/fault. The host build, 31 CPU tests and 115 source guards
-pass. One flat field image was inspected; this is not full-game or both-eye
-pixel qualification. [Evidence and limitations](research/20260906_1505_native-toon-materials.md).
+Latest ownership checkpoint (2026-09-06): primitive/material recipes are now
+published at model-load completion and retired at the full graph destructor.
+Four consumers use immutable native-owned records instead of first-draw command
+discovery. With PSO precaching disabled, a desktop diagnostic records 114 model
+publications, one retirement, 488,116 lookup hits and zero missing/load failures;
+126,735 diffuse and 120,369 specular comparisons match. Host/material tests and
+120 source guards pass. Geometry-table associations and draw templates remain.
+
+**The new interactive-field gate did not pass.** An inspected image was the
+opening cinematic; water activity alone had incorrectly identified it as field
+readiness. Stronger semantic readers continued reporting Loading / state 0, so
+field qualification remains pending. No new stereo/Quest or speedup claim.
+[Evidence, limits and remaining dependencies](research/20260906_1610_load-owned-model-materials.md).
+
+The prior [Toon checkpoint](research/20260906_1505_native-toon-materials.md)
+retains a normal flat standing-scene image and desktop XR parameter comparisons.
+Its water/camera activity markers do not independently prove interactive-field
+execution; full-game and both-eye pixel qualification remain open.
 
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; shared native GPU data, mip cooking, generated LOD support and bounded owners | Asset-level discovery/loading and scene associations, independent layouts, dynamic geometry and streaming/backpressure |
 | Scene submission | Host traversal/replay, native packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Native object storage and transforms; replace retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native material/texture/lighting associations, all recipes, bool/sampler inputs; remove shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |
@@ -96,8 +105,8 @@ identifies the existing load-time integration points and remaining template/data
 dependencies. The source-index tool now exposes indirect and hook boundaries;
 this tooling checkpoint does not itself convert additional rendering.
 
-1. Resolve the selected scene/material path's remaining indirect/data contracts
-   using that map; establish repeatable feature-specific checks.
+1. Reconcile the scene-state readers and establish repeatable feature-specific
+   checks; advance the mapped load-time geometry/material association contracts.
 2. Complete one native static-object path from asset loading and material
    association through native instances to scene/shadow submission.
 3. Complete character asset, pose, joint-palette and GPU skinning ownership.

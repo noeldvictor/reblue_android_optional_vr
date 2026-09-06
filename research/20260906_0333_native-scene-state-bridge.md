@@ -1113,3 +1113,82 @@ output or cleanup savings. No game/build/capture/cache-asset outputs were
 produced, no profile changes. Source map and exact evidence are in
 `20260906_1531_static-model-ownership-frontier.md`. Final Git writes measured
 at handoff; no cleanup credit beyond the already recorded prior checkpoint.
+
+### Load-owned model material records, same checkpoint
+
+Previous goal turn made progress through source-index publication `1482778`.
+The intervening read-only strategy review confirmed the 150 s autoplay walking
+threshold versus 75 s flat smoke duration; that is not movement/transition
+qualification. Current worktree was clean and no build/game producer was live.
+Preflight free: 65,140,396,032 B. The existing original checkpoint limits and
+raw-capture prohibition remain unchanged; this is not a budget reset.
+
+Implement load-owned primitive/material records and replace draw-time command
+discovery. Reuse the native material test and desktop host build trees. Reserve
+<=256 MiB incremental compile/link overlap and <=1 MiB new aggregate build/test
+logs, within the existing 2 GiB peak /100 MiB diagnostics/10 MiB log ceilings.
+CPU ownership fixtures add no persistent test data. No new shader/guest build,
+raw captures, downloads or asset bulk conversion. Game/pixel verification needs
+its own preflight after the focused checks, reusing bounded supervisors and
+qualifying replacements before any predecessor cleanup.
+
+Material fixture build 03 / CPU 03 pass (0.13 s suite); core owner/tests published
+as `d723d70`. Host 38 failed on two missing original-entry declarations (no
+guest object rebuild); fixed in host 39. Host 40 includes the final checked node
+span, terminal exit 0, original codegen reports up-to-date/no files written.
+The shared lease core stays source/GPU/disk independent; full static-object
+geometry/instance/direct submission remains pending.
+
+Live verification preflight: free 65,115,238,400 B; no active producer. Updated
+bounded tool reservation from 41 to 48 MiB to include the source index growth
+and <=1 MiB new fixture allowance. Actual supervisor reservation now 71,797,163 B
+versus 75 MiB stop /100 MiB hard diagnostic ceiling. Permit one <=45 s flat
+model/material comparison with PSO precaching disabled, <=400 KiB log, no perf
+or raw output, and one readiness-triggered window PNG <=3,817,663 B remaining
+overlap. Reuse the currently absent `native_material_pass_window.png` path;
+the old file was already retired in the Toon checkpoint. Existing material
+files remain reusable; newly reached materials obey their independent 1 MiB /
+4096-file/reserve limits, with 25 MiB supervisor headroom including small-file
+allocation. No bulk geometry or texture cooking is requested. The actual
+supervisor comparison gate passes seven in-memory fresh/stale/missing/later-
+failure fixtures. Restore the exact owner profile in guaranteed cleanup.
+
+Run 888 terminal (PID 27768/session 60001, 16:02:26-16:02:55), all seven
+settings audited including PSO precache off; 114 published models /738,768 B,
+14,208 lookup hits, zero missing/load/input/budget failures or unsupported
+meshes. Diffuse 3,951 and specular 3,467 original comparisons match; reflection
+has zero checks. **The inspected image is the opening cinematic, not interactive
+field qualification.** Water activity is an insufficient scene marker. This
+finding corrects the attempted readiness inference; it does not requalify the
+older field-camera/both-eye claims or resolve older scenery/text failures.
+
+Retained log 110,488 B and PNG 1,794,992 B; six newly reached material files
+total 408 B (36 files /2,448 B now). No raw/perf output, profile restored. Host
+41 adds diagnostic-only context from existing Game/Field/Cutscene/Movie readers.
+The updated supervisor requires FieldActive, field state 4, named stage, live
+player, no event/movie, and following matching model/material samples; nine
+in-memory fixtures reject missing/stale/loading/event/later-failure contexts.
+Reserve a second <=75 s, <=400 KiB, capture/perf-disabled comparison (no image),
+sharing the original budget. Do not relaunch the earlier raw/VR matrix. The
+opening-cinematic image and unchanged Toon normal-field/VR evidence remain
+distinct; no passing-field image replacement or cleanup is claimed yet.
+
+Run 889 terminal, PID 24436/session 10626, 16:07:31-16:08:47, 291,441 B log:
+**field gate failed** (Loading / state 0, `bg41_01`, event clears; do not infer
+interactive readiness). Cumulative diffuse 126,735 and specular 120,369 checks
+match, reflection zero checks; 114 publications/one retirement, 488,116 hits,
+zero missing/load/input/budget failures. Profile restored; no new raw/perf/image.
+120 source guards pass. No further producer is running or automatically queued.
+
+All current-turn attempts produced 11,719 B build/test logs +401,929 B runtime
+logs +1,794,992 B PNG =2,208,640 B gross diagnostics. Ten exact obsolete logs
+were safely removed after CPU 03/host 41 replacements passed: old material
+build/CPU 02 and host 38/39/40 stdout/stderr, logical 10,405 B. Immediate free
+65,095,716,864 ->65,095,737,344 B, **20,480 B reclaimed**, counted once.
+Net diagnostic retained growth 2,198,235 B for new cinematic material/pixel
+coverage and the failed semantic field gate, with replacement/diagnosis as the
+cleanup trigger. Material assets +408 B; protected normal flat/XR/failure/raw
+evidence unchanged. Ending post-cleanup drive-wide use +44,658,688 B from this
+continuation's preflight; source/build/Git/other-process use is not inferred to
+equal diagnostic payload. Exact identities and limitations are recorded in
+`20260906_1610_load-owned-model-materials.md`. Final Git writes still count.
