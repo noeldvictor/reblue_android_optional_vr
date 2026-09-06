@@ -21,6 +21,14 @@ proposed cleanup. Free disk space is not an allowance to accumulate artifacts.
 Storage discipline also applies to the code and tools we add: bounded retention
 and reuse must be designed in, not left to occasional manual cleanup.
 
+**Repeated verification should target no net growth in retained artifacts.**
+Replace equivalent evidence instead of accumulating a set for every run or
+commit. Validate the replacement before retiring its predecessor, budgeting
+their temporary overlap. Retained growth needs a specific new coverage or
+unresolved-failure reason and a cleanup trigger; free space alone is not a
+reason. Never meet this target by deleting protected data or skipping required
+qualification.
+
 **Quick storage limits:** preserve at least 20 GiB free; cap each checkpoint at
 2 GiB peak additional disk use, 100 MiB of newly retained diagnostics (including
 tools), and 10 MiB of aggregate build/test logs within that diagnostic budget.
