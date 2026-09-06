@@ -122,3 +122,190 @@ is preserved. Scoped per-directory capture inventory was read without producing
 copies; earlier layered-scene VR has distinct corrected-failure/framing evidence
 and is not selected for cleanup. Review eligible normal controls before budgeting
 any new captures; no new raw allowance has yet been established.
+
+## Fresh retention review and bounded image plan
+
+Read the complete sampler (0436), parameter (0513), frustum (0559) and view-cache
+(0717) worklogs. Select only their four normal comparison-off flat field sets:
+`host_sampler_flat`, `host_parameters_flat`, `native_frustum_guarded_flat`,
+`native_view_flat`. Each contains 120 raws / 995,330,400 bytes and two retained
+endpoint PNGs. They answer the same short normal field stability question as
+the current qualified post-image-flow baseline; their complete sequences are
+superseded, not needed for an unresolved comparison. Keep comparison controls,
+all VR/framing/failure evidence and all eight PNGs (2,348,009 bytes) and reports.
+The view/frustum failed or initial probes are not targeted. Older layered-scene
+sets are also untouched. This is individual review, not blanket archive expiry.
+
+Reuse the existing exact-path cleanup validator with the four fresh names and
+worklog endpoints, rather than making another helper copy. It must validate
+counts/sizes/endpoints, retained PNGs, no reparse ancestry, exact two-link NTFS
+membership, all same-name references and no running renderer, first dry-run and
+again at deletion. Planned removal 480 unique raws / 960 links, 3,981,321,600
+logical bytes. Historical pixels will be unrecoverable; small evidence remains.
+
+Only after measured reclamation: allow one 120-frame normal flat and one
+120-frame final-eye VR set, `native_scene_result_flat` / `_vr`, together
+3,185,054,400 raw bytes, no extra retry allowance. The existing <=100 MiB
+cumulative small-output cap includes both prior diagnostics, analysis exports,
+logs/perf, helpers and caches. Reuse the exact built executable/test trees;
+no build, asset cook, download or new configuration tree. Expected peak reserve
+exceeds 53 GiB after reclamation and replacement; enforce minimum 20 GiB plus
+polling headroom. Check limits during each bounded run, stop owned processes
+and restore temporary settings in guaranteed cleanup. Retain current baseline
+until both new sets are actually inspected and qualified. This plan does not
+permit the historical raw archive to grow or relax the full desktop gate.
+
+Fresh global NTFS inventory matches the prior checkpoint exactly: 29,085 raw
+paths / 28,091 unique payloads / 260,139,759,700 logical bytes, 230,379,540,272
+allocated bytes. First cleanup dry run safely refused: these older sets are
+independent copies, not the newer two-link isolation pattern. No files removed.
+Direct NTFS identity checks across all 480 pairs confirm distinct identities and
+one link each. Extend the same validator to accept only singleton paths with
+matching pairwise SHA-256; retain the same ancestry/reference/process checks.
+Thus planned removal is 960 unique payloads / 960 paths / 7,962,643,200 logical
+bytes, not the initial 480-payload estimate. Measure actual recovery separately;
+the incoming capture allowance stays 3,185,054,400 bytes and is not increased.
+
+Cleanup dry-run session 98265 and deletion session 21120 both completed. All
+480 copy pairs matched SHA-256 and singleton NTFS membership; reference/ancestry
+and stopped-renderer checks passed again before removal. Removed exactly 960
+paths / unique payloads. Actual free 57,528,311,808 -> 65,494,888,448 bytes:
+7,966,576,640 bytes (7.42 GiB) recovered. All eight endpoint PNGs/reports remain;
+removed historical pixels are unavailable. No other directories or evidence
+were deleted. Raw allowance consumed zero, remaining 3,185,054,400 bytes.
+
+Reused `run_post_image_flow.ps1` with the new exact set names and 19:58 cutoff.
+It defaults to no captures, requires the original five-setting profile at entry,
+restores its exact bytes in nested finally cleanup, and stops only its owned
+process. Explicit image runs have 120-frame/byte limits and 110-second timeout;
+two-second checks cover cumulative raw bytes, logs/perf/cache/dumps, with a
+75 MiB stop threshold leaving 25 MiB for analysis/polling, and stop below 21 GiB
+to protect the 20 GiB reserve. Cache/dump roots have no reparse descendants.
+The existing xrsim manifest has an absolute path to the 31,232-byte DLL.
+No global runtime/registry changes. Pixel/stereo analysis will reuse the existing
+streaming helper and only export endpoints, not every frame.
+
+VR runner session 14380 / owned PID 23708 started at 20:34:39, log 815.
+Output is the automatic capture root plus hard-linked `native_scene_result_vr`;
+limit 120 x 18,247,700 bytes, timeout 110 seconds. The 16-setting audit passed.
+The separate flat allowance remains 995,330,400 bytes; do not duplicate this run
+if a poll is quiet. Capture receipt and actual pixel verdict follow on completion.
+
+## Next boundary source evidence
+
+Read the existing Plume interface and Vulkan resolve implementation in the
+actual submodule root. `VulkanCommandList::resolveTextureRegion` hardcodes
+base array layer zero / layerCount one and loops mips, not eye layers. It calls
+`vkCmdResolveImage`; the searched Vulkan backend has no attachment-resolve
+description. It is not a ready drop-in for a complete two-eye colour/depth
+completion path. Current `CopySurfaceToTextureLocked` also handles exposure,
+format retargeting and differing extents. Removing the initial compatibility
+publication requires explicit native resolved-image ownership and suitable
+layered colour/depth resolve support, while retaining ordered exposure and
+separate resampling semantics. Do not merely rename the shared copy path or
+substitute the single-layer helper and claim EDRAM removal. No dependency or
+shader code changed during this review.
+
+## Completed native-result VR qualification
+
+Session 14380 / PID 23708 completed at 20:35:51, log 815. Profile restored
+byte-for-byte in cleanup. Exactly 120 raws / 2,189,724,000 bytes, hard-linked
+isolation, `frame_1788654942_0.raw` through `frame_1788654949_119.raw`, render
+frames 8484..8603, stacked 1440x3168. Actual free after capture 63,302,299,648
+bytes. Remaining raw allowance 995,330,400 bytes for flat only; no retry.
+
+Streaming analysis session 6899 completed: 0/119 changes above 6%, maximum
+0.312763047% (pair 63); cyan maximum/median zero and no hits. First/last
+stereo both correctly crossed: far -1 px, near -9 px, spread 8. Inspected all
+four full-resolution eye endpoints: consistent rocky village, stairs, ground,
+orange sky and moving windmill shadows, without broad missing bands/cyan.
+Existing distant blur remains; this framing does not qualify character-shadow
+alignment. Six endpoint/overview PNGs only, no every-frame export.
+
+Last post counters: 8,401 completed native scene inputs/scopes/sequences/roots/
+final publications, zero imports, original scopes or refusals; max roots one,
+no direct inter-root GPU coverage. Scene report samples one entry earlier:
+8,400 completed/consumed, both images materialized 8,400 times at MSAA4. The
+16 settings audited; checked error/critical/VK_ERROR/device-loss/fatal/assertion/
+exception/upload-exhaustion markers absent. No renderer or analyzer remains.
+This qualifies the normal short field stereo window, not full-game coverage.
+Next use only the remaining 120-frame flat allowance with the original settings.
+
+## Flat qualification and baseline retirement
+
+Flat session 98427 / owned PID 27436, 20:37:37-20:38:44, log 816, completed;
+the original profile was restored byte-for-byte. Five settings audited, full
+1673 archives / 119346 names mounted. Last sample 3,001 completed native inputs,
+post scopes/sequences/roots/final publications, zero getter imports, original
+scopes or refusals. Scene samples 3,000 completed/consumed with both images
+materialized; maximum post roots one. All four checkpoint logs have zero checked
+error/critical/VK_ERROR/device-loss/fatal/assertion/exception/upload-exhaustion
+markers. VR log confirms the actual runtime session and eye/game pose difference.
+The executable SHA-256 remains unchanged; no rebuild for documentation hashes.
+
+Flat captures: 120 x 1920x1080, `frame_1788655120_0.raw` through
+`frame_1788655123_119.raw`, render frames 2845..2964, 995,330,400 bytes. Streaming
+analysis completed: 0/119 changes above 6%, maximum 3.200279707% (pair 1), no
+cyan hits, maximum .020978009%, median .011453511%. Both full endpoint images
+inspected: recognizable Shu/cast silhouette, foliage, solid ground and moving
+windmill shadows. Distant DoF remains. This does not qualify the late scene,
+authored events, title artwork or the full desktop game-mode gate.
+
+All planned raw bytes are now consumed: 3,185,054,400, no remaining allowance.
+The new pair passed streaming, endpoint and both-eye review and becomes the
+current baseline. Following the prior post-image-flow worklog's explicit
+equivalent-replacement cleanup condition, its normal flat/VR pair is superseded.
+Retire only `native_post_image_flow_flat` (`frame_1788652260_0.raw` through
+`frame_1788652264_119.raw`) and `_vr` (`frame_1788651740_0.raw` through
+`frame_1788651750_119.raw`), each 120 raws with their exact automatic hard links.
+Keep all eight PNGs (9,780,919 bytes), logs/reports and distinct protected evidence.
+Revalidate same-name references, ancestry, sizes, endpoints, NTFS link membership
+and terminal processes using the existing validator, dry-run before deletion.
+Planned further removal 240 unique raws / 480 paths / 3,185,054,400 logical bytes.
+This is additional checkpoint cleanup, not an allowance to start another producer.
+
+## Final storage ledger and handoff
+
+The second dry run passed, then deletion revalidated all targets and completed:
+240 unique raws / 480 paths / 3,185,054,400 logical bytes removed. Actual free
+62,285,619,200 -> 65,471,127,552; measured recovery 3,185,508,352 bytes. All eight
+old post-image PNGs remain. Combined with the four earlier retired flat sets,
+six directories now contain zero raws and retain all 16 PNGs (12,128,928 bytes)
+and reports. Historical deleted sequences are unrecoverable.
+
+Current baseline `native_scene_result_flat` / `_vr` retains 240 unique raws /
+3,185,054,400 bytes plus eight PNGs / 9,716,547 bytes. Four checkpoint logs total
+1,255,865 bytes, eight perf files 3,195,328 bytes; no changed cache/dump files.
+Runtime/analysis small outputs total 14,167,740 bytes. Reused helpers, CTest logs
+and small documentation keep the checkpoint well below its 100 MiB small cap.
+No new asset outputs, downloads, guest rebuild, new build tree or duplicate
+capture payloads. All owned runtimes/analyzers/cleanup sessions are terminal,
+and the original profile and unchanged binary hash were checked again.
+
+Final scoped NTFS inventory: 28,125 raw paths / 27,131 unique payloads,
+252,177,116,500 unique logical bytes; GetCompressedFileSizeW reports
+222,416,897,072 bytes after identity deduplication. Relative to preflight,
+960 fewer unique payloads and 7,962,643,200 fewer logical raw bytes. The archive
+still exceeds the 10 GiB target: this is reduced cleanup debt, not compliance.
+Readiness/grading startup controls, distinct authored/synthetic previews/shared
+probes, comparison/VR/framing evidence and unresolved late-scene failures remain
+protected pending their individual review/resolution. Keep the new baseline until
+equivalent verified replacement; preserve small reports/endpoints afterward.
+
+Ending actual free 65,470,930,944 bytes (60.97 GiB). From the original worklog
+preflight of 57,541,398,528 bytes, net volume usage fell 7,929,532,416 bytes
+(7.38 GiB). Both cleanup receipts are gross; replacement captures and all small
+outputs are included in the measured net change, as is unrelated volume activity.
+The entire 3,185,054,400-byte capture allowance is spent. No further large
+producer is planned under this checkpoint; reconcile storage anew before one.
+
+Implementation is pushed as `ca90d3f`; README/transition now distinguish scoped
+completion from the remaining image publication, MSAA/scale copies and engine
+producers. Guest-source anchored the ownership boundaries; devloop reused the
+built executable and bounded/restored runs; vrsim qualified only desktop eyes.
+This is progress, not completion. Next remove the initial compatibility image
+publication with explicit native resolved images and suitable layered resolve
+support, then final UI publication and remaining frame/data producers. Full
+animation/material/light/scene ownership and representative fields, battles,
+cutscenes, menus, transitions/reloads and both-eye authored effects remain
+required before Quest 2 qualification. No device work or performance claim.

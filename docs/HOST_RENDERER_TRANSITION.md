@@ -30,6 +30,24 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Current conversion
 
+Scoped native scene-result checkpoint (2026-09-05): scene end supplies exact
+sampled colour/depth/exposure through a per-view, frame-bounded, single-use
+result. Native target pins and temporary output references preserve its lifetime;
+normal post no longer imports scene image getters or traverses resolve links.
+All 30 CTests and 45 source guards pass. Capture-disabled diagnostics exercise
+both MSAA materialization and direct source images. Normal flat/VR record
+3,001/8,401 completed native inputs and zero imports, original scopes or refusals.
+Both 120-frame sequences have 0/119 large changes and no cyan hits; first/last
+VR depth is correctly crossed and all full eye/flat endpoints were inspected.
+Initial scene MSAA/scale copies and output adapters, final UI publication, engine
+producers and parent scheduling remain. Multi-root/HDR/nested-view GPU cases,
+existing VR blur and full-game gates remain unqualified; no Quest. Six superseded
+normal raw sets and their automatic copies/links were removed, preserving 16
+PNGs/reports and all protected evidence. The new pair is the baseline; net volume
+usage fell 7.38 GiB, ending with 60.97 GiB free. The historical archive remains
+over budget; no new raw allowance remains. Exact source, runtime and retention:
+`research/20260905_1958_native-scene-image-result.md`.
+
 Explicit native post-image checkpoint (2026-09-05): native atlas/composite and
 optical/noise consumers now use actual sampled colour/depth images and exposure.
 The sequence imports the scene boundary once, passes completed images directly
