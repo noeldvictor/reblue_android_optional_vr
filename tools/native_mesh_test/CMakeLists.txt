@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 project(native_mesh_test LANGUAGES CXX)
-add_executable(native_mesh_test main.cpp storage.cpp vertex_input.cpp
+add_executable(native_mesh_test main.cpp storage.cpp vertex_input.cpp cook.cpp
   ../../src/gpu/scene/native_mesh_data.cpp
+  ../../src/gpu/scene/native_mesh_cook.cpp
   ../../src/gpu/scene/native_mesh_storage.cpp)
 target_include_directories(native_mesh_test PRIVATE ../../src ../../thirdparty/plume)
 target_compile_features(native_mesh_test PRIVATE cxx_std_23)

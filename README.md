@@ -58,6 +58,13 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
+Current source checkpoint: self-describing BDMESH v2 rigid vertices and a
+source-free native geometry loader are implemented. CPU conversion/storage tests,
+155 source guards, host syntax checks and read-only decoding of all 3,510 existing
+meshes pass. **Full host linking and new runtime pixels are pending the cumulative
+storage-budget gate.** This is not direct static drawing or an FPS result.
+[Format and verification limits](docs/NATIVE_MESH_FORMAT.md).
+
 Latest ownership checkpoint (2026-09-06): native geometry now owns immutable
 vertex inputs used by pipeline creation, shader-decoding parameters and vertex
 pulling. Converted dispatch clears the guest declaration pointer. The field

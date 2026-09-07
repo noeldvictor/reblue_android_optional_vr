@@ -13,6 +13,7 @@ static void Check(bool ok, const char *name) {
 }
 void TestMeshStorage();
 void TestVertexInput();
+void TestMeshCook();
 int VerifyMeshCache(const char *path);
 static int RunTests(int argc, char **argv) {
   if (argc == 3 && std::string_view(argv[1]) == "--verify-cache")
@@ -72,6 +73,7 @@ static int RunTests(int argc, char **argv) {
   std::cout << "native mesh: topology, bounds, round trip, truncation and corruption passed\n";
   TestMeshStorage();
   TestVertexInput();
+  TestMeshCook();
   return 0;
 }
 

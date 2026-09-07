@@ -75,6 +75,23 @@ void TestMeshStorage() {
   Require(NativeMeshDiskCache::FileName(1) == "0000000000000001.bdmesh", "v1 filename preserved");
   {
     Scratch scratch;
+    NativeMeshData canonical;
+    canonical.indices = {0, 1, 2};
+    canonical.attributes = {{MeshSemantic::Position, 0, 0}};
+    canonical.layout = NativeMeshLayoutId(canonical.attributes);
+    canonical.streams = {{0, 16, std::vector<uint8_t>(48)}};
+    const auto key = NativeMeshContentId(canonical);
+    const auto canonical_bytes = Bytes(canonical);
+    NativeMeshDiskCache writer(scratch.path, {bytes.size() + canonical_bytes.size(), 2, 0});
+    Require(key && writer.Write(key, canonical) && writer.Write(1, mesh), "v1/v2 shared budget");
+    Require(!writer.Write(2, mesh), "new format cannot reset aggregate budget");
+    canonical = {}; // discard the producer; reopen using only a stable asset ID
+    NativeMeshDiskCache reader(scratch.path, {0, 0, UINT64_MAX});
+    Require(reader.Read(key, canonical) && NativeMeshContentId(canonical) == key &&
+            Bytes(canonical) == canonical_bytes, "source-free v2 persistent round trip");
+  }
+  {
+    Scratch scratch;
     NativeMeshDiskCache cache(scratch.path, {bytes.size() * 2, 2, 0});
     Require(cache.Write(1, mesh) && cache.Write(1, mesh), "write and unchanged reuse");
     const auto stamp = fs::last_write_time(scratch.path / cache.FileName(1));

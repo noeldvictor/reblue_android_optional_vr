@@ -6,6 +6,7 @@
  */
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_mesh_data.h"
+#include "gpu/scene/native_mesh_cook.h"
 #include "gpu/scene/native_mesh_storage.h"
 
 #include <algorithm>
@@ -33,6 +34,7 @@ constexpr u32 kChunkBytes = 32u << 20;
 // Geometry's share of the project's 1.5 GB asset budget. A full arena is
 // reported explicitly; it must never grow with every scene reload forever.
 constexpr u64 kGeometryBudget = 256ull << 20;
+constexpr size_t kMaxGeometries = 16384, kMaxImportAliases = 32768;
 struct Chunk {
   std::unique_ptr<plume::RenderBuffer> buffer;
   u32 size = 0, used = 0;
@@ -41,10 +43,14 @@ struct Store {
   std::mutex mutex;
   std::vector<Chunk> chunks;
   std::unordered_map<u64, std::shared_ptr<const NativeGeometry>> meshes;
+  // Temporary import-key -> native content identity. Direct asset loads do
+  // not consult this adapter; bound it independently of GPU byte residency.
+  std::unordered_map<u64, u64> import_aliases;
   NativeVertexInputLibrary vertex_inputs;
   u64 allocated = 0;
   u32 built = 0, loaded = 0, refused = 0, budget_refused = 0;
   u32 native_draws = 0, legacy_draws = 0, last_frame = 0;
+  u32 canonical_meshes = 0, canonical_draws = 0, source_free_loads = 0;
 };
 Store &store() {
   static Store s;
@@ -57,6 +63,8 @@ std::filesystem::path CacheDir() {
     root = runtime->cache_root();
   if (root.empty())
     root = std::filesystem::current_path();
+  // Historical directory name, shared by both checked file versions. Keeping
+  // it avoids a duplicate cache or a reset of its byte/file accounting.
   return root / "native_meshes" / "v1";
 }
 
@@ -97,6 +105,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   auto result = std::make_shared<NativeGeometry>();
   result->id = key;
   result->layout = data.layout;
+  result->canonical_vertices = !data.attributes.empty();
   result->vertex_input = std::move(vertex_input);
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
@@ -188,8 +197,13 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   }
   if (!n)
     return {};
-  if (auto it = s.meshes.find(key); it != s.meshes.end())
-    return it->second;
+  if (auto it = s.import_aliases.find(key); it != s.import_aliases.end())
+    return s.meshes.at(it->second);
+  if (s.import_aliases.size() >= kMaxImportAliases) {
+    ++s.budget_refused;
+    return {};
+  }
+  const u64 import_key = key;
 
   NativeMeshData cached;
   bool loaded = DiskCache().Read(key, cached) && cached.layout == data.layout &&
@@ -217,14 +231,41 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
       return {};
   }
   const auto &decl = *r.declaration;
+  const VertexShaderDecode decode{
+      decl.swappedTexcoords, decl.swappedNormals, decl.swappedBinormals,
+      decl.swappedTangents, decl.swappedBlendWeights, decl.swappedPositions,
+      decl.sintTexcoords};
+  NativeMeshData canonical;
+  if (CookRigidMesh(data, {decl.inputElements.get(), decl.inputElementCount},
+                    decode, decl.hasR11G11B10Normal, canonical)) {
+    data = std::move(canonical);
+    key = NativeMeshContentId(data);
+    if (!key) return {};
+    // Keep the existing aggregate disk budget/path: a second format must not
+    // silently create a second cache allowance. Existing v1 files stay valid.
+    NativeMeshData persisted;
+    loaded = DiskCache().Read(key, persisted) &&
+             NativeMeshContentId(persisted) == key &&
+             persisted.attributes == data.attributes &&
+             persisted.base_vertex == data.base_vertex &&
+             persisted.indices == data.indices && persisted.layout == data.layout &&
+             persisted.streams[0].bytes == data.streams[0].bytes;
+    if (loaded) data = std::move(persisted);
+  }
+  if (auto it = s.meshes.find(key); it != s.meshes.end()) {
+    s.import_aliases.emplace(import_key, key);
+    return it->second;
+  }
+  if (s.meshes.size() >= kMaxGeometries) {
+    ++s.budget_refused;
+    return {};
+  }
   uint32_t stream_mask = 0;
   for (uint32_t slot = 0; slot < 16; ++slot)
     if (decl.vertexStreams[slot]) stream_mask |= 1u << slot;
-  auto vertex_input = s.vertex_inputs.Resolve(
+  auto vertex_input = data.attributes.empty() ? s.vertex_inputs.Resolve(
       {decl.inputElements.get(), decl.inputElementCount}, stream_mask,
-      {decl.swappedTexcoords, decl.swappedNormals, decl.swappedBinormals,
-       decl.swappedTangents, decl.swappedBlendWeights, decl.swappedPositions,
-       decl.sintTexcoords});
+      decode) : RigidMeshVertexInput(data, s.vertex_inputs);
   if (!vertex_input) return {};
   auto result = Upload(s, data, key, std::move(vertex_input));
   if (!result)
@@ -239,6 +280,8 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
     ++s.built;
   }
   s.meshes.emplace(key, result);
+  s.import_aliases.emplace(import_key, key);
+  s.canonical_meshes += result->canonical_vertices;
   return result;
 }
 } // namespace
@@ -252,10 +295,31 @@ std::shared_ptr<const NativeGeometry> ImportNativeMesh(const NativeMeshImport &r
   return result;
 }
 
-void NativeMeshNoteDraw(bool native) {
+std::shared_ptr<const NativeGeometry> LoadNativeGeometry(u64 content_id) {
+  auto &s = store();
+  std::lock_guard lock(s.mutex);
+  if (auto it = s.meshes.find(content_id); it != s.meshes.end())
+    return it->second->canonical_vertices ? it->second : nullptr;
+  NativeMeshData data;
+  if (!content_id || s.meshes.size() >= kMaxGeometries ||
+      !DiskCache().Read(content_id, data) || NativeMeshContentId(data) != content_id)
+    return {};
+  auto input = RigidMeshVertexInput(data, s.vertex_inputs);
+  if (!input) return {};
+  auto result = Upload(s, data, content_id, std::move(input));
+  if (!result) return {};
+  s.meshes.emplace(content_id, result);
+  ++s.loaded;
+  ++s.canonical_meshes;
+  ++s.source_free_loads;
+  return result;
+}
+
+void NativeMeshNoteDraw(bool native, bool canonical) {
   auto &s = store();
   std::lock_guard lock(s.mutex);
   ++(native ? s.native_draws : s.legacy_draws);
+  s.canonical_draws += native && canonical;
   const u32 frame = FrameStatFrameCount();
   if (frame - s.last_frame < 300)
     return;
@@ -267,6 +331,9 @@ void NativeMeshNoteDraw(bool native) {
           double(s.native_draws) / frames, double(s.legacy_draws) / frames,
           s.refused, s.budget_refused);
   const auto disk = DiskCache().Stats();
+  BD_INFO("[native-mesh-canonical] {} meshes, {} draws, {} source-free disk loads; "
+          "named float4 vertices, zero shader unpack masks",
+          s.canonical_meshes, s.canonical_draws, s.source_free_loads);
   BD_INFO("[native-vertex-input] {} owned inputs / {} bytes; no declaration needed by native dispatch",
           s.vertex_inputs.Size(), s.vertex_inputs.Bytes());
   const auto &uses = NativeVertexInputUses();

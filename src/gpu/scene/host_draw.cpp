@@ -73,6 +73,7 @@
 #include "gpu/scene/deferred_entry_bridge.h"
 #include "gpu/scene/mesh_lod.h"
 #include "gpu/scene/native_mesh.h"
+#include "gpu/shaders/shader_constants.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_texture_table_bridge.h"
@@ -2997,6 +2998,8 @@ bool HostDrawReplay(const NodeTag &tag) {
         std::lock_guard lock(s.mutex);
         s.pipelineState.native_vertex_input = mesh->vertex_input.get();
         s.pipelineState.vertexDeclaration = nullptr;
+        if (mesh->canonical_vertices)
+          s.pipelineState.specConstants &= ~kSpecConstantR11G11B10Normal;
         s.native_draw_pipeline = &s.pipelineState;
         for (u32 slot = 0; slot < 16; ++slot)
           if (mesh->stream_mask & (1u << slot)) {
@@ -3009,7 +3012,8 @@ bool HostDrawReplay(const NodeTag &tag) {
         lod_prim = u32(rex::graphics::xenos::PrimitiveType::kTriangleList);
         mark_dirty();
       }
-      NativeMeshNoteDraw(bool(d.native_geometry));
+      NativeMeshNoteDraw(bool(d.native_geometry),
+                        d.native_geometry && d.native_geometry->canonical_vertices);
       NativeModelGeometryNoteDraw(d.geometry_load_owned && bool(d.native_geometry));
     }
     if (verify) {

@@ -38,6 +38,7 @@ struct NativeGeometry {
   // Content identity and explicit native stream strides travel with the data,
   // independently of the temporary source-buffer/declaration lookup.
   u64 id = 0, layout = 0;
+  bool canonical_vertices = false;
   NativeVertexInputHandle vertex_input;
   u32 strides[16]{};
   plume::RenderVertexBufferView streams[16]{};
@@ -51,6 +52,9 @@ struct NativeGeometry {
 // boundary touches guest buffers. The resulting GPU geometry owns its bytes
 // independently of model allocations, stream VAs, and physical-block mirrors.
 std::shared_ptr<const NativeGeometry> ImportNativeMesh(const NativeMeshImport &r);
-void NativeMeshNoteDraw(bool native);
+// A native asset reference loads v2 geometry without source buffers, a
+// declaration, renderer warm-up, or import-source storage. Rejects v1 files.
+std::shared_ptr<const NativeGeometry> LoadNativeGeometry(u64 content_id);
+void NativeMeshNoteDraw(bool native, bool canonical = false);
 
 } // namespace bd::gpu::scene

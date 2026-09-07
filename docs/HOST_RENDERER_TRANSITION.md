@@ -73,6 +73,19 @@ No overall development-speed multiplier is established.
 
 ## Latest qualified checkpoint
 
+Source/CPU progress (2026-09-06, runtime qualification pending): BDMESH v2 has
+named canonical rigid vertex values and content/layout identities independent
+of the source declaration. Import-time conversion replaces per-vertex unpacking
+for supported layouts; its input owner derives from the asset alone. A native
+content-ID loader needs no source wrappers. CPU/storage tests, 155 source guards,
+four host syntax checks and read-only decoding of all 3,510 existing v1 files
+pass. Full linking and new pixels are paused at the cumulative storage gate;
+run911/host63 remain the qualified executable, not this changed source. Expanded
+float4 bandwidth, source-free GPU loading and live canonical draws are unmeasured.
+The old shader signature, source-index producer and replay templates still need
+replacement within the complete native static-object path. Evidence:
+`research/20260906_2158_canonical-rigid-mesh.md`.
+
 Desktop verification loop (2026-09-06): runtime-independent autoplay now waits
 for stable field/controller/player readiness, stops on interruptions, and
 reports observed horizontal displacement separately from stick input. Mindows'

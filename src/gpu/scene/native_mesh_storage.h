@@ -33,8 +33,8 @@ constexpr bool NativeMeshWriteFitsReserve(uint64_t available, uint64_t bytes,
          available - reserve - bytes >= (64ull << 10);
 }
 
-// Keys/BDMESH v1 bytes are unchanged. The legacy importer still derives the key
-// from canonical geometry inputs; this is not a new address-keyed draw cache.
+// Existing v1 keys/bytes remain readable. V2 adds self-describing rigid values
+// under native content IDs in the SAME aggregate budget, not a second cache.
 // Writes serialize across cooperating instances/processes via .bdmesh-writer.
 // Never steal a stale lease, follow reparse paths, evict files, or overwrite a
 // different valid payload. Reads remain available when persistence is disabled.

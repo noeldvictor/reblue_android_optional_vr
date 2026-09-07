@@ -1,5 +1,6 @@
 """Wiring checks complement the production C++ owner/selector and runtime tests."""
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +41,30 @@ class VertexInputBoundaryTest(unittest.TestCase):
         text = self.read("src/gpu/scene/native_vertex_input.h")
         for token in ("GuestVertex", "REX_LOAD", "bd::mem", "PPCContext", "ofstream", "filesystem", "Video::"):
             self.assertNotIn(token, text)
+
+    def test_canonical_shader_adapter_matches_existing_signature(self):
+        shader = self.read("thirdparty/XenosRecomp/XenosRecomp/shader_common.h")
+        macro = shader.split("#define REBLUE_VERTEX_INPUT_LOCATIONS(X)", 1)[1].split("\n\n", 1)[0]
+        expected = re.findall(r"X\((\w+),\s*(\d+),\s*(\d+)\)", macro)
+        adapter = self.read("src/gpu/scene/native_mesh_cook.cpp")
+        actual = re.findall(r'\{MeshSemantic::(\w+), "\w+", (\d+), (\d+)\}', adapter)
+        self.assertGreater(len(expected), 0)
+        self.assertEqual(actual, expected)
+
+    def test_canonical_dispatch_disables_old_packed_normal_specialization(self):
+        text = self.read("src/gpu/scene/host_draw.cpp")
+        self.assertIn("if (mesh->canonical_vertices)\n          s.pipelineState.specConstants &= ~kSpecConstantR11G11B10Normal;", text)
+
+    def test_source_free_load_and_native_file_contract(self):
+        load = self.read("src/gpu/scene/native_mesh.cpp").split("LoadNativeGeometry(u64 content_id)", 1)[1].split("void NativeMeshNoteDraw", 1)[0]
+        for required in ("DiskCache().Read(content_id, data)", "NativeMeshContentId(data) != content_id",
+                         "RigidMeshVertexInput(data, s.vertex_inputs)", "Upload(s, data, content_id"):
+            self.assertIn(required, load)
+        for forbidden in ("Guest", "import_aliases", "ImportNativeMesh", "declaration"):
+            self.assertNotIn(forbidden, load)
+        data = self.read("src/gpu/scene/native_mesh_data.h")
+        for forbidden in ("RenderFormat", "VertexShaderDecode", "GuestVertex", "semanticName", "location"):
+            self.assertNotIn(forbidden, data.replace("not shader locations", "not shader slots"))
 
 
 if __name__ == "__main__":

@@ -1438,3 +1438,49 @@ Post-cleanup drive-wide use **353,050,624 B** from preflight, mostly not explain
 by the scoped retained outputs; do not label the difference task artifact bytes.
 Source/docs/Git writes follow and remain charged. Broader normal flat/XR and
 unresolved failure evidence stays protected. No budget reset or Quest work.
+
+### Canonical rigid mesh values, same checkpoint
+
+Parent9ab1bbd. BDMESH v2 and source-free geometry loading advance the static
+object data contract; full link/pixels remain pending, not qualified by CPU tests.
+Evidence: `20260906_2158_canonical-rigid-mesh.md`. Original cumulative ceilings,
+supervisor floor63,583,739,904 B and zero new raw allowance are unchanged.
+Preflight free **63,733,166,080 B**; initial <=4 MiB fixture/log growth and
+<=128 MiB host/link overlap plan. The actual exe/PDB pair totals154,512,384 B;
+a future complete host build should allow <=192 MiB overlap including changed
+objects, rather than assume the original128 MiB estimate covers both files.
+
+Only the existing mesh fixture was built. Build05 macro failure and CPU05 bad
+half-float fixture were corrected; final build08/CPU07 pass (0.11 s CPU), as do
+155 guards, four no-output host syntax checks and cache verify04 (3,510 v1 files,
+36,510,144 B, read-only). No host/game/Quest run, image, raw/perf/cache output or
+profile change. Host63/run911 remain the previous executable/runtime evidence.
+All started producer handles are terminal; no duplicate jobs remain.
+
+Drive free dropped beyond what the scoped outputs explain. At21:48 it was
+63,642,419,200 B, about56 MiB above the operational floor; the full link did not
+fit and was not launched. Requested approval to increase the cumulative cap to
+3 GiB, still preserving20 GiB free and no new raw allowance; pending. Continued
+small CPU/read-only checks under the unchanged floor, not a budget reset.
+
+After replacement validation, removed **16 exact superseded fixture logs**:
+mesh builds04..07, CPU04..06 and cache verify03 stdout/stderr. Logical7,919 B;
+immediate volume free63,626,665,984 ->**63,626,686,464 B**, recovering **20,480 B**
+once. Keep final build08/CPU07/cache04 instead. Old logs are no longer retained;
+their diagnosed failures and reproducible checks are recorded. No protected
+game data, builds, images or raw evidence removed.
+
+Complete reusable mesh fixture tree **1,412,368 B**, versus measured1,151,798 B
+before this implementation: **260,570 B growth** for canonical data/input/disk
+coverage. Aggregate build logs145,872 B, down144 B from146,016 B preflight.
+Comparable retained fixture/log growth is **260,426 B**; source/docs/Git and small
+external metadata are not fully baselined. No new images; aggregate remains
+10,106,400 B. Replace the same fixture and final logs at the next equivalent check.
+Post-cleanup drive-wide use **106,479,616 B** (~101.5 MiB) from this turn's
+preflight remains mostly unattributed; do not call it task output or reclaim.
+Source/docs/Git writes follow and remain charged to the original checkpoint.
+Before publication the volume fell further to **63,581,585,408 B**, below the
+operational stop floor, despite zero new raw/perf/cache/dump files and no active
+producer. Only low-storage documentation/Git work continues; no host link,
+fixture retry or runtime job may launch under that floor. The 2 GiB hard ceiling
+has not been increased and the owner budget question remains pending.
