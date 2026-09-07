@@ -1,6 +1,6 @@
 ---
 name: devloop
-description: Run focused reblue host checks, incremental desktop builds and readiness-gated verification while preserving existing build trees, profiles and storage budgets.
+description: Verify connected reblue host-renderer changes with existing CPU/GPU fixtures, incremental builds and targeted desktop runs. Use for build/test/runtime work; preserve profiles, evidence and cumulative storage budgets.
 ---
 
 # Host development loop
@@ -9,6 +9,32 @@ description: Run focused reblue host checks, incremental desktop builds and read
 [The transition queue](../../../docs/HOST_RENDERER_TRANSITION.md#active-work-queue)
 owns current work. Desktop host rendering and its complete acceptance gate come
 first; historical device experiments are not the default loop.
+
+## Deliver a connected change
+
+Choose the producer/owned-data/consumer bundle from the active queue. Group its
+related implementation and boundary tests before the host integration build;
+do not run a full game matrix after every helper edit. Keep the existing renderer,
+fixture trees, asset libraries and scenario runner; no second harness or broad
+recook without a concrete missing capability.
+
+Use the table/commands below to select checks, not as a mandatory sequence for
+every task. Reuse current passing evidence for unchanged shaders/programs. A
+changed runtime connection still needs fresh live consumer/pixel evidence;
+fixture-only work must leave that acceptance pending. Commit/push useful coherent
+connections, rather than accumulating many diagnostic-only checkpoints.
+
+When a test fails, distinguish a producer/consumer contract failure from missing
+scenario coverage or unrelated compatibility behavior. Preserve the exact failure
+and strict comparison. Add a causal regression where possible; never manufacture
+a passing fixture by weakening admission. Before another boot, name the changed
+code or new observation that makes it useful. Independent native ownership work
+can continue while a legacy failure remains explicitly unqualified; that does
+not permit calling the affected integration or final desktop gate complete.
+
+Read the linked disk policy before artifact-producing jobs, not for every
+artifact-free source check. Reuse the cumulative ledger; do not create a new
+report/build/log merely to stamp a documentation change.
 
 ## Select the smallest useful check
 
@@ -78,7 +104,9 @@ execution-approval route when needed.
 - `bd_xr_autoplay` uses observed interactive-field readiness.
   `tools/native_instance_scenario.py --movement` checks fresh post-event samples
   and displacement. Fixed delays, water activity and stick input alone are not
-  coverage. Its current field gate is not a reload test.
+  coverage. Movement alone is not reload evidence: use `--rigid-reload` for
+  independent cold/reloaded epochs and source/GPU retirement. Apply the temporary
+  mouse-menu isolation required by AGENTS; autoplay's pad is not exclusive input.
 - Inspect renderer-owned pixels. On Windows, use `PrintWindow`, not foreground
   screen copying. One image is sanity evidence, not a stable sequence or both-eye
   qualification. Budget compressed exports and raw sequences separately.

@@ -78,13 +78,15 @@ no draw-call reduction or speedup is established. This object still has source
 adapters; it is not independently host-owned scene loading.
 [Reload evidence](research/20260907_1140_native-rigid-reload.md).
 
-**Latest work and immediate blocker:** renderer source `6de0c2f` replaces the
+**Latest work and known regression:** renderer source `6de0c2f` replaces the
 receiver callback with host setup and a retained image/camera/late-colour packet.
 Host105/run943 passes its text gates in both reload epochs, but does not reproduce
 or explain run941's light-selection dirty-bit failure. That failure is preserved;
-no new pixels were captured. Resolve the writer/ordering issue and qualify the
-receiver replacement before advancing this path. Representative multi-object
-batches, visual sequences and both-eye game checks remain afterward.
+no new pixels were captured. The next implementation removes mutable guest
+light-selection/cache inputs from the direct native consumer using owned scene
+and object lighting. The mismatch stays open and the affected runtime behavior
+unqualified; independent ownership work need not wait on repeated diagnostic
+boots. Representative batches, visual sequences and both-eye game checks remain.
 [Current evidence and next investigation](research/20260907_1224_native-receiver-setup.md).
 
 Verification: 300 Python source/scenario checks and the current C++ fixtures
@@ -111,11 +113,12 @@ not a second chronological worklog here.
 
 ### How we finish faster
 
-Finish **one complete static object** using the owners and backend already
-built, prove it from cold load through teardown/reload with its old rendering
-path disabled, then expand material families. Characters follow; effects, UI
-and remaining passes follow them. Delete compatibility code as its last
-consumer migrates, and complete the full desktop gate before Quest work.
+Work in **connected subsystem bundles**: producer, owned data, native consumers
+and removal of the replaced interface. Next is scene lighting; then broader
+rigid scene ownership, material/character paths and the remaining frame producers.
+Reuse the existing assets, owners, math, shaders and backend. The first object is
+a regression case, not a permanent limit on scene-level development. Delete
+compatibility at last use and complete the full desktop gate before Quest work.
 
 The [active queue](docs/HOST_RENDERER_TRANSITION.md#active-work-queue) owns the
 dependency order, concrete files and acceptance gates. Do not start another
@@ -124,13 +127,13 @@ source to recover behavior, not to reproduce every console helper one-for-one.
 
 Use the smallest test that can falsify the change:
 
-1. Trace the producer, owned data and actual consumer. Name the dependency being
-   removed before coding; preserve live values, ordering and lifetime.
+1. Define the connected deliverable and interface being removed. Reuse completed
+   source findings; revisit changed or uncertain contracts, not every old helper.
 2. Exercise their real representations in existing CPU/GPU fixtures. A failed
    runtime admission becomes a focused regression before another game boot.
-3. Build the host incrementally and run a bounded readiness-gated scene check
-   for a connected runtime change. Reserve broad sequences/reloads/both-eye
-   checks for the relevant integration gates; do not omit them.
+3. Group related edits before an incremental host build and targeted live/pixel
+   run. Every diagnostic needs a decision it can change. Reserve broad sequences,
+   reloads and both-eye checks for integration milestones; do not omit them.
 4. Commit and push each coherent verified checkpoint, replace superseded
    evidence and report the remaining boundary.
 
@@ -174,6 +177,8 @@ Experimental native sun-camera fitting remains disabled by default.
   ordered work queue, completion requirements and checkpoint history.
 - [AGENTS.md](AGENTS.md): canonical instructions, storage budgets and standing
   approval for frequent scoped commits/pushes. [CLAUDE.md](CLAUDE.md) imports it.
+  Detailed [disk-space policy](docs/DISK_SPACE_POLICY.md) is required before
+  artifact-producing work or cleanup, not a mandatory read for status checks.
 - [Native material format](docs/NATIVE_MATERIAL_FORMAT.md),
   [native texture format](docs/NATIVE_TEXTURE_FORMAT.md) and
   [host upload arena](docs/HOST_UPLOAD_ARENA.md): native data contracts.

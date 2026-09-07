@@ -30,209 +30,100 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07: latest receiver source replaces original sub_82176708 and
-publishes one retained image/camera/late-colour packet;300 Python checks,
-output27/CPU11 and material31/CPU29 pass. Host104/run941 **failed** a second-field
-light-selection dirty-bit comparison. Zero reported receiver original/refused/
-missing calls does not qualify that run. Host105/run943 passes the receiver and
-all existing text gates independently in both reload epochs, after temporary
-mouse-menu isolation. It did not reproduce941 and has no new pixels: the dirty
-writer/cause remains unknown. Investigate that ordering before another full
-reload/receiver/pixel gate; do not relax comparison or chase a pass.
-[Current evidence](../research/20260907_1224_native-receiver-setup.md).
+Updated 2026-09-07 after the owner's request to work faster and smarter.
+The work unit is a **connected rendering subsystem**, not a console callback or
+a longer list of counters. Reuse the native owners, assets and backend already
+built. The selected rigid object remains a regression target, not a permanent
+ceiling on scene-level implementation.
 
-Last accepted live checkpoint: host103/run940 passes one selected-object mono title reload.
-Generation93 retires all1676 native scene/shadow submissions before title;
-generation207/instance389 renders afterward. Each field epoch adds901 actual
-native emissions per consumer after readiness and independently passes the
-existing field/movement checks; final mono pixels inspected.293 Python checks
-and output25/CPU9 pass. Run939's insufficient reporting window is regression
-covered, not relabelled a pass. Remaining source adapters, repeated-object
-batches, sequences and both-eye game acceptance prevent full qualification.
-[Evidence](../research/20260907_1140_native-rigid-reload.md).
-The dependency map below owns the detail; keep this queue outcome-oriented.
+Latest renderer source remains `6de0c2f`; this workflow revision changes no
+renderer binary. Host105/run943 passes the existing text gates and receiver
+checks in both reload epochs, but does not explain run941's light-selection
+dirty-bit mismatch. No new pixels were captured. Host103/run940 remains the last
+accepted selected-object mono reload/pixel checkpoint. There is no qualified
+complete host frame, broad scene, full-game stereo or Quest result.
+[Receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md),
+[last accepted reload](../research/20260907_1140_native-rigid-reload.md).
 
-1. **Finish one direct native static object, then expand material families.**
-   The selected `bg41_01` node64/162-vertex opaque rigid asset is already cooked.
-   Its owned packet retains geometry/material/node associations, pose, object
-   color/images/UVs, participation/shadow policy, shader-layer/color/bone metadata,
-   selected lights, fog, lighting pass, material features and ordinary 2D samplers.
-   Native scene/shadow shaders and shared pipeline/binding cores have focused
-   two-eye GPU coverage. **The selected object now uses both native scene and
-   shadow programs in opt-in acceptance mode.** Run937 has fresh native indirect
-   instance emissions/fence retirements and inspected pixels. Multi-instance
-   GPU fixture pixels pass; the selected field asset still forms singleton
-   batches. Run938 additionally passes cold-start hard-off routing: selection
-   comes from the loaded model before pose fallback/culling, and the old node
-   entry refuses the selected family before diagnostics, capture or replay.
-   Run940 additionally passes actual game-owned teardown/reload with separate
-   source generations and old native GPU-fence retirement, not registry simulation.
-   Source-free lifecycle and both-eye game acceptance remain open.
+### Next deliverable: owned scene lighting consumed by native rigid draws
 
-   Connect this existing packet to the existing backend in dependency order:
+The current direct consumer already bypasses the original shader callback, but
+`PrepareNativeSelectedLightValues` still imports mutable per-object selection
+state and previews the legacy publisher/cache. That is the dependency to remove,
+not another helper to translate. Implement the producer, lifetime and consumer
+connection as one coherent bundle:
 
-   - Retire the remaining scene/receiver source adapters. The primary shadow
-     pass now allocates native depth, uses the shared native framebuffer/clear
-     owner and publishes a retained sampled image without a legacy resolve link.
-     The direct caster consumes pass-local, frame/view-fresh camera matrices,
-     owned model geometry and the immutable pose. Completed depth/camera and
-     receiver colour now reach the scene packet with frame/view/object freshness;
-     colour is published after the actual receiver callback's late flush, not
-     from an early projection snapshot. Latest source replaces that original
-     callback with host setup and one retained image/camera/colour packet;
-     compatibility texture/parameter/colour publication for other draws remains
-     explicit. Run941's light-selection mismatch leaves
-     this replacement's reload/pixel acceptance pending; its cause is unproven.
-     The uploader's actual 2D-array views now match
-     the native scene shader in the focused GPU fixture (19c9da6); bind those
-     retained explicit views, not a texture's default plain-2D view.
-     Native per-node selection/publication preflight now runs before the selected
-     node's old shader callback, sharing the existing source-to-pass cores without
-     calling originals or committing compatibility writes. Unknown cached slots
-     refuse. Authored light storage and its compatibility cache remain producers
-     to replace; this is not independent native scene loading.
-     Ordinary 2D filters/addressing are now owned; cube/volume/inherited-axis
-     samplers remain separate unsupported families, not frozen defaults.
-   - Extend the direct scene route for the supported node before `HostDrawReplay`/original capture
-     in `scene_node.cpp`, using native shader programs, layouts, image leases,
-     pass bindings and the shared culling/instancing/indirect submission backend.
-     Preflight every primitive before any draw or observable side effect, so
-     unsupported siblings are neither lost nor duplicated. Shadow casting and
-     receiving must each have a complete contract.
-     The caster and scene host-walk routes now bypass `bdSceneNodeDrawSingle`
-     entirely after whole-node admission, using the shared queue/cache and
-     fence-retained native descriptors. It does not use translated instance
-     records. Native batching/indirect support now gathers owned784-byte records
-     at the shared queue flush, preserving each instance's material/light/fog
-     values. Exact geometry/images/samplers/pass context and fresh frame/slot
-     ownership gate merging; descriptors retire at the fence. Qualify repeated
-     real-object groups as that lifecycle path gains representative coverage.
-   - Extend the existing scenario harness at that consumer boundary: disable the
-     selected family's interpreter, template capture and replay **before its first
-     draw**, then prove cold load, native instance updates, scene/shadow output,
-     teardown and reload with fresh generations. Refusal must remain a visible
-     failure, never silently warm the fallback. The walking gate is not this test.
-
-     The new `bd_native_rigid_hard_off` opt-in requires both native draw paths,
-     host walking and native instances. Missing model/node/geometry identity
-     refuses classification; known other families still use compatibility.
-     Selected nodes require the exact current model lease/generation, transform,
-     bounds and a supported view. Existing owner registries are reused, with no
-     new selection cache. Run938 enables this before startup and passes fresh
-     scene/shadow admission and emission gates. Run940 now accepts a real
-     game-owned title teardown/reload with generation-specific native submission,
-     emission and fence-retirement evidence. The old source was destroyed while
-     two draws per consumer were still retained; all retired before title.
-     Both epochs pass the complete existing consumer/movement checks separately.
-     **Next: resolve941's light-selection dirty-output failure and qualify the
-     receiver replacement, then remove the remaining receiver/pass source adapters
-     and publish explicit per-eye inputs**, then qualify repeated-object batches,
-     visual sequences and both eyes before expanding families. Mono reload is
-     not source-free scene loading or full lifecycle qualification.
-
-   Test these connections with the producer's actual view types, UV units,
-   frame/view/object identities and lifetime behavior in existing fixtures first.
-   Destroy source storage before native consumption; cover generation reuse,
-   asynchronous completion and late writers. Group the remaining pass contracts
-   around the direct consumer, not another series of unrelated adapter rewrites.
-   No new renderer framework, bulk recook or library-wide format churn is needed.
-
-   After that acceptance passes, expand opaque rigid objects to alpha-tested,
-   wind and translucent families, preserving ordered null/override semantics and
-   deferred/volume participants. Animated overrides must stay live. Native assets,
-   submission and pass systems are reused; temporary source aliases, shader-register
-   packing and retained templates are deleted as their last consumer migrates.
-   See the [dependency map](#direct-rigid-object-dependency-map) and
-   [loader/lifetime source map](../research/20260906_1531_static-model-ownership-frontier.md).
-2. **Complete character path.** Native skeleton/skin assets, animation and pose
-   producers, joint palettes and GPU skinning; preserve gameplay synchronization
-   and verify characters in the relevant field/battle/cutscene/shadow paths.
-3. **Complete specialized producers.** Dynamic vertices, effects/particles, UI,
-   reflections and remaining pass/material callbacks, with authored event and
-   lifecycle checks rather than field-only counter coverage.
-4. **Delete unused compatibility machinery and qualify desktop.** Remove guest
-   rendering execution, register/resource/getter adapters, EDRAM/tile inference,
-   seed copies and emulated resolves as their consumers disappear. Complete all
-   representative desktop/both-eye/animated-effect checks before Quest runs.
-
-Use focused fixtures and incremental builds for the inner loop, targeted
-GPU/pixel checks for coherent rendering changes, and the broad suite at meaningful
-milestones. Maintain frequent verified commits/pushes. The latest autoplay CPU
-fixture takes 0.03 s; a one-file host build 2.323 s. Readiness-driven autoplay
-starts walking at about 42 s from initial pad polling, replacing a fixed 150 s
-delay; a 61 s diagnostic now observes displacement and three motion images.
-Extend the existing scenario checker for reloads, battles and authored effects;
-empty queues, startup counters and water activity do not qualify those paths.
-No overall development-speed multiplier is established.
-
-Prioritize this first complete object over additional broad adapters. Each new
-adapter must name the remaining direct-object dependency it removes; reuse the
-existing native owners and submission backend. Keep shader/material fixtures
-source-free and incremental, then run one coherent field/pixel checkpoint.
-Extend the existing readiness-driven runner for targeted reload/shadow coverage;
-do not begin a bulk asset recook or a second renderer framework. Phase1/2 policy
-rules currently have CPU coverage only, and volume-dependent dual participation
-is explicitly unconverted. These are expansion work, not permission to silently
-drop participants from the initial acceptance scene.
-
-### Next three implementation checkpoints
-
-These are dependency gates, not three parallel workstreams or a new percentage
-complete. Checkpoint1 now has a live mono scene/caster consumer (run936), with
-remaining source adapters explicit. Checkpoint2 now has native batching/indirect
-code and two-instance GPU coverage, plus live singleton indirect draws (run937).
-Cold-start hard-off routing passes in938 and actual mono teardown/reload in940;
-repeated-object runtime and remaining source-free/both-eye gates remain. Stay on
-that same path before expanding families; one image does not establish stability.
-
-| Checkpoint | Existing implementation to extend | Exit evidence |
+| Boundary | Reuse | Required result |
 | --- | --- | --- |
-| 1. Direct rigid scene and receiver | `native_shadow_pass_bridge.cpp` / `native_scene_result_bridge.h` for completed shadow ownership and fresh receiver inputs; `native_selected_lights_bridge.cpp` for native per-node preparation; `native_material_texture_bridge.cpp` / `native_rigid_draw.cpp` / `host_walk.cpp` for retained packets and routing | Whole-node preflight before side effects; source-free packet consumption in fixtures; positive native scene GPU draw emissions after field readiness, not only queued submissions; selected-node interpreter/capture/replay absent after admission; actual scene and shadow pixels inspected. Unsupported selected inputs fail visibly. |
-| 2. Native batching and lifecycle acceptance | Existing queue/culling/instancing/indirect backend, native model/instance owners and `native_instance_scenario.py`; extend the existing runner rather than creating another harness | Selected-family legacy rendering disabled before its first draw; cold load, movement, teardown and reload with fresh generations and no retained templates/warm-up. Batches preserve per-object transforms/materials and fence lifetimes. Both scene and shadow consumers must be exercised. |
-| 3. Expand rigid material families | Existing policy/material/shader programs, native image/sampler owners and the accepted direct route | Alpha-test, wind and translucent families added as complete producer-to-consumer paths, with authored changes, sibling/deferred participation and matching lifecycle/pixel checks. Delete temporary adapters at last use; no library-wide recook unless a measured format requirement needs it. |
+| Authored updates -> owned scene-light data | Existing `bdLightListUpdateSnapshot` boundary in `src/engine/frame_interp.cpp`; `native_light_selection.h`, `native_selected_lights.h` and current lighting bridges | Publish bounded semantic light definitions, scoring/priority/view/exclusion inputs and scene/update identities at a proven coherent handoff. Preserve animated/late changes. Audit synchronization; copying mutable fields or stamping them with a frame number alone is not an immutable snapshot. |
+| Object updates -> selection inputs | Existing native model/instance/object owners and per-node binding import | Retain the correct object/node light binding, class and spatial inputs with owned lifetime. Guest addresses may identify the temporary import boundary, not the native lighting API or persistent asset. Do not substitute guessed bounds or freeze observed light values. |
+| Native light/object inputs -> actual scene packet | Existing `native_selected_lights_bridge.cpp`, `native_material_texture_bridge.cpp`, `PrepareNativeRigidSceneForObject` and `native_rigid_draw.cpp` | Select/compose from owned data without reading guest dirty masks, cached shader IDs or legacy parameter descriptors at native consumption. Preserve the existing native scene/shadow programs, image leases, queue, instancing/indirect and fence retirement. |
 
-Last accepted reload checkpoint: host103/run940 passes both independently checked field
-epochs and actual selected-source/GPU retirement, with901 post-readiness
-emissions per consumer per epoch. Generation93/instance144 becomes207/389.
-Both epochs add300 fresh admission/emission/fence samples; no merged runtime
-instances. One final mono image inspected, not a visual sequence or both eyes.
-[Evidence and failed-sampling regression](../research/20260907_1140_native-rigid-reload.md).
+The exit test is a connected producer-to-consumer proof: existing CPU fixtures
+consume after source mutation/destruction, reject stale scene/update identities,
+and cover changed light values even when old shader slots were unchanged.
+Exercise supported directional/point/spot, priority/exclusion, per-node binding
+and late-update semantics. Then use the existing targeted runtime/receiver
+reload and pixel gates to show fresh consumption and no return to the replaced
+interface. Keep unsupported families explicit. Unchanged shader-fixture evidence
+can be reused; changed bindings/program behavior needs the affected GPU tests.
 
-Hard-off checkpoint: host98/run938 has its first guarded scene/caster submission
-at frame764, then300 fresh admissions and300 real emissions/retirements per
-consumer. The existing field/movement gates pass; the inspected mono image
-retains known cliff marks/blur. Output22/CPU7 covers missing model/pose/geometry,
-generation reuse, incomplete/ambiguous nodes and bounds refusal in0.39 s CTest.
-All288 Python checks pass. No new shader/GPU run was needed; GPU26/rigid05 remains
-the evidence for unchanged programs. No actual reload, both-eye game or speedup
-claim. [Evidence](../research/20260907_1045_native-rigid-hard-off.md).
+Keep run941's exact failure and strict comparison. Establish its affected
+boundary with a targeted observation when needed; do not assume it is unrelated
+or claim a successful rerun fixed it. Independent implementation of the owned
+light path can proceed while that regression is open. The affected runtime
+behavior remains unqualified until the cause is resolved or the replaced
+dependency's removal and equivalent native behavior are proved. No disabling
+checks, counter resets, weaker thresholds or relabelled passing evidence.
 
-Use cheap boundary fixtures to resolve view types, coordinate units and late
-publication before a runtime retry. A changed shared header can rebuild many
-host dependents (host93 scheduled104 steps); keep private changes local where
-possible. Do not rebuild the guest, create another build tree or boot the game
-to validate a shader that still has no live scene consumer. Once routing changes,
-the host build and targeted game/pixel gate are required. Commit/push verified
-connections regularly; distinguish prerequisites from accepted runtime paths.
+### Following delivery bundles
 
-The latest rigid fixture (GPU build26/rigid05) passes five two-eye cases in1.22 s
-with zero validation errors/warnings and no image files. It includes two distinct
-instances in one indirect command, for both scene and shadow, using production
-shaders and nonzero storage/command offsets. The shared packing/compatibility
-core has CPU coverage; the GPU fixture does not execute the full game queue.
-Run937 exercises that queue with one instance per batch, not merged runtime
-groups.284 Python checks pass; output20/CPU5 passes in0.36 s. No speedup claim.
-[Evidence](../research/20260907_1016_native-rigid-batches.md).
+1. **Scene-level rigid ownership and representative batches.** Complete remaining
+   object/receiver/camera/pass producers and explicit per-eye inputs using the
+   existing owners. Grow beyond the single asset to representative supported
+   objects, culling/occlusion and real multi-instance groups. Preserve sibling,
+   deferred and volume participation; no silent omission or warm-up fallback.
+   The selected asset's cold-start hard-off/reload proof stays a regression case.
+2. **Material families and characters.** Extend the same path to alpha-tested,
+   wind and translucent materials; deliver native skeleton/skin assets, animation/
+   pose production and GPU skinning as connected character paths. Test authored
+   changes and field/battle/cutscene/shadow lifetimes. Cook only formats/assets
+   actually needed, with stable IDs, persistence and bounded streaming.
+3. **Specialized producers and complete host frame.** Dynamic vertices,
+   effects/particles, UI, secondary shadows, reflections, remaining frame/pass
+   scheduling and presentation. Remove guest rendering, register/resource
+   adapters, retained templates, EDRAM/tile inference, seed copies and emulated
+   resolves as their final consumers disappear.
+4. **Full desktop gate, then Quest 2.** Qualify fields, battles, cutscenes, menus,
+   transitions, reloads, animated effects and both eyes. Multiview, frustum/
+   occlusion culling, instancing, indirect draws and the remaining required modern
+   GPU techniques stay in scope. Only then qualify/optimize Quest, including
+   foveation, toward the unchanged 72 Hz target.
 
-Direct-scene checkpoint: host95/run936 passes all existing field/movement gates
-and adds300 native scene emissions/300 fence retirements in fresh post-event
-windows. The selected node uses owned constants, albedo/shadow array views and
-native samplers through the shared pipeline/queue, never a captured pipeline.
-The existing C++ fixtures cover transactional per-node light preview, receiver
-freshness, whole-node refusal and sole-plan resource retention.280 Python checks
-pass. The field image is coherent with known cliff marks/blur; no isolated-object
-pixel oracle, sequence/reload, game both-eye or speedup claim.
-[Evidence](../research/20260907_0946_direct-rigid-scene.md).
+These describe dependency order, not a requirement to finish every scene's
+visual matrix before writing the next producer sharing the same owner.
+Acceptance claims remain scoped to what was actually verified; the full
+desktop requirements above are unchanged.
+
+### Working cadence
+
+- Start with a short bundle contract: outcome, interface removed, reused files
+  and a falsifiable exit test. Reuse completed source findings when unchanged.
+- Group related source/fixture/consumer edits before an integration build.
+  Use `python -B tools/host_checks.py` and existing C++/GPU fixtures for the
+  inner loop; use a bounded game/pixel run for a coherent connected change.
+  Broad reload/scene/sequence/both-eye qualification belongs at integration
+  milestones, not after each helper. It is not optional at completion.
+- Every diagnostic must answer a named implementation question. If it does not,
+  change the hypothesis/method instead of repeating it until a pass. Preserve
+  relevant failures, and distinguish investigation from ownership progress.
+- Commit/push coherent verified connections frequently. A prerequisite-only
+  checkpoint names its pending consumer; source/tests do not restamp the last
+  live-tested binary. Keep one active queue and one cumulative storage ledger,
+  not a dated report or duplicate worklog for every small edit.
+- Read the dependency map below only when its specific source contract is needed.
+  It and the linked dated reports preserve detailed provenance; they are not a
+  mandatory re-audit on every turn. No new renderer framework or bulk recook.
 
 ### Direct rigid-object dependency map
 
