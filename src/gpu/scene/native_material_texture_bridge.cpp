@@ -193,9 +193,8 @@ std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
   const auto lights = PrepareNativeSelectedLightValues(uint32_t(selection));
   if (!lights) return {};
   refusal = "fresh completed primary shadow or receiver colour unavailable";
-  const auto shadow = FindCompletedNativePrimaryShadow();
-  const auto colour = FindNativePrimaryReceiverColour(scope->visual);
-  if (!shadow || !colour) return {};
+  const auto receiver = FindNativePrimaryReceiver(scope->visual,scope->render_view);
+  if (!receiver) return {};
   // This is the temporary source boundary, not a tag-based native draw API.
   NodeTag tag; tag.valid = true; tag.visual_va = scope->visual; tag.ctx_va = scope->context;
   tag.node_index = node; tag.render_view = scope->render_view;
@@ -208,7 +207,7 @@ std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
   packet->lights = lights; // computed for this node BEFORE its old shader callback
   refusal = "whole-node scene shader contract unsupported";
   return PrepareNativeRigidScene(*program, *packet,
-      {shadow->image, shadow->camera.world_to_clip, *colour, *visibility});
+      {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility});
 }
 
 namespace {

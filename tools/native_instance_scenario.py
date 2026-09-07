@@ -677,7 +677,32 @@ def split_rigid_reload(text):
     return cold,reloaded,dict(old_generation=old_gen,new_generation=new_gen,old_instance=old_instance,new_instance=new_instance)
 
 
-def verify_rigid_epoch(text):
+def verify_receiver_setup(text):
+    """Host callback and retained packet consumption, not source-free scene loading."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("receiver setup diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-shadow-receiver\] frame (\d+) native (\d+) ignored (\d+) original (\d+) refused (\d+); compatibility bindings (\d+) parameters (\d+); owned packets (\d+) reads (\d+) missing (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-shadow-receiver] refused" in line:
+            raise ValueError("native receiver setup refused")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if any(values[i] for i in (3, 4, 9)):
+                raise ValueError("receiver original execution, refusal or missing owned packet")
+            if values[2] > values[1] or values[6] > values[5] or values[7] > values[6]:
+                raise ValueError("impossible receiver publication counts")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1, 5, 6, 7, 8)):
+        raise Pending("need fresh host receiver setup, publication and native consumer reads")
+    return dict(native_delta=b[1]-a[1], packets_delta=b[7]-a[7], reads_delta=b[8]-a[8], original=b[3])
+
+
+def verify_rigid_epoch(text, receiver_setup=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -688,6 +713,8 @@ def verify_rigid_epoch(text):
                   verify_rigid_batches,verify_rigid_hard_off,verify_fog,verify_primitive_shader,
                   verify_lighting_pass,verify_material_features,verify_material_samplers):
         check(text)
+    if receiver_setup:
+        verify_receiver_setup(text)
 
 
 def main():
@@ -716,6 +743,7 @@ def main():
     parser.add_argument("--rigid-batches", action="store_true")
     parser.add_argument("--rigid-hard-off", action="store_true")
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
+    parser.add_argument("--receiver-setup", action="store_true", help="host receiver callback and fresh retained packet reads in each requested epoch")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -732,8 +760,8 @@ def main():
         text = data.decode("utf-8")
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold)
-            verify_rigid_epoch(text)
+            verify_rigid_epoch(cold, args.receiver_setup)
+            verify_rigid_epoch(text, args.receiver_setup)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -755,6 +783,7 @@ def main():
         rigid_scene = verify_rigid_scene(text) if args.rigid_scene else None
         rigid_batches = verify_rigid_batches(text) if args.rigid_batches else None
         rigid_hard_off = verify_rigid_hard_off(text) if args.rigid_hard_off else None
+        receiver_setup = verify_receiver_setup(text) if args.receiver_setup else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -769,6 +798,8 @@ def main():
     print("PASS: post-event native instances " + ", ".join(f"{k}={v}" for k, v in result.items()))
     if reload is not None:
         print("PASS: same-process native rigid reload (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in reload.items()))
+    if receiver_setup is not None:
+        print("PASS: host receiver setup and owned reads " + ", ".join(f"{k}={v}" for k,v in receiver_setup.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:

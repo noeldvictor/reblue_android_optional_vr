@@ -8,6 +8,7 @@ from native_instance_scenario import verify_rigid_scene
 from native_instance_scenario import verify_rigid_batches
 from native_instance_scenario import verify_rigid_hard_off
 from native_instance_scenario import split_rigid_reload
+from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -592,6 +593,12 @@ class LightSelectionScenarioTest(unittest.TestCase):
         self.assertEqual(verify_light_selection("\n".join(self.rows())), dict(
             updates_delta=50, rebuilds_delta=10, candidates_delta=30, checks_delta=50))
 
+    def test_run941_dirty_mismatch_invalidates_preceding_success(self):
+        text = "\n".join(self.rows()) + ("\n[error] [native-light-selection-mismatch] selection 237FA614 view 0 "
+                "address 237FA618 actual FFFFFFFF expected FFFFFFFE")
+        with self.assertRaisesRegex(ValueError, "native light selection mismatch"):
+            verify_light_selection(text)
+
     def test_stale_missing_scoring_reset_incomplete_wrong_scene(self):
         text = "\n".join(self.rows())
         for bad in (text.replace("150", "100"), text.replace("150 checks", "149 checks"),
@@ -831,6 +838,54 @@ class RigidHardOffScenarioTest(unittest.TestCase):
                     "x" * (MAX_LOG_BYTES+1)):
             with self.assertRaises(ValueError):
                 verify_rigid_hard_off(bad)
+
+
+class ReceiverSetupScenarioTest(unittest.TestCase):
+    def text(self):
+        rows = scenario()
+        for index, frame in ((2, 100), (4, 150)):
+            rows[index] = (f"[native-shadow-receiver] frame {frame} native {frame} ignored 0 original 0 refused 0; "
+                           f"compatibility bindings {frame} parameters {frame}; owned packets {frame} reads {frame} missing 0;")
+        return "\n".join(rows)
+
+    def test_fresh_native_callback_and_owned_reads(self):
+        self.assertEqual(verify_receiver_setup(self.text()),
+                         dict(native_delta=50, packets_delta=50, reads_delta=50, original=0))
+
+    def test_publication_alone_stale_wrong_scene_and_empty_cannot_pass(self):
+        text = self.text()
+        for bad in ("", text.replace("reads 150", "reads 100"),
+                    text.replace("frame 150", "frame 100"),
+                    text.replace("bg41_01", "bg42_01"),
+                    text + "\n[native-material-context] mode Loading",
+                    text.replace("native 150", "native 100")):
+            with self.assertRaises(Pending): verify_receiver_setup(bad)
+
+    def test_original_refusal_missing_and_impossible_counts_are_errors(self):
+        text = self.text()
+        for bad in ("[native-shadow-receiver] refused: descriptor\n" + text,
+                    text.replace("original 0", "original 1"), text.replace("refused 0", "refused 1"),
+                    text.replace("missing 0", "missing 1"), text.replace("ignored 0", "ignored 999"),
+                    text.replace("packets 150", "packets 151"), "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_receiver_setup(bad)
+
+    def test_reload_requires_receiver_check_in_each_epoch(self):
+        # Exercise the real epoch orchestrator; other independently tested
+        # consumer gates are stubbed so this fixture isolates new gate wiring.
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in (
+                        "verify_rigid_epoch", "verify_receiver_setup"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for old_text, new_text in ((cold, self.text()), (self.text(), new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(old_text, receiver_setup=True)
+                    module.verify_rigid_epoch(new_text, receiver_setup=True)
+            module.verify_rigid_epoch(self.text(), receiver_setup=True)
 
 
 class FogScenarioTest(unittest.TestCase):

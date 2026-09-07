@@ -185,13 +185,14 @@ struct DevicePrediction {
                         bytes.size());
   }
 };
-bool Flush(PPCContext &ctx, uint8_t *base) {
+bool Flush(PPCContext &ctx, uint8_t *base, bool publish = true) {
   const auto descriptor = ctx.r3.u32;
   const auto scratch = uint64_t(ctx.r1.u32) - 160;
   if (!Range(descriptor, 16) || Overlap(descriptor, 16, scratch, 160))
     return false;
   const auto flags = bd::mem::load<uint32_t>(descriptor) & 3;
   if (!flags) {
+    if (!publish) return true;
     if (REXCVAR_GET(bd_host_parameters_verify)) {
       const auto result = ctx.r3.u64;
       ReferenceScope scope;
@@ -216,6 +217,7 @@ bool Flush(PPCContext &ctx, uint8_t *base) {
       Overlap(descriptor, 16, device, kD3DDeviceAllocSize) ||
       Overlap(kDevice, 4, device, kD3DDeviceAllocSize))
     return false;
+  if (!publish) return true;
   const bool verify = REXCVAR_GET(bd_host_parameters_verify);
   if (verify) {
     DevicePrediction prediction(device);
@@ -415,6 +417,20 @@ void SetHostFloatParameters(PPCContext &ctx, uint8_t *base, bool vertex) {
     transfer.Count();
   }
   Report();
+}
+bool FlushHostParameterDescriptor(uint32_t descriptor, uint32_t stack) {
+  if (stack < 160 || !REXCVAR_GET(bd_host_parameters) || REXCVAR_GET(bd_host_parameters_verify) || reference_execution) return false;
+  PPCContext context{};
+  context.r3.u64 = descriptor; context.r1.u64 = stack;
+  const bool result = Flush(context,nullptr); // Native branch; settings checked above.
+  Report();
+  return result;
+}
+bool CanFlushHostParameterDescriptor(uint32_t descriptor, uint32_t stack) {
+  if (stack < 160 || !REXCVAR_GET(bd_host_parameters) || REXCVAR_GET(bd_host_parameters_verify) || reference_execution) return false;
+  PPCContext context{};
+  context.r3.u64 = descriptor; context.r1.u64 = stack;
+  return Flush(context,nullptr,false); // Same complete import check, no writes/counters.
 }
 } // namespace bd::gpu::scene
 

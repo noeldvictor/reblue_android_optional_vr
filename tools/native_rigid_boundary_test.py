@@ -6,6 +6,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeRigidBoundaryTest(unittest.TestCase):
+    def test_receiver_is_native_and_draw_consumes_a_retained_packet(self):
+        source = (ROOT / "src/gpu/scene/native_shadow_receiver_bridge.cpp").read_text()
+        self.assertIn("REXCVAR_DEFINE_BOOL(bd_native_shadow_receiver, true", source)
+        hook = source.split("REX_HOOK_RAW(sub_82176708) {",1)[1]
+        native = hook.split("const auto technique =",1)[1]
+        self.assertIn("RunNativeReceiverSetup(enabled,adapter)",native)
+        self.assertNotIn("__imp__",native)
+        self.assertNotIn("D3DDevice_SetTexture",source)
+        self.assertIn("CanFlushHostParameterDescriptor(*descriptor,stack-96)",source)
+        self.assertIn("FlushHostParameterDescriptor(ReadWord(uint64_t(source)+356),stack-96)",source)
+        reader = source.split("std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver",1)[1].split("} // namespace",1)[0]
+        for forbidden in ("Word(","ResolveGuestTexture","FindCompletedNativePrimaryShadow"):
+            self.assertNotIn(forbidden,reader)
+        consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text().split(
+            "std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject",1)[1].split("\n}",1)[0]
+        self.assertIn("receiver->image, receiver->world_to_shadow, receiver->colour",consumer)
+        self.assertNotIn("FindCompletedNativePrimaryShadow",consumer)
+        self.assertNotIn("value_or(ReadColour",source) # Eager fallback reads can outlive the validated late-read boundary.
+
     def test_reload_uses_actual_source_and_gpu_lifetimes(self):
         material = (ROOT / "src/gpu/scene/native_material.cpp").read_text()
         retire = material.split("REX_HOOK_RAW(sub_8227EBE8) {", 1)[1]

@@ -714,22 +714,70 @@ void RigidHardOffRouting() {
   assert(!models.Publish(10,{mesh(100,true)},nodes));
   assert(!models.FindModel(10)); // Failed replacement cannot expose the prior generation.
 }
+void ReceiverSetupOrder() {
+  using namespace bd::gpu::scene;
+  struct Adapter {
+    std::vector<char> events;
+    LightingVector authored{.1f,.2f,.3f,.4f}, owned{};
+    bool refuse = false;
+    void Reset() { events.push_back('z'); owned = {}; }
+    void Preflight() { events.push_back('p'); if (refuse) throw 1; }
+    void BindCompatibilityImage() { events.push_back('b'); }
+    void FlushCompatibilityParameters() { events.push_back('f'); authored[0] = .75f; }
+    LightingVector ReadColour() { events.push_back('r'); return authored; }
+    void PublishCompatibilityColour(const LightingVector &value) {
+      events.push_back('c'); assert(value[0] == .75f); authored[0] = .125f;
+    }
+    void PublishNative(const LightingVector &value) { events.push_back('n'); owned = value; }
+  } adapter;
+  RunNativeReceiverSetup(false,adapter);
+  assert(adapter.events == std::vector<char>{'z'});
+  adapter.events.clear(); adapter.refuse = true;
+  try { RunNativeReceiverSetup(true,adapter); assert(false); } catch (int) {}
+  assert((adapter.events == std::vector<char>{'z','p'}));
+  adapter.events.clear(); adapter.refuse = false;
+  RunNativeReceiverSetup(true,adapter);
+  assert((adapter.events == std::vector<char>{'z','p','b','f','r','c','n'}));
+  assert(adapter.owned[0] == .75f && adapter.authored[0] == .125f);
+  for (uint32_t phase=0;phase<16;++phase) for (uint32_t technique=0;technique<16;++technique)
+    assert(ImportReceiverParticipation(technique,phase) ==
+        (technique != 14 && (phase == 0 || phase == 3 || phase == 5 || phase == 6)));
+  assert(!ImportReceiverParticipation(0,~0u));
+}
 void RigidScenePacket() {
   using namespace bd::gpu::scene;
   const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-  NativeReceiverColourPublication publication;
   const LightingVector colour{.1f,.2f,.3f,.5f};
+  {
+  NativeReceiverPublication publication;
+  NativePrimaryReceiver receiver{std::make_shared<NativeTargetImage>(),identity,colour};
   assert(!publication.Read(12,4,3));
-  publication.Publish(colour,12,4,3);
-  auto retained_colour = publication.Read(12,4,3);
-  assert(retained_colour && !publication.Read(13,4,3) && !publication.Read(12,5,3) && !publication.Read(12,4,1));
-  publication.Publish({.2f,.3f,.4f,.6f},12,4,3);
-  assert(publication.Read(12,4,3)->at(0) == .2f && retained_colour->at(0) == .1f);
-  publication.Publish({std::numeric_limits<float>::quiet_NaN(),0,0,0},12,4,3);
+  publication.Publish(receiver,12,4,3);
+  auto retained_receiver = publication.Read(12,4,3);
+  assert(retained_receiver && !publication.Read(13,4,3) && !publication.Read(12,5,3) && !publication.Read(12,4,1));
+  receiver.colour[0] = .2f; receiver.world_to_shadow[12] = 7;
+  publication.Publish(receiver,12,4,3);
+  assert(publication.Read(12,4,3)->colour[0] == .2f && retained_receiver->colour[0] == .1f);
+  assert(publication.Read(12,4,3)->world_to_shadow[12] == 7 && retained_receiver->world_to_shadow[12] == 0);
+  receiver.colour[0] = std::numeric_limits<float>::quiet_NaN();
+  publication.Publish(receiver,12,4,3);
   assert(!publication.Read(12,4,3));
-  publication.Publish(colour,12,4,3); publication.Reset(); assert(!publication.Read(12,4,3));
-  publication.Publish(colour,0,4,3); assert(!publication.Read(0,4,3));
-  publication.Publish(colour,12,4,16); assert(!publication.Read(12,4,16));
+  receiver.colour = colour; receiver.world_to_shadow[0] = std::numeric_limits<float>::infinity();
+  publication.Publish(receiver,12,4,3);
+  assert(!publication.Read(12,4,3));
+  receiver.world_to_shadow = identity;
+  publication.Publish(receiver,12,4,3); publication.Reset(); assert(!publication.Read(12,4,3));
+  publication.Publish(receiver,0,4,3); assert(!publication.Read(0,4,3));
+  publication.Publish(receiver,12,4,16); assert(!publication.Read(12,4,16));
+  receiver.image.reset(); publication.Publish(receiver,12,4,3); assert(!publication.Read(12,4,3));
+  auto lifetime_image = std::make_shared<NativeTargetImage>();
+  const std::weak_ptr<NativeTargetImage> weak_image = lifetime_image;
+  publication.Publish({lifetime_image,identity,colour},12,4,3);
+  auto retained = publication.Read(12,4,3);
+  lifetime_image.reset(); publication.Reset();
+  assert(!weak_image.expired() && retained->world_to_shadow == identity);
+  retained.reset(); assert(weak_image.expired());
+  }
 
   NativeModelMaterialProgram program; program.valid = true; program.ranges.resize(1);
   auto geometry = std::make_shared<NativeGeometry>();
@@ -757,7 +805,9 @@ void RigidScenePacket() {
   packet.shader.vertex_bones = 0; packet.shader.vertex_colour = true;
   packet.features = NativeMaterialFeatures{true,true,false,false,true};
   packet.lights = NativeSelectedLights{};
-  NativeFogLayers fog; for (auto &layer : fog) layer.disabled = true; packet.fog = fog;
+  // Disabled layers still have a fully defined native payload; do not depend on
+  // prior stack contents when BuildRigidPass validates the complete record.
+  NativeFogLayers fog{}; for (auto &layer : fog) layer.disabled = true; packet.fog = fog;
   packet.camera = RenderCamera{identity,identity,identity};
   packet.lighting = NativeLightingPass{};
   packet.lighting->inputs.color_scale = {0,0,0,1};
@@ -1074,6 +1124,7 @@ int main() {
   RigidHardOffRouting();
   RigidLifecycle();
   RigidScenePacket();
+  ReceiverSetupOrder();
   RigidBatches();
   SceneCommands();
   refraction_material_tests::Run();

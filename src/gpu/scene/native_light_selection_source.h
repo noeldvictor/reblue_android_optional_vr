@@ -21,6 +21,19 @@ struct NativeLightSelectionPlan {
   size_t candidates = 0;
   bool rebuilt = false;
 };
+struct NativeLightSelectionMismatch {
+  NativeLightSelectionWrite write;
+  std::optional<uint32_t> actual;
+};
+template <class Read>
+std::optional<NativeLightSelectionMismatch> FindNativeLightSelectionMismatch(
+    const NativeLightSelectionPlan &plan, Read read) {
+  for (const auto &write : plan.writes) {
+    const auto actual = read(write.address);
+    if (!actual || *actual != write.after) return NativeLightSelectionMismatch{write,actual};
+  }
+  return {};
+}
 inline bool LightSelectionOutput(uint64_t address, uint32_t selection, uint32_t view) {
   if (view >= 16) return true;
   return address == uint64_t(selection)+4 ||

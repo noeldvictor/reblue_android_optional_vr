@@ -99,16 +99,21 @@ bool Select(PPCContext &ctx, uint8_t *base) {
   const auto plan = PrepareSelection(selection, ctx.r1.u32);
   if (!plan || !view) return false;
   if (REXCVAR_GET(bd_native_materials_verify)) {
+    const auto before_view = Word(kView), before_dirty = Word(uint64_t(selection)+4);
     __imp__sub_8218A8C8(ctx, base);
     ++selection_stats.checked;
-    for (const auto &write : plan->writes) {
-      const auto actual = Word(write.address);
-      if (!actual || *actual != write.after) {
-        ++selection_stats.wrong;
-        BD_ERROR("[native-light-selection-mismatch] selection {:08X} view {} address {:08X} actual {:08X} expected {:08X}",
-            selection, *view, write.address, actual.value_or(0), write.after);
-        throw std::runtime_error("Native light selection differs from original");
-      }
+    if (const auto mismatch = FindNativeLightSelectionMismatch(*plan,Word)) {
+      ++selection_stats.wrong;
+      BD_ERROR("[native-light-selection-mismatch] selection {:08X} view {} address {:08X} actual {:08X} expected {:08X}",
+          selection, *view, mismatch->write.address, mismatch->actual.value_or(0), mismatch->write.after);
+      // Bounded failure-only observations, not an atomic snapshot or permission
+      // to ignore a late invalidation. Preserve the refusal before any stores.
+      BD_ERROR("[native-light-selection-state] frame {} rebuilt {} candidates {} pre-original view {} dirty {:08X}; post-original view {}",
+          FrameStatFrameCount(),plan->rebuilt,plan->candidates,before_view.value_or(~0u),before_dirty.value_or(0),Word(kView).value_or(~0u));
+      for (const auto &write : plan->writes)
+        BD_ERROR("[native-light-selection-state] address {:08X} before {:08X} expected {:08X} observed {:08X}",
+            write.address,write.before,write.after,Word(write.address).value_or(0));
+      throw std::runtime_error("Native light selection differs from original");
     }
   }
   for (const auto &write : plan->writes)

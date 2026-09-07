@@ -147,6 +147,25 @@ void TestNativeLightSelection() {
   const auto live_kind = PrepareNativeLightSelection(source,read);
   Require(live_kind && live_kind->selection.category == 6,
           "category uses live kind and live priority, not snapshot kind/manager priority");
+  // Run941 observed view0 dirty FFFFFFFF instead of planned FFFFFFFE after
+  // reference execution. Preserve that failure; a later invalidation is not
+  // equivalent output even if the three selected IDs still match. This models
+  // the boundary condition, not proof of which writer changed the live run.
+  for (uint32_t view = 0; view < 16; ++view) {
+    setup(); source.view = view; words[60004] = ~0u;
+    words[60216+(view & ~3u)] = 0;
+    for (uint32_t slot = 0; slot < 3; ++slot) words[60008+view*12+slot*4] = 0xffff0000;
+    const auto expected = PrepareNativeLightSelection(source,read);
+    Require(expected && expected->writes[0].after == (~0u & ~(1u << view)), "rebuild clears only its view bit");
+    for (const auto &write : expected->writes) words[write.address] = write.after;
+    Require(!FindNativeLightSelectionMismatch(*expected,read), "exact completed selection matches");
+    words[60004] = ~0u;
+    const auto mismatch = FindNativeLightSelectionMismatch(*expected,read);
+    Require(mismatch && mismatch->write.address == 60004 && mismatch->actual == ~0u &&
+            mismatch->write.after == (~0u & ~(1u << view)), "late dirty invalidation remains a strict mismatch");
+    words.erase(60004);
+    Require(!FindNativeLightSelectionMismatch(*expected,read)->actual, "missing output is not zero or successful comparison");
+  }
   setup(); words[1000+46816] = 301;
   Require(!PrepareNativeLightSelection(source,read), "snapshot bound refuses before writes");
   setup(); words[1000+48020] = 301; words[60004] = 0;

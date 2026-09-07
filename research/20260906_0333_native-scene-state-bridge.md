@@ -2868,3 +2868,66 @@ Output-preflight63,374,901,248 ->cleanup-end62,971,351,040 B (58.647 GiB):
 403,550,208 B drive-wide use. Actual peak not separately sampled; existing
 supervisors enforced the floor/drop/log/image limits. No new raw allowance,
 no active producer or next run queued; remeasure this same budget next time.
+
+### 2026-09-07 receiver callback/owned packet continuation — output preflight
+
+Same original65,462,788,096 B baseline, owner3 GiB exception and62,509,998,080 B
+operational floor; no reset. Previous cleanup/compression already counted once.
+Read-only preflight63,202,775,040 B free; owner116 B profile SHA unchanged,
+no renderer/build/test process found. The increase since aa00b09's post-push
+62,889,668,608 B is unattributed volume activity, not cleanup savings.
+
+New requirement: qualify replacement of original sub_82176708 by host receiver
+setup and one retained image/camera/late-colour packet at the direct scene
+consumer.298 artifact-free Python guards/scenario tests pass; runtime pending.
+Reuse the output CPU fixture/tree, host tree, existing bounded reload runner,
+scenario checker and window inspector. Estimate160 MiB peak new overlap for
+incremental fixture/host compilation and link; supervised256 MiB free-drop
+limit plus the original floor. Existing300 s build/10 MiB aggregate log caps.
+One180 s reload, <=800 KiB log (<=400 KiB independently per field), one<=160 KiB
+JPEG,192 MiB runtime free-drop; aggregate images currently10,231,096 B fit the
+10 MiB cap with replacement overlap. Raw/perf/dumps zero; no asset cook planned,
+inspect any automatic cache output and count it. Retained raw archive remains
+252,177,116,500 B/27,131 files with zero incoming allowance.
+
+Keep940/image and host103/output25/CPU9 until the corresponding replacements
+pass, then retire only those superseded agent diagnostics. Unchanged GPU26/
+rigid05 and distinct baseline/VR/movement/failure evidence remain protected.
+No shader changes; no GPU-fixture rerun solely to stamp this source revision.
+Builds/runs/actual pixels, sizes, cleanup and terminal process state pending.
+
+Output26/PID31460 built; CPU10/PID31112 failed an existing fixture's scene-plan
+assertion and hit the30 s timeout. NativeFogLayers in that test was not value
+initialized, leaving disabled-layer payloads indeterminate; changed to fog{}.
+No production admission relaxation. Output27/PID29384 and CPU11/PID31436 pass
+(0.38 s CTest); ordering/finite/stamp/lifetime assertions run. Host104/PID29348
+also passes,13 host objects plus link, no guest objects; codegen0 written/up to
+date. Binary48,558,592 B SHA51E715A16727ACEC27AF74D00D3A8E193F105EB9F19B9DE7D53D8472690F5E5F,
+PDB108,822,528 B, watermark aa00b09 dirty. All producers terminal.
+Post-test free63,200,669,696 B. Live receiver qualification still pending;
+no raw/perf/cook/capture output produced in these fixture/build commands.
+
+After fixture acceptance, removed eight superseded output25/26 and CPU9/10
+stdout/stderr logs (2,870 logical B):63,200,071,680 ->63,200,079,872 B,
+8,192 B recovered once. Runtime941 preflight63,047,393,280 B; the intervening
+volume change was unattributed. PID23416/session68217 ran12:22:17–12:24:10,
+terminal with exact owner profile restored. No image/raw/perf/dump accepted.
+Native receiver original/refused/missing remained zero; cold title closed all
+1688 old submissions per consumer, but the second epoch failed the existing
+light-selection comparison:237FA614 view0 output237FA618 actualFFFFFFFF vs
+expectedFFFFFFFE. Keep941's430,499 B log as unresolved failure evidence and940/
+image as last accepted live evidence. Failure SHA
+F177A5A1AF65403CBAE585E18474BBD86997BA74614E376A12832947751B4C36.
+
+Read the full selector/rebuild/insertion/classification source and the
+sub_8218A998 invalidation writer. Source contains all-bits-set invalidations,
+but941 lacks pre/post producer observations to establish an actual race or
+attribute the failure to this receiver change. Do not silently retry/relax it.
+Added a16-view dirty-output/missing-output regression using the production
+comparison helper, a299th Python test preserving941's exact failure, and
+bounded failure-only context (one header plus five planned/observed writes).
+Next outputs are the existing material fixture31/material CPU29 and host105;
+estimate<=64 MiB incremental overlap within the original160 MiB plan and
+existing supervisors. Preflight63,176,953,856 B. No second game run/capture is
+planned until the failed producer boundary is understood. These diagnostics
+improve the next investigation; they are not a fix or a live pass.
