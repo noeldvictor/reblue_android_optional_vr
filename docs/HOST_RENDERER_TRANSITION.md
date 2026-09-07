@@ -100,6 +100,56 @@ rules currently have CPU coverage only, and volume-dependent dual participation
 is explicitly unconverted. These are expansion work, not permission to silently
 drop participants from the initial acceptance scene.
 
+### Direct rigid-object dependency map
+
+Source audit at `11f5d94` (2026-09-07). This records why the latest component
+checks are not an end-to-end object conversion, and where the next implementation
+must connect. It is not a second roadmap or a new renderer framework.
+
+| Required contract | Reuse | Concrete remaining dependency |
+| --- | --- | --- |
+| An object/primitive packet selected by owned handles | `NativeModelMaterialProgram`, `NativeGeometry`, `NativeInstancePose`, object image/UV/policy publications | `PrepareMaterialMesh` still selects by `NodeTag`/source graph and consumers match source IB/VB/range keys. Publish an immutable model/instance-to-primitive association before drawing; the submission core must not discover it from captured draws. |
+| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, named light/fog evaluator and native image leases | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The normal shader still imports these from register bindings. Finish their producer ownership and define an explicit C++/GPU layout, including sampler/material flags; scalar evaluator structs alone are not that layout. |
+| Native shader/pipeline binding | Existing Plume device, framebuffer owners and queue | `PipelineState` still selects `GuestShader` wrappers; `QueuedDraw` and `EmitBindings` assume the three legacy VS/PS/shared constant offsets. Add the native binding contract to this backend and its batching keys; do not copy an old pipeline template or create a parallel renderer. |
+| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
+
+Start by selecting and recording an actual model/content identity and primitive
+family in `bg41_01`; the latest logs qualify that field but do not identify a
+completed direct-object candidate. Do not hard-code a transient source address as
+its asset identity. The first family may exclude skin, wind, volume and special
+overrides, but eligibility must be explicit and other families must keep drawing.
+
+Work backward from the final submit call, defining the packet/binding contract
+first and connecting its missing producers next. Each implementation checkpoint
+must name which dependency above is removed and which compatibility consumer can
+now be deleted. Further broad adapter expansion, additional math-only rewrites
+and bulk recooking are not substitutes for this path.
+
+The acceptance harness must explicitly disable the selected family's interpreter,
+template capture and replay before its first draw. Prove a cold load, native
+instance updates, scene/shadow output, teardown and reload with fresh generations;
+a failure must stay visible rather than silently warm a fallback. The current
+walking checker is not this harness. Extend it at that consumer milestone, then
+expand families and complete the unchanged desktop/both-eye gate.
+
+### Reusable inner loop
+
+`python -B tools/host_checks.py` runs the selected rigid-path Python guards and
+scenario-parser tests. Repeat `--area model|geometry|material|instance|scenario`
+to narrow the selection, use `--list` to inspect it, and `--all-boundaries` for
+the broader native guard set. No build, game launch, profile edit, output log or
+bytecode cache. Empty/missing tests and failures cannot report a passing check.
+
+Verification of this dev-loop change: eight runner tests pass, including failed
+imports, empty groups, failure exit status, fail-fast/keep-going and list-only
+behavior; 107 rigid-path checks pass in 0.019 s and the broader 222 checks pass in
+0.050 s (test execution, not total process startup or overall development speed).
+Focused model/instance selection also passes from outside the repository cwd.
+Both revised repository skills pass their
+frontmatter validator. C++ and shader code are unchanged: run916/host69 below
+remain the actual renderer evidence, not a new runtime qualification. No new
+renderer build, game run, raw frame, image, asset cache or performance output.
+
 ## Latest qualified checkpoint
 
 Named lit shading (2026-09-07): the live normal material uses shared named

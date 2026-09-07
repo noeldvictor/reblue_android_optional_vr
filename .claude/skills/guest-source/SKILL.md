@@ -1,88 +1,61 @@
 ---
 name: guest-source
-description: Read Blue Dragon's original code. The whole XEX is already translated to C++ in generated/, with the PowerPC interleaved as comments - use this to find guest addresses, struct offsets, and what the original binary does, before reaching for any disassembler.
+description: Investigate Blue Dragon guest/render-loader behavior using existing statically translated C++, PowerPC comments, hook metadata and the source call graph before binary analysis.
 ---
 
-# Reading the guest
+# Read the translated program first
 
-**Do not install a decompiler. The binary is already decompiled, in this repo.**
+The local `generated/` contains the statically translated executable, including
+18,777 function bodies in the recorded census. This is **not the original
+high-level source project**. Register operations and interleaved PowerPC comments
+are the behavior reference the application executes. Do not install a decompiler
+or regenerate an existing tree just to find a function. Use deeper binary analysis
+only for a specific question this source and its call sites cannot answer.
 
-re:Blue is a static recompilation: `rexglue codegen` translates the entire XEX into C++ ahead of
-time. `generated/` is 223 files and about 110 MB containing **18,777 functions** - the whole
-executable, not a sample. It is a build product and gitignored, so it exists only after a codegen
-run; `cmake --build … --target reblue_codegen` takes about 7 seconds and is deterministic.
+[AGENTS.md](../../../AGENTS.md) is authoritative; the
+[transition queue](../../../docs/HOST_RENDERER_TRANSITION.md#active-work-queue)
+sets the ownership outcome. Read relevant `config/hooks/*.toml` before the
+callback, then the exact generated body and callers. Existing hooks may replace
+that body: identify which path actually executes.
 
-This is strictly better than a decompiler for this codebase, for three reasons:
+## Cheap navigation
 
-- **It is exact.** Not a reconstruction that might be wrong - it is the translation the game
-  actually runs.
-- **It is named.** Every address in `config/functions.toml` becomes
-  `DEFINE_REX_FUNC(bdPlayerFieldMovementUpdate)`, so 1608 functions read in the project's own
-  vocabulary. The rest get generated names.
-- **It carries the original PowerPC as comments**, line by line, next to the C++ that implements it.
-  You get the assembly and its meaning together.
-
-## Finding things
-
-```sh
-# A function, by its name from config/functions.toml
-grep -rln "DEFINE_REX_FUNC(bdPlayerFieldMovementUpdate)" generated/
-
-# By guest address - it appears in the comments, at branches into it
-grep -rn "0x82207858" generated/
-
-# What exists at all, when you do not know the name
-grep -rho "DEFINE_REX_FUNC([A-Za-z0-9_]*)" generated/*.cpp | sort -u | grep -i camera
+```powershell
+rg -n 'DEFINE_REX_FUNC\(bdSceneNodeDrawSingle\)' generated -g '*.cpp'
+rg -n 'bdSceneNodeDrawSingle|8227FEE8' config src -g '*.toml' -g '*.cpp'
+python -B tools/callgraph.py sites bdSceneGraphNodeProcess --limit 40
+python -B tools/callgraph.py frontier bdSceneTreeDraw --depth 1 --limit 40
 ```
 
-Then read it. The body is a register machine, which sounds unreadable and is not:
+PowerShell does not expand positional `src/*.cpp` patterns for `rg`; pass the
+directory and `-g '*.cpp'`. Use `rg --files` before opening uncertain paths.
+Start with bounded slices, then read the complete relevant function/control flow
+before concluding. Do not repeatedly load whole subsystems to locate one symbol.
 
-```c
-DEFINE_REX_FUNC(bdPlayerFieldMovementUpdate) {
-	// mr r31,r3
-	r31.u64 = ctx.r3.u64;        // r3 is the first argument - the player object
-	// lwz r11,7224(r31)
-	r11.u64 = REX_LOAD_U32(r31.u32 + 7224);   // and 7224 is a field in it
-```
+The callgraph reuses a valid index and does not write by default. Optional
+`--cache` needs the current storage budget. Its indirect/original-body frontier
+is not a host-helper/preprocessor-complete graph or runtime hotness measurement.
+A hook declaration alone does not prove activation or guest-free execution.
 
-## What it is good at
+## Read the contract, not just an offset
 
-**Struct offsets, which is usually the actual question.** `lwz r11,7224(r31)` says field 7224 of
-whatever `r3` pointed at. Read a few call sites and the layout falls out. This is how to answer
-things like "where does the player keep its world position", which `config/functions.toml` cannot
-tell you because it only has names and sizes.
+- `r3`, `r4`, ... carry arguments; `lwz r11,7224(r31)` reads a field, `lfs` a
+  float. Confirm layout at its writer and another relevant reader/caller; record
+  ownership, count, stride, null meaning and lifetime too.
+- Source data is big-endian. Use checked boundary readers and BE types; validate
+  ranges/counts and complete imports before source storage retires. Never use
+  upload-ring/write-combined memory as a CPU source.
+- Follow indirect callbacks and `__imp__` original-body calls explicitly. Host
+  C++ can still depend on source memory, register layouts and resource wrappers.
+- Preserve ordering, null/override semantics and late writers. Convert producer
+  -> owned data -> consumer, not every console helper one-for-one.
+- Never edit/commit generated code or game data. Hook/codegen input changes can
+  rebuild the guest; inspect that dependency first.
 
-**Register-to-argument mapping.** `ctx.r3` is the first argument, `r4` the second, and so on -
-exactly the register names a `midasm_hook` lists in `config/hooks/*.toml`. A hook body and the
-generated source talk about the same registers, so they read against each other directly.
-
-**Control flow**, since the branches are in the comments with their targets, which is what
-`jump_address_on_true` in a hook needs.
-
-## What to be careful about
-
-- **Guest memory is big-endian, the host is not.** `REX_LOAD_U32` and `REX_STORE_U32` handle it
-  inside the generated code, but a host hook reading the same field has to swap it itself -
-  `__builtin_bswap32`. Every guest struct read in `src/` does.
-- **A float field is `lfs`, not `lwz`**, and floats in a struct are usually a run at 4-byte
-  intervals: a vec3 is 12 bytes, a 4x4 matrix 64.
-- **Confirm an offset at two call sites**, or check it is written where you would expect it to be
-  written. One reader can be a coincidence.
-- **`generated/` is a build product.** Never edit it, and never commit it. If it rebuilds
-  unexpectedly a codegen input changed - find out which.
-
-## Look here first, even before generated/
-
-`config/hooks/*.toml` carries guest addresses **with a comment describing the surrounding code**,
-written by whoever worked it out. Those comments are the accumulated map of this binary and are
-often the whole answer. Read them first, and add to them whenever you learn something - that is how
-the map grows.
-
-## The open question this was set up for
-
-`bd::xr::Camera::SubmitCharacter()` is never called. `CharacterAnchor` - the party leader's
-position, eye height and facing - has no source, so `ThirdPerson` and `FirstPerson` fall back to the
-game's own camera position and the character-anchored VR modes do not do what their names say.
-
-The lead is `bdPlayerFieldMovementUpdate` (`0x82207858`) in `generated/reblue_recomp.30.cpp`, where
-`r3` is the player object. What is needed is the offset of its world position and facing.
+For the active static-object path, the
+[ownership frontier](../../../research/20260906_1531_static-model-ownership-frontier.md)
+locates loader/lifetime hooks; the transition queue maps newer native owners and
+remaining shader/submission gaps. Do not restart the old player-anchor search:
+`src/xr/xr_player_anchor.cpp` and `src/xr/xr_game_camera.cpp` already publish
+character anchors. Inspect their current behavior only when that subsystem is
+actually in scope.

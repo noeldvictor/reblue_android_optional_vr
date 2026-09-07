@@ -176,6 +176,19 @@ material-family expansion until this end-to-end consumer works. The generated
 C++ is our exact behavior reference, not a reason to translate every console
 rendering helper one-for-one. This changes development order, not the full goal.
 
+The capture-free inner loop is now one command:
+
+```powershell
+python -B tools/host_checks.py
+```
+
+It runs the rigid-path Python source/scenario checks, fails fast and creates no
+logs or caches. Use `--area material` (repeatable), `--list`, or
+`--all-boundaries` for broader source checks. C++ fixtures, incremental host
+builds and targeted GPU/pixel checks remain separate. The
+[active queue's concrete dependency map](docs/HOST_RENDERER_TRANSITION.md#direct-rigid-object-dependency-map)
+names the missing contracts; passing these tests is not a completed native draw.
+
 ### Evidence limits and performance
 
 The full gate still includes fields, battles, cutscenes, menus, transitions,
@@ -358,9 +371,8 @@ and `assets/default.xex` from your own game disc. Windows also needs vcpkg
 are not distributed in this repository.
 
 Read the [dev-loop guide](.claude/skills/devloop/SKILL.md) for SDK/bootstrap
-details and [AGENTS.md](AGENTS.md) for current rules. Some older setup passages
-in the guide are historical; in particular, a Vulkan-only build's target is
-`reblue`, not `reblue_vk`.
+guidance and [AGENTS.md](AGENTS.md) for current rules. The guide now starts with
+the focused desktop loop; a Vulkan-only build's target is `reblue`, not `reblue_vk`.
 
 For the **already configured workspace** used by this fork:
 

@@ -3,7 +3,7 @@
 This is the canonical, shared instruction file for coding agents in this
 repository. `CLAUDE.md` imports it. Keep enduring rules here, current progress in
 [`docs/HOST_RENDERER_TRANSITION.md`](docs/HOST_RENDERER_TRANSITION.md), and dated
-evidence in `research/`. Updated 2026-09-06.
+evidence in `research/`. Updated 2026-09-07.
 
 **Storage-first default:** disk use is part of completing the task, not optional
 housekeeping. Produce the minimum new data needed:
@@ -93,9 +93,10 @@ Optional cel shading and tourist mode do not displace the renderer priority.
    - [devloop](.claude/skills/devloop/SKILL.md): builds, runs and tests.
    - [guest-source](.claude/skills/guest-source/SKILL.md): guest/render-loader investigation.
    - [vrsim](.claude/skills/vrsim/SKILL.md): desktop OpenXR verification.
-   These files contain historical setup/status passages. Current owner scope,
-   CMake definitions and verified local configuration take precedence over those
-   passages; they do not authorize a Quest run before the desktop gate.
+   Current owner scope, CMake definitions and verified local configuration take
+   precedence over historical passages in skills/research. The devloop and
+   guest-source skills were refreshed on 2026-09-07; vrsim still needs its
+   historical setup claims checked. No skill authorizes Quest before the gate.
 4. Make a bounded change, verify it in proportion to risk, and record what was
    actually built, run and inspected. Do not silently reduce the full goal to the
    latest milestone.
@@ -160,6 +161,11 @@ interpreter mentioned in research is distinct from CPU emulation.
   related changes into coherent, verified commits; keep required GPU/pixel
   checks proportional to risk. Target the actual feature with scene/event
   readiness checks, not a fixed boot delay or an unexercised queue.
+- For the rigid-object path, `python -B tools/host_checks.py` selects its existing
+  Python guards/scenario tests without builds, caches or game runs. Narrow with
+  repeatable `--area`; use `--list` to inspect or `--all-boundaries` at broader
+  integration checkpoints. These checks do not replace C++ behavior fixtures or
+  GPU/pixel acceptance. Keep runtime evidence tied to the actual tested binary.
 - Maintain one dependency-ordered active queue in the transition document;
   README summarizes it and research retains evidence. Do not duplicate a long
   chronological worklog across active documents.
