@@ -26,6 +26,7 @@
 #include "gpu/backend.h"
 #include "gpu/constant_buffers.h"
 #include "gpu/device.h"
+#include "gpu/draw_bindings_bridge.h"
 #include "gpu/scene/host_draw.h"
 
 REXCVAR_DECLARE(bool, bd_draw_defer);
@@ -57,13 +58,14 @@ u32 g_sequence = 0;
 u32 g_pulled_draws = 0; // per flush, reported with the instancing line
 u32 g_gathered = 0;     // blended draws moved to join their group
 u32 g_indirect_calls = 0, g_indirect_draws = 0;
+uint64_t g_binding_draws = 0;
 
 // Only what actually has to be re-emitted. Sorting by pipeline means runs of
 // draws share one, and re-binding it per draw would spend back exactly what the
 // sort saves.
 struct EmitState {
   plume::RenderPipeline *pipeline = nullptr;
-  u32 constant_offsets[3] = {~0u, ~0u, ~0u};
+  GraphicsBindingState bindings;
   plume::RenderIndexBufferView index_view{plume::RenderBufferReference{}, 0,
                                           plume::RenderFormat::R16_UINT};
   plume::RenderViewport viewport{};
@@ -177,22 +179,14 @@ bool EmitBindings(plume::RenderCommandList *cmd, const QueuedDraw &d,
     st.scissor = d.scissor;
   }
 
+  if (!ApplyGraphicsBindings(*cmd, d.bindings, st.bindings)) {
+    static u32 told = 0;
+    if (told++ < 4) BD_ERROR("[draw-bindings] invalid queued binding snapshot");
+    return false;
+  }
   if (d.pipeline != st.pipeline) {
     cmd->setPipeline(d.pipeline);
     st.pipeline = d.pipeline;
-  }
-
-  if (!st.any || d.constant_offsets[0] != st.constant_offsets[0] ||
-      d.constant_offsets[1] != st.constant_offsets[1] ||
-      d.constant_offsets[2] != st.constant_offsets[2]) {
-    // The constant ranges are a set of their own; the texture and sampler
-    // heaps are bound once by frame_ring and never rebound.
-    if (auto *set = Video::ConstantDescriptorSet())
-      cmd->setGraphicsDescriptorSetDynamic(set, kConstantDescriptorSetIndex,
-                                           d.constant_offsets, 3);
-    st.constant_offsets[0] = d.constant_offsets[0];
-    st.constant_offsets[1] = d.constant_offsets[1];
-    st.constant_offsets[2] = d.constant_offsets[2];
   }
 
   // In runs of slots that actually have a buffer.
@@ -262,6 +256,7 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
   else
     cmd->drawInstanced(d.count, instance_count, d.start_vertex,
                        first_instance);
+  ++g_binding_draws;
   if (counted)
     FragCensusEnd(cmd);
 }
@@ -280,7 +275,7 @@ u64 GroupKey(const QueuedDraw &d) {
     u64 index_offset;
     u32 index_size;
     u32 index_format;
-    u32 constant_offsets[3];
+    u64 binding_key;
     u32 indexed, count, start_index, start_vertex;
     i32 base_vertex;
     u32 vertex_first, vertex_count;
@@ -312,9 +307,7 @@ u64 GroupKey(const QueuedDraw &d) {
     b.index_size = d.index_view.size;
     b.index_format = static_cast<u32>(d.index_view.format);
   }
-  b.constant_offsets[0] = 0;
-  b.constant_offsets[1] = d.constant_offsets[1];
-  b.constant_offsets[2] = d.constant_offsets[2];
+  b.binding_key = d.bindings.Key(0);
   b.indexed = d.indexed;
   b.count = d.count;
   b.start_index = d.start_index;
@@ -367,6 +360,18 @@ static bool BisectDrops(u32 &index_in_frame) {
 }
 
 void DrawQueuePush(const QueuedDraw &draw) {
+  if (!draw.bindings.Valid()) {
+    static u32 told = 0;
+    if (told++ < 4) BD_ERROR("[draw-bindings] refused invalid producer binding snapshot");
+    return;
+  }
+  if (!draw.translated_instance_records &&
+      (draw.instanced_pipeline || draw.pulled_pipeline || draw.record_index != ~0u)) {
+    static u32 told = 0;
+    if (told++ < 4)
+      BD_ERROR("[draw-bindings] unsupported instance record ABI; no implicit translated gather");
+    return;
+  }
   u32 index_in_frame = 0;
   if (BisectDrops(index_in_frame))
     return;
@@ -384,7 +389,8 @@ void DrawQueuePush(const QueuedDraw &draw) {
       q.has_index_buffer) {
     struct B {
       const void *pipeline, *ib, *fb;
-      u32 ps, shared, ib_fmt;
+      u64 binding_key;
+      u32 ib_fmt;
       plume::RenderViewport vp;
       plume::RenderRect sc;
       u8 has_vp;
@@ -393,8 +399,7 @@ void DrawQueuePush(const QueuedDraw &draw) {
     b.pipeline = q.pulled_pipeline;
     b.ib = q.index_view.buffer.ref;
     b.fb = q.framebuffer;
-    b.ps = q.constant_offsets[1];
-    b.shared = q.constant_offsets[2];
+    b.binding_key = q.bindings.Key(0);
     b.ib_fmt = u32(q.index_view.format);
     b.vp = q.viewport;
     b.sc = q.scissor;
@@ -438,6 +443,11 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
     g_queue.clear();
     return;
   }
+
+  // Transitional immediate/post consumers still resume the main layout after
+  // flushing. Snapshot their actual offsets before emitting another layout.
+  // Restore through the same explicit binding core, not a guessed zero window.
+  const auto resume_bindings = EngineGraphicsBindings(state());
 
   if (REXCVAR_GET(bd_draw_sort)) {
     // Opaque first, grouped by pipeline, near to far inside each group.
@@ -655,6 +665,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       // Mode 5 (diagnostic): a batch is one group.
       const bool one_group = REXCVAR_GET(bd_record_mask_mode) == 5;
       while (j < g_queue.size() && g_queue[j].batch_key == q.batch_key &&
+             g_queue[j].bindings.Matches(q.bindings, 0) &&
              g_queue[j].pulled_pipeline == q.pulled_pipeline &&
              g_queue[j].record_index != ~0u &&
              (!one_group || g_queue[j].group_key == q.group_key))
@@ -665,7 +676,8 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       records.clear();
       for (size_t k = i; k < j;) {
         size_t e = k + 1;
-        while (e < j && g_queue[e].group_key == g_queue[k].group_key)
+        while (e < j && g_queue[e].group_key == g_queue[k].group_key &&
+               g_queue[e].bindings.Matches(g_queue[k].bindings, 0))
           ++e;
         spans.emplace_back(k, e);
         for (size_t r = k; r < e; ++r)
@@ -714,7 +726,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
             i = j;
             continue; // never draw a masked record against a stale base window
           }
-          d.constant_offsets[0] = base_off;
+          d.bindings.offsets[0] = base_off;
         }
         if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
         if (EmitBindings(cmd, d, st)) {
@@ -726,6 +738,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
           cmd->drawIndexedIndirect(VertexPullIndirectBuffer(), byte_offset,
                                    static_cast<u32>(spans.size()),
                                    sizeof(IndirectCommand));
+          g_binding_draws += spans.size();
           if (counted)
             FragCensusEnd(cmd);
           ++g_indirect_calls;
@@ -747,6 +760,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       size_t j = i + 1;
       while (j < g_queue.size() && g_queue[j].instanced_pipeline &&
              g_queue[j].record_index != ~0u &&
+             g_queue[j].bindings.Matches(q.bindings, 0) &&
              g_queue[j].group_key == q.group_key)
         ++j;
       const u32 n = static_cast<u32>(j - i);
@@ -759,7 +773,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
         const u32 off = UploadVertexBlockFromStaged(q.record_index);
         if (off != ~0u) {
           QueuedDraw d = q;
-          d.constant_offsets[0] = off;
+          d.bindings.offsets[0] = off;
           if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
           if (!d.blended) {
             ++opaque;
@@ -817,7 +831,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
             i = j;
             continue;
           }
-          d.constant_offsets[0] = base_off;
+          d.bindings.offsets[0] = base_off;
         }
         // Pulled when every draw of the group staged its pull info (the
         // group key already fixes the pipeline, so one check per group).
@@ -858,7 +872,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
     const bool two_pass = q.prepass_pipeline && q.color_pipeline;
     QueuedDraw d = q;
     if (fallback_vertex_offset != ~0u)
-      d.constant_offsets[0] = fallback_vertex_offset;
+      d.bindings.offsets[0] = fallback_vertex_offset;
     if (two_pass)
       d.pipeline = q.color_pipeline;
     if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
@@ -910,9 +924,9 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
         const u64 m = mesh_key(d);
         k0.push_back(m);
         k1.push_back(m ^ (u64(uintptr_t(d.instanced_pipeline)) * 0x9E3779B97F4A7C15ull));
-        k2.push_back(k1.back() ^ (u64(d.constant_offsets[2]) * 0xC2B2AE3D27D4EB4Full));
-        k3.push_back(k2.back() ^ (u64(d.constant_offsets[1]) * 0x165667B19E3779F9ull));
-        k4.push_back(k3.back() ^ (u64(d.constant_offsets[0]) * 0x27D4EB2F165667C5ull));
+        k2.push_back(k1.back() ^ (u64(d.bindings.offsets[2]) * 0xC2B2AE3D27D4EB4Full));
+        k3.push_back(k2.back() ^ (u64(d.bindings.offsets[1]) * 0x165667B19E3779F9ull));
+        k4.push_back(k3.back() ^ (u64(d.bindings.offsets[0]) * 0x27D4EB2F165667C5ull));
         k5.push_back(d.group_key);
       }
       auto distinct = [](std::vector<u64> v) {
@@ -936,8 +950,8 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
         for (const QueuedDraw &d : g_queue) {
           if (!(d.instanced_pipeline && d.record_index != ~0u && d.indexed)) continue;
           Coarse c{}; std::memset(&c, 0, sizeof(c));
-          c.pipeline = d.instanced_pipeline; c.ps = d.constant_offsets[1];
-          c.shared = d.constant_offsets[2]; c.ib = d.index_view.buffer.ref;
+          c.pipeline = d.instanced_pipeline; c.ps = d.bindings.offsets[1];
+          c.shared = d.bindings.offsets[2]; c.ib = d.index_view.buffer.ref;
           c.ib_fmt = u32(d.index_view.format); c.first = d.vertex_first; c.count = d.vertex_count;
           const u32 end = std::min<u32>(d.vertex_first + d.vertex_count, 16u);
           for (u32 i = d.vertex_first; i < end; ++i) {
@@ -998,8 +1012,8 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
         for (const QueuedDraw &d : g_queue) {
           if (!(d.instanced_pipeline && d.record_index != ~0u)) continue;
           u64 k = mesh_key(d) ^ (u64(uintptr_t(d.instanced_pipeline)) * 0x9E3779B97F4A7C15ull);
-          k ^= u64(d.constant_offsets[2]) * 0xC2B2AE3D27D4EB4Full;
-          k ^= u64(d.constant_offsets[1]) * 0x165667B19E3779F9ull;
+          k ^= u64(d.bindings.offsets[2]) * 0xC2B2AE3D27D4EB4Full;
+          k ^= u64(d.bindings.offsets[1]) * 0x165667B19E3779F9ull;
           by_mat.emplace_back(k, &d);
         }
         std::sort(by_mat.begin(), by_mat.end(),
@@ -1009,9 +1023,9 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
         for (size_t a = 0; a + 1 < by_mat.size(); ++a) {
           if (by_mat[a].first != by_mat[a + 1].first) continue;
           const QueuedDraw *x = by_mat[a].second, *y = by_mat[a + 1].second;
-          if (x->constant_offsets[0] == y->constant_offsets[0]) continue;
-          const u8 *bx = ConstantBlockBytes(x->constant_offsets[0]);
-          const u8 *by = ConstantBlockBytes(y->constant_offsets[0]);
+          if (x->bindings.offsets[0] == y->bindings.offsets[0]) continue;
+          const u8 *bx = ConstantBlockBytes(x->bindings.offsets[0]);
+          const u8 *by = ConstantBlockBytes(y->bindings.offsets[0]);
           if (!bx || !by) continue;
           ++pairs;
           for (u32 r = 0; r < 256; ++r)
@@ -1050,6 +1064,19 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       g_pulled_draws = g_indirect_calls = g_indirect_draws = 0;
     }
   }
+  static uint64_t binding_sets = 0, binding_layouts = 0;
+  static uint32_t binding_frame = 0;
+  binding_sets += st.bindings.descriptor_binds;
+  binding_layouts += st.bindings.layout_binds;
+  const auto frame = FrameStatFrameCount();
+  if (frame - binding_frame >= 300) {
+    BD_INFO("[draw-bindings] {} emitted draws {} descriptor binds {} layout binds; "
+            "explicit snapshots, engine producer and translated instance records remain",
+        g_binding_draws, binding_sets, binding_layouts);
+    binding_frame = frame;
+  }
+  if (!ApplyGraphicsBindings(*cmd, resume_bindings, st.bindings))
+    BD_ERROR("[draw-bindings] invalid resume binding snapshot");
   g_queue.clear();
 }
 

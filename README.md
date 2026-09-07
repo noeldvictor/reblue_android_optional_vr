@@ -58,17 +58,20 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **the normal lit shader now uses named,
-CPU-tested lighting and fog arithmetic**, replacing its repeated register-machine
-blocks while preserving material branches. Independent light/fog references,
-host69, 170 source guards and 52 scenario tests pass. Field run916 adds 56,835
-normal-lit queued draws; geometry/image/UV/pose/shadow/policy/movement gates also
-pass. One full-resolution image was inspected; existing cliff artifacts and
-blur remain. No new raw captures, performance CSVs or asset-cache files;
-superseded sanity outputs were removed. Shader bindings, texture/shadow frontend,
-source selection and captured templates still remain: this is not a completed
-direct native object path, numerical GPU parity, reload or both-eye qualification.
-[Evidence and remaining boundaries](research/20260907_0108_named-lit-shading.md).
+Latest desktop checkpoint (2026-09-07): **queued draws now carry explicit GPU
+layouts, descriptor sets and offsets**, removing the emitter's global constant-set
+lookup and fixed three-offset binding assumption. Batching includes the binding
+identity, and flushing restores the caller's bindings. The C++ command fixture,
+host build, 228 source/scenario checks and eight runner tests pass. Field run917
+adds 196,347 explicitly bound draw commands; existing geometry/material/pose/
+shadow/movement gates also pass. One full-resolution image was inspected; known
+cliff artifacts and blur remain. No new raw/perf/asset-cache output; superseded
+sanity evidence was removed. Alternate layouts have **CPU coverage only**: live
+draws still use the engine producer, translated instance records and shader
+wrappers. Source selection/templates, native shader inputs and direct scene/shadow
+object submission remain. This is not cold-load/reload, sequence/both-eye
+qualification or a measured speedup.
+[Evidence and remaining boundaries](research/20260907_0157_explicit-draw-bindings.md).
 
 Canonical geometry owns named values and immutable vertex inputs independently
 of the imported declaration. Unsupported layouts still use transitional packed

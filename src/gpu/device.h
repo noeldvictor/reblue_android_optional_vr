@@ -180,8 +180,8 @@ public:
   // bd_supersampling latched at first use (AA is restart-bound). 1 = MSAA path.
   static i32 BootSupersampling();
 
-  // Shared by every pipeline so descriptor set bindings survive pipeline
-  // switches.
+  // Main compatibility layout used by the engine/post adapters. Native queued
+  // shaders may supply another explicit layout and descriptor binding snapshot.
   static plume::RenderPipelineLayout *MainPipelineLayout();
 
   // The bindless texture set (set 0: the 2D, 3D and cube heaps as three

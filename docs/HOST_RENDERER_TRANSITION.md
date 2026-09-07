@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after named lit/fog shader desktop verification. The first
+Updated 2026-09-07 after explicit queued binding desktop verification. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -53,6 +53,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    an explicit native contract. These scalar structs are semantic inputs, not
    a raw C++/GPU constant-buffer layout. Reuse the evaluator in that contract;
    replacing shader math alone does not provide native scene light/fog owners.
+   The shared queue now accepts explicit layouts/descriptor sets/offsets, with
+   binding-aware batching and exact caller restoration. Its current producer
+   and instance-record gathering remain translated; alternate native layouts
+   have CPU command coverage only. Connect the native object/shader producer
+   through this contract next, not another broad compatibility layer.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -102,7 +107,8 @@ drop participants from the initial acceptance scene.
 
 ### Direct rigid-object dependency map
 
-Source audit at `11f5d94` (2026-09-07). This records why the latest component
+Source audit at `11f5d94`, updated for the explicit binding checkpoint (2026-09-07).
+This records why the latest component
 checks are not an end-to-end object conversion, and where the next implementation
 must connect. It is not a second roadmap or a new renderer framework.
 
@@ -110,7 +116,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelMaterialProgram`, `NativeGeometry`, `NativeInstancePose`, object image/UV/policy publications | `PrepareMaterialMesh` still selects by `NodeTag`/source graph and consumers match source IB/VB/range keys. Publish an immutable model/instance-to-primitive association before drawing; the submission core must not discover it from captured draws. |
 | Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, named light/fog evaluator and native image leases | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The normal shader still imports these from register bindings. Finish their producer ownership and define an explicit C++/GPU layout, including sampler/material flags; scalar evaluator structs alone are not that layout. |
-| Native shader/pipeline binding | Existing Plume device, framebuffer owners and queue | `PipelineState` still selects `GuestShader` wrappers; `QueuedDraw` and `EmitBindings` assume the three legacy VS/PS/shared constant offsets. Add the native binding contract to this backend and its batching keys; do not copy an old pipeline template or create a parallel renderer. |
+| Native shader/pipeline binding | Existing Plume device, framebuffer owners and queue; explicit `GraphicsBindings`, binding-aware grouping and caller restoration | The emitter no longer fetches a global constant set or requires three offsets. `EngineGraphicsBindings` remains the live producer; `PipelineState` still selects `GuestShader` wrappers and instancing still gathers translated records. Supply the native shader pair/input layout through this contract; do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
 
 Start by selecting and recording an actual model/content identity and primitive
@@ -140,17 +146,34 @@ to narrow the selection, use `--list` to inspect it, and `--all-boundaries` for
 the broader native guard set. No build, game launch, profile edit, output log or
 bytecode cache. Empty/missing tests and failures cannot report a passing check.
 
-Verification of this dev-loop change: eight runner tests pass, including failed
+Verification of the dev-loop change: eight runner tests pass, including failed
 imports, empty groups, failure exit status, fail-fast/keep-going and list-only
 behavior; 107 rigid-path checks pass in 0.019 s and the broader 222 checks pass in
 0.050 s (test execution, not total process startup or overall development speed).
 Focused model/instance selection also passes from outside the repository cwd.
-Both revised repository skills pass their
-frontmatter validator. C++ and shader code are unchanged: run916/host69 below
-remain the actual renderer evidence, not a new runtime qualification. No new
-renderer build, game run, raw frame, image, asset cache or performance output.
+Both revised repository skills passed their frontmatter validator. That tooling
+checkpoint made no renderer change or new runtime output. The subsequent binding
+checkpoint expands the selection to 113 rigid-path /228 broader checks; its
+separate C++ and runtime evidence follows below.
 
 ## Latest qualified checkpoint
+
+Explicit queued bindings (2026-09-07): the existing emitter now consumes bounded
+layout/set/offset snapshots without global constant-set lookup or a fixed
+three-offset bind. Grouping includes binding identity and exact comparisons;
+flush restores the caller's entry bindings. Fixture18/CPU16, host70/71, 228 Python
+guards/scenario checks and eight runner tests pass. Run917 used host70; host71
+only caps an unsupported-ABI error message, with no successful draw-path change.
+Fresh post-event field windows add 196,347 draw commands, 128,465 descriptor binds
+and 900 layout binds; existing material/geometry/pose/shadow/movement gates pass.
+Layout binds include flush starts, not proof of live alternative layouts.
+One 1920x1080 image inspected; known cliff artifacts/blur remain. No new raw/perf/
+cache/dumps, exact profile restored, superseded sanity outputs retired. Native
+alternative layouts have CPU coverage only; live engine bindings, translated
+instance records, shader wrappers, source selection and templates remain.
+This removes a direct-object binding dependency, not the native object/shader
+producer or cold-load/reload/sequence/both-eye acceptance gap.
+Evidence: `research/20260907_0157_explicit-draw-bindings.md`.
 
 Named lit shading (2026-09-07): the live normal material uses shared named
 light/fog arithmetic instead of310 lines of repeated register-machine logic.

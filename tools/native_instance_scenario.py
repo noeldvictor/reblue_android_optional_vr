@@ -38,6 +38,7 @@ PRIMITIVE_POLICY_METRIC = re.compile(
     r"(\d+) reads (\d+) unavailable; (\d+) checks wrong (\d+); "
     r"(\d+) draws (\d+) cull changes (\d+) compound refreshes;")
 LIT_SHADING_METRIC = re.compile(r"\[native-lit-shading\] (\d+) normal-lit queued draws;")
+DRAW_BINDING_METRIC = re.compile(r"\[draw-bindings\] (\d+) emitted draws (\d+) descriptor binds (\d+) layout binds;")
 
 
 class Pending(ValueError):
@@ -267,6 +268,26 @@ def verify_lit_shading(text):
     return {"queued_draws_delta": b[0] - a[0]}
 
 
+def verify_draw_bindings(text):
+    """Fresh explicit binding emission, not proof of a native shader/object path."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("draw-binding diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[draw-bindings]" in line and any(word in line for word in ("invalid", "refused", "unsupported")):
+            raise ValueError("draw-binding submission failure")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = DRAW_BINDING_METRIC.search(line)
+        if match:
+            metrics.append((index, tuple(map(int, match.groups()))))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] - a[0] < 32 or b[1] <= a[1] or b[2] <= a[2]:
+        raise Pending("need fresh emitted draws and explicit descriptor/layout binds")
+    return dict(zip(("draws_delta", "descriptor_binds_delta", "layout_binds_delta"),
+                    (b[i] - a[i] for i in range(3))))
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -311,6 +332,7 @@ def main():
     parser.add_argument("--material-textures", action="store_true")
     parser.add_argument("--primitive-policies", action="store_true")
     parser.add_argument("--lit-shading", action="store_true")
+    parser.add_argument("--draw-bindings", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -329,6 +351,7 @@ def main():
         textures = verify_material_textures(text) if args.material_textures else None
         policies = verify_primitive_policies(text) if args.primitive_policies else None
         lit = verify_lit_shading(text) if args.lit_shading else None
+        bindings = verify_draw_bindings(text) if args.draw_bindings else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -352,6 +375,8 @@ def main():
         print("PASS: post-event native primitive policies " + ", ".join(f"{k}={v}" for k, v in policies.items()))
     if lit is not None:
         print("PASS: post-event named lit shading " + ", ".join(f"{k}={v}" for k, v in lit.items()))
+    if bindings is not None:
+        print("PASS: post-event explicit draw bindings " + ", ".join(f"{k}={v}" for k, v in bindings.items()))
     return 0
 
 

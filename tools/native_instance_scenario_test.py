@@ -3,7 +3,7 @@ import re
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
-    verify_material_textures, verify_primitive_policies, verify_lit_shading,
+    verify_material_textures, verify_primitive_policies, verify_lit_shading, verify_draw_bindings,
 )
 
 
@@ -452,6 +452,36 @@ class LitShadingScenarioTest(unittest.TestCase):
             verify_lit_shading("\n".join(self.rows() + ["[native-material-context] mode Loading"]))
         self.assertEqual(verify_lit_shading("\n".join(self.rows() + [
             "[native-material-context] " + READY]))["queued_draws_delta"], 50)
+
+
+class DrawBindingScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[draw-bindings] 100 emitted draws 120 descriptor binds 5 layout binds;"
+        rows[4] = "[draw-bindings] 150 emitted draws 180 descriptor binds 9 layout binds;"
+        return rows
+
+    def test_fresh_emission(self):
+        self.assertEqual(verify_draw_bindings("\n".join(self.rows())),
+                         dict(draws_delta=50, descriptor_binds_delta=60, layout_binds_delta=4))
+
+    def test_stale_reset_unused_startup_and_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150", "100"), text.replace("150", "1"),
+                    text.replace("180", "120"), text.replace("9 layout", "5 layout"),
+                    text.replace("bg41_01", "bg42_01"), "\n".join(self.rows()[1:]),
+                    "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2])):
+            with self.assertRaises(Pending):
+                verify_draw_bindings(bad)
+
+    def test_refusals_cannot_be_hidden_and_input_is_bounded(self):
+        for failure in ("invalid queued binding snapshot", "refused producer", "unsupported instance record ABI"):
+            with self.assertRaises(ValueError):
+                verify_draw_bindings("[draw-bindings] " + failure + "\n" + "\n".join(self.rows()))
+        with self.assertRaises(ValueError):
+            verify_draw_bindings("x" * (MAX_LOG_BYTES + 1))
+        with self.assertRaises(Pending):
+            verify_draw_bindings("\n".join(self.rows() + ["[native-material-context] mode Loading"]))
 
 
 if __name__ == "__main__":

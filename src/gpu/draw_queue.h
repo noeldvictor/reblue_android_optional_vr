@@ -12,6 +12,7 @@
 
 #include <plume_render_interface.h>
 #include <rex/types.h>
+#include "gpu/draw_bindings.h"
 
 namespace bd::gpu {
 
@@ -37,10 +38,11 @@ struct QueuedDraw {
   // which shaders produce the fragments of the scene pass.
   u64 ps_hash = 0;
 
-  // Base offsets for the vertex, pixel and shared guest constant blocks. These
-  // are the whole per-draw material: transform, material parameters, and the
-  // descriptor indices for every texture and sampler the draw reads.
-  u32 constant_offsets[3]{};
+  // Explicit layout, descriptor sets and dynamic offsets. A native producer
+  // need not use the engine's three-block ABI. Owners retain GPU resources
+  // through the submission fence. Current instancing/record diagnostics still
+  // use the translated record ABI and its first three offsets.
+  GraphicsBindings bindings;
 
   // The vertex stream binding as FlushRenderState resolved it. Copied by value
   // because the guest overwrites its own views between draws.
@@ -127,6 +129,10 @@ struct QueuedDraw {
   // so the flush may sort a run of them to bring equal keys together.
   plume::RenderPipeline *instanced_pipeline = nullptr;
   u32 record_index = ~0u;
+  // Explicit opt-in to the current record gather/masked-window ABI. Native
+  // descriptor layouts must not accidentally feed a different record format
+  // through the translated gather/fallback paths.
+  bool translated_instance_records = false;
   // The instanced twin that pulls its vertices from the record's streams
   // (gpu/vertex_pull.h); set only when this draw's pull info staged.
   plume::RenderPipeline *pulled_pipeline = nullptr;

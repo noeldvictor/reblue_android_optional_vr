@@ -14,7 +14,8 @@ sys.dont_write_bytecode = True
 TOOLS = Path(__file__).resolve().parent
 AREAS = {
     "model": ("native_model_material_boundary_test",),
-    "geometry": ("native_vertex_input_boundary_test", "native_mesh_storage_boundary_test"),
+    "geometry": ("native_vertex_input_boundary_test", "native_mesh_storage_boundary_test",
+                 "native_draw_bindings_boundary_test"),
     "material": (
         "native_texture_table_boundary_test", "native_material_texture_boundary_test",
         "native_primitive_policy_boundary_test", "native_lit_shading_boundary_test",

@@ -25,7 +25,9 @@ struct State {
     bool pipelineState = false;
   } dirtyStates;
 };
+void TestGraphicsBindings();
 int main() {
+  TestGraphicsBindings();
   using namespace bd::gpu;
   State state;
   int imports = 0;

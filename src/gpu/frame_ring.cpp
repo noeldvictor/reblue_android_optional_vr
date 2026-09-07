@@ -83,9 +83,10 @@ void BeginCommandList(VideoState &s) {
                              kNullTextureDescriptorCount);
     s.null_texture_barriers_submitted = true;
   }
-  // Every host pipeline shares s.pipeline_layout, so switches keep these.
+  // Initial engine compatibility bindings. Queued draws carry their own layout
+  // and sets; a flush restores this caller's main bindings before returning.
   s.command_list->setGraphicsPipelineLayout(s.pipeline_layout.get());
-  // The texture and sampler heaps are bound once and never rebound. The
+  // The engine texture/sampler heaps normally remain bound. The
   // constant set is the one re-based per draw, and it holds nothing but the
   // three dynamic ranges - so the driver's per-bind copy is 48 bytes, not a
   // heap. See the layout note in bindless_allocator.h.

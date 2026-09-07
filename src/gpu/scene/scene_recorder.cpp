@@ -278,7 +278,7 @@ void OnQueuedDraw(const VideoState &s, const QueuedDraw &q, u32 device_guest) {
     mat.spec_constants = st.specConstants;
   }
   mat.ps_block_hash = HashConstantBlock(
-      q.constant_offsets[1],
+      q.bindings.offsets[1],
       (ps && ps->shaderCacheEntry) ? ps->shaderCacheEntry->constantRegisterMask
                                    : nullptr);
   const auto *dev = bd::mem::try_at<const D3DDevice>(device_guest);
@@ -350,7 +350,7 @@ void OnQueuedDraw(const VideoState &s, const QueuedDraw &q, u32 device_guest) {
     if (q.record_index != ~0u) {
       if (const auto *rec = StagedInstanceRecord(q.record_index))
         vs_regs = rec->regs;
-    } else if (const u8 *b = ConstantBlockBytes(q.constant_offsets[0])) {
+    } else if (const u8 *b = ConstantBlockBytes(q.bindings.offsets[0])) {
       vs_regs = reinterpret_cast<const float *>(b);
     }
     if (vs_regs)

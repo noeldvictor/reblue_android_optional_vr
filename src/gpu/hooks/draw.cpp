@@ -658,7 +658,7 @@ void DispatchDraw(u32 device_guest, u32 primitive_type, const char *name,
       q.viewport = *eye_vp;
       q.scissor = *eye_rc;
       q.has_viewport = true;
-      q.constant_offsets[0] = s.constant_dyn_offsets[0];
+      q.bindings.offsets[0] = s.constant_dyn_offsets[0];
       // The eye skew rewrote the vertex block; a record staged before it
       // holds the unskewed one, so this eye takes a record of its own. Out
       // of records, the plain pipeline reads the skewed window the eye bind
@@ -720,8 +720,8 @@ void DispatchDraw(u32 device_guest, u32 primitive_type, const char *name,
               static_cast<const void *>(s.render_target),
               static_cast<const void *>(q.pipeline),
               static_cast<const void *>(q.instanced_pipeline), q.count,
-              q.start_index, q.base_vertex, q.constant_offsets[0],
-              q.constant_offsets[1], q.constant_offsets[2],
+              q.start_index, q.base_vertex, q.bindings.offsets[0],
+              q.bindings.offsets[1], q.bindings.offsets[2],
               static_cast<const void *>(q.index_view.buffer.ref),
               q.index_view.buffer.offset,
               static_cast<const void *>(q.vertex_views[0].buffer.ref),

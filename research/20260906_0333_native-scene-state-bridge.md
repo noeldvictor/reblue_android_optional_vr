@@ -1817,3 +1817,70 @@ Normal shader header-16,426 B, exe/PDB-5,632 B. Other outputs lack complete byte
 baselines, not zero. Images10,243,007 B,242,753 B overlap headroom. Cleanup ending
 free63,353,044,992 B, drive-wide gain336,257,024 B from first63,016,787,968 B;
 only376,832 B attributed to cleanup. Same original cap/floor and raw0 remain.
+
+### Explicit queued descriptor bindings, same checkpoint (2026-09-07)
+
+Parent1bf9811. Previous goal turn was verified dev-loop progress, pushed and
+clean. First measured free63,354,544,128 B; no owned renderer/build producer.
+The queue emitter fetched the global constant set and assumed three offsets.
+This change supplies explicit layout/set/offset snapshots to the existing queue,
+including grouping and caller restoration. Translated instance-record gathering,
+engine shader selection and direct-object production are still separate gaps.
+
+Pre-build free63,336,759,296 B. Reuse host_draw_intent_test in out/native_texture_test
+(existing exe25,600 B), add the pure binding fixture to that target; no new tree.
+Plan <=2 MiB fixture/log growth, <=512 MiB host compile/link overlap. Existing
+exe48,264,704 B/PDB107,036,672 B; aggregate build logs146,229 B before this work.
+Host dry-run requested CMake regeneration for added source/header files; inspect
+the bounded real build and stop on guest compilation. No shader/translator edits.
+Attempts: fixture18, draw_intent_cpu16, host70. Retain previous qualified evidence
+until replacement passes; preserve the material17/CPU15 math evidence because
+this fixture does not replace it. Same original65,462,788,096 B start, approved
+3 GiB ceiling/floor62,509,998,080 B, diagnostics100 MiB/logs10 MiB/images10 MiB,
+and zero new raw allowance. Runtime/image plan follows only after build passes.
+
+Fixture18/CPU16 pass (0.03 s behavior/0.05 s CTest); host70/PID27928 is terminal
+success,97 scheduled CMake/host edges including link, no guest/shader rebuild.
+The shared queue header required a wider host-only rebuild, not a guest rebuild.
+228 Python boundary/scenario checks and8 runner cases pass. Alternative native
+layouts and exact restore have CPU command-emission coverage, not GPU family
+qualification. Run917 reuses the normal flat/native-MSAA/precache-on complete
+run916 gate plus fresh explicit binding emission. <=75 s, <=400 KiB runtime log,
+one1920x1080 quality60 JPEG <=160 KiB fitting242,753 B image overlap headroom.
+No raw/perf/cache/dump writes; exact owner profile restoration and owned shutdown.
+Retire run916 log/image after the equivalent new regression gate/pixels pass;
+retain its material/math fixture logs, which this binding fixture does not replace.
+
+Run917/PID31508 terminal success,01:47:03..01:48:01 EDT, all14 settings effective.
+Fresh post-event field binding windows2049/2349 add196,347 emitted draw commands,
+128,465 descriptor binds and900 layout binds. Prior geometry/material/image/UV/
+pose/table/shadow/policy/lit/movement gates pass. Alternate layouts have CPU
+coverage only; these live draws still use the engine producer. One1920x1080
+quality60 JPEG128,595 B inspected, known cliff marks/blur remain. Runtime log
+218,794 B; no new raw/perf/cache/dump files, exact116 B profile restored. No
+sequence/reload/both-eye or direct native-object qualification. Evidence:
+`20260907_0157_explicit-draw-bindings.md`.
+
+Removed six exact validated superseded outputs: run916 log/named-lit JPEG,
+host69 and old draw-intent01 stdout/stderr.368,777 logical B. Immediate free
+63,214,342,144 ->63,214,718,976 B, observed recovery376,832 B (368 KiB), once only.
+Protected raw/baseline/failure/motion evidence unchanged. Old reports/hashes
+remain; old runtime files gone, build logs reproducible. Material17/CPU15 stay
+because their numerical coverage is distinct from the new binding fixture.
+
+After run917, capped the unsupported-record-ABI diagnostic at four messages.
+Host71/PID8956 terminal success,4.270 s: one host TU/link, codegen up-to-date probe
+wrote0 files; no guest objects rebuilt. No further runtime needed for this
+failure-log-only change. Run917 is tied to host70's fingerprint, not host71's;
+both hashes are recorded in the report. Final Python228/runner8 checks pass.
+
+Known comparable fixture/log/image growth374,799 B: new fixture object322,943,
+fixture exe+40,960, aggregate build logs+31,190 (now177,419 B), runtime log-12,282,
+JPEG-8,012. New native-layout command coverage justifies retained growth; replace
+by purpose at the next equivalent qualification. Other object/metadata/helper/
+source deltas lack complete baselines, not zero. Final exe48,271,872 B and
+PDB107,040,768 B, combined+11,264. Images10,234,995 B,250,765 B overlap headroom.
+Final measured free at01:57 is63,181,537,280 B (58.84 GiB), drive-wide use
+173,006,848 B (165 MiB) from current first63,354,544,128 B, not all attributable
+to this task. No owned producer remains. Same original ledger start/cap/floor
+and raw0 gate remain; no reset and no duplicate cleanup credit.

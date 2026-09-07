@@ -21,6 +21,7 @@
 #include "core/profiling.h"
 #include "gpu/backend.h"
 #include "gpu/constant_buffers.h"
+#include "gpu/draw_bindings_bridge.h"
 #include "gpu/vertex_pull.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/native_vertex_input.h"
@@ -84,9 +85,7 @@ static void BindGuestConstants(VideoState &s) {
     // Recorded, not bound. The three offsets are the draw's whole material -
     // transform, parameters, and every texture and sampler descriptor index -
     // so capturing them captures what the draw reads.
-    s.pending.constant_offsets[0] = s.constant_dyn_offsets[0];
-    s.pending.constant_offsets[1] = s.constant_dyn_offsets[1];
-    s.pending.constant_offsets[2] = s.constant_dyn_offsets[2];
+    s.pending.bindings = EngineGraphicsBindings(s);
     return;
   }
   if (s.texture_descriptor_set && s.command_list) {
@@ -493,6 +492,7 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
     s.pending.instanced_pipeline =
         record_index != ~0u ? s.current_instanced_pso : nullptr;
     s.pending.record_index = record_index;
+    s.pending.translated_instance_records = true;
     s.pending.pulled_pipeline =
         (record_index != ~0u && pull_ok) ? s.current_pulled_pso : nullptr;
     const u32 first = s.bound_vertex_first;
