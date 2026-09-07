@@ -3445,3 +3445,17 @@ new shader headers107,296. Other objects/CMake/source/Git unallocated. Logs now
 199,039 B/136files; ending inventory free61,580,406,784 B is289,292,288 B below
 first measurement. Original allowance/reserve unchanged; no next producer until
 its peak fits. A separate visible Android toolchain build is not ours to stop.
+
+After a08e128 push, free73,721,511,936 B fit the unchanged192 MiB host peak.
+Host112/PID32864/session17477 completed exit0,38 scheduled host steps,codegen0
+written/module up to date,no guest object rebuild. Exe48,695,296 B SHA256
+ED0B16D60DE438671B39ECE731ACB88B3BAF20203B2525A3ED4130D2451A6F76,
+PDB109,453,312 B. Build endfree73,666,396,160 B. No game/capture/profile change;
+live cutout reachability/interoperation/reload/pixels remain pending.
+Removed superseded host111 stdout/stderr2files/2,921 logical B after replacement
+passed. Free73,573,986,304 ->73,573,142,528 B (-843,776 B amid concurrent activity;
+no isolated savings claim). Turn cleanup total16logs/20,128 logical B. Known
+retained net524,436 B, adding exe26,112/PDB90,112/netlogs1,780 to prior406,432.
+Logs200,819 B/136files. Other objects/CMake/source/Git unallocated. Lastfree
+73,573,142,528 B =11,703,443,456 B drive-wide gain since first, not task cleanup.
+Original floor/exception and all protected baseline/failure evidence unchanged.

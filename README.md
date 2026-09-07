@@ -115,15 +115,15 @@ diagnostics stopped at time/storage limits without reproducing that mismatch;
 the prior failure remains open. The local loop now checks full diagnostics
 headroom before booting. [Current UV investigation and evidence](research/20260907_1638_uv-boundary-provenance.md).
 
-**New scene/shadow cutout connections, pending host compilation and game acceptance:**
+**New scene/shadow cutout connections, host-built; game acceptance pending:**
 direct alpha-tested rigid materials now have owned, ordered model cutoffs,
 object/pass overrides and blend inputs feeding the native scene shader and queue.
 This preserves blended cutout ordering and depth writes; it does not assume a
 fixed cutoff or treat translucent siblings as opaque. Phase1 shadow casting now
 has its own ordered image/alpha recipe, textured and zero-layer depth shaders,
 retained image bindings and native indirect submission. CPU fixtures and37 tiny
-GPU cases pass. Host112 could not launch after drive-wide usage again crossed
-the unchanged checkpoint floor; the tested game executable remains host111.
+GPU cases pass. After disk reserve recovered, host112 compiled both connections
+into `reblue_vk.exe` without rebuilding guest objects. No new game run yet.
 [Cutout contract, verification and remaining gates](research/20260907_1713_native-scene-cutouts.md).
 [Shadow connection and current verification](research/20260907_1742_native-cutout-shadows.md).
 
@@ -143,15 +143,15 @@ material/object families, visual sequences and both-eye game checks remain.
 Verification:315 Python source/scenario checks and expanded C++ fixtures pass.
 The current GPU evidence covers37 8x8 two-eye scene/mono-shadow cases in1.86 seconds with
 zero Vulkan validation errors/warnings, including layered instancing, all eight
-scene/shadow cutout comparisons, blending and discarded-pixel depth preservation. Host111
-predates both cutout connections; host107/run945 remains
+scene/shadow cutout comparisons, blending and discarded-pixel depth preservation.
+Host112 compiles both cutout connections; host107/run945 remains
 the last accepted live result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, fixture-verified layered/cutout scene route, native indirect draws and selected-object reload proof | Host cutout compilation, live layered/cutout acceptance, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
+| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, host-built/fixture-verified scene and shadow cutouts, native indirect draws and selected-object reload proof | Live layered/cutout acceptance, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |

@@ -74,9 +74,9 @@ Independent scene ownership progress: direct blended cutouts now connect the
 load-owned ordered cutoff recipe and object/pass inputs to native scene shader,
 pipeline and indirect submission. 314 Python checks, expanded material/output
 C++ fixtures and 23 two-eye GPU modes pass (2.87 s, zero validation errors/warnings).
-This is not game acceptance: host111 is unchanged; the new host link and later
-syntax checks could not start within the unchanged storage reserve. No game run
-or capture. Preserve sorted siblings, legacy interoperation and all outstanding
+This is not game acceptance: that first host link and later syntax checks could
+not start within the unchanged storage reserve. No game run or capture. Preserve
+sorted siblings, legacy interoperation and all outstanding
 UV/light/pixel gates. The subsequent phase1 caster connection is described below.
 [Cutout connection and current evidence](../research/20260907_1713_native-scene-cutouts.md).
 
@@ -86,9 +86,10 @@ programs and retained indirect batches.315 Python checks, both C++ fixtures and
 37 GPU modes pass (1.86 s, validation0 errors/0warnings). The prior23 GPU cases
 remain unchanged; new cases verify cutout caster depth independently of scene
 colour. A missing shader-header build-order dependency was fixed and guarded.
-Host112 still did not launch: transient disk recovery allowed the fixtures, then
-drive-wide activity again exhausted its unchanged peak reserve. No new game or
-pixel acceptance. [Current shadow connection and pending gates](../research/20260907_1742_native-cutout-shadows.md).
+Host112 initially failed preflight, then later drive-wide recovery allowed its
+host-only compile/link under the original192 MiB bound. Both cutout connections
+are now in the executable, with no guest object rebuild. No new game or pixel
+acceptance. [Current shadow connection and pending gates](../research/20260907_1742_native-cutout-shadows.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -149,9 +150,9 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    culling/participation/lifetime and targeted pixel checks. Do not stop at another
    source-reader helper or claim all2,898 light bindings are native draws.
 2. **Material families and characters.** Direct blended-cutout scene ownership
-   is now connected and CPU/GPU-tested, pending host compilation and fresh game
+   is now connected, host-built and CPU/GPU-tested, pending fresh game
    emission/pixel/interoperation evidence. Phase1 textured/zero-layer cutout
-   casting is also connected and CPU/GPU-tested, pending host compilation and
+   casting is also connected, host-built and CPU/GPU-tested, pending
    live depth/receiver/ordering/lifetime evidence. Next integrate these paired
    scene/shadow consumers, then wind and translucent
    materials; deliver native skeleton/skin assets, animation/

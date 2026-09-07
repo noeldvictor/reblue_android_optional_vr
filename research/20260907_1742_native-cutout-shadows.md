@@ -1,7 +1,8 @@
 # Native phase1 cutout shadow connection
 
-2026-09-07, EDT; based on8a1bf9a. CPU and production GPU fixtures pass;
-host compilation and game acceptance are pending. No complete host frame,
+2026-09-07, EDT; source committed as a08e128, based on8a1bf9a. CPU and production
+GPU fixtures pass; host112 subsequently builds (follow-up below), game acceptance
+is pending. No complete host frame,
 game stereo, performance gain or Quest qualification is claimed.
 
 ## Ownership bundle and recovered contract
@@ -86,15 +87,15 @@ below are terminal; no main game process, capture, profile override or cook ran.
 
 Fixture exe830,464 B, SHA256
 `626AB19AF5DD387A1475C8C25F4B40E9120CA2259A670312CAF1460E8EF814A6`.
-Host112 preflight subsequently failed before compiler or logs were created.
-The host remains111,48,669,184 B, SHA256
+Host112's initial preflight failed before compiler or logs were created.
+At that point the host remained111,48,669,184 B, SHA256
 `295E4FB6B8265DCA01701D411BCCBB9EC4088B0D4DC7BEB143AF2C8F3EFDA655`.
-It contains neither this shadow connection nor8a1bf9a's scene cutout connection.
+That prior binary contains neither this shadow connection nor8a1bf9a's scene cutout connection.
 Profile unchanged116 B, SHA256
 `2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0`.
 
-Next: host compilation/link when the original reserve fits, then a changed-code
-integration run proving fresh scene/caster cutout emissions, participant ordering,
+Next, after the host build recorded below: a changed-code integration run
+proving fresh scene/caster cutout emissions, participant ordering,
 retained-legacy interoperation and inspected game pixels. Keep layered/inherited
 coverage, selected-object cold/reload and both-eye gates. Run945 remains the last
 accepted live/pixel result. Runs948's UV and941's light dirty-bit mismatches
@@ -121,8 +122,34 @@ game-pixel evidence remain intact. No protected raw or image payload deleted.
 Retained fixture sizes: material8,329,132 B/41files (+38,306), texture70,636,050 B/
 129files (+197,240), GPU10,654,788 B/10files (+60,486), logs199,039 B/136files
 (+3,104). Three newly required shader headers total107,296 B. Counted retained
-growth406,432 B; other objects/CMake/source/Git and drive-wide activity are not
+growth406,432 B before the host build; other objects/CMake/source/Git and drive-wide activity are not
 allocated in that subtotal. Retire current logs after equivalent replacement;
-reuse the fixture builds and generated headers. Ending inventory free
+reuse the fixture builds and generated headers. Pre-host inventory free
 61,580,406,784 B is289,292,288 B below the first measurement, not attributed to
 the roughly397 KiB of counted outputs. Same cumulative ledger, no budget reset.
+
+## Host integration follow-up
+
+After a08e128 was pushed, a fresh disk measurement was73,721,511,936 B, so
+host112's original192 MiB peak fit. PID32864/session17477 completed exit0:
+38 scheduled host steps, including both cutout bridges, the material producer,
+native shader factory/draw/queue and executable link. Codegen reports0 written /
+module up to date; no guest objects rebuilt. Build ended at73,666,396,160 B.
+No game launch or new pixel acceptance. The normal profile remains byte-exact.
+
+Host112 exe48,695,296 B, SHA256
+`ED0B16D60DE438671B39ECE731ACB88B3BAF20203B2525A3ED4130D2451A6F76`;
+PDB109,453,312 B, SHA256
+`4D49B7CC4A23065373F6C7FEA07051754FE9DFAE579A6EC6A62D841EC8882126`.
+This is the a08e128 integration binary, not a restamp of host111 or run945.
+
+Retired host111 stdout/stderr after112 passed:2 files/2,921 logical B;
+stdout SHA256`085A924D7081F5426013195FBFC883FEECEB6FFE29FC45622A6C12F761A150A9`.
+Immediate free73,573,986,304 ->73,573,142,528 B fell843,776 B during deletion;
+no isolated recovery claim amid other activity. This turn removed16 logs /
+20,128 logical B total; protected evidence unchanged. Known retained growth
+now524,436 B including exe+26,112,PDB+90,112 and net build logs+1,780 beyond the
+pre-host subtotal. Logs200,819 B/136files. Other objects/CMake/source/Git remain
+unallocated. Last inventory free73,573,142,528 B is11,703,443,456 B above the
+first measurement, a drive-wide gain rather than task cleanup. Preserve the
+original ledger/floor despite that gain; no budget was reset.
