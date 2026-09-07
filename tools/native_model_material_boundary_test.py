@@ -46,7 +46,17 @@ class ModelMaterialBoundaryTest(unittest.TestCase):
         consumers = self.bridge.split("bool ModelOwnsReflectionBinding", 1)[1]
         for forbidden in ("tag.mesh_va +", "range.index_record *", "range.vertex_record *"):
             self.assertNotIn(forbidden, consumers)
-        self.assertEqual(consumers.count("ModelPrimitiveMatches("), 4)
+        self.assertEqual(consumers.count("ModelPrimitiveMatches("), 3)
+        self.assertIn("FindModelShadowPolicy(", consumers)
+
+    def test_shadow_policy_is_imported_at_load_not_draw(self):
+        publish = self.bridge.split("bool PublishModelMaterials(uint32_t graph)", 1)[1].split("FindCommands", 1)[0]
+        self.assertLess(publish.index("ReadModelShadowPolicy("), publish.index("Models().Publish"))
+        consumer = self.bridge.split("std::optional<bool> ImportMaterialDisablesShadow(", 1)[1].split("uint32_t EvaluateNativeMaterial", 1)[0]
+        self.assertIn("FindModelShadowPolicy(", consumer)
+        for forbidden in ("bd::mem", "control_record", "ReadModelShadowPolicy", "MaterialControlDisablesShadow"):
+            self.assertNotIn(forbidden, consumer)
+        self.assertIn("ReceivesNativeShadow(*shadow_inputs, *d.material_disables_shadow)", self.draw)
 
     def test_geometry_lookup_cannot_import_or_touch_source_tables(self):
         lookup = self.bridge.split("FindLoadedNativeGeometry(", 1)[1].split("bool ModelOwnsReflectionBinding", 1)[0]
@@ -72,7 +82,8 @@ class ModelMaterialBoundaryTest(unittest.TestCase):
 
     def test_registry_accounts_for_geometry_and_source_association_leases(self):
         for field in ("mesh.program.geometries.capacity()", "mesh.source_bindings.capacity()",
-                      "mesh.program.geometries.size()", "mesh.source_bindings.size()"):
+                      "mesh.program.geometries.size()", "mesh.source_bindings.size()",
+                      "mesh.program.shadow_policies.capacity()", "mesh.program.shadow_policies.size()"):
             self.assertIn(field, self.core)
 
     def test_owner_core_has_no_guest_memory_gpu_or_disk_operations(self):

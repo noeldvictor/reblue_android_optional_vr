@@ -14,6 +14,10 @@ namespace bd::gpu::scene {
 
 struct NativeGeometry;
 
+// Asset policy only. Pass availability and per-instance visibility remain live
+// inputs; Unknown must not be treated as permission to receive a shadow.
+enum class NativeShadowPolicy : uint8_t { Unknown, Receive, Disabled };
+
 // No captured register state or source-memory pointers. The record indices in
 // NativeMaterialRange are import recipes, not the finished geometry/texture API.
 // Materials already have persistent content identities in NativeMaterialLibrary.
@@ -23,6 +27,7 @@ struct NativeModelMaterialProgram {
   // The same primitive ordinal selects its material and owned GPU geometry.
   // Null is explicitly unconverted, never permission to discover it in this core.
   std::vector<std::shared_ptr<const NativeGeometry>> geometries;
+  std::vector<NativeShadowPolicy> shadow_policies;
   bool valid = false;
 };
 
@@ -53,6 +58,12 @@ struct ModelMaterialImport {
   NativeModelMaterialProgram program;
   std::vector<ModelPrimitiveSourceBinding> source_bindings;
 };
+
+// Temporary source association selects an owned primitive policy. Conflicting
+// policies for identical geometry are ambiguous, not last-writer-wins.
+std::optional<bool> FindModelShadowPolicy(
+    const ModelMaterialImport &mesh, uint32_t index_buffer, uint32_t vertex_buffer,
+    uint32_t first_index, uint32_t index_count);
 
 struct ModelMaterialRegistryStats {
   uint64_t published = 0, retired = 0, refused = 0;

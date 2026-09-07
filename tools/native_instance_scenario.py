@@ -18,6 +18,12 @@ VERTEX_METRIC = re.compile(
     r"\[native-vertex-input-use\] (\d+) pipeline binds, (\d+) decode blocks, (\d+) pulled records")
 CANONICAL_METRIC = re.compile(
     r"\[native-mesh-canonical\] (\d+) meshes, (\d+) draws, (\d+) source-free disk loads;")
+SHADOW_POLICY_METRIC = re.compile(
+    r"\[native-model-shadow\] (\d+) load-owned policies \((\d+) disabled\), (\d+) unknown; "
+    r"(\d+) draw lookups hit / (\d+) unavailable;")
+SHADOW_RECEIVER_METRIC = re.compile(
+    r"\[native-shadow\] receiver inputs checked (\d+) wrong (\d+) receiving (\d+); "
+    r"replays composed (\d+) changed (\d+)")
 MOVEMENT_METRIC = re.compile(
     r"\[autoplay\] t ([\d.]+) stage (\S+) ready ([01]) walking ([01]) episode (\d+) "
     r"walk-s ([\d.]+) moved (\d+) distance ([\d.]+) position (\S+)")
@@ -149,6 +155,36 @@ def verify_canonical_geometry(text):
             "source_free_loads_delta": b[2] - a[2]}
 
 
+def verify_shadow_policies(text):
+    """Match owned policy use AND receiver comparisons in the same field windows."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("shadow-policy diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    policy = None
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+            policy = None
+        match = SHADOW_POLICY_METRIC.search(line)
+        if match:
+            policy = tuple(map(int, match.groups()))
+        match = SHADOW_RECEIVER_METRIC.search(line)
+        if match:
+            receiver = tuple(map(int, match.groups()))
+            if receiver[1]:
+                raise ValueError("native shadow receiver differs from source")
+            if policy is not None:
+                metrics.append((index, policy + receiver))
+    a, b = recent_field_samples(contexts, metrics)
+    if not a[0] or not b[0] or any(b[i] < a[i] for i in range(len(b))) or any(
+            b[i] - a[i] < 32 for i in (3, 5, 7, 8)):
+        raise Pending("owned shadow lookups, matching receiver checks and receiving replays must advance")
+    return {"policies": b[0], "disabled_policies": b[1], "unknown": b[2],
+            "lookups_delta": b[3] - a[3], "unavailable": b[4],
+            "checks_delta": b[5] - a[5], "receiving_delta": b[7] - a[7],
+            "replays_delta": b[8] - a[8]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -189,6 +225,7 @@ def main():
     parser.add_argument("--canonical-geometry", action="store_true",
                         help="require fresh canonical draws and native vertex pulling")
     parser.add_argument("--movement", action="store_true")
+    parser.add_argument("--shadow-policies", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -203,6 +240,7 @@ def main():
             args.vertex_inputs or args.vertex_pulling or args.canonical_geometry) else None
         canonical = verify_canonical_geometry(text) if args.canonical_geometry else None
         movement = verify_movement(text) if args.movement else None
+        shadow = verify_shadow_policies(text) if args.shadow_policies else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -218,6 +256,8 @@ def main():
         print("PASS: post-event canonical geometry " + ", ".join(f"{k}={v}" for k, v in canonical.items()))
     if movement is not None:
         print("PASS: post-event observed player movement " + ", ".join(f"{k}={v}" for k, v in movement.items()))
+    if shadow is not None:
+        print("PASS: post-event owned shadow policies " + ", ".join(f"{k}={v}" for k, v in shadow.items()))
     return 0
 
 

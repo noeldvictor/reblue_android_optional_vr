@@ -9,6 +9,29 @@
 
 namespace bd::gpu::scene {
 
+std::optional<bool> FindModelShadowPolicy(
+    const ModelMaterialImport &mesh, uint32_t index_buffer, uint32_t vertex_buffer,
+    uint32_t first_index, uint32_t index_count) {
+  const auto &program = mesh.program;
+  if (!program.valid || program.ranges.size() != program.shadow_policies.size() ||
+      program.ranges.size() != mesh.source_bindings.size())
+    return {};
+  std::optional<bool> found;
+  for (size_t i = 0; i < program.ranges.size(); ++i) {
+    if (!ModelPrimitiveMatches(program.ranges[i], mesh.source_bindings[i],
+                               index_buffer, vertex_buffer, first_index, index_count))
+      continue;
+    const auto policy = program.shadow_policies[i];
+    if (policy != NativeShadowPolicy::Receive && policy != NativeShadowPolicy::Disabled)
+      return {};
+    const bool disabled = policy == NativeShadowPolicy::Disabled;
+    if (found && *found != disabled)
+      return {};
+    found = disabled;
+  }
+  return found;
+}
+
 ModelMaterialRegistry::ModelMaterialRegistry(size_t max_bytes, size_t max_models)
     : max_bytes_(max_bytes), max_models_(max_models) {}
 
@@ -35,6 +58,7 @@ size_t ModelMaterialRegistry::RetainedBytes(
     add(mesh.program.ranges.capacity(), sizeof(NativeMaterialRange));
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
     add(mesh.program.geometries.capacity(), sizeof(std::shared_ptr<const NativeGeometry>));
+    add(mesh.program.shadow_policies.capacity(), sizeof(NativeShadowPolicy));
     add(mesh.source_bindings.capacity(), sizeof(ModelPrimitiveSourceBinding));
   }
   return bytes;
@@ -62,6 +86,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
     if (!mesh.source_mesh || mesh.source_mesh == previous ||
         mesh.program.ranges.size() != mesh.program.materials.size() ||
         mesh.program.ranges.size() != mesh.program.geometries.size() ||
+        mesh.program.ranges.size() != mesh.program.shadow_policies.size() ||
         mesh.program.ranges.size() != mesh.source_bindings.size() ||
         (!mesh.program.valid && !mesh.program.ranges.empty())) {
       ++stats_.refused;

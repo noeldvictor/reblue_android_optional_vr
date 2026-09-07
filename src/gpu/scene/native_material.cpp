@@ -7,6 +7,7 @@
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_model_geometry_source.h"
+#include "gpu/scene/native_model_shadow_source.h"
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/reflection_texture_import.h"
@@ -37,6 +38,8 @@ ModelMaterialRegistry &Models() {
 std::atomic<uint64_t> model_builds{0}, model_failures{0}, unsupported_meshes{0};
 std::atomic<uint64_t> geometry_loaded{0}, geometry_unconverted{0};
 std::atomic<uint64_t> geometry_hits{0}, geometry_misses{0};
+std::atomic<uint64_t> shadow_policy_loaded{0}, shadow_policy_disabled{0}, shadow_policy_unknown{0};
+std::atomic<uint64_t> shadow_policy_hits{0}, shadow_policy_misses{0};
 thread_local uint64_t geometry_draws = 0, geometry_checked = 0, geometry_wrong = 0;
 thread_local uint32_t checked[3]{}, wrong[3]{}, last_report = 0;
 thread_local uint32_t composed[3]{};
@@ -168,6 +171,8 @@ bool PublishModelMaterials(uint32_t graph) {
   const auto *root = bd::mem::try_at<const be_u32>(graph + 16);
   if (!root)
     return false;
+  const auto *control_table = bd::mem::try_at<const be_u32>(graph + 8);
+  const auto table = control_table ? std::optional(uint32_t(*control_table)) : std::nullopt;
   std::vector<uint32_t> mesh_keys;
   if (!CollectModelMaterialSources(uint32_t(*root), [](uint32_t node_va)
       -> std::optional<ModelMaterialSourceNode> {
@@ -191,6 +196,21 @@ bool PublishModelMaterials(uint32_t graph) {
     if (!commands)
       return false;
     auto program = ReadCommands(uint32_t(*commands), word_budget);
+    // The completed graph builder has relocated the asset control table. Own
+    // its per-primitive result now, under the same generation as the material
+    // and geometry. Visual overrides and pass/visibility inputs are not frozen.
+    program.shadow_policies.reserve(program.ranges.size());
+    for (const auto &range : program.ranges) {
+      const auto policy = ReadModelShadowPolicy(table, range.control_record,
+          [](uint32_t address) -> std::optional<uint32_t> {
+            const auto *word = bd::mem::try_at<const be_u32>(address);
+            return word ? std::optional(uint32_t(*word)) : std::nullopt;
+          });
+      program.shadow_policies.push_back(policy);
+      ++(policy == NativeShadowPolicy::Unknown ? shadow_policy_unknown : shadow_policy_loaded);
+      if (policy == NativeShadowPolicy::Disabled)
+        ++shadow_policy_disabled;
+    }
     if (!program.valid)
       unsupported_meshes.fetch_add(1, std::memory_order_relaxed);
     meshes.push_back({mesh_va, std::move(program)});
@@ -341,38 +361,10 @@ std::optional<bool> ImportMaterialDisablesShadow(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,
     uint32_t first_index, uint32_t index_count) {
   const auto commands = FindCommands(tag);
-  if (!commands)
-    return {};
-  const uint32_t graph = bd::mem::try_load<uint32_t>(tag.ctx_va + 4);
-  const auto *table_ptr = graph ? bd::mem::try_at<const be_u32>(graph + 8) : nullptr;
-  if (!table_ptr)
-    return {};
-  const uint32_t table = uint32_t(*table_ptr);
-  std::optional<bool> found;
-  for (size_t i = 0; i < commands->program.ranges.size(); ++i) {
-    const auto &range = commands->program.ranges[i];
-    if (!ModelPrimitiveMatches(range, commands->source_bindings[i], index_va,
-                               stream_va, first_index, index_count))
-      continue;
-    bool disables = false;
-    if (table && range.control_record != 0xffff) {
-      // 0x822813CC: E000 selects a 16-byte control record. sub_8228AB40
-      // dispatches sub_8228AAB0 for bit 0; its fourth output byte is the
-      // shadow-disable flag (payload bit 3). An absent table is a no-op.
-      const uint64_t address = uint64_t(table) + uint64_t(range.control_record) * 16;
-      if (address + 4 > std::numeric_limits<uint32_t>::max())
-        return {};
-      const auto *mask = bd::mem::try_at<const be_u32>(uint32_t(address));
-      const auto *flags = bd::mem::try_at<const be_u32>(uint32_t(address + 4));
-      if (!mask || !flags)
-        return {};
-      disables = MaterialControlDisablesShadow(uint32_t(*mask), uint32_t(*flags));
-    }
-    if (found && *found != disables)
-      return {}; // ambiguous geometry under different feature policies
-    found = disables;
-  }
-  return found;
+  const auto policy = commands ? FindModelShadowPolicy(
+      *commands, index_va, stream_va, first_index, index_count) : std::nullopt;
+  ++(policy ? shadow_policy_hits : shadow_policy_misses);
+  return policy;
 }
 
 uint32_t EvaluateNativeMaterial(const NodeTag &tag,
@@ -443,6 +435,10 @@ void NativeMaterialNoteReplay(uint32_t mask) {
             model_builds.load(), models.published, models.retired, models.live, models.bytes,
             model_failures.load(), unsupported_meshes.load(), models.refused,
             models.hits, models.misses);
+    BD_INFO("[native-model-shadow] {} load-owned policies ({} disabled), {} unknown; "
+            "{} draw lookups hit / {} unavailable; no draw-time control reads",
+            shadow_policy_loaded.load(), shadow_policy_disabled.load(), shadow_policy_unknown.load(),
+            shadow_policy_hits.load(), shadow_policy_misses.load());
     BD_INFO("[native-model-geometry] {} load-owned primitives, {} unconverted; "
             "{} replay lookups hit / {} unavailable; {} load-owned draws; "
             "{} source checks wrong {}; buffer associations resolved at load",

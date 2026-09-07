@@ -2,7 +2,7 @@ import unittest
 import re
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
-    verify_vertex_inputs, verify_movement, verify_canonical_geometry,
+    verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
 )
 
 
@@ -278,6 +278,51 @@ class CanonicalGeometryScenarioTest(unittest.TestCase):
     def test_bounded_input(self):
         with self.assertRaises(ValueError):
             verify_canonical_geometry("x" * (MAX_LOG_BYTES + 1))
+
+
+class ShadowPolicyScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = ("[native-model-shadow] 12 load-owned policies (2 disabled), 0 unknown; "
+                   "100 draw lookups hit / 0 unavailable;\n"
+                   "[native-shadow] receiver inputs checked 100 wrong 0 receiving 80; "
+                   "replays composed 150 changed 20")
+        rows[4] = rows[2].replace("100", "150").replace("receiving 80", "receiving 120").replace(
+            "composed 150", "composed 200")
+        return rows
+
+    def test_fresh_owned_policy_and_receiver(self):
+        result = verify_shadow_policies("\n".join(self.rows()))
+        self.assertEqual(result["lookups_delta"], 50)
+        self.assertEqual(result["checks_delta"], 50)
+        self.assertEqual(result["receiving_delta"], 40)
+
+    def test_each_consumer_must_advance(self):
+        text = "\n".join(self.rows())
+        for old, new in (("150 draw", "100 draw"), ("checked 150", "checked 100"),
+                         ("receiving 120", "receiving 80"), ("composed 200", "composed 150"),
+                         ("12 load-owned", "0 load-owned")):
+            with self.assertRaises(Pending):
+                verify_shadow_policies(text.replace(old, new))
+
+    def test_mismatch_cannot_be_hidden_by_success(self):
+        with self.assertRaises(ValueError):
+            verify_shadow_policies("[native-shadow] receiver inputs checked 1 wrong 1 receiving 1; "
+                                   "replays composed 1 changed 0\n" + "\n".join(self.rows()))
+
+    def test_startup_and_cross_window_policy_are_not_field_proof(self):
+        rows = self.rows()
+        for bad in ("\n".join(rows[1:]), "\n".join(rows).replace("field-state 0", "field-state 4"),
+                    "\n".join([rows[2], rows[4]] + [r for r in rows if "context" in r]),
+                    "\n".join(rows[:-1] + [rows[-1].split("\n")[1]])):
+            with self.assertRaises(Pending):
+                verify_shadow_policies(bad)
+
+    def test_bounded_input_and_counter_reset(self):
+        with self.assertRaises(ValueError):
+            verify_shadow_policies("x" * (MAX_LOG_BYTES + 1))
+        with self.assertRaises(Pending):
+            verify_shadow_policies("\n".join(self.rows()).replace("150 draw", "10 draw"))
 
 
 if __name__ == "__main__":

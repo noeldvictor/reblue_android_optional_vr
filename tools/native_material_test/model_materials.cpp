@@ -1,5 +1,6 @@
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_model_geometry_source.h"
+#include "gpu/scene/native_model_shadow_source.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -27,6 +28,7 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
   program.materials.push_back(std::make_shared<const NativeMaterial>(
       NativeMaterial{NativeMaterialContentId(encoded), asset}));
   program.geometries.resize(1);
+  program.shadow_policies.push_back(NativeShadowPolicy::Receive);
   mesh.source_bindings.push_back({100, 200, 300, 32});
   return mesh;
 }
@@ -77,6 +79,9 @@ void TestNativeModelMaterials() {
   malformed = Mesh(10);
   malformed.program.geometries.clear();
   Require(!registry.Publish(4, {malformed}), "range/geometry count mismatch");
+  malformed = Mesh(10);
+  malformed.program.shadow_policies.clear();
+  Require(!registry.Publish(4, {malformed}), "range/shadow policy count mismatch");
   malformed = Mesh(10);
   malformed.source_bindings.clear();
   Require(!registry.Publish(4, {malformed}), "range/source association count mismatch");
@@ -204,6 +209,7 @@ void TestNativeModelMaterials() {
   imported.program.ranges.push_back(range);
   imported.program.materials.push_back(second_primitive.program.materials[0]);
   imported.program.geometries.resize(2);
+  imported.program.shadow_policies.resize(2, NativeShadowPolicy::Receive);
   imported.source_bindings.push_back(decoded->binding);
   Require(registry.Publish(50, {std::move(imported)}), "native primitive publication");
   words.clear();
@@ -222,5 +228,70 @@ void TestNativeModelMaterials() {
           registry.Find(50, 10)->source_bindings[0].index_buffer == 100,
           "retired primitive association cannot be repointed by source reuse");
   registry.Retire(50);
+
+  // Asset control import is bounded and host-endian. Missing metadata differs
+  // from an explicitly absent table; neither case may trigger source discovery.
+  words = {{1000, 1}, {1004, 8}, {1016, 0}, {1020, 8}};
+  size_t control_reads = 0;
+  const auto controls = [&](uint32_t address) -> std::optional<uint32_t> {
+    ++control_reads;
+    return reader(address);
+  };
+  Require(ReadModelShadowPolicy({}, 0, controls) == NativeShadowPolicy::Unknown &&
+          ReadModelShadowPolicy(0, 0, controls) == NativeShadowPolicy::Receive &&
+          ReadModelShadowPolicy(1000, 0xffff, controls) == NativeShadowPolicy::Receive &&
+          control_reads == 0, "unknown, null and omitted controls do not read source");
+  Require(ReadModelShadowPolicy(1000, 0x1000, controls) == NativeShadowPolicy::Unknown &&
+          ReadModelShadowPolicy(UINT32_MAX - 6, 0, controls) == NativeShadowPolicy::Unknown &&
+          ReadModelShadowPolicy(UINT32_MAX - 16, 1, controls) == NativeShadowPolicy::Unknown &&
+          control_reads == 0, "invalid control records and full-word overflow refused before reading");
+  Require(ReadModelShadowPolicy(1000, 0, controls) == NativeShadowPolicy::Disabled &&
+          ReadModelShadowPolicy(1000, 1, controls) == NativeShadowPolicy::Receive,
+          "shadow disable requires both present and feature bits");
+  for (uint32_t flags = 0; flags < 16; ++flags) {
+    words[1004] = flags;
+    Require(ReadModelShadowPolicy(1000, 0, controls) ==
+                ((flags & 8) ? NativeShadowPolicy::Disabled : NativeShadowPolicy::Receive),
+            "unrelated material feature bits do not change shadow policy");
+  }
+  words.erase(1004);
+  Require(ReadModelShadowPolicy(1000, 0, controls) == NativeShadowPolicy::Unknown,
+          "missing payload is not an enabled policy");
+  words[1004] = 8;
+  words.erase(1000);
+  Require(ReadModelShadowPolicy(1000, 0, controls) == NativeShadowPolicy::Unknown,
+          "missing present mask is unknown");
+  words[1000] = 1;
+  auto shadow_mesh = Mesh(10);
+  shadow_mesh.program.shadow_policies[0] = ReadModelShadowPolicy(1000, 0, controls);
+  Require(registry.Publish(60, {shadow_mesh}), "load-owned shadow policy publication");
+  const auto old_shadow = registry.Find(60, 10);
+  const auto shadow_generation = registry.Generation(60);
+  words.clear();
+  const auto read_count = control_reads;
+  Require(old_shadow && FindModelShadowPolicy(*old_shadow, 100, 200, 0, 3) == true &&
+          control_reads == read_count, "native consumer survives destroyed control source");
+  Require(!FindModelShadowPolicy(*old_shadow, 100, 200, 1, 3),
+          "shadow lookup does not accept a different draw range");
+  shadow_mesh.program.ranges.push_back(shadow_mesh.program.ranges[0]);
+  shadow_mesh.source_bindings.push_back(shadow_mesh.source_bindings[0]);
+  shadow_mesh.program.shadow_policies.push_back(NativeShadowPolicy::Disabled);
+  Require(FindModelShadowPolicy(shadow_mesh, 100, 200, 0, 3) == true,
+          "identical repeated policies are unambiguous");
+  shadow_mesh.program.shadow_policies[1] = NativeShadowPolicy::Receive;
+  Require(!FindModelShadowPolicy(shadow_mesh, 100, 200, 0, 3),
+          "conflicting policy for shared geometry refuses both orders");
+  std::swap(shadow_mesh.program.shadow_policies[0], shadow_mesh.program.shadow_policies[1]);
+  Require(!FindModelShadowPolicy(shadow_mesh, 100, 200, 0, 3), "reverse conflict refused");
+  shadow_mesh.program.shadow_policies[1] = NativeShadowPolicy::Unknown;
+  Require(!FindModelShadowPolicy(shadow_mesh, 100, 200, 0, 3), "unknown sibling cannot inherit known policy");
+  shadow_mesh.program.shadow_policies.pop_back();
+  Require(!FindModelShadowPolicy(shadow_mesh, 100, 200, 0, 3), "malformed owner is not indexed out of bounds");
+  Require(registry.Publish(60, {Mesh(10)}) && registry.Generation(60) > shadow_generation,
+          "policy reload publishes a new generation");
+  Require(FindModelShadowPolicy(*registry.Find(60, 10), 100, 200, 0, 3) == false &&
+          FindModelShadowPolicy(*old_shadow, 100, 200, 0, 3) == true,
+          "reload cannot repoint a retired primitive policy");
+  registry.Retire(60);
   std::cout << "native model material ownership, budgets, reload and concurrent leases passed\n";
 }

@@ -58,14 +58,15 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-06): self-describing BDMESH v2 rigid vertices
-and format-correct native pulling defaults now pass the rebuilt CPU fixture,
-host64, 156 source guards and 34 scenario tests. Field run912 observes
-**2,206 canonical meshes and 104,787 fresh canonical draws**, with native pulling,
-instancing/indirect submission and matching geometry/material/pose checks. One
-1920x1080 image was inspected after actual player movement; no new raw captures,
-performance logs or asset-cache files were produced.
-[Desktop evidence](research/20260906_2316_canonical-rigid-desktop.md).
+Latest desktop checkpoint (2026-09-06): **2,973 primitive shadow-receiving policies
+are load-owned**, removing control-table reads from their native draw adapter.
+The material fixture, host65, 157 source guards and 39 scenario tests pass.
+Field run913 adds 15,019 matching receiver checks and 43,037 composed replays,
+alongside canonical geometry, native pulling and matching material/pose checks.
+One full-resolution image was inspected after movement. No new raw captures,
+performance CSVs or asset-cache files; superseded sanity outputs were removed.
+This is material ownership within the transitional draw path, not direct native
+scene/shadow submission. [Evidence](research/20260906_2344_load-owned-shadow-policy.md).
 
 Canonical geometry owns named values and immutable vertex inputs independently
 of the imported declaration. Unsupported layouts still use transitional packed
@@ -78,7 +79,7 @@ is an initial checked representation, not the final compact headset format.
 The desktop test loop now starts walking after verified field readiness instead
 of waiting a fixed 150 seconds. A roughly 61-second run observes actual player
 displacement, fresh native-component checks and three inspected motion images;
-walking starts about 42 seconds after pad polling begins. This improves short
+walking starts on observed readiness, not a guaranteed boot time. This improves short
 field coverage, not renderer ownership. Reloads, longer sequences, cliff-edge
 artifacts, distant blur and both-eye qualification remain open.
 [Test-loop evidence](research/20260906_2120_readiness-driven-autoplay.md).
@@ -124,7 +125,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive recipes and shadow policy, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, live texture overrides and draw routing, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |

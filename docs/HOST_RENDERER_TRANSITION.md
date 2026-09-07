@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after canonical rigid geometry desktop verification. The first
+Updated 2026-09-06 after load-owned shadow-policy desktop verification. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -42,6 +42,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    backend. Canonical rigid values now draw on desktop; remaining packed layouts,
    shader-register ABI, `NodeTag`/source lookup and retained templates are not
    the finished contract.
+   Shadow-receiving policy is now load-owned too. Next, represent material
+   texture selection and live object UV/image overrides at their producers,
+   together with explicit opaque/alpha/deferred routing. Do not freeze animated
+   overrides into mesh assets or assume every strip range is opaque. These are
+   prerequisites for the named native shaders and direct scene/shadow consumer.
    The [source map](../research/20260906_1531_static-model-ownership-frontier.md)
    and existing call graph locate producers and indirect/lifetime boundaries.
    Acceptance: the converted object loads, updates, draws in scene/shadow passes
@@ -73,6 +78,20 @@ empty queues, startup counters and water activity do not qualify those paths.
 No overall development-speed multiplier is established.
 
 ## Latest qualified checkpoint
+
+Load-owned shadow policy (2026-09-06): material13/CPU11, host65, 157 source guards
+and39 scenario cases pass. Flat normal-MSAA/precache-on run913 owns2,973 policies
+(209 disabled, zero unknown), with15,019 fresh matching receiver checks and
+43,037 composed replays after the opening event. Canonical geometry, native
+pulling, material/pose checks, normal tables and movement also pass. One inspected
+full-resolution JPEG replaces the preceding canonical component sanity image;
+this is not sequence/both-eye or whole-game qualification. Runtime reloads and
+dynamic control families remain unqualified;71,945 unsupported/unmatched adapter
+lookups remain. No new raw/perf/cache/dump output, original profile restored,
+superseded component outputs retired after validation. The native policy consumer
+no longer reads the model control table; the original interpreter, source index,
+templates, live pass/visibility adapter and direct submission gap remain.
+Evidence: `research/20260906_2344_load-owned-shadow-policy.md`.
 
 Canonical rigid geometry (2026-09-06): the owner-approved 3 GiB exception resumed
 verification under the original cumulative ledger; other storage caps and zero

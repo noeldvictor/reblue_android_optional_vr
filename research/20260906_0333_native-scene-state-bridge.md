@@ -1573,3 +1573,65 @@ the volume. The lowest explicitly returned sample was63,110,840,320 B after
 run912; producer supervision kept the operational floor enforced. Source/docs/
 Git publication writes still count; preserve the original ledger and approved
 3 GiB cap without resetting allowances at the next continuation.
+
+### Load-owned shadow policy, same checkpoint
+
+Parent ae04d1e. Source-only investigation followed the completed graph builder's
+asset control table and E000 shadow policy consumer. Native programs now own
+per-primitive Receive/Disabled/Unknown values; the draw adapter selects those
+values without reading control words. Pass/instance visibility remains live.
+Focused fixtures cover source destruction, missing data, conflicts, retirement
+and reload. This is not complete native static-object submission.
+
+Continue the original approved3 GiB ledger/floor62,509,998,080 B, diagnostics
+100 MiB/logs10 MiB, images10 MiB and raw0. No reset or cleanup credit. Initial
+read-only free63,129,739,264 B; later source-work sample63,424,847,872 B varies
+with other drive writers. Plan material12/CPU11 in the existing fixture tree
+(<=4 MiB growth), then host65 in the existing tree (<=192 MiB compile/link
+overlap). Existing bounded wrapper supervises both. No guest/shader rebuild,
+cache conversion or raw output. Validate replacement logs before retiring only
+superseded successful agent logs; keep prior runtime/image evidence until its
+equivalent is qualified. Runtime/pixels remain pending at this preflight.
+
+Material12 /PID30504 stalled before any compiler or log output in the restricted
+process environment. Read-only inspection confirmed only its idle Ninja child;
+the exact owned tree was stopped, exit1. Retry13 /PID31504 outside that process
+restriction passed in2.94 s wrapper wall; CPU11 /PID31416 passes (test0.10 s,
+ctest0.13 s). Host65 /PID26664 passes; codegen module up to date, no guest object
+or shader rebuild.157 source guards and39 scenario cases pass. Both attempts
+count; the empty failed logs are not successful build evidence.
+
+At23:40:51 free **63,420,157,952 B**. Material fixture6,962,620 B vs6,917,235 B
+preflight (+45,385 B); aggregate build logs152,789 B vs148,356 B (+4,433 B).
+Host exe/PDB grow35,840 B combined. No owned producer remains. Runtime913 plan:
+<=75 s flat normal-MSAA/precache-on canonical/movement/material/pose/table check,
+plus fresh owned-shadow lookup/receiver checks; <=400 KiB log, no raw/perf/cache/
+dump output. New purpose-specific JPEG is1920x1080, quality60, <=160 KiB checked
+in memory before writing;169,035 B remain in the unchanged10 MiB image cap.
+Original profile hash is unchanged. Existing runtime wrapper enforces75 MiB
+diagnostic stop plus25 MiB safety and the original cumulative free-space floor;
+shutdown and byte-exact profile restoration are in finally blocks.
+
+Run913 /PID26452 (23:41:21..23:42:19) passes the full requested field gate:
+2,973 owned policies,15,019 fresh matching receiver checks,43,037 composed
+replays, fresh canonical/geometry/material/pose/table/movement observations.
+One1920x1080 JPEG134,082 B inspected; not a sequence/both-eye qualification.
+All11 settings effective, original116-byte profile restored exactly, all owned
+producers terminal. No new raw/perf/cache/dump files. Details and remaining
+unsupported lookups: `20260906_2344_load-owned-shadow-policy.md`.
+
+After validating equivalent replacement coverage, deleted the old canonical
+sanity JPEG/run912 log, material11/CPU10/host64 stdout/stderr and empty stalled
+material12 logs. Ten exact files417,565 logical B; immediate free63,419,695,104
+->**63,420,121,088 B**, measured reclamation **425,984 B**, counted once.
+Historical reports/hashes remain; exact old captures/logs no longer retained.
+Current run913/image and material13/CPU11/host65 logs replace them. Run911's three
+motion images, standing/failure evidence and protected raw archive unchanged.
+
+Comparable material fixture/log/image set shrinks **7,771 B** after replacement:
+fixture+45,385 B, run log+23,594 B, image-76,243 B, aggregate build logs-507 B.
+The latter now147,849 B; images10,240,482 B,245,278 B remaining under10 MiB.
+Exe/PDB grow35,840 B. Source/docs/Git/helpers, objects and build metadata lack
+complete byte baselines; not falsely zero. End free at cleanup~59.06 GiB,
+drive-wide gain290,381,824 B from the initial read-only preflight; only425,984 B
+attributed to our cleanup. Keep the same original ledger/approved3 GiB cap.
