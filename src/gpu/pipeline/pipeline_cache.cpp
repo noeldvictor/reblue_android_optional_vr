@@ -1,8 +1,7 @@
 /**
  * @file    gpu/pipeline/pipeline_cache.cpp
- * @brief   Cache of plume::RenderPipeline keyed by HashPipelineState. Every PSO
- *          binds Video::MainPipelineLayout() so one setGraphicsPipelineLayout
- *          covers every draw plus the copy/resolve helpers.
+ * @brief   Shared pipeline cache for explicit native programs and temporary
+ *          translated shader producers. Native programs own their own layout.
  *
  * @copyright Copyright (c) 2026 Tom Clay <tomc@tctechstuff.com>
  *            All rights reserved.
@@ -11,6 +10,7 @@
  */
 #include <atomic>
 #include "gpu/pipeline/pipeline_cache.h"
+#include "gpu/pipeline/native_pipeline_program.h"
 
 #include <memory>
 #include <mutex>
@@ -37,7 +37,9 @@ namespace bd::gpu {
 // legitimately changes. The appended native input is runtime-only; legacy
 // CSV/header rows remain unchanged and default it to null. RecordPipelineState
 // explicitly excludes native inputs, which have no console declaration hash.
-static_assert(sizeof(PipelineState) == 166,
+// Native program is appended too: CSV/header schema is unchanged, native rows
+// are excluded, and all existing designated initializers default it to null.
+static_assert(sizeof(PipelineState) == 174,
               "PipelineState size changed: update kCSVHeader/CsvRow + "
               "tools/shader_cache/pso_cache_to_header.py and regenerate "
               "cache/pipeline_state_cache.h.");
@@ -163,38 +165,51 @@ namespace bd::gpu {
 namespace {
 
 std::mutex g_mutex;
-std::unordered_map<u64, std::unique_ptr<plume::RenderPipeline>> g_pipelines;
+struct PipelineEntry {
+  NativePipelineHandle program; // destroyed after the pipeline, never before it
+  std::unique_ptr<plume::RenderPipeline> pipeline;
+};
+std::unordered_map<u64, PipelineEntry> g_pipelines;
+constexpr size_t kMaxNativePipelines = 2048;
+size_t g_native_pipelines = 0; // retained native entries; failed builds consume none
 
 std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
   auto *device = Video::HostDevice();
   if (!device)
     return nullptr;
-  auto *layout = Video::MainPipelineLayout();
-  if (!layout)
-    return nullptr;
-  if (!state.vertexShader || (!state.native_vertex_input && !state.vertexDeclaration))
-    return nullptr;
-
-  auto *vs = GetOrLinkShader(state.vertexShader, state.specConstants);
-  if (!vs)
-    return nullptr;
-  // Sun occlusion count draw swaps the guest PS for the counter PS, whose
-  // [earlydepthstencil] tallies depth-passing pixels into the root UAV.
-  plume::RenderShader *ps = nullptr;
-  if (state.occlusionCounting) {
-    ps = Occlusion::CountPS();
-    if (!ps)
-      return nullptr;
-  } else {
-    ps = state.pixelShader
-             ? GetOrLinkShader(state.pixelShader, state.specConstants)
-             : nullptr;
-    if (state.pixelShader && !ps)
-      return nullptr;
-  }
-
   plume::RenderGraphicsPipelineDesc desc;
-  desc.pipelineLayout = layout;
+  if (state.native_program) {
+    if (!NativePipelineStateValid(state)) return nullptr;
+    ApplyNativePipelineProgram(*state.native_program, desc);
+  } else {
+    auto *layout = Video::MainPipelineLayout();
+    if (!layout)
+      return nullptr;
+    if (!state.vertexShader || (!state.native_vertex_input && !state.vertexDeclaration))
+      return nullptr;
+
+    auto *vs = GetOrLinkShader(state.vertexShader, state.specConstants);
+    if (!vs)
+      return nullptr;
+    // Sun occlusion count draw swaps the guest PS for the counter PS, whose
+    // [earlydepthstencil] tallies depth-passing pixels into the root UAV.
+    plume::RenderShader *ps = nullptr;
+    if (state.occlusionCounting) {
+      ps = Occlusion::CountPS();
+      if (!ps)
+        return nullptr;
+    } else {
+      ps = state.pixelShader
+               ? GetOrLinkShader(state.pixelShader, state.specConstants)
+               : nullptr;
+      if (state.pixelShader && !ps)
+        return nullptr;
+    }
+
+    desc.pipelineLayout = layout;
+    desc.vertexShader = vs;
+    desc.pixelShader = ps;
+  }
   // 0b11: both eyes. Zero leaves the pipeline single-view, which is what every
   // 2D, post and bloom pass gets.
   desc.viewMask = state.multiview ? 0x3u : 0u;
@@ -222,9 +237,6 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
                 mv.load(std::memory_order_relaxed));
     }
   }
-  desc.vertexShader = vs;
-  desc.pixelShader = ps;
-
   // MEASUREMENT ONLY, renders wrongly on purpose: every fragment passes depth.
   //
   // The frame is fragment-bound (a quarter of the fragments halves GPU time)
@@ -279,7 +291,7 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
   desc.renderTargetBlend[0].dstBlendAlpha = state.destBlendAlpha;
   desc.renderTargetBlend[0].blendOpAlpha = state.blendOpAlpha;
   u8 writeMask = state.colorWriteEnable;
-  if (state.pixelShader && state.pixelShader->shaderCacheEntry &&
+  if (!state.native_program && state.pixelShader && state.pixelShader->shaderCacheEntry &&
       state.pixelShader->shaderCacheEntry->hash == 0xD94FD5175EEE4951ull) {
     writeMask &= ~0x8;
   }
@@ -289,12 +301,14 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
   desc.multisampling.sampleCount = state.sampleCount;
   desc.alphaToCoverageEnabled = state.enableAlphaToCoverage;
 
-  const auto inputs = scene::VertexInputElements(state.native_vertex_input, [&] {
-    return std::span<const plume::RenderInputElement>(
-        state.vertexDeclaration->inputElements.get(), state.vertexDeclaration->inputElementCount);
-  });
-  desc.inputElements = inputs.data();
-  desc.inputElementsCount = uint32_t(inputs.size());
+  if (!state.native_program) {
+    const auto inputs = scene::VertexInputElements(state.native_vertex_input, [&] {
+      return std::span<const plume::RenderInputElement>(
+          state.vertexDeclaration->inputElements.get(), state.vertexDeclaration->inputElementCount);
+    });
+    desc.inputElements = inputs.data();
+    desc.inputElementsCount = uint32_t(inputs.size());
+  }
 
   // One input slot per unique slotIndex. Under instancing, slots 0 and 15 stay
   // PER_VERTEX.
@@ -320,6 +334,11 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
   }
   desc.inputSlots = inputSlots;
   desc.inputSlotsCount = inputSlotCount;
+
+  // Native specialization IDs/values are owned by the program. Never apply the
+  // translated id-0 mask or a replacement fragment shader to this branch.
+  if (state.native_program)
+    return CreateHostGraphicsPipeline(device, desc, "native pipeline");
 
 #if defined(REBLUE_D3D12)
   // Spec constants are baked by the DXC linker in GetOrLinkShader, not the PSO.
@@ -360,12 +379,15 @@ plume::RenderPipeline *GetOrCreatePipeline(const PipelineState &state,
   BD_CPU_ZONE("GetOrCreatePipeline");
   if (out_created)
     *out_created = false;
+  if (!NativePipelineStateValid(state)) return nullptr;
+  auto program = state.native_program ? state.native_program->Lease() : nullptr;
   const u64 key = HashPipelineState(state);
   {
     std::lock_guard lock(g_mutex);
     auto it = g_pipelines.find(key);
     if (it != g_pipelines.end())
-      return it->second.get();
+      return it->second.pipeline.get();
+    if (program && g_native_pipelines >= kMaxNativePipelines) return nullptr;
   }
   if (out_created)
     *out_created = true;
@@ -374,8 +396,12 @@ plume::RenderPipeline *GetOrCreatePipeline(const PipelineState &state,
     return nullptr;
   std::lock_guard lock(g_mutex);
   // try_emplace handles a concurrent build of the same key (lock was dropped).
-  auto [it, inserted] = g_pipelines.try_emplace(key, std::move(p));
-  return it->second.get();
+  if (auto it = g_pipelines.find(key); it != g_pipelines.end()) return it->second.pipeline.get();
+  if (program && g_native_pipelines >= kMaxNativePipelines) return nullptr;
+  const bool native = bool(program);
+  auto [it, inserted] = g_pipelines.try_emplace(key, PipelineEntry{std::move(program), std::move(p)});
+  if (native && inserted) ++g_native_pipelines;
+  return it->second.pipeline.get();
 }
 
 size_t PipelineCacheSize() {
@@ -384,10 +410,11 @@ size_t PipelineCacheSize() {
 }
 
 plume::RenderPipeline *FindPipeline(const PipelineState &state) {
+  if (!NativePipelineStateValid(state)) return nullptr;
   const u64 key = HashPipelineState(state);
   std::lock_guard lock(g_mutex);
   auto it = g_pipelines.find(key);
-  return it != g_pipelines.end() ? it->second.get() : nullptr;
+  return it != g_pipelines.end() ? it->second.pipeline.get() : nullptr;
 }
 
 } // namespace bd::gpu

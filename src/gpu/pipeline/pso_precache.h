@@ -44,6 +44,9 @@ bool PrecacheEnabled();
 // matches the cache key. Auto-attaches to the thread's active load capture
 // (BeginLoadCapture), which routes the work to the priority lane so it
 // compiles ahead of background coverage. No-op until host device.
+// Native callers hold their program lease until enqueue returns; work retains
+// its own lease across async compilation. At most 256 native jobs may be queued
+// or compiling. Refused/failed native work may be retried or built on demand.
 void EnqueuePipeline(const PipelineState &state);
 
 // Tokenless priority lane enqueue for work about to be needed, e.g.

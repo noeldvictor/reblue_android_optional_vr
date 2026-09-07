@@ -1884,3 +1884,68 @@ Final measured free at01:57 is63,181,537,280 B (58.84 GiB), drive-wide use
 173,006,848 B (165 MiB) from current first63,354,544,128 B, not all attributable
 to this task. No owned producer remains. Same original ledger start/cap/floor
 and raw0 gate remain; no reset and no duplicate cleanup credit.
+
+### Native pipeline programs, same checkpoint (2026-09-07)
+
+Parent9d3bab0. Previous goal turn was verified progress, committed/pushed clean.
+Previous post-push free63,025,065,984 B; current first63,012,909,056 B with no
+owned producers. At pre-build measurement free63,340,675,072 B; the drive-wide
+increase is not agent cleanup. Original ledger65,462,788,096 B, approved3 GiB
+exception/operational floor62,509,998,080 B and raw0 remain; no allowance reset.
+
+Remove the shared pipeline builder's mandatory GuestShader/main-layout contract
+for explicit native programs. Program-owned shader/layout/input/spec values are
+pinned across async work and cache lifetime; mixed translated inputs are refused.
+Native caps:8 specialization entries,256 pending compiles,2048 retained variants.
+No actual game object/shader producer uses this yet. CPU descriptor/lifetime
+coverage is not a native GPU shader or object qualification.
+
+Reuse out/native_texture_test: native_texture_binding_test.exe195,072 B and
+host_draw_intent_test.exe66,560 B; add the program fixture to the former, avoiding
+the latter's intentionally opaque binding-test backend types. Plan <=3 MiB
+fixture/log growth and <=512 MiB host compile/link overlap. Host exe48,271,872 B/
+PDB107,040,768 B, logs177,419 B before work. Shared PipelineState header appends
+one runtime-only pointer; CSV/generated designated initializers retain their
+schema, native records are excluded. Build one target at a time, no guest/shader
+rebuild, no new tree/cook/cache/raw/perf/dump. Existing bounded wrapper enforces
+300 s/log10 MiB/free floor and stops unexpected guest compilation. Preserve
+run917 and its image until any equivalent regression replacement qualifies.
+
+Binding fixture19/CPU17 pass (0.05 s behavior/0.07 s CTest), intent20/CPU18 pass
+(0.03/0.04 s). Host72/PID28040 terminal success:97 scheduled CMake/host edges,
+no guest objects or shaders rebuilt.231 Python checks and8 runner tests pass.
+Fixture binding exe256,000 B (+60,928), intent exe unchanged66,560 B, new program
+fixture object809,228 B; other object/metadata deltas lack full baselines.
+Exe48,287,232 B/PDB107,188,224 B, combined+162,816. Logs210,302 B (+32,883).
+Host end free63,337,897,984 B. Run918 plan: same run917 complete flat native-MSAA/
+precache-on regression gates, <=75 s, <=400 KiB log and one full-size quality60
+JPEG <=160 KiB within250,765 B aggregate image overlap headroom. No new native
+program producer is present: this run qualifies existing engine rendering only.
+Exact original profile restoration, raw/perf/cache/dumps off, automatic shutdown.
+
+Run918/PID24168 terminal success,02:13:14..02:14:13 EDT; all14 settings effective,
+original116 B profile restored exactly. Fresh post-event contexts2040/2340 pass
+all existing field gates:200,673 explicit draw commands,134,342 descriptor binds,
+900 layout binds;111,862 matching poses,142,063 canonical draws,47,576 load-owned
+draws,61,434 cull replays and57,533 normal-lit uses. Movement observes30 fresh
+samples/+37.625316 units. One135,961 B1920x1080 JPEG inspected; known cliff marks/
+blur remain. No new cache/dump/perf/raw files. Native program creation exists only
+in CPU fixtures; the field run is not native-program GPU qualification.
+Full evidence: `20260907_0217_native-pipeline-programs.md`.
+
+Retired14 exact validated superseded outputs: run917 log/binding JPEG, binding05/
+CPU05, intent18/CPU16 and host70/71 stdout/stderr.380,999 logical B; immediate
+free63,334,731,776 ->63,335,129,088 B, measured397,312 B (388 KiB) reclaimed once.
+Protected raw/baseline/failure/motion evidence unchanged; old reports/hashes
+remain, old runtime files gone, build logs reproducible. Distinct numerical
+material17/CPU15 evidence stays. No owned renderer/build process remains.
+
+Known comparable retained fixture/log/image growth890,087 B: new native program
+fixture object809,228, binding exe+60,928, intent exe unchanged, aggregate logs
+-727 (now176,692), runtime log+13,292, image+7,366. This adds program/lifetime
+coverage; replace by purpose at the next equivalent qualification. Other object/
+metadata/helper/source deltas lack full baselines, not zero. Host exe/PDB grows
+162,816 B. Image aggregate10,242,361 B leaves243,399 B overlap headroom. Cleanup
+end free63,335,129,088 B (58.99 GiB), drive-wide gain322,220,032 B from current
+first63,012,909,056 B; only397,312 B is attributed to cleanup. Same original
+ledger/cap/floor and raw0 gate remain, without reset or double-credit.

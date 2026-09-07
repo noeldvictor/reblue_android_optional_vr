@@ -160,7 +160,9 @@ static void TestTextureTables() {
   Check(survivor->slots[0].image.primary->asset->id == 80, "native lease may outlive the library");
 }
 
+void TestNativePipelineProgram();
 int main() {
+  TestNativePipelineProgram();
   TestTextureTables();
   const NativeTextureIndices nulls{1, 2, 3};
   auto two = Image(10, 100, D::TEXTURE_2D_ARRAY);

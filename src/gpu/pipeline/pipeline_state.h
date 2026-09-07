@@ -19,6 +19,7 @@ namespace bd::gpu {
 
 struct GuestShader;
 struct GuestVertexDeclaration;
+class NativePipelineProgram;
 namespace scene { class NativeVertexInput; }
 
 // pack(1): PipelineState is hashed by raw bytes (XXH3_64bits over sizeof),
@@ -86,6 +87,10 @@ struct PipelineState {
   // Native dispatch clears vertexDeclaration; this input is authoritative.
   // Runtime-only: console PSO CSV capture must not serialize these pipelines.
   const scene::NativeVertexInput *native_vertex_input = nullptr;
+  // Runtime-only, mutually exclusive with translated shaders/declarations and
+  // spec masks. Caller holds a lease until enqueue/build returns; async work and
+  // cached pipelines retain their own complete program/resource lease.
+  const NativePipelineProgram *native_program = nullptr;
 };
 #pragma pack(pop)
 
@@ -95,7 +100,7 @@ struct PipelineState {
 // drift is itself safe (the on-disk capture is a field-named CSV plus a
 // designated-initializer header, not a byte image), but any field
 // add/remove/reorder must be reviewed against kCSVHeader/CsvRow and the cache
-// generators. native_vertex_input is deliberately runtime-only: native rows
+// generators. native_vertex_input/native_program are runtime-only: native rows
 // are excluded from console PSO capture and old generated entries default null.
 static_assert(std::is_trivially_copyable_v<PipelineState>,
               "PipelineState must stay trivially copyable (raw-byte hashed).");

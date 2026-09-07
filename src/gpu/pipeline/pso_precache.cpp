@@ -19,6 +19,7 @@
 #include "core/threading.h"
 #include "gpu/device.h"
 #include "gpu/pipeline/pipeline_cache.h"
+#include "gpu/pipeline/native_pipeline_program.h"
 #include "gpu/settings.h"
 
 namespace bd::gpu {
@@ -28,6 +29,7 @@ namespace {
 struct WorkItem {
   PipelineState state; // value copy, carries live GuestShader*/decl*
   TokenPtr token;      // null for ungated work
+  NativePipelineHandle program; // pins layout/shaders/input before async dispatch
 };
 
 std::mutex g_queueMutex;
@@ -40,6 +42,8 @@ std::deque<WorkItem> g_queue;
 
 std::mutex g_dedupMutex;
 std::unordered_set<u64> g_queuedOrDone;
+constexpr size_t kMaxNativePending = 256;
+size_t g_native_pending = 0; // queued plus currently compiling; under dedup mutex
 
 std::atomic<size_t> g_buildFailures{0};
 
@@ -50,8 +54,10 @@ std::once_flag g_startOnce;
 thread_local TokenPtr t_currentLoadToken;
 
 void ProcessItem(WorkItem &item) {
+  bool succeeded = false;
   try {
-    if (!GetOrCreatePipeline(item.state)) {
+    succeeded = GetOrCreatePipeline(item.state) != nullptr;
+    if (!succeeded) {
       const size_t n =
           g_buildFailures.fetch_add(1, std::memory_order_relaxed) + 1;
       if (n == 1 || (n & 0x3FF) == 0)
@@ -65,6 +71,13 @@ void ProcessItem(WorkItem &item) {
     BD_ERROR("pso_precache GetOrCreatePipeline unknown exception");
   }
 
+  // Native failures must be retryable and cannot leave a retired pointer's key
+  // in permanent dedup storage. A successful cache entry pins that program.
+  if (item.program) {
+    std::lock_guard lock(g_dedupMutex);
+    --g_native_pending;
+    if (!succeeded) g_queuedOrDone.erase(HashPipelineState(item.state));
+  }
   // Release even on a nullptr build or thrown compile so the gate cannot hang.
   if (item.token)
     item.token->ReleasePending();
@@ -126,23 +139,39 @@ namespace {
 // starts the pool or poisons the dedup set.
 void EnqueueResolved(const PipelineState &state, TokenPtr token,
                      bool priority) {
+  if (!NativePipelineStateValid(state)) return;
+  auto program = state.native_program ? state.native_program->Lease() : nullptr;
   const u64 key = HashPipelineState(state);
   {
     std::lock_guard<std::mutex> lock(g_dedupMutex);
+    if (program && g_native_pending >= kMaxNativePending) return;
     if (!g_queuedOrDone.insert(key).second)
       return;
+    if (program) ++g_native_pending;
   }
 
-  StartWorkerPool();
-
-  if (token)
-    token->AddPending();
-  {
+  // Retain these local references for rollback if starting/allocating work
+  // throws after dedup insertion. No token or native quota can remain stuck.
+  const auto rollback_token = token;
+  const bool native = bool(program);
+  bool pending_added = false;
+  try {
+    StartWorkerPool();
+    if (token) {
+      token->AddPending();
+      pending_added = true;
+    }
     std::lock_guard<std::mutex> lock(g_queueMutex);
     if (priority)
-      g_priorityQueue.push_back(WorkItem{state, std::move(token)});
+      g_priorityQueue.push_back(WorkItem{state, std::move(token), std::move(program)});
     else
-      g_queue.push_back(WorkItem{state, std::move(token)});
+      g_queue.push_back(WorkItem{state, std::move(token), std::move(program)});
+  } catch (...) {
+    if (pending_added) rollback_token->ReleasePending();
+    std::lock_guard lock(g_dedupMutex);
+    g_queuedOrDone.erase(key);
+    if (native) --g_native_pending;
+    throw;
   }
   g_queueCv.notify_one();
 }

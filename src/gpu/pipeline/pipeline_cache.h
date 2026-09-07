@@ -33,6 +33,9 @@ namespace bd::gpu {
 // Returns a native pipeline matching 'state' (Sanitize first), nullptr on
 // failure. out_created is set true on a cache miss (built on the calling
 // thread), so the recorder can flag draws whose PSO was not precached.
+// A native program's owner must remain live until this call returns. The cache
+// pins successful native entries (up to 2048); full capacity refuses new native
+// variants without evicting in-flight resources. Legacy entries are unchanged.
 plume::RenderPipeline *GetOrCreatePipeline(const PipelineState &state,
                                            bool *out_created = nullptr);
 

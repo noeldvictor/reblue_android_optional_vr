@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after explicit queued binding desktop verification. The first
+Updated 2026-09-07 after native program CPU checks and the desktop regression. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -53,11 +53,14 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    an explicit native contract. These scalar structs are semantic inputs, not
    a raw C++/GPU constant-buffer layout. Reuse the evaluator in that contract;
    replacing shader math alone does not provide native scene light/fog owners.
-   The shared queue now accepts explicit layouts/descriptor sets/offsets, with
-   binding-aware batching and exact caller restoration. Its current producer
-   and instance-record gathering remain translated; alternate native layouts
-   have CPU command coverage only. Connect the native object/shader producer
-   through this contract next, not another broad compatibility layer.
+   The shared queue accepts explicit layouts/descriptor sets/offsets, with
+   binding-aware batching and exact caller restoration. The shared pipeline cache
+   now accepts owned native shader/layout/input programs; background jobs and
+   cached pipelines pin their resources, with bounded native retention. Native
+   program selection has CPU coverage only: no game producer uses it yet, and
+   instance-record gathering remains translated. Connect a real native rigid
+   shader pair/input layout and object packet through these contracts next,
+   not another broad compatibility layer.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -107,7 +110,7 @@ drop participants from the initial acceptance scene.
 
 ### Direct rigid-object dependency map
 
-Source audit at `11f5d94`, updated for the explicit binding checkpoint (2026-09-07).
+Source audit at `11f5d94`, updated for native pipeline programs (2026-09-07).
 This records why the latest component
 checks are not an end-to-end object conversion, and where the next implementation
 must connect. It is not a second roadmap or a new renderer framework.
@@ -116,7 +119,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelMaterialProgram`, `NativeGeometry`, `NativeInstancePose`, object image/UV/policy publications | `PrepareMaterialMesh` still selects by `NodeTag`/source graph and consumers match source IB/VB/range keys. Publish an immutable model/instance-to-primitive association before drawing; the submission core must not discover it from captured draws. |
 | Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, named light/fog evaluator and native image leases | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The normal shader still imports these from register bindings. Finish their producer ownership and define an explicit C++/GPU layout, including sampler/material flags; scalar evaluator structs alone are not that layout. |
-| Native shader/pipeline binding | Existing Plume device, framebuffer owners and queue; explicit `GraphicsBindings`, binding-aware grouping and caller restoration | The emitter no longer fetches a global constant set or requires three offsets. `EngineGraphicsBindings` remains the live producer; `PipelineState` still selects `GuestShader` wrappers and instancing still gathers translated records. Supply the native shader pair/input layout through this contract; do not copy an old pipeline template or create a parallel renderer. |
+| Native shader/pipeline binding | Existing Plume device/framebuffers/queue; explicit `GraphicsBindings`; `NativePipelineProgram` with async/cache ownership | The emitter no longer requires three offsets, and the cache has a wrapper-free native program branch with explicit specializations. Only CPU fixtures create native programs so far. Supply the actual rigid shader pair/input layout and object producer; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
 
 Start by selecting and recording an actual model/content identity and primitive
@@ -153,10 +156,26 @@ behavior; 107 rigid-path checks pass in 0.019 s and the broader 222 checks pass 
 Focused model/instance selection also passes from outside the repository cwd.
 Both revised repository skills passed their frontmatter validator. That tooling
 checkpoint made no renderer change or new runtime output. The subsequent binding
-checkpoint expands the selection to 113 rigid-path /228 broader checks; its
+checkpoint expanded the selection to 113 rigid-path /228 broader checks; native
+program guards now bring these to 116 /231 respectively. Their
 separate C++ and runtime evidence follows below.
 
 ## Latest qualified checkpoint
+
+Native pipeline programs (2026-09-07): the shared cache accepts an immutable
+native shader/layout/input/specialization owner without calling the translated
+shader linker or selecting the main engine layout. Mixed inputs are refused;
+native background jobs and cache entries retain their program leases. Limits:
+eight specializations, 256 pending compiles and 2,048 retained native variants.
+Binding19/CPU17, intent20/CPU18, host72, 231 source/scenario checks and eight runner
+tests pass. Run918 is an **existing engine-path regression**, not native-program
+GPU qualification: no game producer creates a native program yet. Fresh field
+geometry/material/pose/shadow/movement/binding gates pass; one 1920x1080 image
+inspected, known cliff artifacts/blur remain. No raw/perf/cache/dump output,
+exact profile restored, superseded sanity/fixture/build evidence retired.
+Native rigid shader/input and object producers remain, along with interpreter/
+template-free cold-load/reload, scene/shadow and both-eye acceptance.
+Evidence: `research/20260907_0217_native-pipeline-programs.md`.
 
 Explicit queued bindings (2026-09-07): the existing emitter now consumes bounded
 layout/set/offset snapshots without global constant-set lookup or a fixed

@@ -58,20 +58,21 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **queued draws now carry explicit GPU
-layouts, descriptor sets and offsets**, removing the emitter's global constant-set
-lookup and fixed three-offset binding assumption. Batching includes the binding
-identity, and flushing restores the caller's bindings. The C++ command fixture,
-host build, 228 source/scenario checks and eight runner tests pass. Field run917
-adds 196,347 explicitly bound draw commands; existing geometry/material/pose/
-shadow/movement gates also pass. One full-resolution image was inspected; known
-cliff artifacts and blur remain. No new raw/perf/asset-cache output; superseded
-sanity evidence was removed. Alternate layouts have **CPU coverage only**: live
-draws still use the engine producer, translated instance records and shader
-wrappers. Source selection/templates, native shader inputs and direct scene/shadow
-object submission remain. This is not cold-load/reload, sequence/both-eye
+Latest desktop checkpoint (2026-09-07): **the shared pipeline cache can now accept
+owned native shader programs and layouts without `GuestShader` wrappers**.
+Programs retain shader/input/layout resources across bounded background compilation
+and cached pipeline lifetime; mixed native/translated inputs are refused. This
+connects to the preceding explicit draw-binding contract. Two C++ fixtures,
+host72, 231 source/scenario checks and eight runner tests pass. Field run918
+passes the existing geometry/material/pose/shadow/movement/binding regression;
+one full-resolution image was inspected, with known cliff artifacts and blur
+remaining. **Native program selection has CPU coverage only; no game producer
+uses it yet.** A real native shader pair/input layout, model/instance primitive
+packet and direct scene/shadow consumer remain next. Source selection/templates
+and translated instance records still exist. No new raw/perf/asset-cache output;
+superseded evidence was removed. This is not cold-load/reload, sequence/both-eye
 qualification or a measured speedup.
-[Evidence and remaining boundaries](research/20260907_0157_explicit-draw-bindings.md).
+[Evidence and remaining boundaries](research/20260907_0217_native-pipeline-programs.md).
 
 Canonical geometry owns named values and immutable vertex inputs independently
 of the imported declaration. Unsupported layouts still use transitional packed

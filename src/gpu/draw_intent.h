@@ -36,6 +36,7 @@ void ApplyEngineDrawIntent(State &state, PublishState publish_state) {
   assign(state.pipelineState.pixelShader, state.pixel_shader);
   assign(state.pipelineState.vertexDeclaration, state.vertex_declaration);
   assign(state.pipelineState.native_vertex_input, nullptr);
+  assign(state.pipelineState.native_program, nullptr);
   publish_state();
 }
 } // namespace bd::gpu
