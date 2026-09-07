@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_texture_binding.h"
+#include "gpu/scene/native_primitive_policy.h"
 #include <memory>
 namespace bd::gpu::scene {
 struct NodeTag;
@@ -26,6 +27,12 @@ public:
 // image-resource lookup or table-registry lock is required by this consumer.
 const NativeMaterialTextureValues *FindNativeMaterialTextures(
     const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count);
+std::optional<NativePrimitivePolicy> FindNativePrimitivePolicy(
+    const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count);
+std::optional<NativePrimitivePlan> FindNativePrimitivePlan(const NodeTag &tag);
+void NativePrimitivePolicyCheck(bool same);
+void NativePrimitivePolicyNoteDraw(bool changed);
+void NativePrimitivePolicyRefresh();
 void NativeMaterialTextureCheck(bool same, uint32_t channel, uint32_t visual);
 void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv);
 void NativeMaterialTextureReport();

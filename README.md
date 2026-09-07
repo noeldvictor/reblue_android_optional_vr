@@ -58,16 +58,18 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **object-level native image/UV snapshots
-now feed material draws**, using load-owned ordered texture assignments and
-native image-table leases. Field run914 adds 59,927 UV-composed replays and
-62,690 native image slots with 58,641 matching checks, zero mismatches/refusals.
-The material fixture, host66, 162 source guards and 44 scenario tests pass;
-canonical geometry, pulling, shadow policies, poses and movement also pass.
-One full-resolution image was inspected. No new raw captures, performance CSVs
-or asset-cache files; superseded sanity outputs were removed. This is ownership
-within the transitional draw path, not direct native scene/shadow submission.
-[Evidence and remaining boundaries](research/20260907_0016_object-material-textures.md).
+Latest desktop checkpoint (2026-09-07): **native primitive policies now own
+winding and ordinary direct/deferred participation decisions**. Load-owned
+programs and live object/pass inputs compose these values; a changed compound
+policy invalidates both transitional draw-list halves before either executes.
+Field run915 adds 15,493 matching checks and 59,292 native-cull replays, with
+zero mismatches. The material fixture, host67, 167 source guards and 49 scenario
+tests pass; existing geometry/image/UV/pose/shadow/movement gates also pass.
+One full-resolution image was inspected. Live policy changes, volume routing,
+reloads and both eyes remain unqualified. No new raw captures, performance CSVs
+or asset-cache files; superseded sanity outputs were removed. This is still
+transitional submission, not a completed direct native object path.
+[Evidence and remaining boundaries](research/20260907_0047_native-primitive-participation.md).
 
 Canonical geometry owns named values and immutable vertex inputs independently
 of the imported declaration. Unsupported layouts still use transitional packed
@@ -127,7 +129,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive recipes/shadow policy/ordered texture assignments, object-published image/UV values, lighting/state producers, pass binders, water and Toon callbacks | Explicit opaque/alpha/deferred routing, remaining material/override families and bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, object-published image/UV values, lighting/state producers, pass binders, water and Toon callbacks | Complete direct shader/pass consumers, volume/deferred and remaining override families, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |
@@ -165,6 +167,15 @@ Small, coherent, verified commits and pushes remain the default. Focused CPU
 fixtures and incremental builds form the inner loop; rendering changes still
 need appropriate GPU/pixel checks. Startup-only counters or an empty effect
 queue do not qualify an authored field/effect path.
+
+**Faster delivery focus:** select one ordinary opaque rigid field family and
+finish its named shader inputs plus direct scene/shadow consumer using the
+owners already built. Its acceptance test must cold-load and reload with its
+guest rendering interpreter and template capture disabled. Add another adapter
+only if it removes a named blocker for that path; defer broad recooking and
+material-family expansion until this end-to-end consumer works. The generated
+C++ is our exact behavior reference, not a reason to translate every console
+rendering helper one-for-one. This changes development order, not the full goal.
 
 ### Evidence limits and performance
 

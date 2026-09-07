@@ -32,6 +32,11 @@ MATERIAL_TEXTURE_METRIC = re.compile(
 MOVEMENT_METRIC = re.compile(
     r"\[autoplay\] t ([\d.]+) stage (\S+) ready ([01]) walking ([01]) episode (\d+) "
     r"walk-s ([\d.]+) moved (\d+) distance ([\d.]+) position (\S+)")
+PRIMITIVE_POLICY_METRIC = re.compile(
+    r"\[native-primitive-policy\] (\d+) plans (\d+) known (\d+) unknown; "
+    r"(\d+) direct (\d+) deferred (\d+) suppressed candidates; "
+    r"(\d+) reads (\d+) unavailable; (\d+) checks wrong (\d+); "
+    r"(\d+) draws (\d+) cull changes (\d+) compound refreshes;")
 
 
 class Pending(ValueError):
@@ -216,6 +221,34 @@ def verify_material_textures(text):
             "image_slots_delta": b[11] - a[11], "uv_blocks_delta": b[12] - a[12]}
 
 
+def verify_primitive_policies(text):
+    """Observe owned policy checks/consumers, not unexercised routing families."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("primitive-policy diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        if "[native-primitive-policy-mismatch]" in line:
+            raise ValueError("native primitive cull/participation differs from source")
+        match = PRIMITIVE_POLICY_METRIC.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[9]:
+                raise ValueError("native primitive cull/participation comparison differs")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if any(b[i] < a[i] for i in range(len(b))) or any(
+            b[i] - a[i] < 32 for i in (0, 1, 6, 8, 10)):
+        raise Pending("native plans, known routing, matching checks and policy draws must advance")
+    return {"plans_delta": b[0] - a[0], "known_delta": b[1] - a[1],
+            "unknown_delta": b[2] - a[2], "direct_candidates_delta": b[3] - a[3],
+            "deferred_candidates_delta": b[4] - a[4], "suppressed_candidates_delta": b[5] - a[5],
+            "reads_delta": b[6] - a[6], "unavailable": b[7], "checks_delta": b[8] - a[8],
+            "draws_delta": b[10] - a[10], "cull_changes_delta": b[11] - a[11],
+            "compound_refreshes_delta": b[12] - a[12]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -258,6 +291,7 @@ def main():
     parser.add_argument("--movement", action="store_true")
     parser.add_argument("--shadow-policies", action="store_true")
     parser.add_argument("--material-textures", action="store_true")
+    parser.add_argument("--primitive-policies", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -274,6 +308,7 @@ def main():
         movement = verify_movement(text) if args.movement else None
         shadow = verify_shadow_policies(text) if args.shadow_policies else None
         textures = verify_material_textures(text) if args.material_textures else None
+        policies = verify_primitive_policies(text) if args.primitive_policies else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -293,6 +328,8 @@ def main():
         print("PASS: post-event owned shadow policies " + ", ".join(f"{k}={v}" for k, v in shadow.items()))
     if textures is not None:
         print("PASS: post-event native material textures " + ", ".join(f"{k}={v}" for k, v in textures.items()))
+    if policies is not None:
+        print("PASS: post-event native primitive policies " + ", ".join(f"{k}={v}" for k, v in policies.items()))
     return 0
 
 

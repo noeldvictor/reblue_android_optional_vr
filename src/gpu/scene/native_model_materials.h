@@ -29,6 +29,7 @@ struct NativeModelMaterialProgram {
   std::vector<std::shared_ptr<const NativeGeometry>> geometries;
   std::vector<NativeShadowPolicy> shadow_policies;
   std::vector<MaterialImageAssignment> texture_assignments;
+  std::vector<PrimitivePolicyStep> policy_steps;
   bool valid = false;
 };
 

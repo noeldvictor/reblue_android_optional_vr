@@ -37,11 +37,13 @@ int MeshCommandOperands(uint16_t command) {
 
 bool DecodeMeshMaterials(std::span<const uint16_t> commands,
                          std::vector<NativeMaterialRange> &out,
-                         std::vector<MaterialImageAssignment> *textures) {
+                         std::vector<MaterialImageAssignment> *textures,
+                         std::vector<PrimitivePolicyStep> *policies) {
   if (commands.size() > 65536)
     return false;
   std::vector<NativeMaterialRange> ranges;
   std::vector<MaterialImageAssignment> assignments;
+  std::vector<PrimitivePolicyStep> steps;
   NativeMaterialRange current;
   int last_reflection_command = -1;
   constexpr float byte_scale = 1.0f / 255.0f;
@@ -53,6 +55,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
     if (command == 0xff) {
       out = std::move(ranges);
       if (textures) *textures = std::move(assignments);
+      if (policies) *policies = std::move(steps);
       return true;
     }
     const uint16_t kind = command & 0xf000;
@@ -63,6 +66,9 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       current.index_count = uint32_t(commands[cursor]) + 2;
       current.first_index = commands[cursor + 1];
       current.texture_assignment_end = uint32_t(assignments.size());
+      current.policy_step_end = uint32_t(steps.size());
+      current.winding = kind == 0x1000 ? PrimitiveWinding::Reverse :
+                        kind == 0x2000 ? PrimitiveWinding::Pass : PrimitiveWinding::TwoSided;
       ranges.push_back(current);
     } else if (kind == 0x4000) {
       current.stream = command & 0x0fff;
@@ -74,6 +80,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
     } else if (kind == 0x6000) {
       const auto channel = uint8_t((command >> 8) & 15);
       assignments.push_back({MaterialImageSource::Table, channel, uint8_t(command & 0xff)});
+      steps.push_back({PrimitivePolicyOperation::Texture, uint8_t(command & 0xff), channel});
       // Ordinary material texture overrides have additional visual/animation
       // policy. Do not pretend their slot-5 result is the pass default.
       if (channel == 5) {
@@ -96,6 +103,8 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
         }
         last_reflection_command = value;
       }
+    } else if ((command & 0xff00) == 0x0900) {
+      steps.push_back({PrimitivePolicyOperation::Alpha, uint8_t(command & 0xff)});
     } else if ((command & 0xff00) == 0x0200) {
       current.skin = DecodeNativeSkinBinding(commands.subspan(cursor, size_t(operands)));
       if (!current.skin)

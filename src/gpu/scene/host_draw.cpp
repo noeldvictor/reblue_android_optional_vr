@@ -143,6 +143,7 @@ struct SubDraw {
   NativeMaterialHandle native_material;
   uint16_t native_texture_recipe_mask = 0;
   bool native_uv_recipe = false;
+  bool native_primitive_policy = false;
   std::optional<NativeSkinBinding> skin;
   std::optional<bool> material_disables_shadow;
   std::optional<NativeReflectionRecipe> reflection;
@@ -210,6 +211,7 @@ struct SubDraw {
 
 struct NodeTemplate {
   SceneImportEpoch import_epoch;
+  std::optional<uint64_t> primitive_policy_stamp;
   u32 captured_frame = 0;
   u32 used_frame = 0;
   bool volatile_material = false;
@@ -340,6 +342,7 @@ struct Store {
   // Render-list entries built by the host instead of the interpreter.
   struct ListTemplate {
     SceneImportEpoch import_epoch;
+    std::optional<uint64_t> primitive_policy_stamp;
     std::vector<DeferredEntryRecipe> entries;
     bool matrix_matches = false;
     u32 captured_frame = 0;
@@ -831,6 +834,7 @@ bool MergeDraws(std::vector<SubDraw> &have, const std::vector<SubDraw> &now) {
     x.native_material = y.native_material;
     x.native_texture_recipe_mask = y.native_texture_recipe_mask;
     x.native_uv_recipe = y.native_uv_recipe;
+    x.native_primitive_policy = y.native_primitive_policy;
     x.material_disables_shadow = y.material_disables_shadow;
     // Keep each binding with its original inherited-state snapshot. Replacing
     // only the native half here can pair an old dynamic surface with a newly
@@ -1379,6 +1383,15 @@ void VerifyReport(Verify &vf) {
 
 } // namespace
 
+plume::RenderCullMode NativePrimitiveCullMode(PrimitiveCull cull) {
+  return cull == PrimitiveCull::Front ? plume::RenderCullMode::FRONT :
+         cull == PrimitiveCull::Back ? plume::RenderCullMode::BACK : plume::RenderCullMode::NONE;
+}
+std::optional<uint64_t> CurrentPrimitivePolicyStamp(const NodeTag &tag) {
+  const auto plan = FindNativePrimitivePlan(tag);
+  return plan && plan->known ? std::optional(plan->stamp) : std::nullopt;
+}
+
 void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
                      u32 primitive_type) {
   if (t_replaying)
@@ -1539,6 +1552,15 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
   d.primitive_type = primitive_type;
   d.alpha_threshold = Video::AlphaThreshold();
   if (d.indexed) {
+    if (const auto policy = FindNativePrimitivePolicy(tag, d.index_va, d.stream_va[0], d.start_index, d.count)) {
+      const bool same = NativePrimitiveCullMode(policy->cull) == s.pipelineState.cullMode &&
+                        (!policy->routing_known || policy->direct);
+      NativePrimitivePolicyCheck(same);
+      d.native_primitive_policy = same;
+      if (!same) p.replayable = false;
+    }
+  }
+  if (d.indexed) {
     if (const auto *textures = FindNativeMaterialTextures(tag, d.index_va, d.stream_va[0],
                                                         d.start_index, d.count)) {
       // Scene/reflection callbacks have separate ownership. Validate only the
@@ -1645,6 +1667,7 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
 
 void HostDrawCommit(const NodeTag &tag) {
   auto &p = t_pending;
+  const auto policy_stamp = p.valid && tag.valid ? CurrentPrimitivePolicyStamp(tag) : std::nullopt;
   // The draw hook has returned and released VideoState::mutex. Resolve the
   // captured selectors before taking the template-store lock or publishing
   // any template; a failed source check still refuses the complete node.
@@ -1759,6 +1782,7 @@ void HostDrawCommit(const NodeTag &tag) {
           return;
         }
         auto &t = st.templates[KeyOf(tag)];
+        t.primitive_policy_stamp = policy_stamp;
         t.import_epoch = ImportEpoch();
         t.used_frame = FrameStatFrameCount();
         if (t.draws.empty()) {
@@ -1851,6 +1875,7 @@ void HostDrawCommit(const NodeTag &tag) {
         ++st.volatile_count;
       } else {
         t.captured_frame = frame;
+        t.primitive_policy_stamp = policy_stamp;
       }
       p.valid = false;
       return;
@@ -1862,6 +1887,7 @@ void HostDrawCommit(const NodeTag &tag) {
     return;
   }
   NodeTemplate &t = st.templates[key];
+  t.primitive_policy_stamp = policy_stamp;
   t.import_epoch = ImportEpoch();
   t.used_frame = frame;
   // The cook's unit of work: a content key per sub-draw, over the state that
@@ -2053,12 +2079,20 @@ void HostListBuildCapture(const NodeTag &tag, u32 count_before) {
   if (!tag.valid || !REXCVAR_GET(bd_host_list_build))
     return;
   const u32 count_after = RenderListCount();
+  if (count_after == count_before) {
+    // A newly interpreted node no longer contributes deferred work. Keeping
+    // its old entry image would resurrect that work on the next replay.
+    auto &st = store(); std::lock_guard lock(st.mutex);
+    st.lists.erase(KeyOf(tag));
+    return;
+  }
   if (count_after <= count_before || count_after - count_before > 64)
     return;
   const u32 array = bd::mem::try_load<u32>(kRenderListVa + 12);
   if (!array)
     return;
   Store::ListTemplate lt;
+  lt.primitive_policy_stamp = CurrentPrimitivePolicyStamp(tag);
   lt.import_epoch = ImportEpoch();
   lt.captured_frame = FrameStatFrameCount();
   for (u32 i = count_before; i < count_after; ++i) {
@@ -2097,6 +2131,21 @@ bool HostSceneEye(float out[3]) {
     return false;
   std::memcpy(out, pr.vs[1], 12);
   return true;
+}
+
+void HostRefreshPrimitivePolicy(const NodeTag &tag) {
+  if (!tag.valid || tag.from_list) return;
+  const auto current = FindNativePrimitivePlan(tag);
+  auto &st = store(); std::lock_guard lock(st.mutex);
+  RefreshTemplates(st);
+  const auto key = KeyOf(tag);
+  const auto direct = st.templates.find(key);
+  const auto deferred = st.lists.find(key);
+  const bool same = (direct == st.templates.end() || PrimitivePlanMatches(direct->second.primitive_policy_stamp, current)) &&
+                    (deferred == st.lists.end() || PrimitivePlanMatches(deferred->second.primitive_policy_stamp, current));
+  if (same) return;
+  st.templates.erase(key); st.lists.erase(key); st.never.erase(key); st.runs.erase(key);
+  NativePrimitivePolicyRefresh();
 }
 
 bool HostDrawHasDrawTemplate(const NodeTag &tag) {
@@ -2217,6 +2266,7 @@ bool HostDrawReplay(const NodeTag &tag) {
     u32 mask = 0;
     std::array<float, 4> values[3];
     const NativeMaterialTextureValues *textures = nullptr;
+    std::optional<NativePrimitivePolicy> policy;
   };
   static thread_local std::vector<MaterialValues> native_values;
   const u32 frame = FrameStatFrameCount();
@@ -2276,6 +2326,11 @@ bool HostDrawReplay(const NodeTag &tag) {
       values.mask = 0;
       values.textures = nullptr;
       const auto &draw = t->draws[i];
+      values.policy.reset();
+      if (draw.native_primitive_policy) {
+        values.policy = FindNativePrimitivePolicy(tag, draw.index_va, draw.stream_va[0], draw.start_index, draw.count);
+        if (!values.policy || (values.policy->routing_known && !values.policy->direct)) return false;
+      }
       if (draw.native_texture_recipe_mask || draw.native_uv_recipe) {
         values.textures = FindNativeMaterialTextures(tag, draw.index_va, draw.stream_va[0],
                                                     draw.start_index, draw.count);
@@ -2910,7 +2965,12 @@ bool HostDrawReplay(const NodeTag &tag) {
     {
       std::lock_guard lock(s.mutex);
       s.pipelineState = d.pipelineState;
-      s.native_draw_pipeline = &d.pipelineState;
+      if (const auto &policy = native_values[di].policy) {
+        const auto cull = NativePrimitiveCullMode(policy->cull);
+        NativePrimitivePolicyNoteDraw(cull != s.pipelineState.cullMode);
+        s.pipelineState.cullMode = cull;
+      }
+      s.native_draw_pipeline = &s.pipelineState;
       for (u32 k = 0; k < 16; ++k) {
         if (d.scene_textures.UsesSlot(k)) {
           const auto &input = rs.scene_textures[k == kSceneTextureSlots[0] ? 0 : 1];

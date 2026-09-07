@@ -86,7 +86,7 @@ NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget) {
       if (!read())
         return result;
     if (command == 0xff) {
-      result.valid = DecodeMeshMaterials(words, result.ranges, &result.texture_assignments);
+      result.valid = DecodeMeshMaterials(words, result.ranges, &result.texture_assignments, &result.policy_steps);
       if (result.valid) {
         result.materials.reserve(result.ranges.size());
         for (const auto &range : result.ranges)

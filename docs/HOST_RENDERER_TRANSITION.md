@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after object-owned material image/UV desktop verification. The first
+Updated 2026-09-07 after native primitive-policy desktop verification. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -43,9 +43,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    shader-register ABI, `NodeTag`/source lookup and retained templates are not
    the finished contract.
    Shadow policy and ordered texture assignments are load-owned; object-level
-   image/UV publications now feed native material consumers. Next, encode explicit
-   opaque/alpha/deferred participation and cull/pass policy, then connect named
-   shader inputs and direct scene/shadow submission for a real rigid family.
+   image/UV publications now feed native material consumers. Ordinary alpha,
+   winding and direct/deferred policy now compose from owned programs/pass
+   inputs; live cull consumption passes the field check. Next, connect named
+   shader inputs and direct scene/shadow submission for one ordinary opaque
+   rigid field family (no skin or volume/special override dependency).
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -53,7 +55,10 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    and existing call graph locate producers and indirect/lifetime boundaries.
    Acceptance: the converted object loads, updates, draws in scene/shadow passes
    and reloads without guest rendering warm-up, captured templates or per-draw
-   console imports. Destroy import-source storage in fixtures before native
+   console imports. Run that family's cold-load/reload acceptance with its
+   interpreter and template capture disabled, not just declining to call them
+   when a warm cache happens to exist. Select and record the actual model,
+   material family and scene before claiming coverage. Destroy import-source storage in fixtures before native
    consumption. Verify generation reuse, async completion and late writers.
    Expand opaque rigid objects to alpha-tested/wind/translucent families without
    dropping deferred participants. Cook small batches under existing independent
@@ -79,7 +84,32 @@ Extend the existing scenario checker for reloads, battles and authored effects;
 empty queues, startup counters and water activity do not qualify those paths.
 No overall development-speed multiplier is established.
 
+Prioritize this first complete object over additional broad adapters. Each new
+adapter must name the remaining direct-object dependency it removes; reuse the
+existing native owners and submission backend. Keep shader/material fixtures
+source-free and incremental, then run one coherent field/pixel checkpoint.
+Extend the existing readiness-driven runner for targeted reload/shadow coverage;
+do not begin a bulk asset recook or a second renderer framework. Phase1/2 policy
+rules currently have CPU coverage only, and volume-dependent dual participation
+is explicitly unconverted. These are expansion work, not permission to silently
+drop participants from the initial acceptance scene.
+
 ## Latest qualified checkpoint
+
+Native primitive participation (2026-09-07): material15/CPU13, host67,167 source
+guards and49 scenario cases pass. Flat normal-MSAA/precache-on run915 adds45,313
+known plans,74,785 direct/14,419 deferred candidates,15,493 matching checks and
+59,292 native-cull replays in fresh post-event field windows. Zero mismatches;
+scope peak111,300 B under4 MiB. Prior geometry/pulling/material/image/UV/pose/
+table/shadow/movement gates also pass. One1920x1080 image inspected; known cliff
+artifacts and distant blur remain. No new raw/perf/cache/dumps; exact profile
+restored and equivalent predecessor evidence retired. Live cull changes and
+compound refreshes were zero: invalidation has pure-condition tests and atomic
+erase source guards, not runtime change qualification. Policy publication is
+currently phase0 only; volume effects, original pass/material callbacks, source
+index, shader ABI and templates remain. This is not direct native object drawing,
+reload/both-eye qualification or a measured speedup.
+Evidence: `research/20260907_0047_native-primitive-participation.md`.
 
 Object material textures (2026-09-07): material14/CPU12, host66,162 source guards
 and44 scenario cases pass. Flat normal-MSAA/precache-on run914 adds33,600 native

@@ -88,6 +88,9 @@ void TestNativeModelMaterials() {
   malformed = Mesh(10);
   malformed.program.valid = false;
   Require(!registry.Publish(4, {malformed}), "invalid program cannot carry ranges");
+  malformed = Mesh(10);
+  malformed.program.ranges[0].policy_step_end = 1;
+  Require(!registry.Publish(4, {malformed}), "missing primitive policy steps refused before publication");
   ModelMaterialImport unsupported;
   unsupported.source_mesh = 11;
   Require(registry.Publish(4, {Mesh(10), unsupported}) &&

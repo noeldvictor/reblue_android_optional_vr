@@ -196,6 +196,7 @@ REX_HOOK_RAW(bdSceneNodeDrawSingle) {
     // leaving the list to no one lost its translucent part on every replayed
     // frame (2026-09-03), and replaying the list while the interpreter also
     // ran would append it twice.
+    HostRefreshPrimitivePolicy(tag);
     const u32 list_status = HostListBuildStatus(tag);
     const bool has_draws = HostDrawHasDrawTemplate(tag);
     bool replayed = false;

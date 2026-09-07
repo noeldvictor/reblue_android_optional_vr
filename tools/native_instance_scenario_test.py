@@ -3,7 +3,7 @@ import re
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
-    verify_material_textures,
+    verify_material_textures, verify_primitive_policies,
 )
 
 
@@ -373,6 +373,57 @@ class MaterialTextureScenarioTest(unittest.TestCase):
             with self.assertRaises(Pending):
                 verify_material_textures(bad)
         self.assertEqual(verify_material_textures("\n".join(self.rows() + [
+            "[native-material-context] " + READY]))["draws_delta"], 50)
+
+
+class PrimitivePolicyScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = ("[native-primitive-policy] 100 plans 90 known 10 unknown; "
+                   "100 direct 0 deferred 0 suppressed candidates; "
+                   "100 reads 3 unavailable; 100 checks wrong 0; "
+                   "100 draws 0 cull changes 0 compound refreshes;")
+        rows[4] = rows[2].replace("100", "150").replace("90 known", "140 known")
+        return rows
+
+    def test_fresh_consumers_do_not_claim_unexercised_routing(self):
+        result = verify_primitive_policies("\n".join(self.rows()))
+        for name in ("plans_delta", "known_delta", "reads_delta", "checks_delta", "draws_delta"):
+            self.assertEqual(result[name], 50)
+        for name in ("deferred_candidates_delta", "suppressed_candidates_delta",
+                     "cull_changes_delta", "compound_refreshes_delta"):
+            self.assertEqual(result[name], 0)
+
+    def test_each_producer_and_consumer_must_advance(self):
+        text = "\n".join(self.rows())
+        for old, new in (("150 plans", "100 plans"), ("140 known", "90 known"),
+                         ("150 reads", "100 reads"), ("150 checks", "100 checks"),
+                         ("150 draws", "100 draws")):
+            with self.assertRaises(Pending):
+                verify_primitive_policies(text.replace(old, new))
+
+    def test_failures_cannot_be_hidden_by_later_success(self):
+        for bad in (self.rows()[2].replace("wrong 0", "wrong 1"),
+                    "[native-primitive-policy-mismatch] winding/participation"):
+            with self.assertRaises(ValueError):
+                verify_primitive_policies(bad + "\n" + "\n".join(self.rows()))
+
+    def test_startup_wrong_scene_and_cross_window_counters_do_not_qualify(self):
+        rows = self.rows()
+        for bad in ("\n".join(rows[1:]), "\n".join(rows).replace("field-state 0", "field-state 4"),
+                    "\n".join([rows[2], rows[4]] + [r for r in rows if "context" in r]),
+                    "\n".join(rows[:-1] + ["[native-material-context] " + READY, rows[-1]])):
+            with self.assertRaises(Pending):
+                verify_primitive_policies(bad)
+
+    def test_bounded_reset_and_lost_readiness(self):
+        with self.assertRaises(ValueError):
+            verify_primitive_policies("x" * (MAX_LOG_BYTES + 1))
+        for bad in ("\n".join(self.rows()).replace("150 draws", "10 draws"),
+                    "\n".join(self.rows() + ["[native-material-context] mode Loading"])):
+            with self.assertRaises(Pending):
+                verify_primitive_policies(bad)
+        self.assertEqual(verify_primitive_policies("\n".join(self.rows() + [
             "[native-material-context] " + READY]))["draws_delta"], 50)
 
 

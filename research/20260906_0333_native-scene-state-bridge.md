@@ -1701,3 +1701,61 @@ not zero. Images10,240,483 B,245,277 B headroom under the same10 MiB cap.
 End free at cleanup63,459,926,016 B (~59.10 GiB), drive-wide gain47,939,584 B from
 this turn's first read-only sample; only372,736 B attributed to cleanup. Retain
 the original ledger and3 GiB exception, without resetting/recrediting them.
+
+### Native primitive participation, same checkpoint (2026-09-07)
+
+Parentcf923aa; preceding turn was verified progress, pushed and clean. Current
+first free63,383,052,288 B. Source-only tracing follows the exact1000/2000/3000
+winding,0900 alpha/pass rules, pass helper8227FDC8 and volume-dependent dual
+direct/deferred path. Load-owned programs plus object-pass inputs now compose
+native cull/participation records. Fresh native cull consumers and whole-node
+compound invalidation are wired; volume-effect production and callbacks remain
+explicitly unconverted, not treated as opaque or silently dropped.
+
+Before verification outputs free63,355,101,184 B; existing material fixture
+7,129,853 B, aggregate build logs151,538 B. Reuse material15/CPU13 and host67.
+Plan <=4 MiB fixture/log growth, <=256 MiB host compile/link overlap; no guest/
+shader rebuild or asset cook. Same original ledger/start65,462,788,096 B,
+owner-approved3 GiB cap/floor62,509,998,080 B, diagnostics100 MiB/logs10 MiB/
+images10 MiB/raw0 unchanged. Existing wrapper enforces floor/log/timeout limits.
+Keep run914/material sanity image and all protected baseline/failure evidence
+until an equivalent new runtime/pixel replacement qualifies. No runtime started
+at this preflight; reconcile actual output bytes before that next producer.
+
+Material15/CPU13 and host67 passed; owned PIDs22788/12928/576 terminal,
+exit0. Fixture6.273 s build,0.10 s behavior/0.12 s CTest; host32 actual edges,
+no guest objects or shader rebuild.167 boundary guards pass. Fixture now
+7,268,861 B (+139,008), aggregate logs159,120 B (+7,582); exe48,266,240 B /
+PDB107,040,768 B (combined +171,520). No remaining renderer/compiler/linker/Ninja
+processes. Current free63,353,491,456 B; host terminal63,358,009,344 B. Unbaselined
+objects/metadata and concurrent volume writes are not falsely attributed.
+
+Run915 plan: reuse the previous field gates plus fresh primitive plans/known
+routing/checks/cull consumers, <=75 s flat normal-MSAA/precache-on run. Log
+<=400 KiB and one1920x1080 quality60 JPEG <=160 KiB, within245,277 B existing
+image overlap headroom. No new raw/perf/cache/dumps; explicit native policy
+setting, fail immediately on mismatch, original profile restored in finally.
+Same original cumulative floor/budgets remain enforced. Keep run914 and its
+material image until equivalent checks and actual replacement pixels pass.
+
+Run915 /PID31620 passed at00:45:14; runner exit0, all13 settings effective,
+exact116-byte profile restored, no owned producer or new raw/perf/cache/dumps.
+Fresh frame2040/2340 field windows add45,313 known plans,15,493 matching policy
+checks and59,292 native-cull replays. All prior gates pass, including movement.
+One133,740 B1920x1080 JPEG inspected, known artifacts/blur remain. Live compound
+refresh/cull changes0: not runtime-qualified. Full evidence and limits in
+`20260907_0047_native-primitive-participation.md`.
+
+Retired eight exact verified superseded outputs: run914 log/material image,
+material14/CPU12/host66 stdout/stderr.369,175 logical B; immediate free
+63,181,049,856 ->63,181,299,712 B, observed recovery249,856 B (244 KiB), once only.
+Protected raw/baseline/failure/motion evidence unchanged. Old reports/hashes
+remain; exact old runtime files no longer retained, build/test logs reproducible.
+
+Comparable fixture/log/image growth127,452 B: fixture+139,008, aggregate logs-540
+(now150,998 B), runtime log-10,673, image-343. New policy fixture/live-consumer
+coverage justifies this growth, replaced by purpose at next equivalent check.
+Exe/PDB grow171,520 B; other outputs lack complete byte baselines, not zero.
+Images10,240,140 B,245,620 B headroom. End free at cleanup63,181,299,712 B,
+drive-wide use201,752,576 B from current first63,383,052,288 B; identified outputs
+do not explain all volume activity. Same original3 GiB cap/floor and raw0 remain.

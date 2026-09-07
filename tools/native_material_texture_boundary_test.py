@@ -20,7 +20,7 @@ class MaterialTextureBoundaryTest(unittest.TestCase):
         self.assertIn("depth > kScopeDepth", self.bridge)
 
     def test_consumer_only_uses_owned_program_table_and_override_values(self):
-        consumer = self.bridge.split("const NativeMaterialTextureValues *FindNativeMaterialTextures(")[1]
+        consumer = self.bridge.split("NativeObjectTextureState::Mesh *PrepareMaterialMesh(")[1]
         consumer = consumer.split("void NativeMaterialTextureCheck")[0]
         for forbidden in ("Word(", "ReadMaterialTextureInputs", "ResolveGuestTexture", "CaptureNativeTexture",
                           "REX_LOAD", "bd::mem", "Video::"):
