@@ -138,6 +138,13 @@ std::optional<NativeTextureBinding> FindLoadedNativeTableTexture(uint32_t source
   return {};
 }
 
+NativeTextureTableHandle FindLoadedNativeTextureTable(uint32_t source_table) {
+  if (!REXCVAR_GET(bd_native_texture_tables)) return {};
+  auto &store = Tables(); std::lock_guard lock(store.mutex);
+  const auto it = store.tables.find(source_table);
+  return it == store.tables.end() ? nullptr : it->second.native;
+}
+
 void NativeTextureTableImageChanged(uint32_t source_image, NativeTextureTableSlot slot) noexcept {
   if (!source_image) return;
   auto &store = Tables(); std::lock_guard lock(store.mutex);

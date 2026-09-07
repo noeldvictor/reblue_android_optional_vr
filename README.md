@@ -58,15 +58,16 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-06): **2,973 primitive shadow-receiving policies
-are load-owned**, removing control-table reads from their native draw adapter.
-The material fixture, host65, 157 source guards and 39 scenario tests pass.
-Field run913 adds 15,019 matching receiver checks and 43,037 composed replays,
-alongside canonical geometry, native pulling and matching material/pose checks.
-One full-resolution image was inspected after movement. No new raw captures,
-performance CSVs or asset-cache files; superseded sanity outputs were removed.
-This is material ownership within the transitional draw path, not direct native
-scene/shadow submission. [Evidence](research/20260906_2344_load-owned-shadow-policy.md).
+Latest desktop checkpoint (2026-09-07): **object-level native image/UV snapshots
+now feed material draws**, using load-owned ordered texture assignments and
+native image-table leases. Field run914 adds 59,927 UV-composed replays and
+62,690 native image slots with 58,641 matching checks, zero mismatches/refusals.
+The material fixture, host66, 162 source guards and 44 scenario tests pass;
+canonical geometry, pulling, shadow policies, poses and movement also pass.
+One full-resolution image was inspected. No new raw captures, performance CSVs
+or asset-cache files; superseded sanity outputs were removed. This is ownership
+within the transitional draw path, not direct native scene/shadow submission.
+[Evidence and remaining boundaries](research/20260907_0016_object-material-textures.md).
 
 Canonical geometry owns named values and immutable vertex inputs independently
 of the imported declaration. Unsupported layouts still use transitional packed
@@ -88,9 +89,10 @@ The preceding texture-table checkpoint publishes native image
 leases after completed synchronous/asynchronous loading, with atomic image/table
 publication and generation-safe replacement/retirement. The field has 5,736
 tables /2.07 MiB. Comparison adds 22,326 matching lookups and 22,006 matching image
-checks; the new pulling-enabled field check adds 22,333 normal lookups with zero
-original comparison or fallback calls. Source selection/return ABI, dynamic
-overrides and remaining resource consumers are still adapters; the direct native
+checks; the latest field check adds 20,912 normal lookups with zero original
+comparison or fallback calls. Ordinary material draws now consume native leases
+and live object overrides as described above. Source publication/selection ABI,
+special override families and remaining resource consumers are still adapters; the direct native
 reflection consumer was not exercised. **Broader movement/reload sequences, both eyes and
 full-game qualification remain open.**
 [Texture-table implementation and evidence](research/20260906_1955_native-texture-tables.md).
@@ -125,7 +127,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive recipes and shadow policy, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, live texture overrides and draw routing, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive recipes/shadow policy/ordered texture assignments, object-published image/UV values, lighting/state producers, pass binders, water and Toon callbacks | Explicit opaque/alpha/deferred routing, remaining material/override families and bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |

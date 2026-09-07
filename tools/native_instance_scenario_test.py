@@ -3,6 +3,7 @@ import re
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
+    verify_material_textures,
 )
 
 
@@ -323,6 +324,56 @@ class ShadowPolicyScenarioTest(unittest.TestCase):
             verify_shadow_policies("x" * (MAX_LOG_BYTES + 1))
         with self.assertRaises(Pending):
             verify_shadow_policies("\n".join(self.rows()).replace("150 draw", "10 draw"))
+
+
+class MaterialTextureScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = ("[native-material-textures] 100 object publications 0 with overrides; "
+                   "3 unsupported 0 refused; 10 meshes prepared, peak 9000 bytes; "
+                   "100 reads 3 unavailable; 100 checks wrong 0; 100 draws 100 image slots 100 UV blocks;")
+        rows[4] = rows[2].replace("100", "150")
+        return rows
+
+    def test_fresh_consumers_do_not_claim_animated_override_coverage(self):
+        result = verify_material_textures("\n".join(self.rows()))
+        for name in ("publications_delta", "reads_delta", "checks_delta", "draws_delta",
+                     "image_slots_delta", "uv_blocks_delta"):
+            self.assertEqual(result[name], 50)
+        self.assertEqual(result["override_publications_delta"], 0)
+
+    def test_each_producer_and_consumer_must_advance(self):
+        text = "\n".join(self.rows())
+        for name in ("object publications", "reads", "checks", "draws", "image slots", "UV blocks"):
+            with self.assertRaises(Pending):
+                verify_material_textures(text.replace("150 " + name, "100 " + name))
+
+    def test_failures_cannot_be_hidden_by_later_success(self):
+        text = "\n".join(self.rows())
+        for bad in (self.rows()[2].replace("0 refused", "1 refused"),
+                    self.rows()[2].replace("wrong 0", "wrong 1"),
+                    self.rows()[2].replace("9000 bytes", "4194305 bytes"),
+                    "[native-material-texture-mismatch] visual 12345678 channel 16"):
+            with self.assertRaises(ValueError):
+                verify_material_textures(bad + "\n" + text)
+
+    def test_startup_wrong_scene_and_cross_window_counters_do_not_qualify(self):
+        rows = self.rows()
+        for bad in ("\n".join(rows[1:]), "\n".join(rows).replace("field-state 0", "field-state 4"),
+                    "\n".join([rows[2], rows[4]] + [r for r in rows if "context" in r]),
+                    "\n".join(rows[:-1] + ["[native-material-context] " + READY, rows[-1]])):
+            with self.assertRaises(Pending):
+                verify_material_textures(bad)
+
+    def test_bounded_reset_and_lost_readiness(self):
+        with self.assertRaises(ValueError):
+            verify_material_textures("x" * (MAX_LOG_BYTES + 1))
+        for bad in ("\n".join(self.rows()).replace("150 draws", "10 draws"),
+                    "\n".join(self.rows() + ["[native-material-context] mode Loading"])):
+            with self.assertRaises(Pending):
+                verify_material_textures(bad)
+        self.assertEqual(verify_material_textures("\n".join(self.rows() + [
+            "[native-material-context] " + READY]))["draws_delta"], 50)
 
 
 if __name__ == "__main__":

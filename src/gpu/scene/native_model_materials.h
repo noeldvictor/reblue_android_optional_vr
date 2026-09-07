@@ -28,6 +28,7 @@ struct NativeModelMaterialProgram {
   // Null is explicitly unconverted, never permission to discover it in this core.
   std::vector<std::shared_ptr<const NativeGeometry>> geometries;
   std::vector<NativeShadowPolicy> shadow_policies;
+  std::vector<MaterialImageAssignment> texture_assignments;
   bool valid = false;
 };
 

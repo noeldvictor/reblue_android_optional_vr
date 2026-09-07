@@ -8,6 +8,7 @@
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
+#include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/reflection_texture_import.h"
@@ -85,7 +86,7 @@ NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget) {
       if (!read())
         return result;
     if (command == 0xff) {
-      result.valid = DecodeMeshMaterials(words, result.ranges);
+      result.valid = DecodeMeshMaterials(words, result.ranges, &result.texture_assignments);
       if (result.valid) {
         result.materials.reserve(result.ranges.size());
         for (const auto &range : result.ranges)
@@ -235,6 +236,11 @@ std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {
 
 uint64_t LoadedNativeModelGeneration(uint32_t source_model) {
   return Models().Generation(source_model);
+}
+
+std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelMaterials(
+    uint32_t source_model, uint32_t source_mesh) {
+  return Models().Find(source_model, source_mesh);
 }
 
 std::shared_ptr<const NativeGeometry> FindLoadedNativeGeometry(
@@ -446,6 +452,7 @@ void NativeMaterialNoteReplay(uint32_t mask) {
             geometry_hits.load(), geometry_misses.load(), geometry_draws,
             geometry_checked, geometry_wrong);
     const auto assets = Library().Stats();
+    NativeMaterialTextureReport();
     BD_INFO("[native-material-assets] {} cooked, {} loaded, {} resident, {} memory hits; "
             "{} invalid, {} write failures, {} budget refusals; {} model recipe bytes",
             assets.cooked, assets.loaded, assets.resident, assets.memory_hits,

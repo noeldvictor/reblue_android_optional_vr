@@ -24,6 +24,11 @@ SHADOW_POLICY_METRIC = re.compile(
 SHADOW_RECEIVER_METRIC = re.compile(
     r"\[native-shadow\] receiver inputs checked (\d+) wrong (\d+) receiving (\d+); "
     r"replays composed (\d+) changed (\d+)")
+MATERIAL_TEXTURE_METRIC = re.compile(
+    r"\[native-material-textures\] (\d+) object publications (\d+) with overrides; "
+    r"(\d+) unsupported (\d+) refused; (\d+) meshes prepared, peak (\d+) bytes; "
+    r"(\d+) reads (\d+) unavailable; (\d+) checks wrong (\d+); "
+    r"(\d+) draws (\d+) image slots (\d+) UV blocks;")
 MOVEMENT_METRIC = re.compile(
     r"\[autoplay\] t ([\d.]+) stage (\S+) ready ([01]) walking ([01]) episode (\d+) "
     r"walk-s ([\d.]+) moved (\d+) distance ([\d.]+) position (\S+)")
@@ -185,6 +190,32 @@ def verify_shadow_policies(text):
             "replays_delta": b[8] - a[8]}
 
 
+def verify_material_textures(text):
+    """Require fresh native publication, matching capture and image/UV consumption."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("material-texture diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        if "[native-material-texture-mismatch]" in line:
+            raise ValueError("native material image/UV differs from source")
+        match = MATERIAL_TEXTURE_METRIC.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[3] or values[9] or values[5] > 4 * 1024 * 1024:
+                raise ValueError("material-texture publication refused, exceeded budget or differs from source")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if not b[4] or any(b[i] < a[i] for i in range(len(b))) or any(
+            b[i] - a[i] < 32 for i in (0, 6, 8, 10, 11, 12)):
+        raise Pending("native object publications, matching checks and image/UV draws must advance")
+    return {"publications_delta": b[0] - a[0], "override_publications_delta": b[1] - a[1],
+            "unsupported": b[2], "peak_bytes": b[5], "reads_delta": b[6] - a[6],
+            "unavailable": b[7], "checks_delta": b[8] - a[8], "draws_delta": b[10] - a[10],
+            "image_slots_delta": b[11] - a[11], "uv_blocks_delta": b[12] - a[12]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -226,6 +257,7 @@ def main():
                         help="require fresh canonical draws and native vertex pulling")
     parser.add_argument("--movement", action="store_true")
     parser.add_argument("--shadow-policies", action="store_true")
+    parser.add_argument("--material-textures", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -241,6 +273,7 @@ def main():
         canonical = verify_canonical_geometry(text) if args.canonical_geometry else None
         movement = verify_movement(text) if args.movement else None
         shadow = verify_shadow_policies(text) if args.shadow_policies else None
+        textures = verify_material_textures(text) if args.material_textures else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -258,6 +291,8 @@ def main():
         print("PASS: post-event observed player movement " + ", ".join(f"{k}={v}" for k, v in movement.items()))
     if shadow is not None:
         print("PASS: post-event owned shadow policies " + ", ".join(f"{k}={v}" for k, v in shadow.items()))
+    if textures is not None:
+        print("PASS: post-event native material textures " + ", ".join(f"{k}={v}" for k, v in textures.items()))
     return 0
 
 

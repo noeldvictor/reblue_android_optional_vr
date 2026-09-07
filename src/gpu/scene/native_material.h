@@ -11,6 +11,9 @@
 
 namespace bd::gpu::scene {
 struct NativeGeometry;
+struct ModelMaterialImport;
+std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelMaterials(
+    uint32_t source_model, uint32_t source_mesh);
 uint64_t LoadedNativeModelGeneration(uint32_t source_model);
 std::shared_ptr<const NativeGeometry> FindLoadedNativeGeometry(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,

@@ -59,6 +59,7 @@ size_t ModelMaterialRegistry::RetainedBytes(
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
     add(mesh.program.geometries.capacity(), sizeof(std::shared_ptr<const NativeGeometry>));
     add(mesh.program.shadow_policies.capacity(), sizeof(NativeShadowPolicy));
+    add(mesh.program.texture_assignments.capacity(), sizeof(MaterialImageAssignment));
     add(mesh.source_bindings.capacity(), sizeof(ModelPrimitiveSourceBinding));
   }
   return bytes;
@@ -93,6 +94,15 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
       return false;
     }
     previous = mesh.source_mesh;
+    uint32_t end = 0;
+    for (const auto &range : mesh.program.ranges) {
+      if (range.texture_assignment_end < end ||
+          range.texture_assignment_end > mesh.program.texture_assignments.size()) {
+        ++stats_.refused;
+        return false;
+      }
+      end = range.texture_assignment_end;
+    }
   }
   auto model = std::make_shared<Model>();
   model->generation = stats_.published + 1;

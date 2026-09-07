@@ -1635,3 +1635,69 @@ Exe/PDB grow35,840 B. Source/docs/Git/helpers, objects and build metadata lack
 complete byte baselines; not falsely zero. End free at cleanup~59.06 GiB,
 drive-wide gain290,381,824 B from the initial read-only preflight; only425,984 B
 attributed to our cleanup. Keep the same original ledger/approved3 GiB cap.
+
+### Object material texture publication, same checkpoint (2026-09-07)
+
+Parent2aaf549. The previous goal turn made verified source/runtime progress and
+pushed it. Current turn first measured free63,411,986,432 B, clean tree. Source
+inspection found that null image selection keeps the prior binding and early
+image overrides skip late overrides. A last-selector-only recipe is insufficient.
+The new ordered program, checked object-level override importer, native table
+leases and object-scope consumer preserve these rules; direct submission remains
+the full next outcome, not replaced by a template-only completion claim.
+
+Before outputs free **63,398,559,744 B**, material fixture6,962,620 B, aggregate
+build logs147,849 B. Reuse material fixture14/CPU12 and configured host66. Plan
+<=8 MiB fixture/log growth, <=256 MiB host compile/link overlap. Same original
+starting free65,462,788,096 B, approved3 GiB cap, operational floor62,509,998,080 B,
+diagnostics100 MiB/logs10 MiB/images10 MiB, raw0. Use the existing bounded wrapper
+outside the restricted process context that stalled Ninja last time; no duplicate
+job or guest/shader rebuild. GPU/pixel verification remains pending until focused
+tests/build pass and its producer budget is reconciled. Keep prior run913/field
+image and baseline/failure evidence until equivalent replacements are validated.
+
+Material14/CPU12 and host66 pass (owned build PID30292 terminal, exit0).
+Codegen reports its module up to date; no guest objects or shaders rebuilt.
+162 boundary guards and44 scenario tests pass. Material fixture7,129,853 B
+(+167,233 B), build logs155,971 B (+8,122 B); exe48,250,368 B/PDB106,885,120 B
+(combined +410,936 B). The scoped cache/dump inventory has no new files and
+there are no remaining renderer/compiler/linker/Ninja processes. Drive free
+63,063,465,984 B is lower than the build's63,381,757,952 B terminal sample;
+identified task outputs do not account for that drive-wide change. Other-volume
+writes/unbaselined build objects are not falsely credited to cleanup or zero.
+The same operational floor remains enforced, with553,467,904 B headroom.
+
+Runtime914 plan: one <=75 s normal flat/MSAA/precache-on run, requiring fresh
+post-event canonical/geometry/material/pose/table/shadow/movement gates and new
+object publication/image/UV consumers. At most400 KiB run log and one1920x1080
+quality60 JPEG <=160 KiB, within245,278 B remaining image overlap. No raw/perf/
+cache/dump growth; original profile SHA remains2f1bc38d...f38e23b0. The existing
+wrapper bounds aggregate diagnostics and cumulative free space, terminates only
+its renderer and restores exact profile bytes in finally. Keep run913/image
+until equivalent replacement coverage and actual pixels are validated.
+
+Run914 /PID25128 (00:13:59..00:14:58) passes every requested post-event field
+gate:33,600 fresh object publications,58,641 matching material-image/UV checks,
+59,927 UV-composed replays,62,690 native image slots,0 mismatches/refusals;
+canonical/material/geometry/pose/table/shadow/movement checks also pass. One
+1920x1080 quality60 JPEG134,083 B inspected; background artifacts/blur remain,
+not sequence/reload/both-eye qualification. All12 settings effective, exact
+116-byte profile restored, no owned producer left, no new raw/perf/cache/dumps.
+Full evidence: `20260907_0016_object-material-textures.md`.
+
+After equivalent replacement validation, removed eight exact superseded outputs:
+run913 log/shadow sanity image and material13/CPU11/host65 stdout/stderr.
+364,409 logical B; immediate free63,459,553,280 ->63,459,926,016 B, measured
+reclaimed372,736 B, counted once. Prior reports/hashes remain; exact old runtime
+image/log files no longer retained. Protected raw and baseline/failure/motion
+images unchanged. Build/test outputs can be regenerated.
+
+Comparable retained material fixture/log/image growth171,999 B: fixture+167,233,
+aggregate build logs+3,689 (now151,538 B), replacement run+1,076/image+1 B.
+This retains new source-free texture/UV assignment and live consumer coverage;
+replace evidence by purpose at the next equivalent qualification. Exe/PDB grow
+410,936 B; objects/metadata/source/docs/helpers/Git lack complete byte baselines,
+not zero. Images10,240,483 B,245,277 B headroom under the same10 MiB cap.
+End free at cleanup63,459,926,016 B (~59.10 GiB), drive-wide gain47,939,584 B from
+this turn's first read-only sample; only372,736 B attributed to cleanup. Retain
+the original ledger and3 GiB exception, without resetting/recrediting them.

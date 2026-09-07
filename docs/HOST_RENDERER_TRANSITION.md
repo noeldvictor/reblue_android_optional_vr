@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after load-owned shadow-policy desktop verification. The first
+Updated 2026-09-07 after object-owned material image/UV desktop verification. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -42,11 +42,13 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    backend. Canonical rigid values now draw on desktop; remaining packed layouts,
    shader-register ABI, `NodeTag`/source lookup and retained templates are not
    the finished contract.
-   Shadow-receiving policy is now load-owned too. Next, represent material
-   texture selection and live object UV/image overrides at their producers,
-   together with explicit opaque/alpha/deferred routing. Do not freeze animated
-   overrides into mesh assets or assume every strip range is opaque. These are
-   prerequisites for the named native shaders and direct scene/shadow consumer.
+   Shadow policy and ordered texture assignments are load-owned; object-level
+   image/UV publications now feed native material consumers. Next, encode explicit
+   opaque/alpha/deferred participation and cull/pass policy, then connect named
+   shader inputs and direct scene/shadow submission for a real rigid family.
+   Preserve the ordered null/override semantics and extend unsupported families;
+   do not freeze animated overrides into mesh assets or assume every strip
+   range is opaque. Object/pass source setup and replay templates remain.
    The [source map](../research/20260906_1531_static-model-ownership-frontier.md)
    and existing call graph locate producers and indirect/lifetime boundaries.
    Acceptance: the converted object loads, updates, draws in scene/shadow passes
@@ -78,6 +80,20 @@ empty queues, startup counters and water activity do not qualify those paths.
 No overall development-speed multiplier is established.
 
 ## Latest qualified checkpoint
+
+Object material textures (2026-09-07): material14/CPU12, host66,162 source guards
+and44 scenario cases pass. Flat normal-MSAA/precache-on run914 adds33,600 native
+object publications (300 containing override records),76,625 material reads,
+58,641 matching checks,59,927 UV-composed draws and62,690 native image slots in
+fresh post-event field windows. Zero mismatches/refusals; peak object-scope
+storage110,640 B under4 MiB. Canonical/geometry/material/pose/table/shadow/movement
+gates also pass. One1920x1080 image inspected; prior background artifacts/blur
+remain. No new raw/perf/cache/dump output; profile restored exactly, equivalent
+prior component evidence retired. Source object/pass setup, unsupported/special
+override families, pass/alpha/deferred routing, shader ABI, source index and
+templates remain. This is not a direct static-object path, complete animated
+override/reload/both-eye qualification or a measured speedup.
+Evidence: `research/20260907_0016_object-material-textures.md`.
 
 Load-owned shadow policy (2026-09-06): material13/CPU11, host65, 157 source guards
 and39 scenario cases pass. Flat normal-MSAA/precache-on run913 owns2,973 policies

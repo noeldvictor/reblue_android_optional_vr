@@ -6,6 +6,7 @@
  */
 #pragma once
 #include "gpu/scene/native_skin.h"
+#include "gpu/scene/native_material_textures.h"
 
 #include <array>
 #include <cstddef>
@@ -52,6 +53,7 @@ struct NativeMaterialRange {
   uint16_t stream = 0;
   // Import-only index into the model's control table, not a shader bool value.
   uint16_t control_record = 0xffff;
+  uint32_t texture_assignment_end = 0;
 };
 
 // Operand framing is shared by the bounded guest reader and offline decoder.
@@ -62,7 +64,8 @@ int MeshCommandOperands(uint16_t command);
 // phase 0; the adapter must not apply it to phase 1's shader/colour overrides.
 // Failure is transactional, including truncated operands and missing terminator.
 bool DecodeMeshMaterials(std::span<const uint16_t> commands,
-                         std::vector<NativeMaterialRange> &out);
+                         std::vector<NativeMaterialRange> &out,
+                         std::vector<MaterialImageAssignment> *textures = nullptr);
 
 // Compose only fully known values; no staging globals or sibling draw state.
 // Specular power is written by the game only when the visual permits it.

@@ -51,6 +51,7 @@
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/native_instance_bridge.h"
+#include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/host_frustum_bridge.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/shadow_fit.h"
@@ -414,5 +415,6 @@ REX_HOOK_RAW(bdSceneNodeCullTraverse) {
   const u32 view = bd::mem::try_load<u32>(kRenderViewIdVa);
   if (view == 0 && REXCVAR_GET(bd_walk_skip_stubs) && !REXCVAR_GET(bd_reflections))
     return;
+  bd::gpu::scene::NativeObjectTextureScope textures(ctx.r4.u32);
   Walk(ctx, base, ctx.r3.u32, ctx.r4.u32);
 }

@@ -36,10 +36,12 @@ int MeshCommandOperands(uint16_t command) {
 }
 
 bool DecodeMeshMaterials(std::span<const uint16_t> commands,
-                         std::vector<NativeMaterialRange> &out) {
+                         std::vector<NativeMaterialRange> &out,
+                         std::vector<MaterialImageAssignment> *textures) {
   if (commands.size() > 65536)
     return false;
   std::vector<NativeMaterialRange> ranges;
+  std::vector<MaterialImageAssignment> assignments;
   NativeMaterialRange current;
   int last_reflection_command = -1;
   constexpr float byte_scale = 1.0f / 255.0f;
@@ -50,6 +52,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       return false;
     if (command == 0xff) {
       out = std::move(ranges);
+      if (textures) *textures = std::move(assignments);
       return true;
     }
     const uint16_t kind = command & 0xf000;
@@ -59,6 +62,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       // triangle strip; the second operand is StartIndex, not a byte offset.
       current.index_count = uint32_t(commands[cursor]) + 2;
       current.first_index = commands[cursor + 1];
+      current.texture_assignment_end = uint32_t(assignments.size());
       ranges.push_back(current);
     } else if (kind == 0x4000) {
       current.stream = command & 0x0fff;
@@ -67,11 +71,15 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       current.index_record = command & 0x0fff;
     } else if (kind == 0xe000) {
       current.control_record = command & 0x0fff;
-    } else if (kind == 0x6000 && ((command >> 8) & 15) == 5) {
+    } else if (kind == 0x6000) {
+      const auto channel = uint8_t((command >> 8) & 15);
+      assignments.push_back({MaterialImageSource::Table, channel, uint8_t(command & 0xff)});
       // Ordinary material texture overrides have additional visual/animation
       // policy. Do not pretend their slot-5 result is the pass default.
-      current.reflection.source = ReflectionTextureSource::Unknown;
-      current.reflection.table_index = 0;
+      if (channel == 5) {
+        current.reflection.source = ReflectionTextureSource::Unknown;
+        current.reflection.table_index = 0;
+      }
     } else if ((command & 0xff00) == 0x0600) {
       const uint8_t value = command & 0xff;
       // loc_82281264 elides the whole repeated command, even after another
@@ -79,6 +87,8 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       if (last_reflection_command != value) {
         current.reflection.enabled = value != 255;
         if (value != 255) {
+          // The separate native reflection producer owns this assignment.
+          assignments.push_back({MaterialImageSource::Unknown, 5});
           current.reflection.source = value == 254
               ? ReflectionTextureSource::PassDefault
               : ReflectionTextureSource::Table;

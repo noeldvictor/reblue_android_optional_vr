@@ -75,6 +75,7 @@
 #include "gpu/scene/native_mesh.h"
 #include "gpu/shaders/shader_constants.h"
 #include "gpu/scene/native_material.h"
+#include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_texture_table_bridge.h"
 #include "gpu/scene/native_texture_table_source.h"
@@ -140,6 +141,8 @@ struct FetchDelta {
 // One of a node's draws.
 struct SubDraw {
   NativeMaterialHandle native_material;
+  uint16_t native_texture_recipe_mask = 0;
+  bool native_uv_recipe = false;
   std::optional<NativeSkinBinding> skin;
   std::optional<bool> material_disables_shadow;
   std::optional<NativeReflectionRecipe> reflection;
@@ -826,6 +829,8 @@ bool MergeDraws(std::vector<SubDraw> &have, const std::vector<SubDraw> &now) {
     x.primitive_type = y.primitive_type;
     x.alpha_threshold = y.alpha_threshold;
     x.native_material = y.native_material;
+    x.native_texture_recipe_mask = y.native_texture_recipe_mask;
+    x.native_uv_recipe = y.native_uv_recipe;
     x.material_disables_shadow = y.material_disables_shadow;
     // Keep each binding with its original inherited-state snapshot. Replacing
     // only the native half here can pair an old dynamic surface with a newly
@@ -1533,6 +1538,28 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
   d.start_vertex = q.start_vertex;
   d.primitive_type = primitive_type;
   d.alpha_threshold = Video::AlphaThreshold();
+  if (d.indexed) {
+    if (const auto *textures = FindNativeMaterialTextures(tag, d.index_va, d.stream_va[0],
+                                                        d.start_index, d.count)) {
+      // Scene/reflection callbacks have separate ownership. Validate only the
+      // ordinary channels this model program actually supplies before replacing
+      // any template field; never infer ownership from equal neighbouring state.
+      for (u32 channel = 0; channel < 16; ++channel) {
+        if (channel == 5 || p.scene_texture_recipe.UsesSlot(channel) ||
+            !(textures->image_mask & (1u << channel))) continue;
+        const bool same = textures->images[channel] == CaptureNativeTexture(s.textures[channel]);
+        NativeMaterialTextureCheck(same, channel, tag.visual_va);
+        if (same) d.native_texture_recipe_mask |= uint16_t(1u << channel);
+        else p.replayable = false;
+      }
+      if (textures->owns_uv) {
+        const bool same = std::memcmp(textures->uv.data(), t_vs_block + 2 * 16, 16) == 0;
+        NativeMaterialTextureCheck(same, 16, tag.visual_va);
+        d.native_uv_recipe = same;
+        if (!same) p.replayable = false;
+      }
+    }
+  }
   if (p.shadow_sampling)
     CheckNativeShadowSampling(*p.shadow_sampling, t_ps_block);
   if (d.indexed && REXCVAR_GET(bd_native_shadow_inputs))
@@ -2189,6 +2216,7 @@ bool HostDrawReplay(const NodeTag &tag) {
   struct MaterialValues {
     u32 mask = 0;
     std::array<float, 4> values[3];
+    const NativeMaterialTextureValues *textures = nullptr;
   };
   static thread_local std::vector<MaterialValues> native_values;
   const u32 frame = FrameStatFrameCount();
@@ -2246,6 +2274,15 @@ bool HostDrawReplay(const NodeTag &tag) {
     for (size_t i = 0; i < t->draws.size(); ++i) {
       auto &values = native_values[i];
       values.mask = 0;
+      values.textures = nullptr;
+      const auto &draw = t->draws[i];
+      if (draw.native_texture_recipe_mask || draw.native_uv_recipe) {
+        values.textures = FindNativeMaterialTextures(tag, draw.index_va, draw.stream_va[0],
+                                                    draw.start_index, draw.count);
+        if (!values.textures || (draw.native_uv_recipe && !values.textures->owns_uv) ||
+            (values.textures->image_mask & draw.native_texture_recipe_mask) != draw.native_texture_recipe_mask)
+          return false; // fresh publication unavailable: interpret before issuing any draws
+      }
       if (REXCVAR_GET(bd_native_materials) && t->draws[i].native_material)
         values.mask = EvaluateNativeMaterial(tag, t->draws[i].native_material->asset,
                                               values.values);
@@ -2302,6 +2339,8 @@ bool HostDrawReplay(const NodeTag &tag) {
       for (const RegDelta &r : d.vs_delta) {
         if (r.reg < kPassVsRegs)
           continue; // the pass camera: composed below
+        if (r.reg == 2 && d.native_uv_recipe)
+          continue; // this primitive's live UV values, not sibling register history
         if (!r.stable && (!v || v->vs_frame[r.reg] != frame)) {
           ++st.stale_bail;
           // Which registers keep a node interpreting for want of a fresh
@@ -2714,6 +2753,8 @@ bool HostDrawReplay(const NodeTag &tag) {
     for (const RegDelta &r : d.vs_delta) {
       if (r.reg < kPassVsRegs)
         continue;
+      if (r.reg == 2 && d.native_uv_recipe)
+        continue;
       std::memcpy(t_vs_block + r.reg * 16, r.stable ? r.value : v->vs[r.reg], 16);
     }
     for (const RegDelta &r : d.ps_delta) {
@@ -2819,6 +2860,14 @@ bool HostDrawReplay(const NodeTag &tag) {
     }
     plume::RenderSamplerDesc native_samplers[16];
     auto native_textures = d.native_textures;
+    if (const auto *textures = native_values[di].textures) {
+      for (u32 channel = 0; channel < 16; ++channel)
+        if (d.native_texture_recipe_mask & (1u << channel))
+          native_textures[channel] = textures->images[channel];
+      if (d.native_uv_recipe)
+        std::memcpy(t_vs_block + 2 * 16, textures->uv.data(), 16); // temporary shader ABI boundary
+      NativeMaterialTextureNoteDraw(d.native_texture_recipe_mask, d.native_uv_recipe);
+    }
     if (d.scene_textures.roles) {
       ++t_scene_texture_stats.draws;
       for (u32 i = 0; i < kSceneTextureSlots.size(); ++i) {
