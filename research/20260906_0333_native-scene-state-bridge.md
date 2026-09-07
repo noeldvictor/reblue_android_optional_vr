@@ -2766,3 +2766,70 @@ recorded; supervisors preserved the original floor. No more build/run queued.
 The next producer must remeasure/reconcile this same budget before launching;
 only135,188,480 B remained above its operational floor at cleanup, not a new
 allowance. New raw stays0 and the protected historical archive is unchanged.
+
+### Selected-asset reload continuation (2026-09-07)
+
+Same original65,462,788,096 B start, owner3 GiB exception and
+62,509,998,080 B operational floor; no budget reset. Before new outputs,
+losslessly NTFS-compressed64 already-retained capture files in the existing
+top-level logs/capture directory: frame_1788581218_0.raw through
+frame_1788581219_63.raw,530,842,880 logical B. Exact regular-file names,
+pre-September6 timestamps, parent paths and non-reparse status were checked.
+All64 SHA-256 values matched before/after; no content/path/file-count change,
+deletion, archive copy or new raw allowance. Trial file compressed to1,495,040 B;
+its hash remains12A25FE9279BFDF5C8B384CE139BD3B5C8737A2727A6F1E286B73CE0E512626A.
+Trial free63,113,867,264 ->63,120,060,416 B; remaining63 files
+63,115,436,032 ->63,386,419,200 B. Combined observed gain277,176,320 B,
+counted once. Batch session96070 completed63/63 in9.714 s; no producer remains.
+Compression is reversible with compact /U given sufficient expansion room.
+The separate roughly473 MiB earlier free-space increase is unattributed,
+not credited as cleanup. Protected raw logical union remains252,177,116,500 B.
+
+11:26 preflight63,374,901,248 B free, no renderer/build/compact processes.
+Exact116 B owner profile hash still2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+Existing aggregate build logs184,150 B. Planned minimum outputs: existing
+post-output CPU target23/test8 and incremental host99, estimated160 MiB peak
+overlap, enforced256 MiB per-producer free-drop and original floor;300 s timeout,
+10 MiB aggregate logs. These connect actual source destruction and native
+submission/emission/fence generations to a same-process title round trip.
+289 Python source/scenario checks pass. No shaders, asset cooking, new build
+trees or raw captures. Retain replacement build/test evidence after validation;
+runtime/pixel acceptance and its exact bounded output accounting remain pending.
+
+Output23/PID28788 failed on the Windows max macro; corrected locally before
+output24/PID25660 passed. CPU8/PID29008 passes in0.40 s. Host99/PID30444
+failed on a missing instance include, host100/PID27164 on an anonymous-namespace
+autoplay cvar link; host101/PID30008 then passed. Host102/PID28268 adds explicit
+output-window baseline records and passes one-source rebuild/link in3.36 s.
+All codegen passes report0 written/up to date; no guest objects rebuilt.
+292 Python checks pass. These attempts share the original budget and their
+small failed logs remain until replacement runtime evidence is validated.
+
+Pre-runtime free63,344,873,472 B. Extend the same existing runner for one
+180 s mono title round trip:800 KiB total log, each field epoch still400 KiB,
+one final <=160 KiB JPEG within unchanged10 MiB aggregate image limit,
+192 MiB supervised free-drop and original floor. New raw/perf/cook/dump
+allowance0. Two independently readiness-gated native output windows plus
+source destruction and old GPU-fence retirement are required; failures do
+not qualify reload. Exact profile restoration/owned process shutdown remain
+in finally. No shader/GPU fixture rerun for unchanged shader programs.
+
+939/PID24732 ended11:34:51 after a real title round trip but failed sampling
+acceptance. Selected93 retired1379 draws per view, then206/instance384 rendered
+again. The600-emission cold prefix lacked two fresh caster/admission windows;
+later gameplay retired206 before the wrapper refused extra lifetime events.
+Retained failed log520,428 B, no image/raw/perf/cook/dump; exact profile restored.
+Source/fixture regression uses the observed guard-before-context ordering and
+now requires900 emitted instances per consumer per field epoch, without weaker
+freshness.293 Python checks pass; output25/PID27012 and CPU9/PID27176 pass in
+0.40 s CTest. Host103/PID26000 passes3.32 s incremental one-source/link,
+codegen0 written/up to date; exe48,547,840/PDB108,756,992 B. No owned producers.
+
+After replacements passed, removed18 old reproducible build/test logs:
+host99/100/101/102,output22/23/24,CPU7/8 stdout/stderr.14,264 logical B;
+free63,330,750,464 ->63,330,783,232 B,32,768 measured B reclaimed once.
+The earlier277,176,320 B compression gain is separate and not counted again.
+Retain host103/output25/CPU9,938 passing pixels/log and failed939 until its
+corrected runtime passes. No game/source/profile/build tree or raw deleted.
+The next retry uses the same180 s/800 KiB/160 KiB JPEG/192 MiB drop/original
+floor, not another budget. See20260907_1140_native-rigid-reload.md for evidence.

@@ -6,6 +6,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeRigidBoundaryTest(unittest.TestCase):
+    def test_reload_uses_actual_source_and_gpu_lifetimes(self):
+        material = (ROOT / "src/gpu/scene/native_material.cpp").read_text()
+        retire = material.split("REX_HOOK_RAW(sub_8227EBE8) {", 1)[1]
+        self.assertLess(retire.index("__imp__sub_8227EBE8(ctx, base)"),
+                        retire.index("NoteNativeRigidSourceRetired(generation)"))
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        self.assertIn("NoteNativeRigidSubmitted(item->model_generation,item->instance,item->view)", direct)
+        self.assertIn("NoteNativeRigidFenceRetired(record->model_generation,record->view)", direct)
+        bridge = (ROOT / "src/gpu/scene/native_rigid_lifecycle_bridge.cpp").read_text()
+        self.assertIn("REXCVAR_DEFINE_BOOL(bd_native_rigid_reload, false", bridge)
+        self.assertIn("REX_HOOK_RAW(SequenceControl_vf02)", bridge)
+        self.assertIn("RigidFindSequenceByName(sequence,0x82065008)", bridge)
+        for forbidden in ("Models().Retire", "DrainNativeRigidDrawsLocked", "HostDrawReplay", "CreateProcess"):
+            self.assertNotIn(forbidden, bridge)
+
     def test_hard_off_selection_precedes_pose_fallback_and_every_legacy_path(self):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
         guard = walk.index("RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id)")
@@ -36,7 +51,8 @@ class NativeRigidBoundaryTest(unittest.TestCase):
                          "store.scene_emitted += instances", "draw.bindings.set_count = 3"):
             self.assertIn(required, direct)
         emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
-        self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count)", emitter)
+        self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,", emitter)
+        self.assertIn("d.native_rigid ? d.native_rigid->model_generation : 0", emitter)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
         preview = lights.split("PrepareNativeSelectedLightValues(uint32_t selection)", 1)[1].split(
             "std::optional<NativeSelectedLights> FindNativeSelectedLights", 1)[0]

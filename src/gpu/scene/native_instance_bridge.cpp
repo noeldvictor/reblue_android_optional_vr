@@ -227,12 +227,14 @@ void RequireNativeRigidWalkNode(const std::shared_ptr<const NativeModelRenderDat
   thread_local uint64_t scene = 0, shadow = 0;
   thread_local uint32_t reported = 0;
   thread_local bool first = true;
+  thread_local uint64_t reported_generation = 0;
   ++(decision.route == NativeRigidRoute::Scene ? scene : shadow);
   const auto frame = FrameStatFrameCount();
-  if (first || frame - reported >= 300) {
+  if (first || reported_generation != model->Generation() || frame - reported >= 300) {
     BD_INFO("[native-rigid-hard-off] frame {} scene checks {} shadow checks {}; node {} generation {}; load-owned admission before culling, legacy entry disabled",
         frame, scene, shadow, node, model->Generation());
     first = false; reported = frame;
+    reported_generation = model->Generation();
   }
 }
 

@@ -616,6 +616,80 @@ def verify_movement(text):
             "distance_delta": round(b[7] - a[7], 6), "walk_seconds": b[5]}
 
 
+def split_rigid_reload(text):
+    """Validate one bounded same-process round trip; return independent epochs.
+
+    Lifetime records are not pixels. Each returned <=400 KiB epoch must still
+    pass the existing fresh-field/consumer checks; no across-load counter deltas.
+    """
+    if len(text.encode("utf-8")) > 2 * MAX_LOG_BYTES:
+        raise ValueError("reload diagnostic exceeds 800 KiB")
+    if re.search(r"\[(?:error|critical)\]|\[native-rigid-reload\] refused:", text):
+        raise ValueError("runtime reload refused or reported an error")
+    complete = list(re.finditer(r"\[native-rigid-reload\] complete old-generation (\d+) new-generation (\d+) old-instance (\d+) new-instance (\d+);", text))
+    if not complete:
+        raise Pending("need completed same-process selected-asset reload")
+    if len(complete) != 1:
+        raise ValueError("multiple reload completions in one diagnostic")
+    old_gen, new_gen, old_instance, new_instance = map(int, complete[0].groups())
+    if not all((old_gen,new_gen,old_instance,new_instance)) or old_gen == new_gen or old_instance == new_instance:
+        raise ValueError("reload did not produce fresh model and instance identities")
+    pattern = re.compile(r"\[native-rigid-lifecycle\] (\S+) generation (\d+) instance (\d+) source-retired ([01]) scene (\d+)/(\d+)/(\d+) shadow (\d+)/(\d+)/(\d+);")
+    rows = [(m.start(), m.end(), m[1], tuple(map(int,m.groups()[1:]))) for m in pattern.finditer(text)]
+    expected = [("loaded",old_gen), ("cold-qualified",old_gen), ("source-retired",old_gen),
+                ("closed-at-title",old_gen), ("loaded",new_gen), ("reload-qualified",new_gen)]
+    if [(r[2],r[3][0]) for r in rows] != expected:
+        raise ValueError("missing, duplicate or reordered selected source lifetime events")
+    request = re.search(r"\[native-rigid-reload\] title requested generation (\d+) instance (\d+) task-uid ([1-9]\d*) sequence-id ([1-9]\d*)",text)
+    if (not request or tuple(map(int,request.groups()[:2])) != (old_gen,old_instance) or
+            not rows[1][1] < request.start() < rows[2][0] or complete[0].start() < rows[5][1]):
+        raise ValueError("return-to-title request or completion ordering is invalid")
+    for _, _, event, values in rows:
+        gen, instance, retired, scene_s, scene_e, scene_r, shadow_s, shadow_e, shadow_r = values
+        if scene_e > scene_s or scene_r > scene_s or shadow_e > shadow_s or shadow_r > shadow_s:
+            raise ValueError("native output/retirement exceeds retained submissions")
+        if event == "loaded":
+            if any(values[1:]):
+                raise ValueError("loaded generation inherited previous evidence")
+        elif instance != (old_instance if gen == old_gen else new_instance):
+            raise ValueError("selected instance identity changed in lifecycle evidence")
+        if bool(retired) != (event in ("source-retired", "closed-at-title")):
+            raise ValueError("source-retirement state disagrees with lifecycle")
+        if event == "closed-at-title" and (scene_r != scene_s or shadow_r != shadow_s):
+            raise ValueError("old native draws are still fence-retained at title")
+    for earlier, later in ((1,2),(2,3)):
+        if any(b < a for a,b in zip(rows[earlier][3][3:],rows[later][3][3:])):
+            raise ValueError("old generation counters regressed")
+    windows = list(re.finditer(r"\[native-rigid-reload\] window generation (\d+) scene (\d+)->(\d+) shadow (\d+)->(\d+)",text))
+    if len(windows) != 2:
+        raise ValueError("need independent interactive-field output windows")
+    for window, row, end in zip(windows,(rows[1],rows[5]),(request.start(),complete[0].start())):
+        generation, scene_before, scene_after, shadow_before, shadow_after = map(int,window.groups())
+        if (generation != row[3][0] or scene_after != row[3][4] or shadow_after != row[3][7] or
+                scene_after-scene_before < 900 or shadow_after-shadow_before < 900 or not row[1] < window.start() < end):
+            raise ValueError("each loaded generation needs 900 fresh scene and shadow emissions")
+    title = re.search(r"\[native-rigid-reload\] title reached; old generation (\d+) fully fence-retired; autoplay epoch 1",text)
+    if not title or int(title[1]) != old_gen or not rows[3][1] < title.start() < rows[4][0]:
+        raise ValueError("missing closed title epoch before reloading")
+    cold, reloaded = text[:rows[1][0]], text[title.end():]
+    if any(len(epoch.encode("utf-8")) > MAX_LOG_BYTES for epoch in (cold,reloaded)):
+        raise ValueError("one reload field epoch exceeds 400 KiB")
+    return cold,reloaded,dict(old_generation=old_gen,new_generation=new_gen,old_instance=old_instance,new_instance=new_instance)
+
+
+def verify_rigid_epoch(text):
+    verify(text)
+    verify_texture_tables(text, comparison=False)
+    verify_vertex_inputs(text, require_pulling=True)
+    for check in (verify_movement,verify_canonical_geometry,verify_shadow_policies,
+                  verify_material_textures,verify_primitive_policies,verify_lit_shading,
+                  verify_draw_bindings,verify_model_nodes,verify_object_inputs,verify_selected_lights,
+                  verify_light_selection,verify_shadow_images,verify_rigid_shadow,verify_rigid_scene,
+                  verify_rigid_batches,verify_rigid_hard_off,verify_fog,verify_primitive_shader,
+                  verify_lighting_pass,verify_material_features,verify_material_samplers):
+        check(text)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -641,18 +715,25 @@ def main():
     parser.add_argument("--rigid-scene", action="store_true")
     parser.add_argument("--rigid-batches", action="store_true")
     parser.add_argument("--rigid-hard-off", action="store_true")
+    parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
     parser.add_argument("--material-features", action="store_true")
     parser.add_argument("--material-samplers", action="store_true")
     args = parser.parse_args()
+    reload = None
     try:
+        limit = MAX_LOG_BYTES * (2 if args.rigid_reload else 1)
         with args.log.open("rb") as source:
-            data = source.read(MAX_LOG_BYTES + 1)
-        if len(data) > MAX_LOG_BYTES:
-            raise ValueError("instance diagnostic exceeds 400 KiB")
+            data = source.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError(f"instance diagnostic exceeds {limit // 1024} KiB")
         text = data.decode("utf-8")
+        if args.rigid_reload:
+            cold, text, reload = split_rigid_reload(text)
+            verify_rigid_epoch(cold)
+            verify_rigid_epoch(text)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -686,6 +767,8 @@ def main():
         print(f"FAIL: {error}")
         return 1
     print("PASS: post-event native instances " + ", ".join(f"{k}={v}" for k, v in result.items()))
+    if reload is not None:
+        print("PASS: same-process native rigid reload (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in reload.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:

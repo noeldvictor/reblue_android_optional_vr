@@ -33,6 +33,13 @@ All of these remain required; shipping an intermediate component is not completi
 Updated 2026-09-07 after load-owned hard-off routing; the latest
 live-game-tested executable is host98/field run938. This is a mono sanity
 checkpoint, not complete lifecycle or desktop qualification.
+Latest implementation is host103: generation-specific source/submission/GPU/
+fence evidence and a game-owned title round trip. Run939 actually retired the
+selected model and reloaded fresh identities, but its cold reporting window
+failed the unchanged freshness gate. A focused regression now requires900
+actual scene/shadow emissions per ready-field epoch.293 Python checks and
+output25/CPU9 pass; the corrected runtime/pixel retry remains pending.
+[Evidence](../research/20260907_1140_native-rigid-reload.md).
 The dependency map below owns the detail; keep this queue outcome-oriented.
 
 1. **Finish one direct native static object, then expand material families.**
@@ -96,8 +103,8 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
      Selected nodes require the exact current model lease/generation, transform,
      bounds and a supported view. Existing owner registries are reused, with no
      new selection cache. Run938 enables this before startup and passes fresh
-     scene/shadow admission and emission gates. **Next: a real in-game teardown
-     and reload of this selected asset**, with generation-specific lifecycle
+     scene/shadow admission and emission gates. **Next: accept the real in-game
+     teardown/reload of this selected asset**, with generation-specific lifecycle
      evidence. The one aggregate model retirement in938 does not prove that
      selected-object lifecycle; CPU address-reuse tests are not a game reload.
 

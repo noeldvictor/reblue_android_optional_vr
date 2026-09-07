@@ -78,9 +78,16 @@ Latest **GPU-fixture** checkpoint: five 8x8 two-eye pixel cases pass in
 1.22 seconds with zero Vulkan validation errors/warnings. The new case draws
 two instances together with different transforms, colours, lights and fog;
 both scene and caster use native indexed indirect commands. Nonzero storage/
-command offsets and production-style array views are exercised. All 288 Python
+command offsets and production-style array views are exercised. All 293 Python
 source/scenario checks pass; the expanded C++ fixture also covers missing poses,
 missing geometry identities, stale generations and source-address reuse.
+
+The reload driver now exercises the game's actual title teardown/reentry.
+Run939 destroyed the selected model, retired its native GPU work, and created
+a fresh model/instance. Its sampling gate failed, so reload pixels are not yet
+accepted. Host103 adds a regression-tested longer fresh-output window; the
+corrected runtime check is pending.
+[Reload evidence and limits](research/20260907_1140_native-rigid-reload.md).
 
 **This is still one opt-in object, not a fully native scene.** Cold-start hard-off
 routing passes; actual teardown/reload and runtime multi-object batch coverage

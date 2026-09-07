@@ -21,13 +21,14 @@ struct NativeRigidBatchItem {
   plume::RenderViewport viewport{};
   plume::RenderRect scissor{};
   uint32_t frame = ~0u, slot = ~0u, view = ~0u;
+  uint64_t model_generation = 0, instance = 0; // Host lifetime metadata, not shader ABI.
   bool Ready(uint32_t expected_frame, uint32_t expected_slot) const {
-    return frame == expected_frame && slot == expected_slot && geometry && pipeline && layout && framebuffer &&
+    return frame == expected_frame && slot == expected_slot && model_generation && instance && geometry && pipeline && layout && framebuffer &&
         (view == 1 || (view == 3 && albedo && shadow && albedo_sampler && shadow_sampler));
   }
 };
 inline bool SameNativeRigidBatch(const NativeRigidBatchItem &a, const NativeRigidBatchItem &b) {
-  return a.frame == b.frame && a.slot == b.slot && a.view == b.view &&
+  return a.frame == b.frame && a.slot == b.slot && a.view == b.view && a.model_generation == b.model_generation &&
       a.geometry == b.geometry && a.pipeline == b.pipeline && a.layout == b.layout && a.framebuffer == b.framebuffer &&
       a.albedo == b.albedo && a.shadow == b.shadow && a.albedo_sampler == b.albedo_sampler && a.shadow_sampler == b.shadow_sampler &&
       a.viewport.x == b.viewport.x && a.viewport.y == b.viewport.y &&

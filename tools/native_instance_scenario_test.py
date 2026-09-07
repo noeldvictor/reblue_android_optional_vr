@@ -7,6 +7,7 @@ from native_instance_scenario import verify_rigid_shadow
 from native_instance_scenario import verify_rigid_scene
 from native_instance_scenario import verify_rigid_batches
 from native_instance_scenario import verify_rigid_hard_off
+from native_instance_scenario import split_rigid_reload
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -861,6 +862,66 @@ class FogScenarioTest(unittest.TestCase):
                     text.replace("layers wrong 0", "layers wrong 1", 1), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_fog(bad)
+
+
+class RigidReloadScenarioTest(unittest.TestCase):
+    @staticmethod
+    def sample():
+        def row(event,gen,instance,retired,counts):
+            return f"[native-rigid-lifecycle] {event} generation {gen} instance {instance} source-retired {retired} scene {counts} shadow {counts};"
+        return "\n".join((
+            row("loaded",93,0,0,"0/0/0"), "cold field evidence",
+            row("cold-qualified",93,144,0,"1002/1000/998"),
+            "[native-rigid-reload] window generation 93 scene 100->1000 shadow 100->1000",
+            "[native-rigid-reload] title requested generation 93 instance 144 task-uid 24 sequence-id 2",
+            row("source-retired",93,144,1,"1004/1002/1000"),
+            row("closed-at-title",93,144,1,"1004/1004/1004"),
+            "[native-rigid-reload] title reached; old generation 93 fully fence-retired; autoplay epoch 1",
+            row("loaded",193,0,0,"0/0/0"), "reloaded field evidence",
+            row("reload-qualified",193,288,0,"1102/1100/1098"),
+            "[native-rigid-reload] window generation 193 scene 200->1100 shadow 200->1100",
+            "[native-rigid-reload] complete old-generation 93 new-generation 193 old-instance 144 new-instance 288;"))
+
+    def test_split_keeps_epochs_independent(self):
+        cold,new,proof = split_rigid_reload(self.sample())
+        self.assertIn("cold field evidence",cold)
+        self.assertNotIn("reloaded field evidence",cold)
+        self.assertIn("reloaded field evidence",new)
+        self.assertNotIn("cold field evidence",new)
+        self.assertEqual(proof["new_generation"],193)
+
+    def test_pending_and_limits(self):
+        with self.assertRaises(Pending):
+            split_rigid_reload(self.sample().split("[native-rigid-reload] complete")[0])
+        for bad in ("x"*(2*MAX_LOG_BYTES+1),self.sample()+"\n[error] fault",
+                    "x"*MAX_LOG_BYTES+self.sample(), self.sample()+self.sample()):
+            with self.assertRaises(ValueError): split_rigid_reload(bad)
+
+    def test_requires_real_fresh_lifetimes_and_both_output_windows(self):
+        text = self.sample()
+        for bad in (text.replace("new-generation 193","new-generation 93"),
+                    text.replace("new-instance 288","new-instance 144"),
+                    text.replace("source-retired generation","aggregate-retired generation"),
+                    text.replace("1004/1004/1004","1004/1004/1003"),
+                    text.replace("1004/1002/1000","999/998/997"),
+                    text.replace("200->1100 shadow 200->1100","201->1100 shadow 200->1100"),
+                    text.replace("epoch 1","epoch 2"),
+                    text.replace("task-uid 24","task-uid 0"),
+                    text.splitlines()[-1]+"\n"+"\n".join(text.splitlines()[:-1]),
+                    text.replace("loaded generation 193 instance 0","loaded generation 193 instance 288")):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError): split_rigid_reload(bad)
+
+    def test_939_guard_before_context_needs_another_window_not_weaker_freshness(self):
+        def guard(frame,count):
+            return f"[native-rigid-hard-off] frame {frame} scene checks {count} shadow checks {count+1}; node 64 generation 93;"
+        rows = [guard(745,0), "[native-rigid-shadow] frame 745 submitted 1",
+                "[native-material-context] frame 1345 " + READY.replace("event 0", "event 1"),
+                guard(1645,900), "[native-material-context] frame 1645 " + READY,
+                guard(1945,1200), "[native-material-context] frame 1945 " + READY]
+        with self.assertRaises(Pending): verify_rigid_hard_off("\n".join(rows))
+        rows += [guard(2245,1500), "[native-material-context] frame 2245 " + READY]
+        self.assertEqual(verify_rigid_hard_off("\n".join(rows))["scene_checks_delta"],300)
 
 
 if __name__ == "__main__":

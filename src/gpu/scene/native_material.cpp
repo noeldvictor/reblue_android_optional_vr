@@ -7,6 +7,7 @@
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_instance.h"
+#include "gpu/scene/native_rigid_lifecycle_bridge.h"
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
 #include "gpu/scene/native_material_texture_bridge.h"
@@ -567,11 +568,16 @@ REX_HOOK_RAW(bdSceneGraphBuild) {
     model_failures.fetch_add(1, std::memory_order_relaxed);
     BD_WARN("[native-model-materials] load import failed: {}", error.what());
   }
+  // Outside the import catch: acceptance refusal must not become a warning.
+  if (NativeRigidLifecycleEnabled()) NoteNativeRigidModelLoaded(FindLoadedNativeModel(ctx.r3.u32));
 }
 
 REX_HOOK_RAW(sub_8227EBE8) {
   // Complete destructor entry, before node/declaration release. Unlike the
   // physical-block free hook, this also covers graphs with no physical block.
-  bd::gpu::scene::Models().Retire(ctx.r3.u32);
+  using namespace bd::gpu::scene;
+  const auto generation = NativeRigidLifecycleEnabled() ? NativeRigidRetiringGeneration(FindLoadedNativeModel(ctx.r3.u32)) : 0;
+  Models().Retire(ctx.r3.u32);
   __imp__sub_8227EBE8(ctx, base);
+  NoteNativeRigidSourceRetired(generation); // Completed original destructor, not just registry erasure.
 }

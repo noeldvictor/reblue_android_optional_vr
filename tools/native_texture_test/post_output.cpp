@@ -11,6 +11,7 @@
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_rigid_route.h"
+#include "gpu/scene/native_rigid_lifecycle.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include <array>
 #include <limits>
@@ -811,6 +812,63 @@ void RigidScenePacket() {
   plan.reset();
   assert(retired_geometry.expired() && retired_albedo.expired() && retired_depth.expired());
 }
+void RigidLifecycle() {
+  using namespace bd::gpu::scene;
+  using Event = NativeRigidLifecycle::Event;
+  NativeRigidLifecycle lifecycle;
+  assert(!lifecycle.Loaded(0) && !lifecycle.Find(0));
+  assert(lifecycle.Loaded(93) && !lifecycle.Loaded(93));
+  assert(!lifecycle.Note(Event::Submitted,94,144,3));
+  assert(!lifecycle.Note(Event::Submitted,93,0,3));
+  assert(!lifecycle.Note(Event::Submitted,93,144,2));
+  assert(!lifecycle.Note(Event::Submitted,93,144,3,2));
+  assert(!lifecycle.Note(Event::Emitted,93,0,3));
+  assert(!lifecycle.Note(Event::FenceRetired,93,0,3));
+  for (auto view : {1u,3u}) for (int i=0;i<2;++i) assert(lifecycle.Note(Event::Submitted,93,144+i,view));
+  assert(lifecycle.Find(93)->first_instance == 144);
+  assert(lifecycle.SourceRetired(93) && !lifecycle.SourceRetired(93));
+  assert(!lifecycle.SourceRetired(94) && !lifecycle.Find(93)->Closed());
+  assert(!lifecycle.Note(Event::Submitted,93,144,3));
+  assert(lifecycle.Loaded(94)); // New load while old native commands are pending.
+  for (auto view : {1u,3u}) {
+    assert(lifecycle.Note(Event::Emitted,93,0,view,2));
+    assert(!lifecycle.Note(Event::Emitted,93,0,view));
+    assert(lifecycle.Note(Event::FenceRetired,93,0,view));
+    assert(!lifecycle.Find(93)->Closed());
+    assert(lifecycle.Note(Event::FenceRetired,93,0,view));
+    assert(!lifecycle.Note(Event::FenceRetired,93,0,view));
+  }
+  assert(lifecycle.Find(93)->Closed() && !lifecycle.Find(94)->Closed());
+  assert(lifecycle.Note(Event::Submitted,94,288,3));
+  assert(lifecycle.Note(Event::FenceRetired,94,0,3));
+  assert(lifecycle.Find(94)->views[1].emitted == 0); // Retirement is not output.
+  assert(lifecycle.SourceRetired(94) && lifecycle.Find(94)->Closed());
+  for (uint64_t i=0;i<NativeRigidLifecycle::kCapacity-2;++i) assert(lifecycle.Loaded(100+i));
+  assert(!lifecycle.Loaded(999) && !lifecycle.Loaded(93)); // Never evict proof.
+  NativeRigidEpoch epoch; epoch.generation = 1;
+  NativeRigidOutputWindow window;
+  assert(!window.Step(true,epoch,2));
+  epoch.views[0].emitted = 2;
+  assert(!window.Step(true,epoch,2));
+  epoch.views[1].emitted = 2;
+  assert(window.Step(true,epoch,2));
+  assert(!window.Step(false,epoch,2));
+  assert(!window.Step(true,epoch,2)); // Readiness loss discards prior output.
+  epoch.views[0].emitted = epoch.views[1].emitted = 4;
+  assert(window.Step(true,epoch,2));
+  ++epoch.generation;
+  assert(!window.Step(true,epoch,2)); // New generation gets its own baseline.
+  epoch.views[0].emitted = epoch.views[1].emitted = 6;
+  assert(window.Step(true,epoch,2));
+  epoch.source_retired = true;
+  assert(!window.Step(true,epoch,2));
+  window = {}; epoch = {}; epoch.generation = 2;
+  assert(!window.Step(true,epoch));
+  epoch.views[0].emitted = epoch.views[1].emitted = 899;
+  assert(!window.Step(true,epoch));
+  epoch.views[0].emitted = epoch.views[1].emitted = 900;
+  assert(window.Step(true,epoch));
+}
 void RigidBatches() {
   using namespace bd::gpu::scene;
   int token = 0;
@@ -821,7 +879,9 @@ void RigidBatches() {
   a.framebuffer = reinterpret_cast<RenderFramebuffer *>(&token);
   a.viewport = RenderViewport(0,0,32,16); a.scissor = RenderRect(0,0,32,16);
   a.frame = 8; a.slot = 1; a.view = 1;
+  a.model_generation = 93; a.instance = 144;
   NativeRigidBatchItem b = a;
+  b.instance = 145;
   b.input.object_data.world.rows[3].x = 7;
   b.input.object_data.diffuse = {.2f,.4f,.6f,1};
   b.input.pass_data.lights[0].colour_strength.x = .7f;
@@ -833,7 +893,7 @@ void RigidBatches() {
   assert(packed[1].object_data.diffuse.z == .6f && packed[1].pass_data.lights[0].colour_strength.x == .7f);
   assert(packed[1].pass_data.fog[0].colour_opacity.w == .4f);
   const auto good = b;
-  for (uint32_t fault=0;fault<14;++fault) {
+  for (uint32_t fault=0;fault<16;++fault) {
     b = good;
     if (fault == 0) ++b.frame;
     if (fault == 1) ++b.slot;
@@ -849,6 +909,8 @@ void RigidBatches() {
     if (fault == 11) b.albedo = std::make_shared<NativeTextureGpu>();
     if (fault == 12) b.shadow = std::make_shared<NativeTargetImage>();
     if (fault == 13) b.albedo_sampler = reinterpret_cast<RenderSampler *>(&token);
+    if (fault == 14) ++b.model_generation;
+    if (fault == 15) b.instance = 0;
     const auto before = packed;
     assert(NativeRigidBatchLength(pair,8,1) == 1 && !PackNativeRigidBatch(pair,packed,8,1));
     assert(std::memcmp(before.data(),packed.data(),sizeof(packed)) == 0);
@@ -1010,6 +1072,7 @@ int main() {
   DepthOnlyCommands();
   CameraAndRigidCaster();
   RigidHardOffRouting();
+  RigidLifecycle();
   RigidScenePacket();
   RigidBatches();
   SceneCommands();

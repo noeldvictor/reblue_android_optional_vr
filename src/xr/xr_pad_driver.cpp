@@ -22,11 +22,8 @@
 #include "core/settings.h" // kCvarGroup
 #include "engine/game.h"
 #include "xr/autoplay.h"
+#include "gpu/scene/native_rigid_lifecycle_bridge.h"
 #include "xr/xr_pad.h"
-
-namespace bd::xr {
-
-namespace {
 
 // Drives the game from the log, with nobody wearing the headset.
 //
@@ -39,6 +36,10 @@ namespace {
 REXCVAR_DEFINE_BOOL(bd_xr_autoplay, false, kCvarGroup,
                     "Synthesise pad presses to walk the game into a field "
                     "scene unattended, for screenshots and profiling.");
+
+namespace bd::xr {
+
+namespace {
 
 // One device, so its handle is a constant. 'XRPD'.
 constexpr rex::input::DeviceId kPadDevice =
@@ -74,12 +75,19 @@ void ApplyAutoplay(PadState &pad, bool enabled) {
   static Clock::time_point start{};
   static double last_report = -1;
   static uint32_t reports = 0;
+  static uint32_t reload_serial = 0;
   if (!enabled) {
     policy.Reset();
     start = {};
     last_report = -1;
     reports = 0;
     return; // Do not change the real controller's state.
+  }
+  const auto reload = gpu::scene::GetNativeRigidReloadInput();
+  if (reload.paused) { pad = {}; return; }
+  if (reload.serial != reload_serial) {
+    policy.Reset(); start = {}; last_report = -1; reports = 0;
+    reload_serial = reload.serial;
   }
   if (start.time_since_epoch().count() == 0)
     start = Clock::now();
@@ -102,6 +110,7 @@ void ApplyAutoplay(PadState &pad, bool enabled) {
     observation.stage = (uint64_t(stage.Category() + 1) << 32) | stage.CombinedNum();
   observation.position = field.Position();
   const auto input = policy.Step(t, observation);
+  gpu::scene::ObserveNativeRigidReloadField(input.walking,observation.stage);
   // Explicit diagnostic mode owns the whole pad; neutralize stale real sticks.
   pad = {};
   pad.menu = input.start;

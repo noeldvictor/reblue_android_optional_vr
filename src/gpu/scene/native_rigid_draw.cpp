@@ -6,6 +6,7 @@
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_rigid_batch.h"
+#include "gpu/scene/native_rigid_lifecycle_bridge.h"
 #include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/device.h"
@@ -46,6 +47,7 @@ struct NativeRigidDrawStore {
   uint64_t emitted = 0, scene_submitted = 0, scene_emitted = 0, scene_retired = 0, scene_suppressed = 0;
   uint32_t scene_reported_frame = 0;
   uint64_t scene_batches = 0, shadow_batches = 0, merged_instances = 0;
+  uint64_t reported_generation = 0, scene_reported_generation = 0;
 };
 namespace {
 void Require(bool valid, const char *reason) {
@@ -64,6 +66,7 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
   item->frame = FrameStatFrameCount(); item->slot = Video::CurrentFrameSlot();
   BatchRequire(item->Ready(item->frame,item->slot), "incomplete native instance");
   state().native_rigid_draws->records[item->slot].push_back(item);
+  NoteNativeRigidSubmitted(item->model_generation,item->instance,item->view);
   draw.native_rigid = std::move(item);
 }
 }
@@ -129,6 +132,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   Require(draw.bindings.Valid(), "invalid native descriptor contract");
   auto item = std::make_shared<NativeRigidBatchItem>();
   item->geometry = geometry; item->input = {plan->object,plan->pass};
+  item->model_generation = pose.model_generation; item->instance = pose.instance;
   StageNativeItem(draw,std::move(item));
   if (!s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
@@ -139,10 +143,11 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   if (!DrawQueueEnabled()) DrawQueueFlush(s.command_list);
   ++store.submitted;
   const auto frame = FrameStatFrameCount();
-  if (store.submitted == 1 || frame - store.reported_frame >= 300) {
+  if (store.reported_generation != pose.model_generation || frame - store.reported_frame >= 300) {
     BD_INFO("[native-rigid-shadow] frame {} submitted {} suppressed {} fence-retired {}; node {} instance {} generation {} phase {}; native program and owned matrices, no interpreter/template/replay",
         frame, store.submitted, store.suppressed, store.retired, node, pose.instance, pose.model_generation, inputs->phase);
     store.reported_frame = frame;
+    store.reported_generation = pose.model_generation;
   }
   return true;
 }
@@ -226,6 +231,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node) {
   require(draw.bindings.Valid(), "invalid native scene descriptor contract");
   auto item = std::make_shared<NativeRigidBatchItem>();
   item->geometry = geometry; item->input = {plan->object,plan->pass};
+  item->model_generation = pose.model_generation; item->instance = pose.instance;
   item->albedo = plan->albedo; item->shadow = plan->shadow;
   item->albedo_sampler = albedo_sampler; item->shadow_sampler = shadow_sampler;
   StageNativeItem(draw,std::move(item));
@@ -237,13 +243,14 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node) {
   if (!DrawQueueEnabled()) DrawQueueFlush(s.command_list);
   ++store.scene_submitted;
   const auto frame = FrameStatFrameCount();
-  if (store.scene_submitted == 1 || frame-store.scene_reported_frame >= 300) {
+  if (store.scene_reported_generation != pose.model_generation || frame-store.scene_reported_frame >= 300) {
     BD_INFO("[native-rigid-scene] frame {} submitted {} emitted {} suppressed {} fence-retired {}; node {} instance {} generation {}; owned packet and native program, no node interpreter/template/replay",
         frame, store.scene_submitted, store.scene_emitted, store.scene_suppressed, store.scene_retired,
         node, pose.instance, pose.model_generation);
     BD_INFO("[native-rigid-batch] frame {} scene instances {} indirect calls {} shadow instances {} indirect calls {} merged instances {}; native storage records, no translated gather",
         frame, store.scene_emitted, store.scene_batches, store.emitted, store.shadow_batches, store.merged_instances);
     store.scene_reported_frame = frame;
+    store.scene_reported_generation = pose.model_generation;
   }
   return true;
 }
@@ -294,11 +301,12 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   draw.native_indirect = indirect.ref;
   batches.push_back(std::move(batch));
 }
-void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances) {
+void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances, uint64_t generation) {
   auto &s = state();
   if (!s.native_rigid_draws) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &program : store.programs) if (bindings.layout == program.shaders.scene->Layout()) {
+    NoteNativeRigidEmitted(generation,render_view,instances);
     if (render_view == 3 && bindings.set_count == 3) { store.scene_emitted += instances; ++store.scene_batches; }
     else if (render_view == 1 && bindings.set_count == 1) { store.emitted += instances; ++store.shadow_batches; }
     if (instances > 1) store.merged_instances += instances;
@@ -309,6 +317,7 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   if (!s.native_rigid_draws || slot >= kNumFrames) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &record : store.records[slot]) {
+    NoteNativeRigidFenceRetired(record->model_generation,record->view);
     if (record->view == 3) ++store.scene_retired;
     else ++store.retired;
   }

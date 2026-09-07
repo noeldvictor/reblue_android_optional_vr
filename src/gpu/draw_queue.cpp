@@ -262,7 +262,8 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
     cmd->drawInstanced(d.count, instance_count, d.start_vertex,
                        first_instance);
   ++g_binding_draws;
-  scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count);
+  scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,
+      d.native_rigid ? d.native_rigid->model_generation : 0);
   if (counted)
     FragCensusEnd(cmd);
 }
