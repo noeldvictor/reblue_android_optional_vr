@@ -30,8 +30,8 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after direct rigid scene routing; the latest
-live-game-tested executable is host95/field run936. This is a mono sanity
+Updated 2026-09-07 after native rigid batching/indirect integration; the latest
+live-game-tested executable is host96/field run937. This is a mono sanity
 checkpoint, not complete lifecycle or desktop qualification.
 The dependency map below owns the detail; keep this queue outcome-oriented.
 
@@ -42,9 +42,10 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
    selected lights, fog, lighting pass, material features and ordinary 2D samplers.
    Native scene/shadow shaders and shared pipeline/binding cores have focused
    two-eye GPU coverage. **The selected object now uses both native scene and
-   shadow programs in opt-in acceptance mode.** Run936 has fresh scene draw
-   emissions/fence retirements and inspected pixels; batching, source-free
-   lifecycle and both-eye game acceptance remain open.
+   shadow programs in opt-in acceptance mode.** Run937 has fresh native indirect
+   instance emissions/fence retirements and inspected pixels. Multi-instance
+   GPU fixture pixels pass; the selected field asset still forms singleton
+   batches. Source-free lifecycle and both-eye game acceptance remain open.
 
    Connect this existing packet to the existing backend in dependency order:
 
@@ -75,7 +76,11 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
      The caster and scene host-walk routes now bypass `bdSceneNodeDrawSingle`
      entirely after whole-node admission, using the shared queue/cache and
      fence-retained native descriptors. It does not use translated instance
-     records; native batching/indirect support remains required follow-up work.
+     records. Native batching/indirect support now gathers owned784-byte records
+     at the shared queue flush, preserving each instance's material/light/fog
+     values. Exact geometry/images/samplers/pass context and fresh frame/slot
+     ownership gate merging; descriptors retire at the fence. Qualify repeated
+     real-object groups as that lifecycle path gains representative coverage.
    - Extend the existing scenario harness at that consumer boundary: disable the
      selected family's interpreter, template capture and replay **before its first
      draw**, then prove cold load, native instance updates, scene/shadow output,
@@ -131,8 +136,10 @@ drop participants from the initial acceptance scene.
 
 These are dependency gates, not three parallel workstreams or a new percentage
 complete. Checkpoint1 now has a live mono scene/caster consumer (run936), with
-remaining source adapters explicit. Continue with checkpoint2 for that same
-object, before expanding families. A single image does not establish stability.
+remaining source adapters explicit. Checkpoint2 now has native batching/indirect
+code and two-instance GPU coverage, plus live singleton indirect draws (run937).
+Its hard-off cold-load/reload and repeated-object runtime gates remain. Stay on
+that same path before expanding families; one image does not establish stability.
 
 | Checkpoint | Existing implementation to extend | Exit evidence |
 | --- | --- | --- |
@@ -148,11 +155,14 @@ to validate a shader that still has no live scene consumer. Once routing changes
 the host build and targeted game/pixel gate are required. Commit/push verified
 connections regularly; distinguish prerequisites from accepted runtime paths.
 
-The latest array-view fixture (GPU build25/rigid04) passes four two-eye cases
-in1.16 s with zero validation errors/warnings and no image files. It reuses the
-production program factory and explicit descriptors; it does not qualify the
-full asset uploader or live scene route.
-[Evidence](../research/20260907_0906_rigid-array-view-contract.md).
+The latest rigid fixture (GPU build26/rigid05) passes five two-eye cases in1.22 s
+with zero validation errors/warnings and no image files. It includes two distinct
+instances in one indirect command, for both scene and shadow, using production
+shaders and nonzero storage/command offsets. The shared packing/compatibility
+core has CPU coverage; the GPU fixture does not execute the full game queue.
+Run937 exercises that queue with one instance per batch, not merged runtime
+groups.284 Python checks pass; output20/CPU5 passes in0.36 s. No speedup claim.
+[Evidence](../research/20260907_1016_native-rigid-batches.md).
 
 Direct-scene checkpoint: host95/run936 passes all existing field/movement gates
 and adds300 native scene emissions/300 fence retirements in fresh post-event
@@ -175,8 +185,8 @@ must connect. It is not a second roadmap or a new renderer framework.
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | The selected direct scene draw now consumes the owned packet, retaining geometry/images through the fence. Packet assembly selects owned programs without a `NodeTag`/source key. The producer still resolves object bindings and visibility at an explicit source boundary. Only `PrepareReplayMaterialMesh` keeps the bounded replay alias index; remove it when replay's last consumer migrates. Source-to-object publication still needs replacement. |
 | Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and native per-node light preflight. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. The original receiver callback, authored light snapshot/cache, fog and source camera/object producers remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
-| Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Both native programs now emit real selected-object draws through the shared cache, explicit descriptor sets and bounded fence-retained records. No translated instance records are used by this path; add native batching/indirect support next. Other families still use engine bindings and translated instance gathering. |
-| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in selected rigid routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission feeds native shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Native instance batching, source object/pass publication, unsupported families and hard-off cold-load/reload acceptance remain. |
+| Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Both programs now use native structured instance storage and indexed indirect commands through the shared cache/queue. CPU batch preflight and two-instance/two-eye GPU pixels pass; live field uses singleton batches. Complete repeated-object runtime/lifecycle coverage. Other families still use engine bindings and translated instance gathering. |
+| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission and exact native batch compatibility feed shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Source object/pass publication, unsupported families, repeated-object batches and hard-off cold-load/reload acceptance remain. |
 
 Selected investigation target from field run920: geometry `258694267A8DBAEE`,
 material `63B8D67932573E51`, model-local node64, sole primitive, technique0/view3

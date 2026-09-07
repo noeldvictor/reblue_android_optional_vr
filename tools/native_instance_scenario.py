@@ -440,6 +440,30 @@ def verify_rigid_scene(text):
     return dict(submitted_delta=b[1]-a[1], emitted_delta=b[2]-a[2], retired_delta=b[4]-a[4])
 
 
+def verify_rigid_batches(text):
+    """Native instance/indirect emissions; zero merged instances is explicit, not coverage of merging."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("rigid batch diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-rigid-batch\] frame (\d+) scene instances (\d+) indirect calls (\d+) shadow instances (\d+) indirect calls (\d+) merged instances (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-rigid-batch] refused" in line:
+            raise ValueError("native batching refused; no translated fallback qualification")
+        if "[native-material-context]" in line:
+            contexts.append((index,line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int,match.groups()))
+            if values[2] > values[1] or values[4] > values[3] or values[5] > values[1]+values[3]:
+                raise ValueError("impossible native batch counts")
+            metrics.append((index,values))
+    a,b = recent_field_samples(contexts,metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in range(1,5)) or b[5] < a[5]:
+        raise Pending("need fresh native scene/shadow instance and indirect emissions")
+    return dict(scene_instances_delta=b[1]-a[1], scene_calls_delta=b[2]-a[2],
+                shadow_instances_delta=b[3]-a[3], shadow_calls_delta=b[4]-a[4], merged_instances_delta=b[5]-a[5])
+
+
 def verify_shadow_images(text):
     """Require fresh native shadow completion and exact image-owner publication."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -587,6 +611,7 @@ def main():
     parser.add_argument("--shadow-images", action="store_true")
     parser.add_argument("--rigid-shadow", action="store_true")
     parser.add_argument("--rigid-scene", action="store_true")
+    parser.add_argument("--rigid-batches", action="store_true")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -618,6 +643,7 @@ def main():
         shadow_images = verify_shadow_images(text) if args.shadow_images else None
         rigid_shadow = verify_rigid_shadow(text) if args.rigid_shadow else None
         rigid_scene = verify_rigid_scene(text) if args.rigid_scene else None
+        rigid_batches = verify_rigid_batches(text) if args.rigid_batches else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -662,6 +688,8 @@ def main():
         print("PASS: post-event direct rigid shadows " + ", ".join(f"{k}={v}" for k, v in rigid_shadow.items()))
     if rigid_scene is not None:
         print("PASS: post-event direct rigid scene " + ", ".join(f"{k}={v}" for k, v in rigid_scene.items()))
+    if rigid_batches is not None:
+        print("PASS: post-event native rigid batches " + ", ".join(f"{k}={v}" for k, v in rigid_batches.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     if primitive_shader is not None:

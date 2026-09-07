@@ -9,12 +9,14 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 
 #include <plume_render_interface.h>
 #include <rex/types.h>
 #include "gpu/draw_bindings.h"
 
 namespace bd::gpu {
+namespace scene { struct NativeRigidBatchItem; }
 
 // Blue Dragon submits about a thousand individually placed scene nodes a frame,
 // in whatever order the guest's traversal produced, because on a Xenon the
@@ -133,6 +135,11 @@ struct QueuedDraw {
   // descriptor layouts must not accidentally feed a different record format
   // through the translated gather/fallback paths.
   bool translated_instance_records = false;
+  // Native staged CPU values; descriptors are built once for a compatible batch
+  // at flush. Kept alive through the producer's frame-slot fence as well.
+  std::shared_ptr<const scene::NativeRigidBatchItem> native_rigid;
+  // Populated only by native batch preparation, never an inherited binding.
+  plume::RenderBufferReference native_indirect{};
   // The instanced twin that pulls its vertices from the record's streams
   // (gpu/vertex_pull.h); set only when this draw's pull info staged.
   plume::RenderPipeline *pulled_pipeline = nullptr;

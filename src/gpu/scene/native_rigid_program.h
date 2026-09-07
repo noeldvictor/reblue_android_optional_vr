@@ -13,8 +13,7 @@ struct NativeRigidDescriptorSchema {
   std::array<plume::RenderDescriptorSetBuilder, 3> sets;
   NativeRigidDescriptorSchema() {
     sets[0].begin();
-    sets[0].addConstantBufferDynamic(0); // NativeRigidObjectGPU
-    sets[0].addConstantBufferDynamic(1); // NativeRigidPassGPU
+    sets[0].addStructuredBuffer(0); // NativeRigidInstanceGPU[], indexed by SV_InstanceID
     sets[0].end();
     // Explicit TEXTURE_2D_ARRAY sampled views: ordinary albedo and mono sun
     // depth, both using layer zero. Do not bind a texture's default 2D view.

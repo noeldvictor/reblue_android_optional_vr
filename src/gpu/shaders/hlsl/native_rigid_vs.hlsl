@@ -1,7 +1,10 @@
 // Opaque rigid geometry: named attributes, object transform and complete per-eye views.
 #include "src/gpu/scene/native_rigid_shader.h"
-RigidFragment main(RigidVertex vertex, uint eye : SV_ViewID) {
+RigidFragment main(RigidVertex vertex, uint eye : SV_ViewID, uint instance : SV_InstanceID) {
+  const NativeRigidObjectGPU object_data = rigid_instances[instance].object_data;
+  const NativeRigidPassGPU pass_data = rigid_instances[instance].pass_data;
   RigidFragment result;
+  result.instance = instance;
   const float4 world = RigidTransform(float4(vertex.position.xyz, 1), object_data.world);
   result.clip = RigidTransform(world, pass_data.world_to_clip[eye]);
   result.world = world.xyz;

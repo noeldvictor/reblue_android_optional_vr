@@ -9,7 +9,7 @@
 [[vk::binding(0, 2)]] SamplerState albedo_sampler : register(s0, space2);
 [[vk::binding(1, 2)]] SamplerComparisonState shadow_sampler : register(s1, space2);
 
-float RigidShadow(float3 world, float3 normal) {
+float RigidShadow(float3 world, float3 normal, NativeRigidObjectGPU object_data, NativeRigidPassGPU pass_data) {
   if (!(object_data.flags.x & RigidReceiveShadow)) return 1;
   const float4 shadow = RigidTransform(float4(world, 1), pass_data.world_to_shadow);
   if (shadow.w <= 0) return 1;
@@ -27,6 +27,8 @@ float RigidShadow(float3 world, float3 normal) {
 }
 
 float4 main(RigidFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
+  const NativeRigidObjectGPU object_data = rigid_instances[fragment.instance].object_data;
+  const NativeRigidPassGPU pass_data = rigid_instances[fragment.instance].pass_data;
   const uint flags = object_data.flags.x;
   float4 albedo = object_data.diffuse * fragment.colour;
   if (flags & RigidAlbedo) albedo *= albedo_image.Sample(albedo_sampler, float3(fragment.uv, 0));
@@ -46,7 +48,7 @@ float4 main(RigidFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
   surface.ambient = RigidVector(pass_data.ambient.rgb);
   surface.shadow_colour = RigidVector(pass_data.shadow_colour_strength.rgb);
   surface.shadow_strength = pass_data.shadow_colour_strength.w;
-  surface.shadow_visibility = RigidShadow(fragment.world, normal);
+  surface.shadow_visibility = RigidShadow(fragment.world, normal, object_data, pass_data);
   surface.diffuse_enabled = (flags & RigidDiffuse) != 0;
   surface.specular_enabled = (flags & RigidSpecular) != 0;
   LitVector colour = ComposeLitSurface(surface, light0, light1, light2, a, b, c);

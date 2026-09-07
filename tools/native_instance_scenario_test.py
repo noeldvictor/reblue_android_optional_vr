@@ -5,6 +5,7 @@ from native_instance_scenario import verify_fog, verify_primitive_shader, verify
 from native_instance_scenario import verify_material_samplers, verify_light_selection, verify_shadow_images
 from native_instance_scenario import verify_rigid_shadow
 from native_instance_scenario import verify_rigid_scene
+from native_instance_scenario import verify_rigid_batches
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -765,6 +766,35 @@ class RigidSceneScenarioTest(unittest.TestCase):
                     text.replace("node 64", "node 63"), "x" * (MAX_LOG_BYTES+1)):
             with self.assertRaises(ValueError):
                 verify_rigid_scene(bad)
+
+
+class RigidBatchScenarioTest(unittest.TestCase):
+    def text(self):
+        rows = scenario()
+        rows[2] = "[native-rigid-batch] frame 100 scene instances 100 indirect calls 100 shadow instances 100 indirect calls 100 merged instances 0;"
+        rows[4] = "[native-rigid-batch] frame 150 scene instances 150 indirect calls 150 shadow instances 150 indirect calls 150 merged instances 0;"
+        return "\n".join(rows)
+
+    def test_fresh_indirect_instances_do_not_claim_merged_runtime_groups(self):
+        result = verify_rigid_batches(self.text())
+        self.assertEqual(result,dict(scene_instances_delta=50,scene_calls_delta=50,
+                                    shadow_instances_delta=50,shadow_calls_delta=50,merged_instances_delta=0))
+
+    def test_each_consumer_must_advance_in_the_ready_scene(self):
+        text = self.text()
+        for bad in (text.replace("instances 150","instances 100").replace("calls 150","calls 100"),
+                    text.replace("calls 150","calls 100"), text.replace("frame 150","frame 100"),
+                    text.replace("bg41_01","bg42_01"), text+"\n[native-material-context] mode Loading"):
+            with self.assertRaises(Pending):
+                verify_rigid_batches(bad)
+
+    def test_refusals_impossible_counts_and_size_are_errors(self):
+        text = self.text()
+        for bad in ("[native-rigid-batch] refused storage\n"+text,
+                    text.replace("calls 150","calls 151"),text.replace("merged instances 0","merged instances 9999"),
+                    "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError):
+                verify_rigid_batches(bad)
 
 
 class FogScenarioTest(unittest.TestCase):

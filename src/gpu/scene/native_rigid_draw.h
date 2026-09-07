@@ -4,9 +4,10 @@
  */
 #pragma once
 #include "gpu/scene/native_instance.h"
-namespace bd::gpu { struct VideoState; struct GraphicsBindings; }
+namespace bd::gpu { struct VideoState; struct GraphicsBindings; struct QueuedDraw; }
 namespace bd::gpu::scene {
 struct NativeRigidDrawStore;
+struct NativeRigidBatchItem;
 bool NativeRigidShadowEnabled();
 bool NativeRigidSceneEnabled();
 // Called before the per-node interpreter/replay/capture, after host culling.
@@ -16,6 +17,9 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
                              const std::optional<PrimitivePolicyInputs> &inputs);
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node);
 // Called only after the shared emitter records a real draw command.
-void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view);
+void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances);
+// Shared queue calls this under the renderer lock after exact batch admission.
+// Creates explicit storage/image bindings and one indexed indirect command.
+void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw);
 void DrainNativeRigidDrawsLocked(VideoState &state, uint32_t slot);
 } // namespace bd::gpu::scene

@@ -58,34 +58,35 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-Latest **live-game** checkpoint (2026-09-07, host95/run936): one real rigid
+Latest **live-game** checkpoint (2026-09-07, host96/run937): one real rigid
 field object now uses native programs for **both scene and shadow draws**.
 Whole-node admission bypasses its interpreter, capture and replay; fresh field
 windows add 300 scene draw emissions and 300 fence retirements. Its retained
 packet binds current per-node lights, receiver values and explicit image views.
+Both paths now use native instance storage and indexed indirect submission in
+the shared queue. The field target produced single-instance batches, not a
+measured draw-call reduction.
 The inspected field image is coherent, with known cliff marks/distant blur.
 Both acceptance switches remain off in the normal profile.
-[Direct-scene evidence](research/20260907_0946_direct-rigid-scene.md).
+[Native-batch evidence](research/20260907_1016_native-rigid-batches.md).
 
-Latest **GPU-fixture** checkpoint: `19c9da6` fixes the native scene shader's
-texture-view mismatch. Both albedo and mono shadow now use the uploader's actual
-2D-array view contract; the fixture uses D32/S8 shadow depth. Four 8x8 two-eye
-pixel cases pass in 1.16 seconds with zero Vulkan validation errors/warnings.
-That prerequisite needed no game launch or new captures. Its shader/pixel
-coverage is reused by the live checkpoint; current source/scenario checks pass
-all 280 tests, alongside the focused C++ fixtures.
-[Array-view evidence](research/20260907_0906_rigid-array-view-contract.md).
+Latest **GPU-fixture** checkpoint: five 8x8 two-eye pixel cases pass in
+1.22 seconds with zero Vulkan validation errors/warnings. The new case draws
+two instances together with different transforms, colours, lights and fog;
+both scene and caster use native indexed indirect commands. Nonzero storage/
+command offsets and production-style array views are exercised. All 284 Python
+source/scenario checks and the focused C++ batching fixture pass.
 
-**This is still one opt-in object, not a fully native scene.** Native batching
-and interpreter/template-free cold-load/reload acceptance are next for the same
-already-cooked 162-vertex asset. Object/pass source adapters and the original
+**This is still one opt-in object, not a fully native scene.** Interpreter/
+template-free cold-load/reload acceptance and runtime multi-object batch coverage
+remain for the already-cooked asset path. Object/pass source adapters and the original
 receiver callback remain explicitly tracked; no complete lifecycle, both-eye
 qualification or performance improvement is claimed.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive packets, first direct native scene/caster route, culling/instancing/indirect infrastructure | Native batching, lifetime/reload proof, remaining source producers and material families |
+| Scene and materials | Owned instance/primitive packets, native scene/caster instanced-indirect route, shared culling/batching infrastructure | Lifetime/reload proof, representative multi-object batches, remaining source producers and material families |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |

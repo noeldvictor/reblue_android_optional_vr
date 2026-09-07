@@ -1,8 +1,7 @@
 // Production native rigid shader interface. No translated shader common header.
 #include "src/gpu/scene/native_rigid_inputs.h"
 #include "src/gpu/scene/native_lit_shading.h"
-[[vk::binding(0, 0)]] ConstantBuffer<NativeRigidObjectGPU> object_data : register(b0, space0);
-[[vk::binding(1, 0)]] ConstantBuffer<NativeRigidPassGPU> pass_data : register(b1, space0);
+[[vk::binding(0, 0)]] StructuredBuffer<NativeRigidInstanceGPU> rigid_instances : register(t0, space0);
 struct RigidVertex {
   [[vk::location(0)]] float4 position : POSITION;
   [[vk::location(1)]] float4 normal : NORMAL;
@@ -15,6 +14,7 @@ struct RigidFragment {
   float3 normal : TEXCOORD1;
   float2 uv : TEXCOORD2;
   float4 colour : COLOR0;
+  nointerpolation uint instance : TEXCOORD3;
 };
 float4 RigidTransform(float4 value, RigidMatrix matrix) {
   return (value.x * matrix.rows[0] + value.y * matrix.rows[1]) +

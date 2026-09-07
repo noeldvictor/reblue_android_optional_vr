@@ -49,6 +49,12 @@ struct NativeRigidPassGPU {
   RigidLightGPU lights[3];
   RigidFogGPU fog[2];
 };
+// An instance owns its lighting/fog too: different selected lights must not
+// accidentally become a batch-wide value. No translated constant-record ABI.
+struct NativeRigidInstanceGPU {
+  NativeRigidObjectGPU object_data;
+  NativeRigidPassGPU pass_data;
+};
 
 #ifdef __cplusplus
 static_assert(sizeof(RigidLightGPU) == 64 && sizeof(RigidFogGPU) == 64);
@@ -60,6 +66,9 @@ static_assert(sizeof(NativeRigidPassGPU) == 608 && alignof(NativeRigidPassGPU) =
 static_assert(offsetof(NativeRigidPassGPU, cameras) == 192);
 static_assert(offsetof(NativeRigidPassGPU, lights) == 288);
 static_assert(offsetof(NativeRigidPassGPU, fog) == 480);
+static_assert(sizeof(NativeRigidInstanceGPU) == 784 && alignof(NativeRigidInstanceGPU) == 16);
+static_assert(offsetof(NativeRigidInstanceGPU, pass_data) == 176);
+static_assert(std::is_trivially_copyable_v<NativeRigidInstanceGPU>);
 static_assert(std::is_trivially_copyable_v<NativeRigidObjectGPU> &&
               std::is_trivially_copyable_v<NativeRigidPassGPU>);
 

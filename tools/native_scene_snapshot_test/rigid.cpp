@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_rigid_inputs.h"
+#include "gpu/scene/native_rigid_batch.h"
 #include "gpu/draw_bindings.h"
 #include <plume_vulkan.h>
 #include <cstring>
@@ -53,7 +54,7 @@ void Run(RenderDevice &device, uint32_t mode) {
 
   auto world = Identity(); world[0] = 1.2f; world[5] = 1.25f; world[12] = .1f; world[13] = -.1f;
   const uint32_t flags = RigidAlbedo | RigidVertexColour | RigidDiffuse | RigidSpecular |
-      (mode == 1 ? RigidReceiveShadow : 0) | (mode >= 2 ? RigidFogEnabled : 0);
+      (mode == 1 || mode == 4 ? RigidReceiveShadow : 0) | (mode >= 2 ? RigidFogEnabled : 0);
   const auto object = BuildRigidObject(world, {.5f,.75f,1,.8f}, {.1f,.2f,.15f,8}, {.5f,.5f,.5f,.5f}, flags);
   world[14] = -.25f;
   const auto caster = BuildRigidObject(world, {1,1,1,1}, {0,0,0,8}, {1,1,0,0}, 0);
@@ -74,21 +75,38 @@ void Run(RenderDevice &device, uint32_t mode) {
   pass.fog[0] = {LitVec(0,0,0), LitVec(0,0,1), LitVec(.2f,.4f,.6f), 0,8,.3f,mode < 2,mode == 2,LitFogBlend};
   pass.fog[1] = {LitVec(0,0,0), LitVec(1,0,0), LitVec(.1f,.2f,.1f), -2,2,.2f,mode < 2,false,LitFogAdd};
   const auto packed_pass = BuildRigidPass(pass); Need(bool(packed_pass), "Native rigid pass inputs");
-  const auto alignment = static_cast<VulkanDevice &>(device).physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
-  const uint32_t stride = uint32_t((sizeof(NativeRigidPassGPU) + alignment - 1) / alignment * alignment);
-  Need(stride && stride <= 65536, "Rigid fixture alignment bound");
-  std::vector<uint8_t> uniform_bytes(stride * 4);
-  std::memcpy(uniform_bytes.data()+stride, &*object, sizeof(*object));
-  std::memcpy(uniform_bytes.data()+2*stride, &*caster, sizeof(*caster));
-  std::memcpy(uniform_bytes.data()+3*stride, &*packed_pass, sizeof(*packed_pass));
-  auto uniforms = Upload(device, uniform_bytes.data(), uint32_t(uniform_bytes.size()), RenderBufferFlag::CONSTANT);
+  const uint32_t instance_count = mode == 4 ? 2 : 1;
+  std::array<NativeRigidInstanceGPU,2> scene_instances, shadow_instances;
+  std::array<NativeRigidPassInputs,2> references{pass,pass};
+  scene_instances[0] = {*object,*packed_pass}; shadow_instances[0] = {*caster,*packed_pass};
+  if (mode == 4) for (uint32_t n=0;n<2;++n) {
+    auto transform = Identity(); transform[0] = .5f; transform[5] = n ? 1.1f : 1.f;
+    transform[12] = n ? .5f : -.5f; transform[14] = n ? -.125f : 0;
+    // Distinct worlds, colour/alpha, lights and fog within one GPU draw, in both
+    // eyes. A shared final object's uniforms cannot satisfy the pixel oracle.
+    references[n].lights[0].colour.x += .2f*n;
+    references[n].fog[0].opacity += .15f*n;
+    references[n].colour_grade.x += .1f*n;
+    scene_instances[n] = {*BuildRigidObject(transform,{.5f+.25f*n,.75f,1,.8f-.2f*n},
+        {.1f,.2f,.15f,8},{.5f,.5f,.5f,.5f},flags),*BuildRigidPass(references[n])};
+    transform[14] -= .25f;
+    shadow_instances[n] = {*BuildRigidObject(transform,{1,1,1,1},{0,0,0,8},{1,1,0,0},0),scene_instances[n].pass_data};
+  }
+  const auto alignment = static_cast<VulkanDevice &>(device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment;
+  const auto placement = PlanNativeRigidStorage(instance_count,uint32_t(alignment));
+  Need(bool(placement), "Rigid fixture storage alignment bound");
+  const uint64_t scene_offset = placement->Offset(1), shadow_offset = placement->Offset(scene_offset+placement->bytes);
+  std::vector<uint8_t> storage_bytes(shadow_offset+placement->bytes,0xCD); // poison prefix catches element/byte confusion
+  std::memcpy(storage_bytes.data()+scene_offset,scene_instances.data(),placement->bytes);
+  std::memcpy(storage_bytes.data()+shadow_offset,shadow_instances.data(),placement->bytes);
+  auto storage = Upload(device,storage_bytes.data(),uint32_t(storage_bytes.size()),RenderBufferFlag::STORAGE);
   struct Vertex { RigidFloat4 position, normal, uv, colour; };
-  std::array<Vertex, 3> vertices{};
-  const float xy[3][2]{{-1,-1},{3,-1},{-1,3}};
-  for (uint32_t i = 0; i < 3; ++i) vertices[i] = {{xy[i][0],xy[i][1],.5f,1},
+  std::array<Vertex, 4> vertices{};
+  const float xy[4][2]{{-1,-1},{1,-1},{1,1},{-1,1}};
+  for (uint32_t i = 0; i < 4; ++i) vertices[i] = {{xy[i][0],xy[i][1],.5f,1},
       {.3f,.4f,1,0},{xy[i][0],xy[i][1],0,0},{.8f,.6f,.4f,.5f}};
   auto vb = Upload(device, vertices.data(), sizeof(vertices), RenderBufferFlag::VERTEX);
-  const uint16_t indices[]{0,1,2};
+  const uint16_t indices[]{0,1,2,0,2,3};
   auto ib = Upload(device, indices, sizeof(indices), RenderBufferFlag::INDEX);
   auto colour_desc = RenderTextureDesc::ColorTarget(size,size,RenderFormat::R32G32B32A32_FLOAT);
   colour_desc.arraySize = 2;
@@ -115,8 +133,11 @@ void Run(RenderDevice &device, uint32_t mode) {
   NativeRigidDescriptorSchema schema;
   std::array<std::unique_ptr<RenderDescriptorSet>, 3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]), "Rigid descriptors"); }
-  sets[0]->setBuffer(0, uniforms.get(), sizeof(NativeRigidObjectGPU));
-  sets[0]->setBuffer(1, uniforms.get(), sizeof(NativeRigidPassGPU));
+  auto shadow_set = schema.sets[0].create(&device); Need(bool(shadow_set), "Rigid shadow storage set");
+  const RenderBufferStructuredView scene_view(sizeof(NativeRigidInstanceGPU),uint32_t(scene_offset/sizeof(NativeRigidInstanceGPU)));
+  const RenderBufferStructuredView caster_view(sizeof(NativeRigidInstanceGPU),uint32_t(shadow_offset/sizeof(NativeRigidInstanceGPU)));
+  sets[0]->setBuffer(0,storage.get(),placement->bytes,&scene_view);
+  shadow_set->setBuffer(0,storage.get(),placement->bytes,&caster_view);
   sets[1]->setTexture(0, albedo.get(), RenderTextureLayout::SHADER_READ, albedo_view.get());
   sets[1]->setTexture(1, shadow.get(), RenderTextureLayout::SHADER_READ, shadow_view.get());
   RenderSamplerDesc sampler_desc;
@@ -145,6 +166,9 @@ void Run(RenderDevice &device, uint32_t mode) {
   auto shadow_pipeline = device.createGraphicsPipeline(pipeline_desc);
   Need(scene_pipeline && static_cast<VulkanGraphicsPipeline *>(scene_pipeline.get())->vk &&
        shadow_pipeline && static_cast<VulkanGraphicsPipeline *>(shadow_pipeline.get())->vk, "Rigid native pipelines");
+  const NativeRigidIndexedCommand indirect_command{6,instance_count,0,0,0};
+  const std::array<NativeRigidIndexedCommand,2> indirect_commands{{{},indirect_command}};
+  auto indirect = Upload(device,indirect_commands.data(),sizeof(indirect_commands),RenderBufferFlag::INDIRECT);
   auto queue = device.createCommandQueue(RenderCommandListType::DIRECT);
   auto commands = queue->createCommandList(); auto fence = device.createCommandFence();
   commands->begin();
@@ -159,29 +183,29 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::DEPTH_WRITE));
   commands->setFramebuffer(shadow_fb.get()); commands->clearDepthStencil(true,true,1,0);
   GraphicsBindings bindings;
-  // Production casters bind only their two matrix blocks. The depth-only VS
+  // Production casters bind only their native instance storage. The depth-only VS
   // does not require otherwise declared image/sampler sets to be populated.
   bindings.layout = programs.shadow->Layout(); bindings.set_count = 1;
-  bindings.sets[0] = sets[0].get();
-  bindings.dynamic_counts[0] = 2; bindings.offsets = {2*stride,3*stride};
+  bindings.sets[0] = shadow_set.get();
   GraphicsBindingState binding_state;
   Need(ApplyGraphicsBindings(*commands,bindings,binding_state), "Rigid shadow bind");
   commands->setPipeline(shadow_pipeline.get());
   const RenderVertexBufferView vertex_view({vb.get(),0},sizeof(vertices));
   const RenderIndexBufferView index_view({ib.get(),0},sizeof(indices),RenderFormat::R16_UINT);
   commands->setVertexBuffers(0,&vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
-  commands->drawIndexedInstanced(3,1,0,0,0);
+  commands->drawIndexedIndirect(indirect.get(),sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
   commands->setFramebuffer(nullptr);
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::SHADER_READ));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(colour.get(),RenderTextureLayout::COLOR_WRITE));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(depth.get(),RenderTextureLayout::DEPTH_WRITE));
   commands->setFramebuffer(scene_fb.get()); commands->clearColor(0,RenderColor(0,0,0,0));
   commands->clearDepthStencil(true,false,1,0);
-  bindings.layout = programs.scene->Layout(); bindings.offsets[0] = stride;
+  bindings.layout = programs.scene->Layout(); bindings.sets[0] = sets[0].get();
   bindings.set_count = 3;
   for (uint32_t n=1;n<3;++n) bindings.sets[n] = sets[n].get();
   Need(ApplyGraphicsBindings(*commands,bindings,binding_state), "Rigid scene bind");
-  commands->setPipeline(scene_pipeline.get()); commands->drawIndexedInstanced(3,1,0,0,0);
+  commands->setPipeline(scene_pipeline.get());
+  commands->drawIndexedIndirect(indirect.get(),sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
   commands->setFramebuffer(nullptr);
   auto readback = device.createBuffer(RenderBufferDesc::ReadbackBuffer(2*colour_bytes+3*depth_bytes));
   Need(bool(readback), "Rigid readback");
@@ -217,20 +241,26 @@ void Run(RenderDevice &device, uint32_t mode) {
   const auto *pixels=static_cast<const float *>(readback->map()); Need(pixels!=nullptr,"Rigid readback map");
   float maximum_error=0;
   for (uint32_t eye=0;eye<2;++eye) for (uint32_t y=0;y<size;++y) for (uint32_t x=0;x<size;++x) {
-    const LitVector position=LitVec(2*(x+.5f)/size-1-(eye?.0625f:0),1-2*(y+.5f)/size,.5f);
-    const LitVector normal=LitNormalize(LitVec(.3f/1.2f,.4f/1.25f,1));
-    const auto camera=LitVec(pass.cameras[eye].x,pass.cameras[eye].y,pass.cameras[eye].z);
+    const uint32_t n = mode == 4 && x >= size/2 ? 1 : 0;
+    const auto &reference = references[n];
+    const auto &object_reference = scene_instances[n].object_data;
+    const auto &matrix = object_reference.world.rows;
+    const float world_z = .5f+matrix[3].z;
+    const LitVector position=LitVec(2*(x+.5f)/size-1-(eye?.0625f:0),1-2*(y+.5f)/size,world_z);
+    const LitVector normal=LitNormalize(LitVec(.3f/matrix[0].x,.4f/matrix[1].y,1));
+    const auto camera=LitVec(reference.cameras[eye].x,reference.cameras[eye].y,reference.cameras[eye].z);
     const auto view=LitNormalize(LitSubtract(camera,position));
-    const bool second=(position.x-.1f)/1.2f>=0;
+    const bool second=(position.x-matrix[3].x)/matrix[0].x>=0;
     const auto texture=second?LitVec(.25f,.75f,.5f):LitVec(.5f,.25f,.75f);
-    LitSurface surface{LitMultiply(texture,LitVec(.4f,.45f,.4f)),LitVec(.1f,.2f,.15f),
-      LitVec(.2f,.15f,.1f),LitVec(.15f,.2f,.1f),.5f,mode==1?0.f:1.f,true,true};
+    const auto &diffuse = object_reference.diffuse;
+    LitSurface surface{LitMultiply(texture,LitVec(.8f*diffuse.x,.6f*diffuse.y,.4f*diffuse.z)),LitVec(.1f,.2f,.15f),
+      LitVec(.2f,.15f,.1f),LitVec(.15f,.2f,.1f),.5f,mode==1||mode==4?0.f:1.f,true,true};
     LitResponse response[3];
-    for (uint32_t n=0;n<3;++n) response[n]=EvaluateLitLight(pass.lights[n],position,normal,view,8);
-    auto expected=ComposeLitSurface(surface,pass.lights[0],pass.lights[1],pass.lights[2],response[0],response[1],response[2]);
-    if(mode>=2) for(const auto &fog:pass.fog) expected=ApplyLitFog(expected,position,camera,fog);
-    expected=LitScale(LitAdd(expected,LitVec(.01f,.02f,.03f)),.9f);
-    const float rgba[]{expected.x,expected.y,expected.z,second?.2f:.4f};
+    for (uint32_t light=0;light<3;++light) response[light]=EvaluateLitLight(reference.lights[light],position,normal,view,8);
+    auto expected=ComposeLitSurface(surface,reference.lights[0],reference.lights[1],reference.lights[2],response[0],response[1],response[2]);
+    if(mode>=2) for(const auto &fog:reference.fog) expected=ApplyLitFog(expected,position,camera,fog);
+    expected=LitScale(LitAdd(expected,LitVec(reference.colour_grade.x,.02f,.03f)),.9f);
+    const float rgba[]{expected.x,expected.y,expected.z,diffuse.w*(second?.25f:.5f)};
     const auto pixel=eye*size*size+y*size+x;
     for(uint32_t c=0;c<4;++c) {
       const float actual=pixels[pixel*4+c], error=std::abs(actual-rgba[c]);
@@ -240,12 +270,12 @@ void Run(RenderDevice &device, uint32_t mode) {
       }
       maximum_error=(std::max)(maximum_error,error);
     }
-    Need(std::abs(pixels[2*colour_bytes/4+pixel]-(eye?.25f:.5f))<1e-5f,"Rigid per-eye depth mismatch");
-    Need(std::abs(pixels[(2*colour_bytes+2*depth_bytes)/4+y*size+x]-.25f)<1e-5f,"Rigid caster depth mismatch");
+    Need(std::abs(pixels[2*colour_bytes/4+pixel]-world_z*(eye?.5f:1.f))<1e-5f,"Rigid per-eye depth mismatch");
+    Need(std::abs(pixels[(2*colour_bytes+2*depth_bytes)/4+y*size+x]-(world_z-.25f))<1e-5f,"Rigid caster depth mismatch");
   }
   readback->unmap();
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" eyes=2 pixels=128 max_error="<<maximum_error
-           <<"; sampled views=2D_ARRAY layer=0 shadow=D32_S8; native caster/receiver; raw bytes=0\n";
+           <<"; instances="<<instance_count<<" native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
 }
 }
-void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<4;++mode) Run(device,mode); }
+void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<5;++mode) Run(device,mode); }

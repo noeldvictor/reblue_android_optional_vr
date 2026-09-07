@@ -9,6 +9,7 @@
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include <array>
 #include <limits>
@@ -737,6 +738,74 @@ void RigidScenePacket() {
   plan.reset();
   assert(retired_geometry.expired() && retired_albedo.expired() && retired_depth.expired());
 }
+void RigidBatches() {
+  using namespace bd::gpu::scene;
+  int token = 0;
+  NativeRigidBatchItem a;
+  a.geometry = std::make_shared<NativeGeometry>();
+  a.pipeline = reinterpret_cast<RenderPipeline *>(&token);
+  a.layout = reinterpret_cast<RenderPipelineLayout *>(&token);
+  a.framebuffer = reinterpret_cast<RenderFramebuffer *>(&token);
+  a.viewport = RenderViewport(0,0,32,16); a.scissor = RenderRect(0,0,32,16);
+  a.frame = 8; a.slot = 1; a.view = 1;
+  NativeRigidBatchItem b = a;
+  b.input.object_data.world.rows[3].x = 7;
+  b.input.object_data.diffuse = {.2f,.4f,.6f,1};
+  b.input.pass_data.lights[0].colour_strength.x = .7f;
+  b.input.pass_data.fog[0].colour_opacity.w = .4f;
+  const NativeRigidBatchItem *pair[]{&a,&b};
+  std::array<NativeRigidInstanceGPU,2> packed{};
+  assert(NativeRigidBatchLength(pair,8,1) == 2 && PackNativeRigidBatch(pair,packed,8,1));
+  assert(packed[0].object_data.world.rows[3].x == 0 && packed[1].object_data.world.rows[3].x == 7);
+  assert(packed[1].object_data.diffuse.z == .6f && packed[1].pass_data.lights[0].colour_strength.x == .7f);
+  assert(packed[1].pass_data.fog[0].colour_opacity.w == .4f);
+  const auto good = b;
+  for (uint32_t fault=0;fault<14;++fault) {
+    b = good;
+    if (fault == 0) ++b.frame;
+    if (fault == 1) ++b.slot;
+    if (fault == 2) b.view = 3;
+    if (fault == 3) b.geometry = std::make_shared<NativeGeometry>(); // even an identical reloaded asset is a new lease
+    if (fault == 4) b.pipeline = nullptr;
+    if (fault == 5) b.layout = nullptr;
+    if (fault == 6) b.framebuffer = nullptr;
+    if (fault == 7) b.viewport.x = 1;
+    if (fault == 8) b.viewport.width = 64;
+    if (fault == 9) b.viewport.minDepth = .2f;
+    if (fault == 10) b.scissor.right = 8;
+    if (fault == 11) b.albedo = std::make_shared<NativeTextureGpu>();
+    if (fault == 12) b.shadow = std::make_shared<NativeTargetImage>();
+    if (fault == 13) b.albedo_sampler = reinterpret_cast<RenderSampler *>(&token);
+    const auto before = packed;
+    assert(NativeRigidBatchLength(pair,8,1) == 1 && !PackNativeRigidBatch(pair,packed,8,1));
+    assert(std::memcmp(before.data(),packed.data(),sizeof(packed)) == 0);
+  }
+  b = good;
+  const NativeRigidBatchItem *barrier[]{&a,nullptr,&b};
+  assert(NativeRigidBatchLength(barrier,8,1) == 1);
+  assert(!NativeRigidBatchLength(pair,9,1) && !NativeRigidBatchLength(pair,8,0));
+  std::array<const NativeRigidBatchItem *,kNativeRigidBatchLimit+1> many;
+  many.fill(&a); assert(NativeRigidBatchLength(many,8,1) == kNativeRigidBatchLimit);
+  assert(!PackNativeRigidBatch(pair,std::span(packed).first(1),8,1));
+  a.view = b.view = 3;
+  assert(!NativeRigidBatchLength(pair,8,1));
+  a.albedo = std::make_shared<NativeTextureGpu>(); a.shadow = std::make_shared<NativeTargetImage>();
+  a.albedo_sampler = a.shadow_sampler = reinterpret_cast<RenderSampler *>(&token);
+  b = a; assert(NativeRigidBatchLength(pair,8,1) == 2);
+  b.shadow_sampler = nullptr; assert(NativeRigidBatchLength(pair,8,1) == 1);
+  for (const uint32_t alignment : {1u,16u,64u,256u,1024u}) for (uint32_t count : {1u,2u,256u}) {
+    const auto placement = PlanNativeRigidStorage(count,alignment); assert(placement);
+    for (uint64_t base : {0ull,16ull,1024ull,4193792ull}) {
+      const auto offset = placement->Offset(base);
+      assert(offset >= base && offset%alignment == 0 && offset%sizeof(NativeRigidInstanceGPU) == 0);
+      assert(offset-base+placement->bytes <= placement->reserve);
+    }
+  }
+  assert(!PlanNativeRigidStorage(0,16) && !PlanNativeRigidStorage(257,16));
+  assert(!PlanNativeRigidStorage(2,0) && !PlanNativeRigidStorage(2,3) && !PlanNativeRigidStorage(2,65536));
+  a = {}; b = {};
+  assert(packed[1].object_data.world.rows[3].x == 7); // packed CPU data survives source retirement
+}
 void SceneCommands() {
   using namespace bd::gpu::scene;
   const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
@@ -868,6 +937,7 @@ int main() {
   DepthOnlyCommands();
   CameraAndRigidCaster();
   RigidScenePacket();
+  RigidBatches();
   SceneCommands();
   refraction_material_tests::Run();
   water_update_tests::Run();

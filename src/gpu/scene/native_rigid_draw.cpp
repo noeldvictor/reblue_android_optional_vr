@@ -5,6 +5,7 @@
 #include "gpu/scene/native_rigid_draw.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/device.h"
@@ -28,30 +29,42 @@ REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
     "Fail-closed direct native mono scene acceptance for the selected rigid field asset; no node interpreter/template warm-up.");
 namespace bd::gpu::scene {
 struct NativeRigidDrawStore {
-  struct Record {
-    std::shared_ptr<const NativeGeometry> geometry;
+  struct Batch {
     std::unique_ptr<plume::RenderDescriptorSet> constants;
-    NativeTextureGpuHandle albedo;
-    NativeTargetImageHandle shadow;
     std::unique_ptr<plume::RenderDescriptorSet> images, samplers;
-    bool scene = false;
   };
   struct Program { NativeVertexInputHandle input; NativeRigidPrograms shaders; };
   // Immutable program variants remain bounded; per-draw descriptors/geometry
   // survive exactly their recording slot's fence. Upload pages have their own
   // shared bounded arena and are never read back as a CPU data source.
   std::vector<Program> programs;
-  std::array<std::vector<Record>, kNumFrames> records;
+  std::array<std::vector<std::shared_ptr<const NativeRigidBatchItem>>, kNumFrames> records;
+  std::array<std::vector<Batch>, kNumFrames> batches;
+  std::array<NativeRigidInstanceGPU, kNativeRigidBatchLimit> scratch;
   uint64_t submitted = 0, suppressed = 0, retired = 0;
   uint32_t reported_frame = 0;
   uint64_t emitted = 0, scene_submitted = 0, scene_emitted = 0, scene_retired = 0, scene_suppressed = 0;
   uint32_t scene_reported_frame = 0;
+  uint64_t scene_batches = 0, shadow_batches = 0, merged_instances = 0;
 };
 namespace {
 void Require(bool valid, const char *reason) {
   if (valid) return;
   BD_ERROR("[native-rigid-shadow] selected node refused: {}; interpreter/capture/replay remain disabled", reason);
   throw std::runtime_error(reason);
+}
+void BatchRequire(bool valid, const char *reason) {
+  if (valid) return;
+  BD_ERROR("[native-rigid-batch] refused: {}; no translated-record fallback", reason);
+  throw std::runtime_error(reason);
+}
+void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> item) {
+  item->pipeline = draw.pipeline; item->layout = draw.bindings.layout; item->framebuffer = draw.framebuffer;
+  item->viewport = draw.viewport; item->scissor = draw.scissor; item->view = draw.render_view;
+  item->frame = FrameStatFrameCount(); item->slot = Video::CurrentFrameSlot();
+  BatchRequire(item->Ready(item->frame,item->slot), "incomplete native instance");
+  state().native_rigid_draws->records[item->slot].push_back(item);
+  draw.native_rigid = std::move(item);
 }
 }
 bool NativeRigidShadowEnabled() { return REXCVAR_GET(bd_native_rigid_shadow); }
@@ -100,26 +113,9 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   SanitizePipelineState(pipeline_state);
   auto *pipeline = GetOrCreatePipeline(pipeline_state);
   Require(pipeline != nullptr, "native shadow pipeline unavailable");
-  uint64_t alignment = 256;
-#if !defined(REBLUE_D3D12)
-  alignment = static_cast<plume::VulkanDevice &>(*s.device).physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
-#endif
-  Require(alignment && alignment <= 65536 && !(alignment & (alignment - 1)), "uniform alignment unsupported");
-  const auto object_upload = UploadHostData(&plan->object, sizeof(plan->object), uint32_t(alignment));
-  const auto pass_upload = UploadHostData(&plan->pass, sizeof(plan->pass), uint32_t(alignment));
-  Require(object_upload.memory && pass_upload.memory, "bounded uniform upload refused");
-  NativeRigidDescriptorSchema schema;
-  auto constants = schema.sets[0].create(s.device.get());
-  Require(bool(constants), "native constant descriptors unavailable");
-  constants->setBuffer(0, object_upload.ref.ref, sizeof(plan->object));
-  constants->setBuffer(1, pass_upload.ref.ref, sizeof(plan->pass));
   QueuedDraw draw;
   draw.pipeline = pipeline;
   draw.bindings.layout = program->shaders.shadow->Layout();
-  draw.bindings.set_count = 1; draw.bindings.sets[0] = constants.get();
-  draw.bindings.dynamic_counts[0] = 2;
-  draw.bindings.offsets[0] = uint32_t(object_upload.ref.offset);
-  draw.bindings.offsets[1] = uint32_t(pass_upload.ref.offset);
   draw.vertex_views[0] = geometry->streams[0];
   draw.input_slots[0] = plume::RenderInputSlot(0, geometry->strides[0]);
   draw.vertex_count = 1; draw.index_view = geometry->index;
@@ -130,10 +126,10 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   draw.viewport = plume::RenderViewport(0, 0, float(width), float(height));
   draw.scissor = plume::RenderRect(0, 0, width, height); draw.has_viewport = true;
   draw.render_view = 1; draw.zwrite = true; draw.reorderable = true;
-  // No translated-instance ABI opt-in. Native instance batching is separate
-  // follow-up work, not an excuse to pack source register records here.
   Require(draw.bindings.Valid(), "invalid native descriptor contract");
-  records.push_back({geometry, std::move(constants)});
+  auto item = std::make_shared<NativeRigidBatchItem>();
+  item->geometry = geometry; item->input = {plan->object,plan->pass};
+  StageNativeItem(draw,std::move(item));
   if (!s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands);
@@ -218,32 +214,8 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node) {
   sampler.comparisonEnabled = true; sampler.comparisonFunc = plume::RenderComparisonFunction::LESS_EQUAL;
   const auto *shadow_sampler = ResolveSamplerLocked(sampler);
   require(albedo_sampler && shadow_sampler, "native sampler cache refused explicit binding");
-  uint64_t alignment = 256;
-#if !defined(REBLUE_D3D12)
-  alignment = static_cast<plume::VulkanDevice &>(*s.device).physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
-#endif
-  require(alignment && alignment <= 65536 && !(alignment & (alignment-1)), "uniform alignment unsupported");
-  const auto object_upload = UploadHostData(&plan->object, sizeof(plan->object), uint32_t(alignment));
-  const auto pass_upload = UploadHostData(&plan->pass, sizeof(plan->pass), uint32_t(alignment));
-  require(object_upload.memory && pass_upload.memory, "bounded uniform upload refused");
-  NativeRigidDescriptorSchema schema;
-  NativeRigidDrawStore::Record record;
-  record.geometry = geometry; record.albedo = plan->albedo; record.shadow = plan->shadow; record.scene = true;
-  record.constants = schema.sets[0].create(s.device.get());
-  record.images = schema.sets[1].create(s.device.get());
-  record.samplers = schema.sets[2].create(s.device.get());
-  require(record.constants && record.images && record.samplers, "native scene descriptors unavailable");
-  record.constants->setBuffer(0, object_upload.ref.ref, sizeof(plan->object));
-  record.constants->setBuffer(1, pass_upload.ref.ref, sizeof(plan->pass));
-  record.images->setTexture(0, plan->albedo->image.get(), plume::RenderTextureLayout::SHADER_READ, plan->albedo->view.get());
-  record.images->setTexture(1, plan->shadow->image.get(), plume::RenderTextureLayout::SHADER_READ, plan->shadow->view.get());
-  record.samplers->setSampler(0, albedo_sampler); record.samplers->setSampler(1, shadow_sampler);
   QueuedDraw draw;
   draw.pipeline = pipeline; draw.bindings.layout = program->shaders.scene->Layout();
-  draw.bindings.set_count = 3;
-  draw.bindings.sets[0] = record.constants.get(); draw.bindings.sets[1] = record.images.get(); draw.bindings.sets[2] = record.samplers.get();
-  draw.bindings.dynamic_counts[0] = 2;
-  draw.bindings.offsets[0] = uint32_t(object_upload.ref.offset); draw.bindings.offsets[1] = uint32_t(pass_upload.ref.offset);
   draw.vertex_views[0] = geometry->streams[0]; draw.input_slots[0] = plume::RenderInputSlot(0, geometry->strides[0]);
   draw.vertex_count = 1; draw.index_view = geometry->index; draw.has_index_buffer = draw.indexed = true;
   draw.count = geometry->count; draw.start_index = geometry->start_index; draw.base_vertex = geometry->base_vertex;
@@ -252,7 +224,11 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node) {
   draw.scissor = plume::RenderRect(0, 0, shape->width, shape->height); draw.has_viewport = true;
   draw.render_view = 3; draw.zwrite = true; draw.reorderable = true;
   require(draw.bindings.Valid(), "invalid native scene descriptor contract");
-  records.push_back(std::move(record));
+  auto item = std::make_shared<NativeRigidBatchItem>();
+  item->geometry = geometry; item->input = {plan->object,plan->pass};
+  item->albedo = plan->albedo; item->shadow = plan->shadow;
+  item->albedo_sampler = albedo_sampler; item->shadow_sampler = shadow_sampler;
+  StageNativeItem(draw,std::move(item));
   if (!s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands); s.draw_framebuffer_bound = true;
@@ -265,17 +241,67 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node) {
     BD_INFO("[native-rigid-scene] frame {} submitted {} emitted {} suppressed {} fence-retired {}; node {} instance {} generation {}; owned packet and native program, no node interpreter/template/replay",
         frame, store.scene_submitted, store.scene_emitted, store.scene_suppressed, store.scene_retired,
         node, pose.instance, pose.model_generation);
+    BD_INFO("[native-rigid-batch] frame {} scene instances {} indirect calls {} shadow instances {} indirect calls {} merged instances {}; native storage records, no translated gather",
+        frame, store.scene_emitted, store.scene_batches, store.emitted, store.shadow_batches, store.merged_instances);
     store.scene_reported_frame = frame;
   }
   return true;
 }
-void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view) {
+void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw) {
+  auto &s = state();
+  BatchRequire(s.native_rigid_draws && s.ready && s.device && s.command_list_open, "native batch device unavailable");
+  auto &store = *s.native_rigid_draws;
+  const auto slot = Video::CurrentFrameSlot();
+  auto &batches = store.batches[slot];
+  BatchRequire(items.size() <= kNativeRigidBatchLimit && batches.size() < 4096, "native batch capacity");
+  const auto packed = std::span(store.scratch).first(items.size());
+  BatchRequire(PackNativeRigidBatch(items,packed,FrameStatFrameCount(),slot), "stale or incompatible native batch");
+  const auto &first = *items[0];
+  BatchRequire(draw.pipeline == first.pipeline && draw.bindings.layout == first.layout && draw.framebuffer == first.framebuffer &&
+      draw.indexed && draw.has_index_buffer && !draw.translated_instance_records, "native queue contract changed");
+  uint64_t alignment = 16;
+#if !defined(REBLUE_D3D12)
+  alignment = static_cast<plume::VulkanDevice &>(*s.device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment;
+#endif
+  BatchRequire(alignment <= 65536, "storage alignment unsupported");
+  const auto placement = PlanNativeRigidStorage(uint32_t(items.size()),uint32_t(alignment));
+  BatchRequire(placement.has_value(), "native storage placement refused");
+  const auto upload = AllocateHostUpload(placement->reserve,uint32_t(alignment));
+  BatchRequire(upload.memory != nullptr, "bounded native instance upload refused");
+  const auto offset = placement->Offset(upload.ref.offset);
+  const auto prefix = uint32_t(offset-upload.ref.offset);
+  BatchRequire(prefix <= upload.size && placement->bytes <= upload.size-prefix, "native storage slice outside upload");
+  std::memcpy(upload.memory+prefix,packed.data(),placement->bytes);
+  NativeRigidDescriptorSchema schema;
+  NativeRigidDrawStore::Batch batch;
+  batch.constants = schema.sets[0].create(s.device.get());
+  BatchRequire(bool(batch.constants), "native storage descriptor unavailable");
+  const plume::RenderBufferStructuredView view(sizeof(NativeRigidInstanceGPU),offset/sizeof(NativeRigidInstanceGPU));
+  batch.constants->setBuffer(0,upload.ref.ref,placement->bytes,&view);
+  draw.bindings = {}; draw.bindings.layout = first.layout;
+  draw.bindings.set_count = 1; draw.bindings.sets[0] = batch.constants.get();
+  if (first.view == 3) {
+    batch.images = schema.sets[1].create(s.device.get()); batch.samplers = schema.sets[2].create(s.device.get());
+    BatchRequire(batch.images && batch.samplers, "native image descriptors unavailable");
+    batch.images->setTexture(0,first.albedo->image.get(),plume::RenderTextureLayout::SHADER_READ,first.albedo->view.get());
+    batch.images->setTexture(1,first.shadow->image.get(),plume::RenderTextureLayout::SHADER_READ,first.shadow->view.get());
+    batch.samplers->setSampler(0,first.albedo_sampler); batch.samplers->setSampler(1,first.shadow_sampler);
+    draw.bindings.set_count = 3; draw.bindings.sets[1] = batch.images.get(); draw.bindings.sets[2] = batch.samplers.get();
+  }
+  const NativeRigidIndexedCommand command{draw.count,uint32_t(items.size()),draw.start_index,draw.base_vertex,0};
+  const auto indirect = UploadHostData(&command,sizeof(command),4);
+  BatchRequire(indirect.memory && draw.bindings.Valid(), "native indirect upload or bindings refused");
+  draw.native_indirect = indirect.ref;
+  batches.push_back(std::move(batch));
+}
+void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances) {
   auto &s = state();
   if (!s.native_rigid_draws) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &program : store.programs) if (bindings.layout == program.shaders.scene->Layout()) {
-    if (render_view == 3 && bindings.set_count == 3) ++store.scene_emitted;
-    else if (render_view == 1 && bindings.set_count == 1) ++store.emitted;
+    if (render_view == 3 && bindings.set_count == 3) { store.scene_emitted += instances; ++store.scene_batches; }
+    else if (render_view == 1 && bindings.set_count == 1) { store.emitted += instances; ++store.shadow_batches; }
+    if (instances > 1) store.merged_instances += instances;
     return;
   }
 }
@@ -283,9 +309,10 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   if (!s.native_rigid_draws || slot >= kNumFrames) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &record : store.records[slot]) {
-    if (record.scene) ++store.scene_retired;
+    if (record->view == 3) ++store.scene_retired;
     else ++store.retired;
   }
   store.records[slot].clear();
+  store.batches[slot].clear();
 }
 } // namespace bd::gpu::scene

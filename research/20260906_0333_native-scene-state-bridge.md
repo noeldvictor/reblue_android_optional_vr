@@ -2671,3 +2671,46 @@ remain unattributed. Cleanup-end63,143,739,392 B/58.807 GiB free,106,983,424 B
 drive-wide free gain from output preflight; only450,560 B is measured cleanup.
 Next work shares this same ledger and must replace equivalent evidence after
 validation; new raw remains0.
+
+### Native rigid batching continuation, 2026-09-07
+
+Parent62a095f; previous turn made verified progress. Same original3 GiB exception,
+62,509,998,080 B floor/100 MiB diagnostics/10 MiB logs/images/raw0 gate; no reset.
+Previous post-push free63,143,137,280 B; current output preflight63,115,522,048 B.
+The intervening volume use is not fully attributed. No active renderer/build
+producer at preflight and the116-byte owner profile hash was unchanged.
+
+Planned host/fixture overlap under192 MiB; reused existing256 MiB build free-drop/
+300 s/10 MiB log supervisor. Output20/PID28180 and CPU5/PID28536 pass0.34/0.36 s;
+GPU26/PID15436 and rigid05/PID30300 pass five8x8 two-eye cases including two
+instances/indirect scene and caster commands.1.21/1.22 s, zero validation errors/
+warnings, no raw/images. Host96/PID28072 passes, codegen0 written/up to date,
+no guest objects rebuilt.284 Python checks pass. No failed build/run retry.
+True peak not separately recorded; sampled frees stayed above the original floor.
+Build-end63,116,124,160 B free; movement in drive free space is not cleanup credit.
+
+Pre-runtime63,113,625,600 B free. Run937/PID19332,10:11:14-10:12:15, passes
+fresh field/movement and native scene/shadow indirect emission/fence gates:
+300 instances and300 calls each,0 merged instances. Multi-instance GPU fixture
+coverage is distinct from this live singleton path.243,734 B runtime log and
+inspected143,601 B JPEG, no new raw/perf/cache/cook/dump.17 settings audited;
+exact profile restored and no owned producer survives. Runtime192 MiB free-drop/
+75 s/400 KiB log/160 KiB JPEG and aggregate10 MiB image limits unchanged.
+Hashes, source boundaries and pixel limitations:20260907_1016_native-rigid-batches.md.
+
+After validation removed12 exact superseded agent files: output19/CPU4,
+GPU25/rigid04, host95 stdout/stderr plus936 log/direct-scene JPEG.393,067 logical B;
+free63,110,656,000 ->63,111,065,600 B: **409,600 B reclaimed** once. Exact old
+runtime text/image gone; prior hashes/findings retained, tests reproducible.
+Keep937/image,host96,output20/CPU5,GPU26/rigid05 and unchanged distinct/protected
+baseline/flat/VR/movement/failure/raw evidence. No game data, source or build tree
+removed. The historical raw archive and incoming raw0 allowance are unchanged.
+
+Texture CPU tree66,119,132 B (+255,153), GPU tree10,487,791 B (+54,192),
+logs212,666 B (+25,580), images10,250,001 B (+2,164), runtime replacement+1,643 B.
+Exe48,519,680 B (+26,112), PDB108,617,728 B (+155,648). Known component growth
+**520,492 B** for native batch implementation and expanded CPU/GPU fixtures;
+replacement evidence is retained until its coverage is superseded. Other objects,
+source/Git and unrelated volume activity are not fully attributed. Cleanup-end
+63,111,065,600 B/58.777 GiB free,4,456,448 B drive-wide use from output preflight.
+Keep the same cumulative ledger/budget for continued lifecycle work.

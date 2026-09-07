@@ -12,11 +12,13 @@
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_rigid_batch.h"
 #include "gpu/frag_census.h"
 #include "gpu/vertex_pull.h"
 
 #include <algorithm>
 #include <cstring>
+#include <stdexcept>
 #include <vector>
 
 #include <fmt/format.h>
@@ -251,14 +253,16 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
   const bool counted = FragCensusBegin(
       cmd, d.ps_hash, d.visual_va, d.render_view,
       FragCensusFlags(d.blended, d.tex_opaque, d.zwrite, d.tex_slot0_only));
-  if (d.indexed)
+  if (d.native_indirect.ref)
+    cmd->drawIndexedIndirect(d.native_indirect.ref,d.native_indirect.offset,1,sizeof(scene::NativeRigidIndexedCommand));
+  else if (d.indexed)
     cmd->drawIndexedInstanced(d.count, instance_count, d.start_index,
                               d.base_vertex, first_instance);
   else
     cmd->drawInstanced(d.count, instance_count, d.start_vertex,
                        first_instance);
   ++g_binding_draws;
-  scene::NoteNativeRigidEmission(d.bindings, d.render_view);
+  scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count);
   if (counted)
     FragCensusEnd(cmd);
 }
@@ -289,7 +293,7 @@ u64 GroupKey(const QueuedDraw &d) {
     } streams[16];
   } b;
   std::memset(&b, 0, sizeof(b));
-  b.pipeline = d.instanced_pipeline;
+  b.pipeline = d.native_rigid ? d.pipeline : d.instanced_pipeline;
   b.framebuffer = d.framebuffer;
   if (d.has_viewport) {
     b.viewport[0] = d.viewport.x;
@@ -362,6 +366,11 @@ static bool BisectDrops(u32 &index_in_frame) {
 }
 
 void DrawQueuePush(const QueuedDraw &draw) {
+  if (draw.native_rigid && (draw.translated_instance_records || draw.instanced_pipeline || draw.pulled_pipeline ||
+      draw.record_index != ~0u || draw.native_indirect.ref || draw.prepass_pipeline || draw.color_pipeline)) {
+    BD_ERROR("[native-rigid-batch] refused hybrid native/translated queue record");
+    throw std::runtime_error("invalid native queue record");
+  }
   if (!draw.bindings.Valid()) {
     static u32 told = 0;
     if (told++ < 4) BD_ERROR("[draw-bindings] refused invalid producer binding snapshot");
@@ -384,7 +393,7 @@ void DrawQueuePush(const QueuedDraw &draw) {
   q.sequence = g_sequence++;
   // Computed here, after the caller filled in the draw parameters and the
   // eye viewport, and once rather than per comparison in the flush.
-  q.group_key = (q.instanced_pipeline && q.record_index != ~0u) ? GroupKey(q)
+  q.group_key = (q.native_rigid || (q.instanced_pipeline && q.record_index != ~0u)) ? GroupKey(q)
                                                                 : 0;
   q.batch_key = 0;
   if (q.pulled_pipeline && q.record_index != ~0u && q.indexed &&
@@ -652,6 +661,32 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       since_split = 0;
     }
     ++since_split;
+
+    if (q.native_rigid) {
+      std::array<const scene::NativeRigidBatchItem *,scene::kNativeRigidBatchLimit> items{};
+      size_t candidates = 0;
+      const auto limit = instancing && q.reorderable ? items.size() : size_t(1);
+      while (candidates < limit && i+candidates < g_queue.size()) {
+        const auto &candidate = g_queue[i+candidates];
+        if (!candidate.native_rigid || (candidates && !candidate.reorderable)) break;
+        items[candidates++] = candidate.native_rigid.get();
+      }
+      const auto n = scene::NativeRigidBatchLength(std::span(items).first(candidates),
+          FrameStatFrameCount(),Video::CurrentFrameSlot());
+      if (!n) {
+        BD_ERROR("[native-rigid-batch] refused stale queued instance; no translated fallback");
+        throw std::runtime_error("stale native queue record");
+      }
+      QueuedDraw d = q;
+      scene::PrepareNativeRigidBatchDraw(std::span(items).first(n),d);
+      if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
+      opaque += n; dmin = (std::min)(dmin,d.depth); dmax = (std::max)(dmax,d.depth);
+      EmitOne(cmd,d,st,n);
+      ++emitted;
+      if (n > 1) { ++groups; grouped_draws += n; }
+      i += n;
+      continue;
+    }
 
     // A run of consecutive draws sharing this one's group key becomes one
     // instanced draw; its records are committed to the GPU contiguously, in

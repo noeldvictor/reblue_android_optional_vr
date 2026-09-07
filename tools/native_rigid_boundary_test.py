@@ -11,18 +11,38 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
         self.assertIn("SubmitNativeRigidScene(*instance_pose, index)", walk)
         for required in ("PrepareNativeRigidSceneForObject(pose, node, refusal)",
-                         "shape->layers == 1", "plan->albedo->view.get()", "plan->shadow->view.get()",
-                         "ResolveSamplerLocked(", "record.scene = true", "store.scene_retired",
-                         "++store.scene_emitted", "draw.bindings.set_count = 3"):
+                         "shape->layers == 1", "first.albedo->view.get()", "first.shadow->view.get()",
+                         "ResolveSamplerLocked(", "item->input = {plan->object,plan->pass}", "store.scene_retired",
+                         "store.scene_emitted += instances", "draw.bindings.set_count = 3"):
             self.assertIn(required, direct)
         emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
-        self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view)", emitter)
+        self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count)", emitter)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
         preview = lights.split("PrepareNativeSelectedLightValues(uint32_t selection)", 1)[1].split(
             "std::optional<NativeSelectedLights> FindNativeSelectedLights", 1)[0]
         self.assertIn("PreviewSelectedLightValues(", preview)
         for forbidden in ("__imp__", "bd::mem::store", "REXCVAR_GET(bd_native_materials_verify)"):
             self.assertNotIn(forbidden, preview)
+
+    def test_native_batches_use_owned_storage_and_shared_queue_without_translated_gather(self):
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        for required in ("PackNativeRigidBatch(items,packed,FrameStatFrameCount(),slot)",
+                         "PlanNativeRigidStorage(", "minStorageBufferOffsetAlignment",
+                         "std::memcpy(upload.memory+prefix,packed.data(),placement->bytes)",
+                         "store.batches[slot].clear()", "draw.native_indirect = indirect.ref"):
+            self.assertIn(required, direct)
+        queue = (ROOT / "src/gpu/draw_queue.cpp").read_text()
+        native = queue.split("if (q.native_rigid) {",1)[1].split("// A run of consecutive draws",1)[0]
+        for required in ("NativeRigidBatchLength(", "PrepareNativeRigidBatchDraw(", "EmitOne(cmd,d,st,n)"):
+            self.assertIn(required, native)
+        self.assertNotIn("CommitInstanceRecords", native)
+        self.assertIn("cmd->drawIndexedIndirect(d.native_indirect.ref", queue)
+        schema = (ROOT / "src/gpu/scene/native_rigid_program.h").read_text()
+        self.assertIn("sets[0].addStructuredBuffer(0)", schema)
+        self.assertNotIn("addConstantBufferDynamic", schema)
+        shader = (ROOT / "src/gpu/scene/native_rigid_shader.h").read_text()
+        self.assertIn("StructuredBuffer<NativeRigidInstanceGPU>", shader)
+        self.assertIn("nointerpolation uint instance", shader)
 
     def test_scene_sampling_matches_production_array_views(self):
         shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
@@ -66,7 +86,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_gpu_fixture_uses_production_programs_and_real_pixels(self):
         text = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
         for required in ("CreateNativeRigidPrograms(device, input)", "ApplyGraphicsBindings(",
-                         "ApplyNativePipelineProgram(", "drawIndexedInstanced(", "vkWaitForFences(",
+                         "ApplyNativePipelineProgram(", "drawIndexedIndirect(", "instance_count = mode == 4 ? 2 : 1", "vkWaitForFences(",
                          "Rigid colour mismatch", "Rigid per-eye depth mismatch", "Rigid caster depth mismatch"):
             self.assertIn(required, text)
         self.assertNotIn("ofstream", text)
