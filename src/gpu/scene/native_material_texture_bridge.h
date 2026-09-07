@@ -13,7 +13,7 @@ namespace bd::gpu::scene {
 struct NodeTag;
 struct NativeObjectTextureState;
 using NativeMaterialTextureValues = MaterialTextureValues<NativeTextureBinding>;
-// One bounded immutable input snapshot for the complete object traversal. A
+// Bounded object defaults plus explicit node-light updates during traversal. A
 // nested traversal gets its own publication, and restores the parent on exit.
 class NativeObjectTextureScope {
   std::unique_ptr<NativeObjectTextureState> owned_;
@@ -30,6 +30,10 @@ using NativeObjectPrimitiveInputs = NativeObjectPrimitive<NativeTextureBinding>;
 std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
     const NativeInstancePose &pose, uint32_t node, uint32_t primitive);
 std::optional<NativeMaterialObjectInputs> FindNativeMaterialObjectInputs(const NodeTag &tag);
+std::optional<NativeSelectedLights> FindNativeMaterialLights(const NodeTag &tag);
+// Authored-selection binding is resolved only at the producer boundary.
+bool PublishNativeMaterialLights(uint32_t selection, const NativeSelectedLights &lights);
+void InvalidateNativeMaterialLights();
 void NativeMaterialObjectInputCheck(bool same);
 // Returned values live only through the current object scope. No source memory,
 // image-resource lookup or table-registry lock is required by this consumer.

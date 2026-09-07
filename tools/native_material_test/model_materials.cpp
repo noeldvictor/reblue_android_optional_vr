@@ -63,7 +63,8 @@ void TestNativeModelMaterials() {
     NativePrimitivePolicy policy;
     policy.routing_known = policy.direct = true;
     NativeMaterialObjectInputs object{{.5f, .25f, .75f, 1}, true};
-    auto packet = BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy);
+    NativeSelectedLights lights{}; lights[0].kind = LitDirectional; lights[0].colour.x = .75f;
+    auto packet = BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy, lights);
     Require(packet && packet->geometry && packet->world[12] == 7 && packet->policy.direct &&
             packet->receiver_shadow == NativeShadowPolicy::Receive && (packet->material_mask & kNativeDiffuse) &&
             packet->material_values[0] == object.colour, "owned pose/material/geometry/texture/policy packet");
@@ -75,10 +76,11 @@ void TestNativeModelMaterials() {
             "mismatched model generation cannot assemble a packet");
     object.colour[0] = std::numeric_limits<float>::infinity();
     Require(!BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy), "nonfinite object input refused");
-    textures = {}; object = {}; source = {}; gpu_owner.reset();
+    textures = {}; object = {}; source = {}; lights = {}; gpu_owner.reset();
     models.Retire(100); instances.Retire(id); pose.reset(); model.reset(); stale = {};
     Require(!gpu_lifetime.expired() && !image_lifetime.expired() && *packet->textures.images[0] == 73 &&
-            packet->textures.uv[3] == 4 && packet->world[12] == 7 && packet->material_values[0][0] == .5f,
+            packet->textures.uv[3] == 4 && packet->world[12] == 7 && packet->material_values[0][0] == .5f &&
+            packet->lights && (*packet->lights)[0].colour.x == .75f,
             "queued packet survives object scope, source and model/instance retirement");
     Require(models.Publish(100, {Mesh(20, 42)}), "same source key may be reused");
     Require(packet->material->asset.properties.shininess != 42, "replacement model cannot repoint packet");

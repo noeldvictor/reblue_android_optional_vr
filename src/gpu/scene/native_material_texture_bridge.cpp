@@ -7,6 +7,7 @@
 #include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
+#include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_texture_table_bridge.h"
 #include "gpu/scene/native_texture_binding_bridge.h"
@@ -28,6 +29,8 @@ struct NativeObjectTextureState {
   NativeModelRenderHandle model;
   std::shared_ptr<const NativeInstancePose> pose;
   std::optional<NativeMaterialObjectInputs> object;
+  std::optional<NativeSelectedLights> lights;
+  std::optional<NativeNodeSelectedLights> node_lights;
   NativeTextureTableHandle table;
   MaterialImageSelection<NativeTextureBinding> fallback;
   MaterialTextureInputs<NativeTextureBinding> inputs;
@@ -96,6 +99,10 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     publication->generation = publication->model ? publication->model->Generation() : 0;
     if (pose && pose->model == publication->model) publication->pose = std::move(pose);
     publication->object = ReadMaterialObjectInputs(*visual, Word);
+    // Per-node light selections execute later than this scope. Do not snapshot
+    // another node's lights as object-wide data; the direct path must own those updates.
+    if (const auto per_node = Word(uint64_t(*visual)+3380); per_node && !*per_node)
+      publication->lights = FindNativeSelectedLights(*visual+3132);
     publication->table = *table ? FindLoadedNativeTextureTable(*table) : nullptr;
     if (!publication->generation || (*table && !publication->table)) { ++stats.unsupported; return; }
     publication->context = context; publication->visual = *visual; publication->graph = *graph;
@@ -116,6 +123,35 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
   }
 }
 NativeObjectTextureScope::~NativeObjectTextureScope() { current = previous_; --depth; }
+
+void InvalidateNativeMaterialLights() {
+  if (current) { current->lights.reset(); current->node_lights.reset(); }
+}
+
+bool PublishNativeMaterialLights(uint32_t selection, const NativeSelectedLights &lights) {
+  auto *scope = current;
+  const auto &tag = CurrentNodeTag();
+  if (!scope || !tag.valid || tag.from_list || tag.ctx_va != scope->context ||
+      tag.visual_va != scope->visual || !scope->pose ||
+      !FindNativeInstanceNode(*scope->pose, tag.node_index)) return false;
+  scope->node_lights.reset();
+  // sub_82142C58: a non-null per-node table entry replaces visual+3132.
+  // Resolve that source binding where the authored publisher executes, never
+  // from a register file or a direct packet consumer. Null/inherited nodes are
+  // still unowned; another node's publication cannot supply their packet.
+  const auto per_node = Word(uint64_t(scope->visual)+3380);
+  if (!per_node) return false;
+  uint64_t expected = uint64_t(scope->visual)+3132;
+  if (*per_node) {
+    const auto table = Word(uint64_t(scope->visual)+3376);
+    const auto entry = table && *table ? Word(uint64_t(*table)+uint64_t(tag.node_index)*4) : std::nullopt;
+    if (!entry || !*entry) return false;
+    expected = *entry;
+  }
+  if (expected != selection) return false;
+  scope->node_lights = NativeNodeSelectedLights{tag.node_index, lights};
+  return true;
+}
 
 namespace {
 NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialProgram &program) {
@@ -212,7 +248,8 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
   const auto *mesh = program ? PrepareMaterialMesh(*program) : nullptr;
   if (!mesh || primitive >= mesh->values.size() || primitive >= mesh->policies.size()) return {};
   auto result = BuildNativeObjectPrimitive(scope->pose, node, primitive,
-      *scope->object, mesh->values[primitive], mesh->policies[primitive]);
+      *scope->object, mesh->values[primitive], mesh->policies[primitive],
+      SelectNativeObjectLights(scope->lights, scope->node_lights, node));
   object_stats.packets += result.has_value();
   return result;
 }
@@ -224,6 +261,11 @@ std::optional<NativeMaterialObjectInputs> FindNativeMaterialObjectInputs(const N
   }
   ++object_stats.reads;
   return scope->object;
+}
+std::optional<NativeSelectedLights> FindNativeMaterialLights(const NodeTag &tag) {
+  const auto *scope = current;
+  if (!scope || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual) return {};
+  return SelectNativeObjectLights(scope->lights, scope->node_lights, tag.node_index);
 }
 void NativeMaterialObjectInputCheck(bool same) {
   ++object_stats.checked;
@@ -282,6 +324,7 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  NativeSelectedLightsReport();
   BD_INFO("[native-object-inputs] {} publications {} owned colour reads {} unavailable; {} checks wrong {}; {} owned primitive packets; no direct draw claimed",
           object_stats.publications, object_stats.reads, object_stats.missing,
           object_stats.checked, object_stats.wrong, object_stats.packets);

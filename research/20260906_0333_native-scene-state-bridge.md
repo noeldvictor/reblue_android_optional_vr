@@ -2193,3 +2193,70 @@ owned-packet lifetime/color-consumer coverage; replace equivalent outputs next
 checkpoint. Other objects/metadata/source/Git deltas unknown. Cleanup-end free
 58.92 GiB, drive-wide use+20,201,472 B (19.27 MiB) from current first preflight;
 not all attributed to task outputs. Original exception/floor/raw0 gate unchanged.
+
+### Owned selected-light publication, same checkpoint (2026-09-07)
+
+Parent ada121d, prior turn verified progress and pushed. First free63,263,776,768 B;
+04:29 preflight62,948,524,032 B. No renderer/build producer. Scoped cache/HLSL/perf
+inventory has no modified files since the prior run; material tree7,532,110 B,
+build logs182,554 B and prior field/image unchanged. Drive-wide loss315,252,736 B
+is not explained by these source-only edits; attribution remains unknown. Same
+original3 GiB exception/floor62,509,998,080 B, no budget reset. Reuse material and
+desktop build trees; plan <=4 MiB retained fixture/log growth and <=256 MiB build
+overlap, enforce the tighter per-build256 MiB/free-floor stops. No guest/shader
+rebuild, new tree, asset cook or raw output. CPU/source checks precede runtime;
+one <=75 s field comparison and <=160 KiB replacement image will be preflighted
+separately. Keep run922/image and current passing logs until replacements pass.
+
+Material21/PID29552 and CPU19/PID28084 pass (0.12 s behavior/0.13 s CTest).
+250 Python checks pass. Host79 stopped on an incorrect diagnostic GuestShader
+field name; corrected to shaderCacheEntry->hash. Host80/PID28944 passes, only
+host objects/link, codegen up-to-date. Build-end free62,924,156,928 B. No guest
+objects/shader regeneration. Next one <=75 s full post-event field comparison
+with selected-light publication AND actual normal-lit input checks, <=400 KiB
+log, one <=160 KiB replacement JPEG, raw/perf/cache/dump/cook off. Existing image
+10,243,891 B plus incoming163,840 B fits10 MiB. Enforce original floor and192 MiB
+per-run stop; exact owner profile restoration in finally. Retire prior passing
+image/text only after fresh matching comparisons and actual pixel inspection.
+
+Run923/PID14416 terminal04:34:21, original profile hash restored. Its317,845 B
+log records matching host publications but zero normal-lit draw checks; no image
+was produced and the readiness gate correctly failed. The selected object uses
+later per-node light overrides. Keep this failure until a corrected consumer
+passes. Add exact-node publication at the authored producer boundary; immutable
+returned packet values do not borrow another node's lights. Diagnostic packet
+observation moves after the node callback. Material22/PID30824, CPU20/PID23656
+(0.11 s behavior) and host81/PID18740 pass;250 Python checks pass. Host-only,
+no guest/shader build. Build-end free63,291,977,728 B; intervening drive-wide gain
+is not cleanup savings. Retry shares all original limits and retains the prior
+failure/current flat evidence until fresh comparisons and a replacement image pass.
+
+Run924/PID29684 terminal04:40:04; all15 settings effective and owner profile
+restored exactly. Fresh post-event contexts2051/2351: light publications/checks
++13,870 each, changed slots+900, snapshots+1,986, normal-lit input checks+1,322;
+zero mismatch/fallback/unavailable. The selected rigid packet now owns light
+kinds1/0/0. All existing field/shadow/colour/node/pose gates and player movement
+pass. Inspected136,226 B1920x1080 JPEG: coherent running Shu/bell/fence/terrain
+and shadows, known cliff marks/blur remain; not sequence/both-eye qualification.
+Run924239,652 B replaces prior flat text. No new raw/cache/perf/dump/asset file.
+Final host82/PID27524 passes with defensive invalidation of unbound/refused
+publications;250 guards pass again. That ownership guard was not rerun in-game;
+runtime/pixels remain tied to host81. Hashes/limits in the dated selected-light report.
+
+After replacement validation, removed17 exact superseded agent files: material
+20/21, CPU18/19, host78/79/80 stdout/stderr, run922/923 text and prior object-input
+sanity image. The compilation typo and per-node timing failure are resolved;
+their causes/hashes remain recorded. Current material22/CPU20 and tested/current
+host81/82 logs, run924/image, selected mesh and distinct baseline/GPU/motion/
+unresolved-failure/raw evidence preserved.694,095 logical B removed; immediate
+free63,234,830,336 ->63,235,543,040 B, **712,704 B (696 KiB) actually reclaimed**,
+credited once. Build logs are reproducible; exact retired runtime text/image
+files are no longer retained. No build/renderer producer remains.
+
+Known retained growth211,701 B: material tree+77,533, build logs-2,186, flat image
+replacement-1,265, field text+15,763, host exe+15,360/PDB+106,496. Growth covers
+owned light publication, node isolation and real consumer comparison; replace
+these outputs by purpose at the next checkpoint. Other objects/metadata/source/
+Git deltas unknown. Cleanup-end free58.89 GiB; drive-wide use+28,233,728 B
+(26.93 MiB) from this turn's first preflight, not all attributable to task files.
+Same original exception/floor/raw0 gate; no budget reset or new raw allowance.

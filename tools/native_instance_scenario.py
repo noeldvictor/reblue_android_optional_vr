@@ -41,6 +41,7 @@ LIT_SHADING_METRIC = re.compile(r"\[native-lit-shading\] (\d+) normal-lit queued
 DRAW_BINDING_METRIC = re.compile(r"\[draw-bindings\] (\d+) emitted draws (\d+) descriptor binds (\d+) layout binds;")
 MODEL_NODE_METRIC = re.compile(r"\[native-model-nodes\] (\d+) owned bounds/primitive associations (\d+) unavailable; (\d+) bounds checks wrong (\d+);")
 OBJECT_INPUT_METRIC = re.compile(r"\[native-object-inputs\] (\d+) publications (\d+) owned colour reads (\d+) unavailable; (\d+) checks wrong (\d+); (\d+) owned primitive packets;")
+SELECTED_LIGHT_METRIC = re.compile(r"\[native-selected-lights\] (\d+) publications (\d+) changed slots (\d+) compatibility; (\d+) checks wrong (\d+); (\d+) object snapshots (\d+) unavailable; (\d+) draw checks wrong (\d+);")
 
 
 class Pending(ValueError):
@@ -335,6 +336,32 @@ def verify_object_inputs(text):
             "checks_delta": b[3] - a[3], "unavailable": b[2], "packets_observed": b[5]}
 
 
+def verify_selected_lights(text):
+    """Fresh producer comparison and owned normal-lit consumption, not native GPU draws."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("selected-light diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-selected-light-mismatch]" in line:
+            raise ValueError("native selected light mismatch")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = SELECTED_LIGHT_METRIC.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[4] or values[8]:
+                raise ValueError("selected light differs at publication or draw consumption")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if (any(b[i] < a[i] for i in range(len(b))) or
+            any(b[i] - a[i] < 32 for i in (0, 5, 7)) or b[1] <= a[1] or
+            b[3] - a[3] != b[0] - a[0]):
+        raise Pending("need fresh completely checked light publications, changes, object snapshots and draw checks")
+    return dict(zip(("publications_delta", "changed_slots_delta", "compatibility_delta",
+                     "checks_delta", "snapshots_delta", "unavailable_delta", "draw_checks_delta"),
+                    (b[i] - a[i] for i in (0, 1, 2, 3, 5, 6, 7))))
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -382,6 +409,7 @@ def main():
     parser.add_argument("--draw-bindings", action="store_true")
     parser.add_argument("--model-nodes", action="store_true")
     parser.add_argument("--object-inputs", action="store_true")
+    parser.add_argument("--selected-lights", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -403,6 +431,7 @@ def main():
         bindings = verify_draw_bindings(text) if args.draw_bindings else None
         nodes = verify_model_nodes(text) if args.model_nodes else None
         objects = verify_object_inputs(text) if args.object_inputs else None
+        lights = verify_selected_lights(text) if args.selected_lights else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -432,6 +461,8 @@ def main():
         print("PASS: post-event owned model nodes " + ", ".join(f"{k}={v}" for k, v in nodes.items()))
     if objects is not None:
         print("PASS: post-event owned object inputs " + ", ".join(f"{k}={v}" for k, v in objects.items()))
+    if lights is not None:
+        print("PASS: post-event owned selected lights " + ", ".join(f"{k}={v}" for k, v in lights.items()))
     return 0
 
 

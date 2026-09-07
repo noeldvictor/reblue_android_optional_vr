@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_instance.h"
+#include "gpu/scene/native_selected_lights.h"
 
 namespace bd::gpu::scene {
 // Own every resource/value needed after the publication scope ends. Image
@@ -18,6 +19,7 @@ template <class Image> struct NativeObjectPrimitive {
   NativeMaterialHandle material;
   MaterialTextureValues<Image> textures;
   NativePrimitivePolicy policy;
+  std::optional<NativeSelectedLights> lights;
   NativeShadowPolicy receiver_shadow = NativeShadowPolicy::Unknown;
   std::array<float, 4> material_values[3]{};
   uint32_t material_mask = 0;
@@ -27,7 +29,7 @@ template <class Image>
 std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
     std::shared_ptr<const NativeInstancePose> pose, uint32_t node, uint32_t primitive,
     const NativeMaterialObjectInputs &object, const MaterialTextureValues<Image> &textures,
-    const NativePrimitivePolicy &policy) {
+    const NativePrimitivePolicy &policy, std::optional<NativeSelectedLights> lights = {}) {
   const auto *program = pose ? FindNativeInstanceNode(*pose, node) : nullptr;
   if (!program || !program->valid || primitive >= program->ranges.size() ||
       primitive >= program->geometries.size() || primitive >= program->materials.size() ||
@@ -39,6 +41,7 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
   result.world = result.pose->transforms[node];
   result.geometry = program->geometries[primitive]; result.material = program->materials[primitive];
   result.textures = textures; result.policy = policy;
+  result.lights = std::move(lights);
   result.receiver_shadow = program->shadow_policies[primitive];
   result.material_mask = ComposeNativeMaterialAsset(result.material->asset, object.colour,
       object.writes_shininess, result.material_values);

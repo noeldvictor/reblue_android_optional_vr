@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after owned object packets/color consumption and field run922. The first
+Updated 2026-09-07 after owned selected-light publication and field run924. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -52,7 +52,8 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    explicit 176-byte object/608-byte pass buffers, textures and samplers. Four
    tiny two-eye Vulkan color/depth cases pass using the shared light/fog core;
    packing is explicit, not a memcpy of its semantic structs. These shaders
-   are not connected to game objects yet; live scene light/fog ownership remains.
+   are not connected to game draws yet; selected lights now have owned publications,
+   while live fog and remaining pass ownership are still required.
    The shared queue accepts explicit layouts/descriptor sets/offsets, with
    binding-aware batching and exact caller restoration. The shared pipeline cache
    now accepts owned native shader/layout/input programs; background jobs and
@@ -69,7 +70,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    geometry/material/transform/color/image/UV/policy packets from that association;
    normal material composition uses the published object color. Exact pose identity
    prevents another instance/lane from borrowing the publication. Direct submission
-   must use this packet, not rediscover its data from replay; live pass inputs remain.
+   must use this packet, not rediscover its data from replay. The host three-light
+   publisher now supplies semantic values at the correctly timed per-node callback,
+   with exact object/node isolation and retained packet ownership. Authored selection
+   scoring, snapshot/animation updates and shader staging remain adapters; fog and
+   exact material-family inputs are next, before direct submission.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -119,7 +124,7 @@ drop participants from the initial acceptance scene.
 
 ### Direct rigid-object dependency map
 
-Source audit at `11f5d94`, updated for owned object primitive inputs (2026-09-07).
+Source audit at `11f5d94`, updated for owned object/selected-light inputs (2026-09-07).
 This records why the latest component
 checks are not an end-to-end object conversion, and where the next implementation
 must connect. It is not a second roadmap or a new renderer framework.
@@ -127,7 +132,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | Packet assembly and shared material preparation now select owned programs, with no `NodeTag`/source lookup. Packets retain resources after scope retirement; ordinary color composition is a live consumer. Feed these packets into direct submission. Only `PrepareReplayMaterialMesh` keeps the bounded source alias index; remove it when replay's last consumer migrates. Source-to-object publication itself still needs replacement. |
-| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass` and explicit GPU layout | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The live normal shader still imports these from registers. Publish owned lights/fog and associate native material/UV inputs with actual model primitives; do not repack translated registers per draw as the finished producer. |
+| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights | `NativeLightingInputs` owns ambient/camera/shadow sampling. The host `sub_8218B0F0` replacement now produces the three semantic light records; correctly scoped object/node publications feed retained packets. Authored selection scoring/snapshot updates and compatibility shader staging remain. The two fog layers and exact material/UV-family interpretation are still missing; do not import registers per draw as the finished producer. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Actual native shaders now work in the Vulkan fixture, using the production factory/description/binding cores. Connect the game object producer and shared cache selection; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
 
@@ -144,11 +149,24 @@ related cached CS-normal shader uses `(uv+1)/512+offset`, not yet proven as this
 object's exact live variant. Run922 observes its owned packet: material mask3,
 image mask0001, known UV offsets `(0,0,0,0)`, diffuse `(1,1,1,1)`, known direct
 non-deferred/non-alpha participation. These are that object's live values, not
-defaults to freeze into its asset or proof of exact shader eligibility.
+defaults to freeze into its asset or proof of exact shader eligibility. Run924
+also observes its owned light kinds `(directional, disabled, disabled)` after
+the per-node callback. Run923's object-wide-only snapshot missed these updates;
+the consumer gate failed instead of accepting startup publisher checks.
 Reuse this selected asset, not a library-wide recook. Connect its owned packet,
-complete light/fog production, resolve material-family interpretation and
+complete fog/pass production, resolve material-family interpretation and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
+
+[Selected-light evidence](../research/20260907_0442_owned-selected-lights.md):
+material22/CPU20,250 source/scenario checks and host82 pass. Run924/host81 adds
+13,870 matching publications,900 changed slots,1,986 object/node snapshots and
+1,322 matching normal-lit draw-input checks in fresh post-event windows; zero
+fallback/mismatch. The selected asset's retained packet owns the light set.
+Host82 only adds invalidation of unsupported/unbound publications; it was not
+rerun in the game. The inspected1920x1080 sanity image retains known cliff marks
+and distant blur. This is not direct native shader submission, source-free GPU
+loading, reload/sequence/both-eye qualification or a measured speedup.
 
 Work backward from the final submit call, defining the packet/binding contract
 first and connecting its missing producers next. Each implementation checkpoint

@@ -376,14 +376,15 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
                 bd::mem::try_store<u8>(at, u8(bd::mem::try_load<u8>(at) + 1));
               }
             }
-            if (instance_pose && REXCVAR_GET(bd_native_materials_verify))
-              NoteNativeModelNodeCandidate(*instance_pose, index, view_id,
-                  bd::mem::try_field<u32>(bd::mem::try_load<u32>(ctx_va), kVisualTech, ~0u));
             ctx.r3.u64 = mesh;
             ctx.r4.u64 = index;
             ctx.r5.u64 = matrix;
             ctx.r6.u64 = ctx_va;
             bdSceneNodeDrawSingle(ctx, base);
+            // Diagnostic only: per-node light callbacks publish during the draw.
+            if (instance_pose && REXCVAR_GET(bd_native_materials_verify))
+              NoteNativeModelNodeCandidate(*instance_pose, index, view_id,
+                  bd::mem::try_field<u32>(bd::mem::try_load<u32>(ctx_va), kVisualTech, ~0u));
           }
         }
       }

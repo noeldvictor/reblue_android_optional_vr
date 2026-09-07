@@ -1584,6 +1584,10 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
   }
   if (p.shadow_sampling)
     CheckNativeShadowSampling(*p.shadow_sampling, t_ps_block);
+  if (REXCVAR_GET(bd_native_materials_verify) && s.pipelineState.pixelShader &&
+      s.pipelineState.pixelShader->shaderCacheEntry &&
+      s.pipelineState.pixelShader->shaderCacheEntry->hash == 0xFB83DD3F5E67CEB7ull)
+    if (const auto lights = FindNativeMaterialLights(tag)) CheckNativeSelectedLights(*lights, t_ps_block);
   if (d.indexed && REXCVAR_GET(bd_native_shadow_inputs))
     d.material_disables_shadow = ImportMaterialDisablesShadow(
         tag, d.index_va, d.stream_va[0], d.start_index, d.count);

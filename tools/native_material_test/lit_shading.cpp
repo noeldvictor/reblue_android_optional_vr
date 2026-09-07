@@ -1,5 +1,7 @@
 #include "gpu/scene/native_lit_shading.h"
 #include "gpu/scene/native_rigid_inputs.h"
+#include "gpu/scene/native_selected_lights_source.h"
+#include <unordered_map>
 #include <limits>
 #include <array>
 #include <iostream>
@@ -51,6 +53,95 @@ Vec ReferenceFog(Vec colour, LitVector p, LitVector camera, LitFog fog) {
 }
 }
 void TestNativeLitShading() {
+  {
+    std::unordered_map<uint64_t, uint32_t> words;
+    const uint32_t owner = 1000, selection = 2000, records = 4000;
+    auto setup = [&] {
+      words.clear();
+      for (uint32_t slot = 0; slot < 3; ++slot) {
+        words[selection+8+slot*4] = (slot == 2 ? 0xffffu : slot) << 16;
+        words[owner+276+slot*4] = uint32_t(-2);
+        for (uint32_t part = 0; part < 4; ++part) {
+          const auto descriptor = owner+36+part*60+slot*20;
+          const auto buffer = 8000+part*100+slot*20;
+          const auto data = 10000+part*256+slot*64;
+          words[descriptor+4] = buffer; words[descriptor+12] = 2;
+          if (part == 3) words[descriptor+16] = slot;
+          words[buffer+12] = data;
+          for (uint32_t n = 0; n < 4; ++n) words[data+32+n*4] = 0x42c80000;
+        }
+        const uint64_t source = records+slot*76;
+        words[source] = slot+1;
+        for (uint32_t n = 20; n <= 72; n += 4) words[source+n] = std::bit_cast<uint32_t>(float(n));
+        words[source+56] = std::bit_cast<uint32_t>(1.04719755f);
+        words[source+60] = std::bit_cast<uint32_t>(3.0f);
+        words[source+72] = std::bit_cast<uint32_t>(100.0f);
+      }
+    };
+    const auto read = [&](uint64_t address) -> std::optional<uint32_t> {
+      const auto it = words.find(address);
+      return it == words.end() ? std::nullopt : std::optional(it->second);
+    };
+    auto prepare = [&](const SelectedLightSourceState &state = {}) {
+      return PrepareSelectedLights(owner, selection, 0, records, 3, 2, state, read,
+                                   [](double angle) { return std::cos(angle); });
+    };
+    setup();
+    const auto publication = prepare();
+    Require(publication && publication->count == 33 && publication->changed == 3 &&
+            publication->state.known == 7 && publication->state.lights[0].kind == LitDirectional &&
+            publication->state.lights[0].inverse_range == 0 &&
+            publication->state.lights[1].kind == LitSpot && publication->state.lights[1].cone_strength == .5f &&
+            Near(publication->state.lights[1].cone_cosine, .5) &&
+            publication->state.lights[2].kind == LitDisabled, "authored three-light semantic production");
+    for (size_t n = 0; n < publication->count; ++n) {
+      const auto &write = publication->writes[n]; words[write.address] = write.word;
+    }
+    Require(words[10000+32+12] == std::bit_cast<uint32_t>(1.0f) &&
+            words[10000+256+64+32+12] == std::bit_cast<uint32_t>(.5f) &&
+            words[10000+512+64+32+12] == std::bit_cast<uint32_t>(.01f) &&
+            words[10000+512+128+32] == 0 && words[10000+512+128+32+12] == 0x42c80000,
+            "descriptor/lane packing and inactive partial-write semantics");
+    auto same = prepare(publication->state);
+    Require(same && !same->count && same->state.known == 7, "unchanged IDs reuse owned light values");
+    Require(prepare()->state.known == 0, "unchanged unknown payload cannot be invented from source");
+    words[records+44] = std::bit_cast<uint32_t>(999.0f);
+    Require(prepare(publication->state)->state.lights[0].colour.x == 44,
+            "unannounced source update does not replace an unchanged selected value");
+    words[owner+276] = uint32_t(-2);
+    Require(prepare(publication->state)->state.lights[0].colour.x == 999,
+            "snapshot invalidation republishes the changed authored light");
+    words.clear();
+    std::optional<NativeNodeSelectedLights> node_lights = NativeNodeSelectedLights{64, publication->state.lights};
+    const auto selected = SelectNativeObjectLights({}, node_lights, 64);
+    Require(selected && !SelectNativeObjectLights({}, node_lights, 65),
+            "node publication cannot be borrowed by a different primitive owner");
+    node_lights.reset();
+    Require(selected->at(1).cone_strength == .5f &&
+            !SelectNativeObjectLights({}, node_lights, 64), "retired node publication leaves retained copies alive");
+    Require(SelectNativeObjectLights(publication->state.lights, {}, 64).has_value(),
+            "ordinary object defaults remain available without per-node overrides");
+    NativeRigidPassInputs owned_pass;
+    for (auto &fog : owned_pass.fog) fog.disabled = true;
+    owned_pass.lights = publication->state.lights;
+    Require(BuildRigidPass(owned_pass).has_value(), "native pass packs lights after source destruction");
+    setup(); words[selection+8] = 3u << 16;
+    Require(!prepare(), "out-of-range selected ID rejected before writes");
+    setup(); words[records+76+72] = 0;
+    Require(!prepare(), "singular active point/spot range refused");
+    setup(); words[8000+12] = records+20-32;
+    Require(!prepare(), "source/destination alias refused transactionally");
+    setup(); words[8000+12] = owner+276-32;
+    Require(!prepare(), "shader destination cannot alias selected identity cache");
+    setup(); words[8000+100+12] = words[8000+12];
+    Require(!prepare(), "overlapping output records refused");
+    setup(); words.erase(owner+36+4);
+    Require(!prepare(), "missing control descriptor refused");
+    Require(!PrepareSelectedLights(owner,selection,16,records,3,2,{},read,[](double x){return std::cos(x);}) &&
+            !PrepareSelectedLights(owner,selection,0,records,301,2,{},read,[](double x){return std::cos(x);}) &&
+            !PrepareSelectedLights(UINT32_MAX-3,selection,0,records,3,2,{},read,[](double x){return std::cos(x);}),
+            "view/count/address bounds refuse before mutation");
+  }
   const RenderMatrix world{2,0,0,0, 0,4,0,0, 0,0,.5f,0, 3,5,7,1};
   const auto object = BuildRigidObject(world, {1,2,3,1}, {.1f,.2f,.3f,8}, {2,3,4,5}, RigidDiffuse);
   Require(object && object->normal_rows[0].x == .5f && object->normal_rows[1].y == .25f &&
