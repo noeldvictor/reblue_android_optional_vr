@@ -56,6 +56,8 @@ struct ShadowPass {
   NativeImageLease image;
 };
 thread_local std::vector<ShadowPass> shadows;
+thread_local std::optional<CompletedNativeShadow> completed_shadow;
+thread_local uint32_t completed_frame = ~0u;
 struct Stats {
   uint64_t begins = 0, ends = 0, compatibility_begin = 0, compatibility_end = 0;
   uint64_t refused = 0, outputs = 0, null_outputs = 0, empty_clears = 0;
@@ -279,6 +281,10 @@ bool End(PPCContext &ctx, uint8_t *base, uint32_t source) {
     ++stats.image_checks;
     ++stats.outputs;
   } else ++stats.null_outputs;
+  if (const auto camera = pass.commands->Camera(FrameStatFrameCount(), 1); camera && pass.output) {
+    completed_shadow = CompletedNativeShadow{pass.depth->nativeTarget, *camera};
+    completed_frame = FrameStatFrameCount();
+  }
   CallFrame frame(ctx);
   SetState(ctx, base, 212, 7);
   uint32_t result = 0;
@@ -293,6 +299,11 @@ bool End(PPCContext &ctx, uint8_t *base, uint32_t source) {
 }
 } // namespace
 
+std::optional<CompletedNativeShadow> FindCompletedNativePrimaryShadow() {
+  if (completed_frame != FrameStatFrameCount() || !completed_shadow ||
+      completed_shadow->image->layout != plume::RenderTextureLayout::SHADER_READ) return {};
+  return completed_shadow;
+}
 NativeSceneCommands *ActiveNativeShadowCommands(plume::RenderTexture *color, plume::RenderTexture *depth) {
   if (shadows.empty() || !shadows.back().commands || NativePassDepth() != shadows.back().nesting)
     return nullptr;
@@ -307,6 +318,7 @@ plume::RenderFramebuffer *ActiveNativeShadowFramebuffer(plume::RenderTexture *co
 
 REX_HOOK_RAW(sub_82187168) {
   using namespace bd::gpu::scene;
+  completed_shadow.reset(); completed_frame = ~0u;
   const auto source = ctx.r3.u32;
   if (!Begin(ctx, base, source)) {
     InvalidateNativeSunCamera();

@@ -4,6 +4,7 @@ from native_instance_scenario import verify_model_nodes, verify_object_inputs, v
 from native_instance_scenario import verify_fog, verify_primitive_shader, verify_lighting_pass, verify_material_features
 from native_instance_scenario import verify_material_samplers, verify_light_selection, verify_shadow_images
 from native_instance_scenario import verify_rigid_shadow
+from native_instance_scenario import verify_rigid_scene
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -734,6 +735,36 @@ class RigidShadowScenarioTest(unittest.TestCase):
                     text.replace("node 64", "node 63"), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_rigid_shadow(bad)
+
+
+class RigidSceneScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-rigid-scene] frame 100 submitted 100 emitted 99 suppressed 0 fence-retired 98; node 64 instance 144 generation 93;"
+        rows[4] = "[native-rigid-scene] frame 150 submitted 150 emitted 149 suppressed 0 fence-retired 148; node 64 instance 144 generation 93;"
+        return rows
+
+    def test_emitted_commands_and_fences(self):
+        self.assertEqual(verify_rigid_scene("\n".join(self.rows())),
+                         dict(submitted_delta=50, emitted_delta=50, retired_delta=50))
+
+    def test_queue_only_stale_reset_or_wrong_scene_cannot_pass(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("emitted 149", "emitted 99").replace("retired 148", "retired 98"),
+                    text.replace("emitted 149", "emitted 148"), text.replace("retired 148", "retired 98"),
+                    text.replace("generation 93;", "generation 94;", 1),
+                    text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
+                    "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2])):
+            with self.assertRaises(Pending):
+                verify_rigid_scene(bad)
+
+    def test_refusal_impossible_counts_and_bounds(self):
+        text = "\n".join(self.rows())
+        for bad in ("[native-rigid-scene] selected node refused: receiver\n" + text,
+                    text.replace("emitted 149", "emitted 151"), text.replace("retired 148", "retired 150"),
+                    text.replace("node 64", "node 63"), "x" * (MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError):
+                verify_rigid_scene(bad)
 
 
 class FogScenarioTest(unittest.TestCase):

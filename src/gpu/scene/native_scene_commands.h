@@ -74,6 +74,7 @@ public:
         sources_[1]->image.get() == depth;
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
+  const NativeTargetShape *ColorShape() const { return sources_[0] ? &sources_[0]->shape : nullptr; }
   bool ClearPending() const { return clear_.has_value(); }
   void PublishCamera(const RenderTransformInputs &inputs, bool view_changed, bool projection_changed,
                      bool suppressed, uint32_t frame, uint32_t view) {

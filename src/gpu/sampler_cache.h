@@ -32,5 +32,8 @@ plume::RenderSamplerDesc ApplySamplerPolicy(plume::RenderSamplerDesc recipe,
 // default slot) on creation failure or heap full. Caller holds state().mutex (the miss
 // path allocates from the bindless sampler heap).
 u32 ResolveSlotLocked(const plume::RenderSamplerDesc &desc);
+// Same bounded device-lifetime cache, for explicit native descriptor sets.
+// Never substitutes slot zero on failure. Caller holds state().mutex.
+const plume::RenderSampler *ResolveSamplerLocked(const plume::RenderSamplerDesc &desc);
 
 } // namespace bd::gpu

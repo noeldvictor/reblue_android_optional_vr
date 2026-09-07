@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_light_selection.h"
+#include "gpu/scene/native_selected_lights_source.h"
 #include <bit>
 
 namespace bd::gpu::scene {
@@ -127,5 +128,21 @@ std::optional<NativeLightSelectionPlan> PrepareNativeLightSelection(
   }
   result.writes[4].after = (category_word & ~(255u << shift)) | (uint32_t(result.selection.category) << shift);
   return result;
+}
+// Direct node preflight shares both production cores, without committing their
+// compatibility writes. A failed later material/image admission leaves source
+// state untouched. Unknown unchanged slots remain unavailable, not fresh defaults.
+template <class Read, class Cosine>
+std::optional<NativeSelectedLights> PreviewSelectedLightValues(const NativeLightSelectionPlan &plan,
+    uint32_t owner, uint32_t selection, uint32_t view, uint32_t records, uint32_t record_count,
+    float strength, const SelectedLightSourceState &previous, Read read, Cosine cosine) {
+  const auto overlay = [&](uint64_t address) -> std::optional<uint32_t> {
+    for (const auto &write : plan.writes) if (write.address == address) return write.after;
+    return read(address);
+  };
+  const auto publication = PrepareSelectedLights(owner, selection, view, records, record_count,
+      strength, previous, overlay, cosine);
+  if (!publication || publication->state.known != 7) return {};
+  return publication->state.lights;
 }
 } // namespace bd::gpu::scene

@@ -8,6 +8,8 @@
 #include "gpu/scene/native_scene_commands.h"
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_rigid_shadow.h"
+#include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_shadow_receiver_bridge.h"
 #include <array>
 #include <limits>
 #ifdef NDEBUG
@@ -637,6 +639,104 @@ void CameraAndRigidCaster() {
   program = {}; material.reset(); geometry.reset();
   assert(caster->geometry && caster->geometry->count == 474); // source/model lifetime independent
 }
+void RigidScenePacket() {
+  using namespace bd::gpu::scene;
+  const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+  NativeReceiverColourPublication publication;
+  const LightingVector colour{.1f,.2f,.3f,.5f};
+  assert(!publication.Read(12,4,3));
+  publication.Publish(colour,12,4,3);
+  auto retained_colour = publication.Read(12,4,3);
+  assert(retained_colour && !publication.Read(13,4,3) && !publication.Read(12,5,3) && !publication.Read(12,4,1));
+  publication.Publish({.2f,.3f,.4f,.6f},12,4,3);
+  assert(publication.Read(12,4,3)->at(0) == .2f && retained_colour->at(0) == .1f);
+  publication.Publish({std::numeric_limits<float>::quiet_NaN(),0,0,0},12,4,3);
+  assert(!publication.Read(12,4,3));
+  publication.Publish(colour,12,4,3); publication.Reset(); assert(!publication.Read(12,4,3));
+  publication.Publish(colour,0,4,3); assert(!publication.Read(0,4,3));
+  publication.Publish(colour,12,4,16); assert(!publication.Read(12,4,16));
+
+  NativeModelMaterialProgram program; program.valid = true; program.ranges.resize(1);
+  auto geometry = std::make_shared<NativeGeometry>();
+  geometry->canonical_vertices = true; geometry->stream_mask = 1;
+  geometry->count = 474; geometry->strides[0] = 96;
+  int buffer_token = 0;
+  geometry->streams[0].buffer.ref = reinterpret_cast<RenderBuffer *>(&buffer_token);
+  geometry->index.buffer.ref = geometry->streams[0].buffer.ref;
+  NativeVertexInputLibrary library;
+  RenderInputElement element{}; element.semanticName = "POSITION";
+  element.format = RenderFormat::R32G32B32A32_FLOAT;
+  geometry->rigid_vertex_input = library.Resolve(std::span(&element,1),1,{});
+  auto material = std::make_shared<NativeMaterial>(); material->id = 0x63B8D67932573E51ull;
+  program.geometries = {geometry}; program.materials = {material};
+  auto albedo = std::make_shared<NativeTextureGpu>();
+  albedo->image = std::make_unique<SceneSource>(); albedo->view = std::make_unique<RenderTextureView>();
+  albedo->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  auto depth = std::make_shared<NativeTargetImage>();
+  depth->shape = {1024,1024,1,RenderFormat::D32_FLOAT_S8_UINT,1}; depth->descriptor = 1;
+  depth->layout = RenderTextureLayout::SHADER_READ;
+  depth->image = std::make_unique<SceneSource>(); depth->view = std::make_unique<RenderTextureView>();
+  NativeRigidReceiver receiver{depth,identity,colour,{true,true,true}};
+  NativeObjectPrimitive<NativeTextureBinding> packet;
+  packet.geometry = geometry; packet.material = material; packet.world = identity;
+  packet.shader.vertex_bones = 0; packet.shader.vertex_colour = true;
+  packet.features = NativeMaterialFeatures{true,true,false,false,true};
+  packet.lights = NativeSelectedLights{};
+  NativeFogLayers fog; for (auto &layer : fog) layer.disabled = true; packet.fog = fog;
+  packet.camera = RenderCamera{identity,identity,identity};
+  packet.lighting = NativeLightingPass{};
+  packet.lighting->inputs.color_scale = {0,0,0,1};
+  packet.lighting->inputs.shadow_bias = .001f;
+  packet.policy = {PrimitiveCull::Back,true,true,false,false,true};
+  packet.material_mask = 3; packet.material_values[0] = {1,.8f,.7f,1}; packet.material_values[1] = {0,0,0,0};
+  packet.textures.image_mask = 1; packet.textures.images[0].primary = albedo;
+  packet.textures.owns_uv = true; packet.textures.uv = {.25f,-.5f,0,0};
+  packet.receiver_shadow = NativeShadowPolicy::Receive;
+  packet.samplers[0] = NativeMaterialSampler2D{{},MaterialSampleAddress::Wrap,MaterialSampleAddress::Clamp};
+  const auto build = [&] { return PrepareNativeRigidScene(program,packet,receiver); };
+  auto plan = build(); assert(plan && plan->draw && plan->cull == PrimitiveCull::Back);
+  assert(plan->object.flags.x == 63 && plan->object.uv_scale_offset.x == 1.f/512);
+  assert(plan->object.uv_scale_offset.z == .25f+1.f/512 && plan->object.uv_scale_offset.w == -.5f+1.f/512);
+  assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo == albedo);
+  auto good = packet;
+  for (uint32_t fault=0;fault<15;++fault) {
+    packet = good;
+    if (fault == 0) packet.lights.reset();
+    if (fault == 1) packet.fog.reset();
+    if (fault == 2) packet.camera.reset();
+    if (fault == 3) packet.lighting.reset();
+    if (fault == 4) packet.shader.vertex_bones.reset();
+    if (fault == 5) packet.shader.vertex_bones = 1;
+    if (fault == 6) packet.shader.texture_layers = 2;
+    if (fault == 7) packet.policy.deferred = true;
+    if (fault == 8) packet.policy.alpha_test = true;
+    if (fault == 9) packet.textures.owns_uv = false;
+    if (fault == 10) packet.features->reflection = true;
+    if (fault == 11) packet.features->normal_mapping = true;
+    if (fault == 12) packet.samplers[0].reset();
+    if (fault == 13) packet.material_mask = 1;
+    if (fault == 14) packet.receiver_shadow = NativeShadowPolicy::Unknown;
+    assert(!build());
+  }
+  packet = good;
+  program.ranges.push_back(program.ranges[0]); assert(!build()); program.ranges.pop_back();
+  albedo->dimension = RenderTextureViewDimension::TEXTURE_2D; assert(!build());
+  albedo->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  depth->layout = RenderTextureLayout::DEPTH_WRITE; assert(!build()); depth->layout = RenderTextureLayout::SHADER_READ;
+  depth->shape.layers = 2; assert(!build()); depth->shape.layers = 1;
+  receiver.visibility.receiver_visible = false;
+  assert(!(build()->object.flags.x & RigidReceiveShadow));
+  packet.policy.direct = false; assert(!build()->draw);
+  const std::weak_ptr<NativeGeometry> retired_geometry = geometry;
+  const std::weak_ptr<NativeTextureGpu> retired_albedo = albedo;
+  const std::weak_ptr<NativeTargetImage> retired_depth = depth;
+  program = {}; packet = {}; good = {}; receiver = {};
+  geometry.reset(); material.reset(); albedo.reset(); depth.reset();
+  assert(retired_geometry.use_count() == 1 && retired_albedo.use_count() == 1 && retired_depth.use_count() == 1);
+  assert(plan->geometry->count == 474 && plan->albedo->view && plan->shadow->image);
+  plan.reset();
+  assert(retired_geometry.expired() && retired_albedo.expired() && retired_depth.expired());
+}
 void SceneCommands() {
   using namespace bd::gpu::scene;
   const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
@@ -767,6 +867,7 @@ int main() {
   SceneFramebufferOwnership();
   DepthOnlyCommands();
   CameraAndRigidCaster();
+  RigidScenePacket();
   SceneCommands();
   refraction_material_tests::Run();
   water_update_tests::Run();

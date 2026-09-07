@@ -416,6 +416,30 @@ def verify_rigid_shadow(text):
     return {"submitted_delta": b[1] - a[1], "retired_delta": b[3] - a[3]}
 
 
+def verify_rigid_scene(text):
+    """Fresh direct scene command emission and fence lifetime, not reload proof."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("rigid scene diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-rigid-scene\] frame (\d+) submitted (\d+) emitted (\d+) suppressed (\d+) fence-retired (\d+); node (\d+) instance (\d+) generation (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-rigid-scene] selected node refused:" in line:
+            raise ValueError("direct rigid scene refused; no fallback qualification")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[5] != 64 or not values[6] or not values[7] or values[2] > values[1] or values[4] > values[2]:
+                raise ValueError("invalid rigid scene identity/emission/fence counts")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if (b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1,2,4)) or
+            b[3] < a[3] or b[5:] != a[5:] or b[1]-a[1] != b[2]-a[2]):
+        raise Pending("need fresh direct scene submissions, real draw emission and fence retirement")
+    return dict(submitted_delta=b[1]-a[1], emitted_delta=b[2]-a[2], retired_delta=b[4]-a[4])
+
+
 def verify_shadow_images(text):
     """Require fresh native shadow completion and exact image-owner publication."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -562,6 +586,7 @@ def main():
     parser.add_argument("--light-selection", action="store_true")
     parser.add_argument("--shadow-images", action="store_true")
     parser.add_argument("--rigid-shadow", action="store_true")
+    parser.add_argument("--rigid-scene", action="store_true")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -592,6 +617,7 @@ def main():
         selection = verify_light_selection(text) if args.light_selection else None
         shadow_images = verify_shadow_images(text) if args.shadow_images else None
         rigid_shadow = verify_rigid_shadow(text) if args.rigid_shadow else None
+        rigid_scene = verify_rigid_scene(text) if args.rigid_scene else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -634,6 +660,8 @@ def main():
         print("PASS: post-event native shadow images " + ", ".join(f"{k}={v}" for k, v in shadow_images.items()))
     if rigid_shadow is not None:
         print("PASS: post-event direct rigid shadows " + ", ".join(f"{k}={v}" for k, v in rigid_shadow.items()))
+    if rigid_scene is not None:
+        print("PASS: post-event direct rigid scene " + ", ".join(f"{k}={v}" for k, v in rigid_scene.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     if primitive_shader is not None:

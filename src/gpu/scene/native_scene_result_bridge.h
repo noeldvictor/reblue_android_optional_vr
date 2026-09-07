@@ -63,6 +63,13 @@ void PublishNativePassCamera(const RenderTransformInputs &inputs, bool view_chan
                             bool projection_changed, bool suppressed);
 void InvalidateNativePassCamera();
 std::optional<RenderCamera> FindNativePassCamera(uint32_t render_view);
+struct CompletedNativeShadow {
+  NativeTargetImageHandle image;
+  RenderCamera camera;
+};
+// Only the completed primary pass in this frame. Beginning another pass or a
+// compatibility lifecycle invalidates it; the returned image lease pins storage.
+std::optional<CompletedNativeShadow> FindCompletedNativePrimaryShadow();
 void BindNativeSceneCommands(VideoState &s, NativeSceneCommands &commands);
 void ApplyNativeSceneClear(VideoState &s, NativeSceneCommands &commands);
 } // namespace bd::gpu::scene

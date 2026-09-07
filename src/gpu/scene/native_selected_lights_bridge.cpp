@@ -56,16 +56,14 @@ void Report() {
       selection_stats.updates, selection_stats.rebuilt, selection_stats.candidates,
       selection_stats.compatibility, selection_stats.checked, selection_stats.wrong);
 }
-bool Select(PPCContext &ctx, uint8_t *base) {
-  if (ctx.r3.u32 != kManager || ctx.r1.u32 < 704 || (ctx.r1.u32 & 15) ||
-      !rex::system::XThread::GetCurrentThread()) return false;
+std::optional<NativeLightSelectionPlan> PrepareSelection(uint32_t selection, uint32_t stack) {
+  if (!rex::system::XThread::GetCurrentThread()) return {};
   const auto view = Word(kView);
-  if (!view || *view >= 16) return false;
-  const auto selection = ctx.r4.u32;
+  if (!view || *view >= 16) return {};
   // Includes the deepest original scoring/ray stack, for comparison and safe
   // unsupported fallback. Reject aliases before any selection write occurs.
   const auto safe_word = [&](uint64_t address) -> std::optional<uint32_t> {
-    if (address < ctx.r1.u32 && address+4 > uint64_t(ctx.r1.u32)-704) return {};
+    if (stack && address < stack && address+4 > uint64_t(stack)-704) return {};
     return Word(address);
   };
   const auto control = [&](uint32_t address) -> std::optional<uint32_t> {
@@ -81,19 +79,25 @@ bool Select(PPCContext &ctx, uint8_t *base) {
   const auto owner = control(kLiveOwner), primary = control(kPrimaryThread), scene = control(kSpecialScene);
   const auto scale = control(kScale), angle = control(kAngleScale), low = control(kRayMin), high = control(kRayMax);
   if (!control(kView) || !owner || !primary || !scene || !scale || !angle || !low || !high ||
-      control(kOne) != 0x3f800000u || control(kZero) != 0u) return false;
+      control(kOne) != 0x3f800000u || control(kZero) != 0u) return {};
   bool special_scene = false;
   if (*scene) {
-    if (*scene > UINT32_MAX-1035) return false;
+    if (*scene > UINT32_MAX-1035) return {};
     const auto mode = control(*scene+1032);
-    if (!mode) return false;
+    if (!mode) return {};
     special_scene = *mode == 1;
   }
   const NativeLightSelectionSource source{kManager, selection, *owner, *view,
       rex::system::XThread::GetCurrentThreadId() == *primary, special_scene,
       {std::bit_cast<float>(*scale),std::bit_cast<float>(*angle),std::bit_cast<float>(*low),std::bit_cast<float>(*high)}};
-  const auto plan = PrepareNativeLightSelection(source, safe_word);
-  if (!plan) return false;
+  return PrepareNativeLightSelection(source, safe_word);
+}
+bool Select(PPCContext &ctx, uint8_t *base) {
+  if (ctx.r3.u32 != kManager || ctx.r1.u32 < 704 || (ctx.r1.u32 & 15)) return false;
+  const auto selection = ctx.r4.u32;
+  const auto view = Word(kView);
+  const auto plan = PrepareSelection(selection, ctx.r1.u32);
+  if (!plan || !view) return false;
   if (REXCVAR_GET(bd_native_materials_verify)) {
     __imp__sub_8218A8C8(ctx, base);
     ++selection_stats.checked;
@@ -166,6 +170,18 @@ bool Publish(PPCContext &ctx, uint8_t *base) {
 }
 } // namespace
 
+std::optional<NativeSelectedLights> PrepareNativeSelectedLightValues(uint32_t selection) {
+  if (!REXCVAR_GET(bd_native_lighting)) return {};
+  const auto plan = PrepareSelection(selection, 0);
+  const auto view = Word(kView), count = Word(kManager+46816), numerator = Word(kStrength);
+  if (!plan || !view || !count || !numerator) return {};
+  // Evaluate the publisher against the proposed selection without writing any
+  // compatibility state. A refused scene packet has no observable side effects.
+  // In particular, do not call comparison/original bodies in this direct path.
+  return PreviewSelectedLightValues(*plan, kPublisher, selection, *view, kManager+24016,
+      *count, std::bit_cast<float>(*numerator), current, Word,
+      [](double angle) { return std::cos(angle); });
+}
 std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection) {
   if (!REXCVAR_GET(bd_native_lighting) || current.known != 7 || current_selection != selection ||
       current_frame != FrameStatFrameCount()) { ++stats.unavailable; return {}; }

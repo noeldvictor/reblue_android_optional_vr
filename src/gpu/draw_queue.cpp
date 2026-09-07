@@ -11,6 +11,7 @@
 #include "gpu/frame_stats.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/node_tag.h"
+#include "gpu/scene/native_rigid_draw.h"
 #include "gpu/frag_census.h"
 #include "gpu/vertex_pull.h"
 
@@ -257,6 +258,7 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
     cmd->drawInstanced(d.count, instance_count, d.start_vertex,
                        first_instance);
   ++g_binding_draws;
+  scene::NoteNativeRigidEmission(d.bindings, d.render_view);
   if (counted)
     FragCensusEnd(cmd);
 }

@@ -2615,3 +2615,59 @@ GPU fixture tree10,433,599 B (+13,430); aggregate logs212,743 B (-49), known
 component growth13,381 B. Source/generated PS/CMake/Git and unrelated volume
 changes not fully attributed. Cleanup-end58.41 GiB free;311,296 B drive-wide
 free gain from preflight, not all cleanup credit. Budget unchanged.
+
+### Direct rigid scene continuation, 2026-09-07
+
+Parent9759a75; same original3 GiB exception/62,509,998,080 B operational floor,
+100 MiB diagnostics/10 MiB logs/images and raw0 gate. No budget reset. Previous
+post-push free62,712,070,144 B; current output preflight63,036,755,968 B. That
+initial free gain is unattributed, not cleanup. Original checkpoint starting
+free65,462,788,096 B and protected historical raw252,177,116,500 B/27,131 files
+remain the accounting baseline; no new raw allowance or historical deletion.
+
+CPU output18/PID30216 passed, ending62,899,900,416 B free:136,855,552 B
+(130.52 MiB) drive-wide transient use exceeded the initial under32 MiB fixture
+estimate. Material30/PID972 passed, ending63,035,432,960 B, returning most of
+that free space. Output attribution and true peak are unknown, not zero.
+Remaining host/fixture overlap was corrected to under192 MiB; existing256 MiB
+free-drop/300 s supervisor and original cumulative floor stayed enforced.
+CPU3/PID25628 and materialCPU28/PID30776 passed. Host94/PID30444 failed on a
+missing include; host95/PID28064 passed after the fix,63,033,151,488 B free.
+No guest rebuild or shader change; GPU25/rigid04 evidence remains applicable.
+
+Pre-runtime free63,160,893,440 B; the intervening free gain is unattributed.
+Run936/PID28504,09:42:32-09:43:43, passes the fresh field/movement gates and
+adds300 direct native scene draw emissions/300 fence retirements, plus matching
+caster/image deltas. First observed native scene/caster draws at frame766.
+17 settings audited, exact116 B owner profile restored, no producer survives.
+New242,091 B runtime log and inspected141,437 B JPEG, no raw/perf/cache/cook/dump.
+Runtime stops remain75 s/192 MiB free drop/400 KiB log/160 KiB JPEG and the
+aggregate10 MiB image ceiling. Single mono image is not sequence/reload/both-eye
+qualification. Findings, exact hashes and source limitations are in
+20260907_0946_direct-rigid-scene.md.
+
+A final test-only change proves the plan is the sole remaining geometry/albedo/
+shadow owner after all source copies retire, then proves expiration. Output19/
+PID30400 and CPU4/PID29012 pass; no additional host rebuild/game run required.
+0.34 s assertions/0.36 s CTest; materialCPU28 is0.12/0.14 s. All280 Python
+source/scenario checks pass. Reused existing fixture trees; no new outputs beyond
+bounded replacement build/test logs and binaries/objects.
+
+After validation removed18 exact superseded agent files: host93/failed94,
+output17/18, CPU2/3, material29/CPU27 stdout/stderr and935's log/caster JPEG.
+431,108 logical B; free63,143,288,832 ->63,143,739,392 B: **450,560 B reclaimed**
+once. Exact old runtime text/image are gone, hashes/findings remain; fixture
+logs can be regenerated. Keep936/image,host95,output19/CPU4,material30/CPU28,
+GPU25/rigid04 and all distinct protected baseline/flat/VR/movement/failure/raw
+evidence, source, game data and build trees. No active producer at cleanup.
+
+Texture CPU tree65,863,979 B (+768,618), material CPU7,968,151 B (+55,745),
+GPU tree unchanged10,433,599 B. Build logs187,086 B (-25,657), window images
+10,247,837 B (-6,762), runtime replacement+39 B. Exe48,493,568 B (+36,352),
+PDB108,462,080 B (+200,704). Known component growth**1,029,039 B**, retained for
+new native consumer code and stronger source-to-consumer/lifetime tests; no
+duplicate successful runtime archive. Other objects/source/Git/volume activity
+remain unattributed. Cleanup-end63,143,739,392 B/58.807 GiB free,106,983,424 B
+drive-wide free gain from output preflight; only450,560 B is measured cleanup.
+Next work shares this same ledger and must replace equivalent evidence after
+validation; new raw remains0.

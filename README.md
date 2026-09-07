@@ -58,32 +58,34 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-Latest **live-game** checkpoint: `ce56e24` (2026-09-07) draws one real rigid
-field object's shadow with native shaders and pass-owned camera matrices.
-The opt-in acceptance path bypasses that caster's interpreter, capture and
-replay. Run935 observes fresh submissions and fence retirements; its inspected
-field image retains coherent shadows and known cliff marks/distant blur.
-The switch is off in the normal profile.
-[Direct-caster evidence](research/20260907_0846_direct-rigid-shadow.md).
+Latest **live-game** checkpoint (2026-09-07, host95/run936): one real rigid
+field object now uses native programs for **both scene and shadow draws**.
+Whole-node admission bypasses its interpreter, capture and replay; fresh field
+windows add 300 scene draw emissions and 300 fence retirements. Its retained
+packet binds current per-node lights, receiver values and explicit image views.
+The inspected field image is coherent, with known cliff marks/distant blur.
+Both acceptance switches remain off in the normal profile.
+[Direct-scene evidence](research/20260907_0946_direct-rigid-scene.md).
 
 Latest **GPU-fixture** checkpoint: `19c9da6` fixes the native scene shader's
 texture-view mismatch. Both albedo and mono shadow now use the uploader's actual
 2D-array view contract; the fixture uses D32/S8 shadow depth. Four 8x8 two-eye
 pixel cases pass in 1.16 seconds with zero Vulkan validation errors/warnings.
-All 276 Python boundary/scenario checks pass. No game launch or new captures
-were needed; the last field-qualified executable remains host93/run935.
+That prerequisite needed no game launch or new captures. Its shader/pixel
+coverage is reused by the live checkpoint; current source/scenario checks pass
+all 280 tests, alongside the focused C++ fixtures.
 [Array-view evidence](research/20260907_0906_rigid-array-view-contract.md).
 
-**No live game scene draw uses the native rigid scene shader yet.** The next
-connection is the same already-cooked 162-vertex object: correctly timed
-receiver values and per-node lights, then direct scene submission. Native
-batching and interpreter/template-free cold-load/reload acceptance follow.
-Passing individual components is not this end-to-end result.
+**This is still one opt-in object, not a fully native scene.** Native batching
+and interpreter/template-free cold-load/reload acceptance are next for the same
+already-cooked 162-vertex asset. Object/pass source adapters and the original
+receiver callback remain explicitly tracked; no complete lifecycle, both-eye
+qualification or performance improvement is claimed.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive packets, native rigid shaders, first direct caster, culling/instancing/indirect infrastructure | Direct scene inputs and routing, native batching, lifetime/reload proof, remaining material families |
+| Scene and materials | Owned instance/primitive packets, first direct native scene/caster route, culling/instancing/indirect infrastructure | Native batching, lifetime/reload proof, remaining source producers and material families |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |

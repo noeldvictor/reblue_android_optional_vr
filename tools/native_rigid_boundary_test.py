@@ -6,6 +6,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeRigidBoundaryTest(unittest.TestCase):
+    def test_direct_scene_has_a_live_producer_and_an_emission_gate(self):
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index)", walk)
+        for required in ("PrepareNativeRigidSceneForObject(pose, node, refusal)",
+                         "shape->layers == 1", "plan->albedo->view.get()", "plan->shadow->view.get()",
+                         "ResolveSamplerLocked(", "record.scene = true", "store.scene_retired",
+                         "++store.scene_emitted", "draw.bindings.set_count = 3"):
+            self.assertIn(required, direct)
+        emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
+        self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view)", emitter)
+        lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
+        preview = lights.split("PrepareNativeSelectedLightValues(uint32_t selection)", 1)[1].split(
+            "std::optional<NativeSelectedLights> FindNativeSelectedLights", 1)[0]
+        self.assertIn("PreviewSelectedLightValues(", preview)
+        for forbidden in ("__imp__", "bd::mem::store", "REXCVAR_GET(bd_native_materials_verify)"):
+            self.assertNotIn(forbidden, preview)
+
     def test_scene_sampling_matches_production_array_views(self):
         shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
         self.assertIn("Texture2DArray<float4> albedo_image", shader)

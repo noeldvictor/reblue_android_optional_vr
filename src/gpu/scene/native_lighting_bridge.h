@@ -15,6 +15,9 @@ bool CheckNativeLightingPass(const NativeLightingPass &pass, const uint8_t *pixe
 void NoteNativeLightingPassDraw();
 // Source selection identity is checked only at object publication, not drawing.
 std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection);
+// Read-only native selection/publication preflight. No original callback,
+// comparison execution or compatibility writes; returns owned semantic values.
+std::optional<NativeSelectedLights> PrepareNativeSelectedLightValues(uint32_t selection);
 void NativeSelectedLightsReport();
 void CheckNativeSelectedLights(const NativeSelectedLights &lights, const uint8_t *pixel_constants);
 std::optional<LightingVector> NativeNodeShadowSampling(const NodeTag &tag);

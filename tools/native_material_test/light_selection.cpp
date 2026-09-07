@@ -185,6 +185,21 @@ void TestNativeLightSelection() {
       [](double a) { return std::cos(a); });
   Require(publication && publication->state.known == 7 && publication->state.lights[0].kind == LitDirectional &&
           publication->state.lights[1].kind == LitDisabled, "first selection reaches the real publication consumer");
+  const auto before_preview = words;
+  const auto preview = [&] (const SelectedLightSourceState &prior = {}) {
+    return PreviewSelectedLightValues(*first,publisher,60000,3,1000+24016,1,2,prior,read,
+        [](double a) { return std::cos(a); });
+  };
+  const auto native = preview();
+  Require(native && (*native)[0].kind == LitDirectional && words == before_preview,
+      "direct light preview uses proposed IDs without selection or shader writes");
+  words[publisher+276] = uint32_t(first->selection.slots[0].id);
+  Require(!preview(), "unchanged unknown slot cannot warm direct admission");
+  Require(preview(publication->state).has_value(), "owned unchanged slot remains valid");
+  words = before_preview;
+  words.erase(publisher+36+4);
+  const auto incomplete = words;
+  Require(!preview() && words == incomplete, "missing descriptor refuses without partial source writes");
   words.clear();
   NativeRigidPassInputs pass;
   for (auto &fog : pass.fog) fog.disabled = true;

@@ -10,6 +10,8 @@
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_sampler_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_shadow_receiver_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_model_materials.h"
@@ -165,6 +167,48 @@ bool PublishNativeMaterialLights(uint32_t selection, const NativeSelectedLights 
   if (expected != selection) return false;
   scope->node_lights = NativeNodeSelectedLights{tag.node_index, lights};
   return true;
+}
+
+std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
+    const NativeInstancePose &pose, uint32_t node, const char *&refusal) {
+  auto *scope = current;
+  refusal = "fresh ordinary object scope unavailable";
+  if (!scope || scope->pose.get() != &pose || scope->model != pose.model ||
+      scope->render_view != 3 || !scope->policy_inputs || scope->policy_inputs->phase != 0 ||
+      scope->policy_inputs->technique != 0) return {};
+  const auto *program = FindNativeInstanceNode(pose, node);
+  if (!program) return {};
+  refusal = "per-node light source binding unavailable";
+  const auto per_node = Word(uint64_t(scope->visual)+3380);
+  if (!per_node) return {};
+  uint64_t selection = uint64_t(scope->visual)+3132;
+  if (*per_node) {
+    const auto table = Word(uint64_t(scope->visual)+3376);
+    const auto entry = table && *table ? Word(uint64_t(*table)+uint64_t(node)*4) : std::nullopt;
+    if (!entry || !*entry) return {}; // inherited state is not a native light owner
+    selection = *entry;
+  }
+  if (selection > UINT32_MAX) return {};
+  refusal = "native per-node light preflight unavailable";
+  const auto lights = PrepareNativeSelectedLightValues(uint32_t(selection));
+  if (!lights) return {};
+  refusal = "fresh completed primary shadow or receiver colour unavailable";
+  const auto shadow = FindCompletedNativePrimaryShadow();
+  const auto colour = FindNativePrimaryReceiverColour(scope->visual);
+  if (!shadow || !colour) return {};
+  // This is the temporary source boundary, not a tag-based native draw API.
+  NodeTag tag; tag.valid = true; tag.visual_va = scope->visual; tag.ctx_va = scope->context;
+  tag.node_index = node; tag.render_view = scope->render_view;
+  refusal = "live receiver visibility unavailable";
+  const auto visibility = ImportNodeShadowInputs(tag);
+  if (!visibility) return {};
+  refusal = "owned ordinary scene packet unavailable";
+  auto packet = FindNativeObjectPrimitive(pose, node, 0);
+  if (!packet) return {};
+  packet->lights = lights; // computed for this node BEFORE its old shader callback
+  refusal = "whole-node scene shader contract unsupported";
+  return PrepareNativeRigidScene(*program, *packet,
+      {shadow->image, shadow->camera.world_to_clip, *colour, *visibility});
 }
 
 namespace {

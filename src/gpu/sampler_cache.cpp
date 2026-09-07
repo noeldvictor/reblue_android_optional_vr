@@ -173,4 +173,12 @@ u32 ResolveSlotLocked(const plume::RenderSamplerDesc &desc) {
   return slot;
 }
 
+const plume::RenderSampler *ResolveSamplerLocked(const plume::RenderSamplerDesc &desc) {
+  if (!ResolveSlotLocked(desc)) return nullptr;
+  auto &c = cache();
+  std::lock_guard lock(c.mutex);
+  const auto it = c.map.find(SamplerKey(desc));
+  return it != c.map.end() ? it->second.sampler.get() : nullptr;
+}
+
 } // namespace bd::gpu
