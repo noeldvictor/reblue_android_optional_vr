@@ -73,6 +73,15 @@ No overall development-speed multiplier is established.
 
 ## Latest qualified checkpoint
 
+Source follow-up (2026-09-06, still unqualified on GPU): native pulling now
+preserves synthetic attribute formats using an owned zero STORAGE buffer and
+stride zero. Empty table entries otherwise reach a shader default with w=1,
+which disagrees with omitted secondary-position blend weights of zero. Host/
+fixture syntax, compile-time encoding assertions and156 source guards pass.
+Updated C++ fixtures, full linking and new pixels remain pending the storage
+gate; the earlier CPU pass below predates this correction. No shader regeneration,
+new artifact set or game run. Evidence: `research/20260906_2211_native-pull-defaults.md`.
+
 Source/CPU progress (2026-09-06, runtime qualification pending): BDMESH v2 has
 named canonical rigid vertex values and content/layout identities independent
 of the source declaration. Import-time conversion replaces per-vertex unpacking

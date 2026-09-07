@@ -55,7 +55,10 @@ existing transitional import remains tracked, not relabeled as canonical.
 `RigidMeshVertexInput` derives IA/pulling inputs from the decoded schema alone.
 Its location/filler mapping remains an adapter to the existing shader signature,
 but all unpack masks are zero. Converted dispatch also clears the packed-normal
-specialization. `LoadNativeGeometry(content_id)` loads and uploads v2 data without
+specialization. Synthetic attributes retain their format in native pulling and
+read an owned zero buffer with stride zero, so missing secondary-position
+weights remain zero while missing color alpha remains one.
+`LoadNativeGeometry(content_id)` loads and uploads v2 data without
 source buffers or declarations; v1 cannot use that entry point. Direct native
 scene/shadow object submission is still pending.
 
@@ -68,9 +71,12 @@ import aliases. Direct native loads do not consult that alias map.
 
 ## Verification status
 
-The source and CPU fixture pass, including source-destroyed consumption and a
-small persistent v2 round trip. All 3,510 existing v1 files decode read-only.
-The host integration has syntax checks, but **the full host link and runtime
-pixel checks are pending** at this checkpoint's storage gate. No game-rendering
-or performance result is claimed. See
-[the checkpoint evidence](../research/20260906_2158_canonical-rigid-mesh.md).
+The canonical data CPU fixture passed, including source-destroyed consumption
+and a small persistent v2 round trip. All 3,510 existing v1 files decoded
+read-only. The subsequent synthetic-pulling correction passes host/fixture syntax,
+compile-time encoding assertions and 156 source guards, but its updated runtime
+fixtures have not been rebuilt. **Updated C++ execution, full host linking and
+new runtime pixels are pending** at the cumulative storage gate. No new
+game-rendering or performance result is claimed. See the
+[canonical-data evidence](../research/20260906_2158_canonical-rigid-mesh.md) and
+[pull-default follow-up](../research/20260906_2211_native-pull-defaults.md).

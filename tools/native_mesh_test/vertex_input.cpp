@@ -10,6 +10,10 @@
 
 using namespace bd::gpu::scene;
 using F = plume::RenderFormat;
+// Evaluated by syntax-only checking too: the format controls the shader's
+// default lanes even though both sources contain all-zero bytes.
+static_assert(VertexInputPullEntry(F::R32_FLOAT, 15, 0) == ((1u << 24) | (15u << 16)));
+static_assert(VertexInputPullEntry(F::R32G32B32A32_FLOAT, 15, 0) == ((4u << 24) | (15u << 16)));
 static void Check(bool value, const char *message) {
   if (!value)
     throw std::runtime_error(message);
@@ -62,7 +66,8 @@ void TestVertexInput() {
         "source-free shader bridge");
   Check(owned->Pullable() && owned->PullTable()[0] == (3u << 24) &&
             owned->PullTable()[7] == ((13u << 24) | (2u << 16) | 12) &&
-            owned->PullTable()[1] == 0,
+            owned->PullTable()[1] == ((4u << 24) | (15u << 16)) &&
+            owned->PullStreams() == (5u | (1u << 15)),
         "real streams and synthetic zero attributes");
   NativeVertexInputLibrary library;
   std::vector<plume::RenderInputElement> bad(elements.begin(), elements.end());
@@ -76,6 +81,9 @@ void TestVertexInput() {
   Check(!library.Resolve(bad, 5, {}), "bounded semantic name");
   bad[0].semanticName = nullptr;
   Check(!library.Resolve(bad, 5, {}), "null semantic");
+  bad.assign(elements.begin(), elements.end());
+  bad[2].alignedByteOffset = 4;
+  Check(!library.Resolve(bad, 5, {}), "synthetic source cannot address past its origin");
   Check(!library.Resolve({}, 5, {}) && !library.Resolve(elements, 65536, {}),
         "empty and invalid mask");
   NativeVertexInputLibrary tiny(NativeVertexInputLibrary::kOwnerBytes - 1);

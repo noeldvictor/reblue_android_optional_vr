@@ -1484,3 +1484,32 @@ operational stop floor, despite zero new raw/perf/cache/dump files and no active
 producer. Only low-storage documentation/Git work continues; no host link,
 fixture retry or runtime job may launch under that floor. The 2 GiB hard ceiling
 has not been increased and the owner budget question remains pending.
+
+### Native pulling default-lane correction, same checkpoint
+
+Parented2e884. Start free **63,426,617,344 B**, still below the unchanged
+63,583,739,904 B operational floor; no build/run/capture launched. Source review
+found native synthetic entries lose their format and reach BD_PullF's w=1
+default, inconsistent with zero secondary-position blend weights. Native input/
+staging now retains the format and uses the existing64-byte zero buffer with
+STORAGE usage and zero stride. Shader payloads and game data are unchanged.
+Evidence: `20260906_2211_native-pull-defaults.md`.
+
+Three host and two fixture syntax checks pass, including compile-time encoding
+assertions;156 source guards pass. Updated C++ runtime tests, full linking and
+GPU/pixel qualification remain pending; do not relabel the preceding fixture
+binary or host63/run911 as verification of this changed source.
+
+Read-only process counters identify another project's Python data workflow
+writing10,170,513 B/s at one sample. Its script is outside this workspace; no
+foreign files were read/changed and no process was stopped. This is a likely
+contributor to drive-wide changes, not an exact attribution permitting a budget
+subtraction/reset. Pagefile allocation2,048 MiB was sampled once, with no prior
+allocation baseline. Owner approval for the proposed3 GiB cap is still pending.
+
+At22:11 free **63,516,618,752 B**, drive-wide gain **90,001,408 B** from this
+turn's preflight, unrelated to cleanup here. **Zero bytes reclaimed**; no new
+build/test logs, binary, image, cache, dump or raw output. Source/docs/Git writes
+are small but not fully baselined and remain charged. Existing fixture and game
+executables/profile are unchanged; protected evidence remains. No goal completion
+or new resource allowance is claimed.

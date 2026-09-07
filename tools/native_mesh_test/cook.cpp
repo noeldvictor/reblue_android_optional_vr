@@ -155,7 +155,9 @@ void TestMeshCook() {
   NativeVertexInputLibrary defaults;
   const auto default_input = RigidMeshVertexInput(cooked, defaults);
   Check(default_input && default_input->Elements()[10].format == F::R32_FLOAT &&
-        default_input->Elements()[6].format == F::R32G32B32A32_FLOAT,
+        default_input->Elements()[6].format == F::R32G32B32A32_FLOAT &&
+        default_input->PullTable()[10] == ((1u << 24) | (15u << 16)) &&
+        default_input->PullTable()[1] == ((4u << 24) | (15u << 16)),
         "absent color retains alpha one, packed tangent retains w zero");
   // Half subnormals, sign and one; then nonfinite rejection.
   elements = {{"POSITION", 0, 0, F::R32G32B32_FLOAT, 2, 0},

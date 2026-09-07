@@ -164,14 +164,15 @@ bool VertexPullInit(plume::RenderDevice *device) {
   }
   {
     auto desc = plume::RenderBufferDesc::UploadBuffer(
-        64, plume::RenderBufferFlag::VERTEX);
+        64, plume::RenderBufferFlag::VERTEX | plume::RenderBufferFlag::STORAGE);
     p.dummy = CreateHostBuffer(device, desc, "vertex-pull-dummy");
     if (!p.dummy)
       return false;
-    if (auto *m = p.dummy->map()) {
-      std::memset(m, 0, 64);
-      p.dummy->unmap();
-    }
+    auto *mapped = p.dummy->map();
+    if (!mapped)
+      return false; // neither IA nor pulling may consume uninitialized defaults
+    std::memset(mapped, 0, 64);
+    p.dummy->unmap();
     p.dummy_view = plume::RenderVertexBufferView(
         plume::RenderBufferReference(p.dummy.get(), 0), 64);
     p.dummy_slot = plume::RenderInputSlot(
@@ -258,9 +259,10 @@ bool VertexPullStage(u32 record_index, const VideoState &s) {
   }
   const GuestVertexDeclaration *decl = s.pipelineState.vertexDeclaration;
   for (u32 i = 0; i < 16; ++i) {
-    if (!(native ? (native->Streams() & (1u << i)) : decl->vertexStreams[i]))
+    if (!(native ? (native->PullStreams() & (1u << i)) : decl->vertexStreams[i]))
       continue;
-    const auto &view = s.vertex_views[i];
+    const bool synthetic = native && i == 15 && !(native->Streams() & (1u << i));
+    const auto &view = synthetic ? p.dummy_view : s.vertex_views[i];
     if (!view.buffer.ref) {
       info.decl = 0; // a declared stream with nothing bound: not pullable
       ++p.n_unbound;
@@ -274,7 +276,7 @@ bool VertexPullStage(u32 record_index, const VideoState &s) {
     }
     info.streams[i][0] = slot;
     info.streams[i][1] = static_cast<u32>(view.buffer.offset);
-    info.streams[i][2] = s.input_slots[i].stride;
+    info.streams[i][2] = synthetic ? 0 : s.input_slots[i].stride;
   }
   ++p.n_ok;
   if (native) ++scene::NativeVertexInputUses().pulled_records;

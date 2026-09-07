@@ -24,8 +24,8 @@ struct VertexShaderDecode {
 
 // Shared by the input assembler and pulling. These codes are the current
 // pulling shader ABI, not a serialized asset format.
-inline uint32_t VertexInputPullEntry(plume::RenderFormat format, uint32_t slot,
-                                     uint32_t offset) {
+constexpr uint32_t VertexInputPullEntry(plume::RenderFormat format, uint32_t slot,
+                                      uint32_t offset) {
   using F = plume::RenderFormat;
   uint32_t code = 0;
   switch (format) {
@@ -91,6 +91,9 @@ public:
   }
   uint64_t Id() const { return id_; }
   uint32_t Streams() const { return streams_; }
+  // Pulling also binds an explicit zero source for synthetic attributes. An
+  // absent table entry loses the format's default lanes (notably float4 w=0).
+  uint32_t PullStreams() const { return pull_streams_; }
   const std::array<uint32_t, 16> &PullTable() const { return pull_; }
   bool Pullable() const { return pullable_; }
   const VertexShaderDecode &ShaderDecode() const { return decode_; }
@@ -105,7 +108,7 @@ private:
   std::array<uint32_t, 16> pull_{};
   VertexShaderDecode decode_{};
   uint64_t id_ = 0;
-  uint32_t count_ = 0, streams_ = 0;
+  uint32_t count_ = 0, streams_ = 0, pull_streams_ = 0;
   bool pullable_ = true;
 };
 using NativeVertexInputHandle = std::shared_ptr<const NativeVertexInput>;
@@ -155,6 +158,8 @@ public:
         return {};
       if (!(streams & (1u << element.slotIndex)) && element.slotIndex != 15)
         return {};
+      if (!(streams & (1u << element.slotIndex)) && element.alignedByteOffset != 0)
+        return {}; // the synthetic source is a bounded zero buffer, not a stream
       size_t length = 0;
       while (length < NativeVertexInput::kSemanticBytes &&
              element.semanticName[length])
@@ -173,13 +178,14 @@ public:
       std::memcpy(input->names_[i].data(), element.semanticName, length);
       input->elements_[i] = element;
       input->elements_[i].semanticName = input->names_[i].data();
-      // Synthetic zero attributes use slot 15 but are not actual streams.
-      if (streams & (1u << element.slotIndex)) {
-        const auto entry = VertexInputPullEntry(
-            element.format, element.slotIndex, element.alignedByteOffset);
-        input->pull_[element.location] = entry;
-        input->pullable_ &= entry != 0;
-      }
+      // Preserve the format for synthetic inputs too: BD_PullF's empty-entry
+      // default is (0,0,0,1), whereas a zero float4 has w=0. Native staging
+      // supplies its own zero buffer with stride zero, not a retained guest view.
+      const auto entry = VertexInputPullEntry(
+          element.format, element.slotIndex, element.alignedByteOffset);
+      input->pull_[element.location] = entry;
+      input->pullable_ &= entry != 0;
+      input->pull_streams_ |= 1u << element.slotIndex;
     }
     input->id_ = hash;
     input->count_ = uint32_t(elements.size());

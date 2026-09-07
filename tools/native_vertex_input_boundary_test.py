@@ -66,6 +66,17 @@ class VertexInputBoundaryTest(unittest.TestCase):
         for forbidden in ("RenderFormat", "VertexShaderDecode", "GuestVertex", "semanticName", "location"):
             self.assertNotIn(forbidden, data.replace("not shader locations", "not shader slots"))
 
+    def test_synthetic_pulling_uses_owned_storage_and_zero_stride(self):
+        text = self.read("src/gpu/vertex_pull.cpp")
+        self.assertIn("plume::RenderBufferFlag::VERTEX | plume::RenderBufferFlag::STORAGE", text)
+        self.assertIn("native->PullStreams()", text)
+        self.assertIn("synthetic ? p.dummy_view : s.vertex_views[i]", text)
+        self.assertIn("synthetic ? 0 : s.input_slots[i].stride", text)
+        self.assertIn("if (!mapped)\n      return false;", text)
+        owner = self.read("src/gpu/scene/native_vertex_input.h")
+        self.assertIn("input->pull_[element.location] = entry;", owner)
+        self.assertIn("element.alignedByteOffset != 0", owner)
+
 
 if __name__ == "__main__":
     unittest.main()
