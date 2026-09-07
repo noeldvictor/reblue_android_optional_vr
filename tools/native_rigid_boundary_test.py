@@ -79,6 +79,21 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         for forbidden in ("__imp__", "bd::mem::", "Word(", "PrepareSelection(", "PrepareSelectedLights("):
             self.assertNotIn(forbidden, preview)
 
+    def test_cutouts_are_counted_per_emitted_instance_and_retired_record(self):
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
+        self.assertIn("EmitOne(cmd,d,st,n,0,std::span(items).first(n))", emitter)
+        self.assertIn("model_generation : 0, native_items)", emitter)
+        note = direct.split("void NoteNativeRigidEmission(", 1)[1].split("void DrainNativeRigidDrawsLocked", 1)[0]
+        self.assertIn("items.size() == instances", note)
+        self.assertIn("for (const auto *item : items)", note)
+        self.assertIn("++cutouts.emitted", note)
+        self.assertIn("cutouts.textured_emitted +=", note)
+        retire = direct.split("void DrainNativeRigidDrawsLocked", 1)[1]
+        self.assertIn("record->input.object_data.flags.x & RigidCutout", retire)
+        self.assertIn("cutouts.textured_retired +=", retire)
+        self.assertIn("[native-cutout-family]", direct)
+
     def test_scene_lights_publish_at_handoff_without_dirty_or_shader_cache_inputs(self):
         producer = (ROOT / "src/engine/frame_interp.cpp").read_text().split(
             "REX_HOOK_RAW(bdLightListUpdateSnapshot) {", 1)[1].split("\n}", 1)[0]
@@ -127,7 +142,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
             self.assertIn(required, direct)
         queue = (ROOT / "src/gpu/draw_queue.cpp").read_text()
         native = queue.split("if (q.native_rigid) {",1)[1].split("// A run of consecutive draws",1)[0]
-        for required in ("NativeRigidBatchLength(", "PrepareNativeRigidBatchDraw(", "EmitOne(cmd,d,st,n)"):
+        for required in ("NativeRigidBatchLength(", "PrepareNativeRigidBatchDraw(", "EmitOne(cmd,d,st,n,0,std::span(items).first(n))"):
             self.assertIn(required, native)
         self.assertNotIn("CommitInstanceRecords", native)
         self.assertIn("cmd->drawIndexedIndirect(d.native_indirect.ref", queue)
@@ -225,7 +240,10 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         schema = (ROOT / "src/gpu/scene/native_rigid_program.h").read_text()
         self.assertIn("layer < 4", schema)
         fixture = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
-        self.assertIn("mode<37", fixture)
+        self.assertIn("mode<41", fixture)
+        self.assertIn("if (cutout_receiver) sampler_desc.minFilter = sampler_desc.magFilter = RenderFilter::LINEAR", fixture)
+        self.assertIn("compare_z <= caster_depth(", fixture)
+        self.assertIn("shadowed_receivers > 0 && filtered_receivers > 0", fixture)
         self.assertIn("detail_colours[layer-1]", fixture)
 
     def test_cutouts_use_owned_recipe_and_shader_not_draw_state(self):

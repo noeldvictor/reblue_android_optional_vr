@@ -244,7 +244,8 @@ bool EmitBindings(plume::RenderCommandList *cmd, const QueuedDraw &d,
 }
 
 void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
-             EmitState &st, u32 instance_count = 1, u32 first_instance = 0) {
+             EmitState &st, u32 instance_count = 1, u32 first_instance = 0,
+             std::span<const scene::NativeRigidBatchItem *const> native_items = {}) {
   if (!EmitBindings(cmd, d, st))
     return;
 
@@ -263,7 +264,7 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
                        first_instance);
   ++g_binding_draws;
   scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,
-      d.native_rigid && d.native_rigid->regression ? d.native_rigid->model_generation : 0);
+      d.native_rigid && d.native_rigid->regression ? d.native_rigid->model_generation : 0, native_items);
   if (counted)
     FragCensusEnd(cmd);
 }
@@ -682,7 +683,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       scene::PrepareNativeRigidBatchDraw(std::span(items).first(n),d);
       if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
       opaque += n; dmin = (std::min)(dmin,d.depth); dmax = (std::max)(dmax,d.depth);
-      EmitOne(cmd,d,st,n);
+      EmitOne(cmd,d,st,n,0,std::span(items).first(n));
       ++emitted;
       if (n > 1) { ++groups; grouped_draws += n; }
       i += n;

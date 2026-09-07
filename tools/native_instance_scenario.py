@@ -756,7 +756,40 @@ def verify_caster_family(text):
                 submitted_delta=b[3]-a[3], emitted_delta=b[4]-a[4], retired_delta=b[5]-a[5])
 
 
-def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False):
+def verify_cutout_family(text):
+    """Fresh scene AND shadow cutouts, including textured emissions and fences."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("cutout family diagnostic exceeds 400 KiB")
+    counts = r"submitted (\d+) emitted (\d+) fence-retired (\d+) textured-emitted (\d+) textured-retired (\d+);"
+    metric = re.compile(r"\[native-cutout-family\] frame (\d+) scene " + counts + r" shadow " + counts)
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if re.search(r"\[native-rigid-(?:scene|shadow|batch)\].*refused", line):
+            raise ValueError("native cutout consumer refused; family not qualified")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if "[native-cutout-family]" in line and not match:
+            raise ValueError("malformed native cutout family evidence")
+        if match:
+            values = tuple(map(int, match.groups()))
+            for start in (1, 6):
+                submitted, emitted, retired, textured, textured_retired = values[start:start+5]
+                if not (textured_retired <= textured <= emitted <= submitted and
+                        textured_retired <= retired <= emitted):
+                    raise ValueError("impossible cutout emission/lifetime counts")
+            if metrics and any(b < a for a, b in zip(metrics[-1][1], values)):
+                raise ValueError("cutout counters or frame reset inside a reload epoch")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in range(1, 11)):
+        raise Pending("need fresh scene and shadow cutout emissions, textures and fence retirement")
+    return {f"{view}_{name}_delta": b[start+i]-a[start+i]
+            for view, start in (("scene", 1), ("shadow", 6))
+            for i, name in enumerate(("submitted", "emitted", "retired", "textured_emitted", "textured_retired"))}
+
+
+def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False, cutout_family=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -773,6 +806,8 @@ def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_fa
         verify_scene_lights(text)
     if caster_family:
         verify_caster_family(text)
+    if cutout_family:
+        verify_cutout_family(text)
 
 
 def main():
@@ -804,6 +839,7 @@ def main():
     parser.add_argument("--receiver-setup", action="store_true", help="host receiver callback and fresh retained packet reads in each requested epoch")
     parser.add_argument("--scene-lights", action="store_true", help="owned scene/object handoffs and fresh native reads in each requested epoch")
     parser.add_argument("--caster-family", action="store_true", help="non-regression multi-primitive native caster emissions and fence retirement")
+    parser.add_argument("--cutout-family", action="store_true", help="fresh scene/shadow cutout emissions and textured fence retirement in each requested epoch")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -820,8 +856,8 @@ def main():
         text = data.decode("utf-8")
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family)
-            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -846,6 +882,7 @@ def main():
         receiver_setup = verify_receiver_setup(text) if args.receiver_setup else None
         scene_lights = verify_scene_lights(text) if args.scene_lights else None
         caster_family = verify_caster_family(text) if args.caster_family else None
+        cutout_family = verify_cutout_family(text) if args.cutout_family else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -866,6 +903,8 @@ def main():
         print("PASS: owned scene/object lighting and native reads " + ", ".join(f"{k}={v}" for k,v in scene_lights.items()))
     if caster_family is not None:
         print("PASS: multi-primitive native caster family " + ", ".join(f"{k}={v}" for k,v in caster_family.items()))
+    if cutout_family is not None:
+        print("PASS: native scene/shadow cutout family (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in cutout_family.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:

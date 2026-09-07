@@ -397,17 +397,25 @@ NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
 } // namespace
 
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
-    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera) {
+    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal) {
   const auto *scope = current;
+  refusal = "shadow object scope/pose/phase unavailable";
   if (!scope || !scope->shadow_phase || scope->render_view != 1 || scope->pose.get() != &pose ||
-      scope->model != pose.model || !scope->policy_inputs || !scope->shadow_inputs ||
-      !scope->alpha_inputs || !scope->cutout_pass || node >= pose.transforms.size()) return {};
+      scope->model != pose.model || !scope->policy_inputs || node >= pose.transforms.size()) return {};
+  refusal = "shadow object mode/alpha unavailable";
+  if (!scope->shadow_inputs) return {};
+  refusal = "shadow alpha-reference producer unavailable";
+  if (!scope->alpha_inputs) return {};
+  refusal = "shadow alpha comparison producer unavailable";
+  if (!scope->cutout_pass) return {};
+  refusal = "shadow owned node/admission unavailable";
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
   const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const auto *mesh = PrepareMaterialMesh(*program);
   std::vector<uint32_t> references;
+  refusal = "shadow texture recipe or ordered cutoff composition unavailable";
   if (!mesh || mesh->values.size() != program->ranges.size() ||
       !ComposeMaterialAlphaReferences(program->ranges, admission.policies, *scope->alpha_inputs, references)) return {};
   std::vector<NativeRigidShadowCutout> cutouts(program->ranges.size());
@@ -417,19 +425,33 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
     const uint32_t layers = range.shadow_uses_texture ? scope->shadow_inputs->texture_layers : 0;
     // Modes above3 preserve old shader enables; that inherited producer is not
     // represented. Detail layers affect RGB only and do not affect depth alpha.
+    refusal = "shadow texture mode exceeds represented layers";
     if (layers > 3) return {};
     cutout.textured = layers != 0;
     cutout.alpha = scope->shadow_inputs->alpha;
     cutout.reference = references[n]; cutout.comparison = scope->cutout_pass->comparison;
     cutout.uv = mesh->values[n].uv; cutout.owns_uv = mesh->values[n].owns_uv;
     if (cutout.textured) {
-      if (!(mesh->values[n].image_mask & 1) || !scope->shadow_filters || !(*scope->shadow_filters)[0]) return {};
+      refusal = "shadow base image assignment unavailable";
+      if (!(mesh->values[n].image_mask & 1)) return {};
+      refusal = "shadow pass sampler filters unavailable";
+      if (!scope->shadow_filters || !(*scope->shadow_filters)[0]) return {};
       cutout.image = mesh->values[n].images[0];
       cutout.sampler = NativeMaterialSampler2D{*(*scope->shadow_filters)[0],
           MaterialSampleAddress::Wrap, MaterialSampleAddress::Wrap};
     }
   }
-  return PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts);
+  refusal = "shadow canonical geometry, matrices or sampled image contract unavailable";
+  auto plans = PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts);
+  if (!plans) for (size_t n=0;n<std::min<size_t>(8,cutouts.size());++n) {
+    const auto &geometry = program->geometries[n];
+    const auto &cutout = cutouts[n];
+    BD_ERROR("[native-shadow-input] primitive {} geometry {:016X} canonical {} input {} stream mask {} stride {} count {}; textured {} image {} UV {} sampler {}",
+        n, geometry ? geometry->id : 0, geometry && geometry->canonical_vertices, geometry && geometry->rigid_vertex_input,
+        geometry ? geometry->stream_mask : 0, geometry ? geometry->strides[0] : 0, geometry ? geometry->count : 0,
+        cutout.textured, bool(cutout.image.primary), cutout.owns_uv, cutout.sampler.has_value());
+  }
+  return plans;
 }
 
 std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(

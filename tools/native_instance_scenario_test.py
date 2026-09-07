@@ -11,6 +11,7 @@ from native_instance_scenario import split_rigid_reload
 from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
+from native_instance_scenario import verify_cutout_family
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -795,6 +796,63 @@ class CasterFamilyScenarioTest(unittest.TestCase):
                     module.verify_rigid_epoch(first, caster_family=True)
                     module.verify_rigid_epoch(second, caster_family=True)
             module.verify_rigid_epoch("\n".join(self.rows()), caster_family=True)
+
+
+class CutoutFamilyScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        for index, frame in ((2, 100), (4, 150)):
+            counts = (f"submitted {frame+3} emitted {frame+2} fence-retired {frame+1} "
+                      f"textured-emitted {frame} textured-retired {frame-1};")
+            rows[index] = f"[native-cutout-family] frame {frame} scene {counts} shadow {counts}"
+        return rows
+
+    def test_both_consumers_and_textured_retirement_advance(self):
+        result = verify_cutout_family("\n".join(self.rows()))
+        self.assertEqual(len(result), 10)
+        self.assertEqual(set(result.values()), {50})
+
+    def test_opaque_only_stale_untextured_or_wrong_scene_cannot_pass(self):
+        rows = self.rows(); text = "\n".join(rows)
+        zeros = re.sub(r"(?<!frame )\b\d+\b", "0", rows[2])
+        for bad in (text.replace(rows[4], rows[2].replace("frame 100", "frame 150")),
+                    text.replace("textured-emitted 150", "textured-emitted 100").replace("textured-retired 149", "textured-retired 99"),
+                    text.replace("textured-retired 149", "textured-retired 99"),
+                    text.replace(rows[2], zeros).replace(rows[4], zeros.replace("frame 100", "frame 150")),
+                    text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
+                    "\n".join([rows[2], rows[4]] + scenario()[::2])):
+            with self.assertRaises(Pending): verify_cutout_family(bad)
+
+    def test_refusal_impossible_counts_reset_and_bounds(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("emitted 152", "emitted 154"),
+                    text.replace("retired 151", "retired 153"),
+                    text.replace("textured-emitted 150", "textured-emitted 153"),
+                    text.replace("textured-retired 149", "textured-retired 151"),
+                    text.replace("frame 150", "frame 99"),
+                    text.replace("textured-retired 149", "textured-retired 98"),
+                    "[native-rigid-shadow] admitted node refused: owner\n" + text,
+                    "[native-rigid-scene] node refused: owner\n" + text,
+                    "[native-cutout-family] invalid\n" + text, "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_cutout_family(bad)
+
+    def test_each_reload_epoch_requires_both_consumers(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in (
+                        "verify_rigid_epoch", "verify_cutout_family"):
+                    stack.enter_context(patch.object(module, name))
+            good = "\n".join(self.rows())
+            missing = "\n".join(scenario())
+            for first, second in ((missing, good), (good, missing)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(first, cutout_family=True)
+                    module.verify_rigid_epoch(second, cutout_family=True)
+            module.verify_rigid_epoch(good, cutout_family=True)
+            module.verify_rigid_epoch(good, cutout_family=True)
 
 
 class RigidSceneScenarioTest(unittest.TestCase):

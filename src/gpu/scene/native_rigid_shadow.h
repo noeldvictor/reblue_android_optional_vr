@@ -83,7 +83,7 @@ inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
   return admission;
 }
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
-    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera);
+    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal);
 inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadow(
     const NativeModelMaterialProgram &program, const RenderMatrix &world,
     const PrimitivePolicyInputs &inputs, const RenderCamera &camera,

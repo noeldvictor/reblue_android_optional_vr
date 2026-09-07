@@ -53,6 +53,9 @@ struct NativeRigidDrawStore {
   uint64_t family_emitted = 0, family_retired = 0;
   uint64_t scene_family_multi_nodes = 0, scene_family_primitives = 0, scene_family_layered = 0;
   uint64_t scene_family_emitted = 0, scene_family_retired = 0;
+  struct Cutouts {
+    uint64_t submitted = 0, emitted = 0, retired = 0, textured_emitted = 0, textured_retired = 0;
+  } scene_cutouts, shadow_cutouts;
 };
 namespace {
 void Require(bool valid, const char *reason) {
@@ -71,6 +74,10 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
   item->frame = FrameStatFrameCount(); item->slot = Video::CurrentFrameSlot();
   BatchRequire(item->Ready(item->frame,item->slot), "incomplete native instance");
   state().native_rigid_draws->records[item->slot].push_back(item);
+  if (item->input.object_data.flags.x & RigidCutout) {
+    auto &store = *state().native_rigid_draws;
+    ++(item->view == 3 ? store.scene_cutouts : store.shadow_cutouts).submitted;
+  }
   if (item->regression) NoteNativeRigidSubmitted(item->model_generation,item->instance,item->view);
   draw.native_rigid = std::move(item);
 }
@@ -90,9 +97,12 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   Require(node < pose.transforms.size(), "native caster transform unavailable");
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });
-  const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera)
+  const char *refusal = "whole-node caster resources or matrices unavailable";
+  const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal)
       : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera);
-  Require(plans.has_value(), "whole-node caster resources or matrices unavailable");
+  if (!plans) BD_ERROR("[native-shadow-packet] instance {} generation {} node {} phase {} cutouts {} ranges {}; {}",
+      pose.instance, pose.model_generation, node, inputs->phase, cutouts, model->ranges.size(), refusal);
+  Require(plans.has_value(), refusal);
   auto &s = state();
   std::lock_guard lock(s.mutex);
   auto *commands = ActiveNativeShadowCommands(s.render_target ? s.render_target->texture : nullptr,
@@ -318,6 +328,11 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     BD_INFO("[native-scene-family] frame {} multi-primitive nodes {} submitted {} layered {} emitted {} fence-retired {}; excludes selected regression",
         frame, store.scene_family_multi_nodes, store.scene_family_primitives, store.scene_family_layered,
         store.scene_family_emitted, store.scene_family_retired);
+    const auto &scene = store.scene_cutouts;
+    const auto &shadow = store.shadow_cutouts;
+    BD_INFO("[native-cutout-family] frame {} scene submitted {} emitted {} fence-retired {} textured-emitted {} textured-retired {}; shadow submitted {} emitted {} fence-retired {} textured-emitted {} textured-retired {}; cutout instances only",
+        frame, scene.submitted, scene.emitted, scene.retired, scene.textured_emitted, scene.textured_retired,
+        shadow.submitted, shadow.emitted, shadow.retired, shadow.textured_emitted, shadow.textured_retired);
     store.scene_reported_frame = frame;
     store.scene_reported_generation = pose.model_generation;
   }
@@ -387,11 +402,20 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   draw.native_indirect = indirect.ref;
   batches.push_back(std::move(batch));
 }
-void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances, uint64_t generation) {
+void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances, uint64_t generation,
+                            std::span<const NativeRigidBatchItem *const> items) {
   auto &s = state();
   if (!s.native_rigid_draws) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &program : store.programs) if (bindings.layout == program.shaders.scene->Layout()) {
+    BatchRequire(items.size() == instances, "native emission lost its instance records");
+    // Count each actually emitted packet, not the first instance's flags: scene
+    // batches can share a shader/pipeline while their material flags differ.
+    for (const auto *item : items) if (item->input.object_data.flags.x & RigidCutout) {
+      auto &cutouts = render_view == 3 ? store.scene_cutouts : store.shadow_cutouts;
+      ++cutouts.emitted;
+      cutouts.textured_emitted += (item->input.object_data.flags.x & RigidAlbedo) != 0;
+    }
     if (generation) NoteNativeRigidEmitted(generation,render_view,instances);
     else if (render_view == 1) store.family_emitted += instances;
     else if (render_view == 3) store.scene_family_emitted += instances;
@@ -405,6 +429,11 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   if (!s.native_rigid_draws || slot >= kNumFrames) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &record : store.records[slot]) {
+    if (record->input.object_data.flags.x & RigidCutout) {
+      auto &cutouts = record->view == 3 ? store.scene_cutouts : store.shadow_cutouts;
+      ++cutouts.retired;
+      cutouts.textured_retired += (record->input.object_data.flags.x & RigidAlbedo) != 0;
+    }
     if (record->regression) NoteNativeRigidFenceRetired(record->model_generation,record->view);
     else if (record->view == 1) ++store.family_retired;
     else if (record->view == 3) ++store.scene_family_retired;
