@@ -46,6 +46,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
   std::vector<MaterialImageAssignment> assignments;
   std::vector<PrimitivePolicyStep> steps;
   NativeMaterialRange current;
+  bool shadow_alpha = false;
   int last_reflection_command = -1;
   constexpr float byte_scale = 1.0f / 255.0f;
   for (size_t cursor = 0; cursor < commands.size();) {
@@ -95,7 +96,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       }
     } else if (kind == 0x6000) {
       const auto channel = uint8_t((command >> 8) & 15);
-      assignments.push_back({MaterialImageSource::Table, channel, uint8_t(command & 0xff)});
+      assignments.push_back({MaterialImageSource::Table, channel, uint8_t(command & 0xff), shadow_alpha});
       steps.push_back({PrimitivePolicyOperation::Texture, uint8_t(command & 0xff), channel});
       // Ordinary material texture overrides have additional visual/animation
       // policy. Do not pretend their slot-5 result is the pass default.
@@ -132,12 +133,15 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       }
     } else if ((command & 0xff00) == 0x0900) {
       steps.push_back({PrimitivePolicyOperation::Alpha, uint8_t(command & 0xff)});
+      shadow_alpha = (command & 15) != 0;
+      current.shadow_uses_texture = shadow_alpha;
     } else if ((command & 0xff00) == 0x0200) {
       current.skin = DecodeNativeSkinBinding(commands.subspan(cursor, size_t(operands)));
       if (!current.skin)
         return false;
     } else if ((command & 0xff00) == 0x0100) {
       m.modulate_diffuse = (command & 0xff) == 0;
+      current.shadow_uses_texture = (command & 0xff) != 0;
       // sub_82198138 updates the three texture enables only for modes 0..3.
       // Higher values change its serial/mode but preserve the previous enables.
       if ((command & 0xff) <= 3)

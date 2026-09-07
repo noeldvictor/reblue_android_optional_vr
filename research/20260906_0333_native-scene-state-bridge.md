@@ -3409,3 +3409,39 @@ material+63,416,texture+119,466,GPU fixture+8,731,build logs+5,856. Logs195,935 
 source/Git unallocated. Inventory ending free62,243,811,328 B is1,515,708,416 B
 drive-wide loss from first measurement, not attributed to this small retained
 growth. Continue low-storage source work; unchanged reserve gates all producers.
+
+Continuation after8a1bf9a: the intervening push-only turn was no renderer
+progress; worktree was clean and origin/main synchronized. Phase1 cutout shadow
+source now connects assignment-time alpha/texture recipes, object alpha and
+owned sampled images to native depth programs and the existing indirect/fence
+queue.315 artifact-free Python checks pass; behavior and integration pending.
+First measured free61,869,699,072 B was below the original62,509,998,080 B floor,
+so no compiler/game producer ran. Later drive-wide recovery gives63,141,998,592 B;
+this is not attributed to cleanup. Baseline fixture sizes unchanged: material
+8,290,826 B/41files,texture70,438,810 B/129files,GPU10,594,302 B/10files;
+build logs195,935 B/136files. No owned build/game process found; profile unchanged.
+Reuse sequential material36/CPU34,output36/CPU19,GPU30/rigid09: <=32 MiB peak/drop
+each,300 s supervisor/original floor,10 MiB aggregate logs,new text<=64 KiB.
+No game/raw/image/perf/cook output. Only after passing fixtures and a fresh
+reserve check may host112 use <=192 MiB peak in the existing tree. All unresolved
+UV/light failures and945's last accepted pixels remain protected; no fixture
+restamps that game evidence. These continuations share the original3 GiB cap.
+
+Material36/PID24192 and CPU34/PID34112 pass0.13/0.15 s. Output36/PID32580 and
+CPU19/PID31912 pass0.40/0.42 s. GPU30/PID33340 failed because new shaders were
+missing from the existing explicit cross-directory header-order list; fixed
+the list and added an all-entry guard. GPU31/PID35344 builds three new shaders /
+factory; rigid09/PID23348 passes37 two-eye scene/mono-shadow8x8 modes1.86/1.87 s,
+validation0 errors/0warnings,oneGOGloader message. All terminal, raw/image0.
+Host112's192 MiB preflight then failed before compiler/log creation; host111
+and the116 B normal profile remain unchanged.315 Python checks pass. No game
+acceptance or UV/light fix claimed. Detailed contract/hashes in1742 report.
+
+Removed14 superseded material35/CPU33/output35/CPU18/GPU29/rigid08/GPU30 logs,
+17,207 logical B; free63,146,737,664 ->63,146,766,336 B,28,672 B observed recovery
+with concurrent volume activity not isolated. No protected evidence/data deleted.
+Retained growth406,432 B: material+38,306,texture+197,240,GPU+60,486,logs+3,104,
+new shader headers107,296. Other objects/CMake/source/Git unallocated. Logs now
+199,039 B/136files; ending inventory free61,580,406,784 B is289,292,288 B below
+first measurement. Original allowance/reserve unchanged; no next producer until
+its peak fits. A separate visible Android toolchain build is not ours to stop.

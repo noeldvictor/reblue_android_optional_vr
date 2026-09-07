@@ -20,6 +20,9 @@ enum class MaterialImageSource : uint8_t { Table, Unknown };
 struct MaterialImageAssignment {
   MaterialImageSource source = MaterialImageSource::Table;
   uint8_t channel = 0, selector = 0;
+  // Authored alpha at this command, before pass overrides or later commands.
+  // Phase1 only binds the base table/special/late image when this is true.
+  bool shadow_alpha = false;
 };
 enum class MaterialImageAction : uint8_t { Unknown, Keep, Bind };
 template <class Image> struct MaterialImageSelection {
@@ -59,7 +62,7 @@ template <class Image, class Range, class Lookup>
 bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignments,
     std::span<const Range> ranges, const MaterialTextureInputs<Image> &inputs,
     Lookup lookup, std::vector<MaterialTextureValues<Image>> &out,
-    size_t max_primitives = 4096) {
+    size_t max_primitives = 4096, bool shadow_phase = false) {
   if (ranges.size() > max_primitives || assignments.size() > 65536 ||
       inputs.overrides.size() > 256 || inputs.late_images.size() > 256)
     return false;
@@ -102,7 +105,9 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
             uv_overridden[step.channel] = false;
           }
         }
-        if (!early_image) {
+        if (!early_image && shadow_phase && (step.channel != 0 || !step.shadow_alpha)) {
+          selected = {MaterialImageAction::Keep};
+        } else if (!early_image) {
           selected = lookup(step.selector);
           if (inputs.special_selector == step.selector &&
               inputs.special_image.action != MaterialImageAction::Keep)

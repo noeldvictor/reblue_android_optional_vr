@@ -50,6 +50,9 @@ reblue_host_shader(bd_normal_lit ps_6_1 -D REBLUE_RECOMP)
 reblue_host_shader(native_rigid_vs vs_6_1)
 reblue_host_shader(native_rigid_layered_vs vs_6_1)
 reblue_host_shader(native_rigid_shadow_vs vs_6_1)
+reblue_host_shader(native_rigid_shadow_cutout_vs vs_6_1)
+reblue_host_shader(native_rigid_shadow_cutout_ps ps_6_1)
+reblue_host_shader(native_rigid_shadow_alpha_ps ps_6_1)
 reblue_host_shader(native_rigid_ps ps_6_1)
 if(TARGET native_scene_snapshot_test)
     # The fixture is declared in a child directory; give Ninja an explicit
@@ -58,7 +61,10 @@ if(TARGET native_scene_snapshot_test)
         "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_vs.hlsl.spirv.h"
         "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_layered_vs.hlsl.spirv.h"
         "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_ps.hlsl.spirv.h"
-        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.spirv.h")
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_cutout_vs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_cutout_ps.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_alpha_ps.hlsl.spirv.h")
     add_dependencies(native_scene_snapshot_test native_rigid_shader_headers)
 endif()
 # The occlusion proxy (gpu/occlusion_cull.cpp): a cube per node under a query.

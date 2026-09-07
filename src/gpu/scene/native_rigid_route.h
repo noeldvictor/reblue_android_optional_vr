@@ -35,7 +35,7 @@ inline NativeRigidRouteDecision PrepareNativeRigidRoute(
     return {NativeRigidRoute::Refused, "load-owned geometry identity unavailable"};
   if (!SelectedNativeRigidShadow(*program)) {
     if (view != 1 && view != 3) return {NativeRigidRoute::Legacy};
-    const auto caster = view == 1 ? PrepareNativeRigidCasterAdmission(*program, inputs)
+    const auto caster = view == 1 ? PrepareNativeRigidShadowAdmission(*program, inputs)
                                   : PrepareNativeRigidSceneAdmission(*program, inputs);
     if (caster.route == NativeRigidCasterRoute::Legacy) return {NativeRigidRoute::Legacy};
     if (caster.route == NativeRigidCasterRoute::Refused)
@@ -55,7 +55,7 @@ inline NativeRigidRouteDecision PrepareNativeRigidRoute(
 inline bool NativeRigidLegacyAllowed(const ModelMaterialImport *mesh, uint32_t view = ~0u,
                                     const std::optional<PrimitivePolicyInputs> &inputs = {}) {
   if (!mesh || !NativeRigidFamilyKnown(mesh->program) || SelectedNativeRigidShadow(mesh->program)) return false;
-  if (view == 1) return PrepareNativeRigidCasterAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
+  if (view == 1) return PrepareNativeRigidShadowAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
   if (view == 3) return PrepareNativeRigidSceneAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
   return true;
 }

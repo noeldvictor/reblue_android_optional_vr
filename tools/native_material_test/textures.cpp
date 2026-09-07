@@ -133,5 +133,37 @@ void TestNativeMaterialTextures() {
   Require(object->colour[3] == .75f && object->writes_shininess, "object input survives source destruction");
   Require(imported->overrides[0].uv == std::array<float, 2>{9, 10} &&
           imported->late_images[0].image.image == 88, "owned publication survives all source storage destruction");
+  // Phase1 uses alpha at the IMAGE command, not the later primitive's alpha.
+  // Changing 01xx affects the shadow texture mode but not that authored alpha.
+  words = {0x6001,0x0911,0x1000,1,0, 0x6002,0x0900,0x0103,0x1000,1,3,
+      0x6003,0x0911,0x0100,0x1000,1,6, 0x6101,0x1000,1,9,0xff};
+  Require(DecodeMeshMaterials(words,ranges,&assignments), "shadow texture recipe decode");
+  Require(!assignments[0].shadow_alpha && assignments[1].shadow_alpha && !assignments[2].shadow_alpha &&
+      ranges[0].shadow_uses_texture && ranges[1].shadow_uses_texture && !ranges[2].shadow_uses_texture,
+      "assignment alpha and final shadow texture mode are independent ordered recipes");
+  words.clear();
+  inputs = {}; inputs.owns_uv = true; inputs.initial_uv = {1,2,3,4}; inputs.reset_uv = {5,6,7,8};
+  auto shadow_compose = [&] { return ComposeMaterialTextures(std::span<const MaterialImageAssignment>(assignments),
+      std::span<const NativeMaterialRange>(ranges),inputs,[](uint8_t key) { return Bind(100+key); },out,4096,true); };
+  Require(shadow_compose() && !out[0].image_mask && out[1].images[0] == 102 &&
+      out[2].images[0] == 102 && !(out[3].image_mask & 2),
+      "opaque-time base commands and detail commands cannot invent shadow images");
+  inputs.overrides = {{1,0,{},true,Bind(201)},{3,1,std::array<float,2>{9,10},false,{}}};
+  inputs.late_images = {{1,0,{},true,Bind(301)},{2,0,{},true,Bind(302)},{3,0,{},true,Bind(303)}};
+  Require(shadow_compose() && out[0].images[0] == 201 && out[1].images[0] == 302 &&
+      out[2].images[0] == 302 && out[2].uv[0] == 9 && out[3].images[1] == 201,
+      "early image/UV overrides precede phase gate; gated commands skip late images");
+  inputs.overrides = {{1,1,std::array<float,2>{7,8},true,Bind(401)}};
+  Require(shadow_compose() && !out[0].image_mask && out[0].uv[0] == 7 &&
+      out[1].uv[0] == 5, "first UV match skips its image even on a gated shadow command");
+  memory[visual+3068] = 3; memory[visual+3416] = std::bit_cast<uint32_t>(.375f);
+  const auto shadow_object = ReadMaterialShadowInputs(visual,read);
+  Require(shadow_object && shadow_object->texture_layers == 3 && shadow_object->alpha == .375f,
+      "shadow object consumes alpha and full texture mode without phase0 material fields");
+  memory[visual+3416] = 0x7fc00000;
+  Require(!ReadMaterialShadowInputs(visual,read) && !ReadMaterialShadowInputs(UINT32_MAX-3,read),
+      "shadow alpha nonfinite and overflow refused");
+  memory.clear();
+  Require(shadow_object->alpha == .375f && shadow_compose(), "shadow recipes survive source retirement");
   std::cout << "native material texture order, null inheritance, live overrides, source-free ownership and bounds passed\n";
 }

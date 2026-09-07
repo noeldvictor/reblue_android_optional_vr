@@ -98,6 +98,9 @@ struct NativeMaterialRange {
   NativeMaterialProperties material;
   NativeReflectionRecipe reflection;
   NativePrimitiveShaderInputs shader;
+  // Phase1 starts untextured. 01xx/09xx select zero or visual's shadow
+  // texture mode in order; this is not phase0's final texture-layer count.
+  bool shadow_uses_texture = false;
   NativeMaterialFeatureRecipe features;
   std::array<NativeSamplerAddress, 5> sampler_addresses = MaterialSamplerEntry();
   // Unknown until a bone-index command; an explicit empty binding is unskinned.
@@ -123,8 +126,8 @@ struct NativeMaterialRange {
 // -1 is an unsupported opcode. 0x00ff ends the stream, only at an opcode boundary.
 int MeshCommandOperands(uint16_t command);
 
-// Input words are host endian. The native material program here covers scene
-// phase 0; the adapter must not apply it to phase 1's shader/colour overrides.
+// Input words are host endian. Scene properties cover phase0; the separate
+// shadow recipe and assignment-time alpha cover phase1's different rules.
 // Failure is transactional, including truncated operands and missing terminator.
 bool DecodeMeshMaterials(std::span<const uint16_t> commands,
                          std::vector<NativeMaterialRange> &out,

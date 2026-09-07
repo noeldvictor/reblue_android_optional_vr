@@ -1,5 +1,5 @@
 /**
- * @brief Production shader programs and descriptor schema for opaque rigid objects.
+ * @brief Production shader programs and descriptor schema for rigid scene/casters.
  * @copyright Copyright (c) 2026 reblue contributors
  * @license BSD 3-Clause, see LICENSE
  */
@@ -26,8 +26,8 @@ struct NativeRigidDescriptorSchema {
   NativeRigidDescriptorSchema(const NativeRigidDescriptorSchema &) = delete;
   NativeRigidDescriptorSchema &operator=(const NativeRigidDescriptorSchema &) = delete;
 };
-struct NativeRigidPrograms { NativePipelineHandle scene, shadow; };
-// Caller retains/reuses the returned immutable pair per compatible vertex input;
+struct NativeRigidPrograms { NativePipelineHandle scene, shadow, shadow_alpha, shadow_cutout; };
+// Caller retains/reuses the returned immutable programs per compatible vertex input;
 // this function does not accumulate a global cache or read any source resources.
 NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device,
                                               NativeVertexInputHandle input);

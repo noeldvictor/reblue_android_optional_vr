@@ -26,7 +26,7 @@
 #endif
 
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
-    "Fail-closed native opaque rigid caster families, including multi-primitive nodes; no template warm-up.");
+    "Fail-closed native opaque and phase1 cutout rigid caster families; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
     "Fail-closed native mono opaque/cutout rigid scene families with zero-to-three texture layers; no node interpreter/template warm-up.");
 namespace bd::gpu::scene {
@@ -82,13 +82,16 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   if (!NativeRigidShadowEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
-  const auto admission = PrepareNativeRigidCasterAdmission(*model, inputs);
+  const auto admission = PrepareNativeRigidShadowAdmission(*model, inputs);
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
   Require(admission.route == NativeRigidCasterRoute::Native, "caster family or object pass policy unavailable");
   const auto camera = FindNativePassCamera(1);
   Require(camera.has_value(), "fresh shadow pass camera unavailable");
   Require(node < pose.transforms.size(), "native caster transform unavailable");
-  const auto plans = PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera);
+  const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
+      [](const auto &policy) { return policy.alpha_test; });
+  const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera)
+      : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera);
   Require(plans.has_value(), "whole-node caster resources or matrices unavailable");
   auto &s = state();
   std::lock_guard lock(s.mutex);
@@ -115,12 +118,14 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     if (program == store.programs.end()) {
       Require(store.programs.size() < 8, "native program capacity reached");
       auto shaders = CreateNativeRigidPrograms(*s.device, geometry->rigid_vertex_input);
-      Require(shaders.shadow && shaders.scene, "native shader creation failed");
+      Require(shaders.shadow && shaders.scene && shaders.shadow_alpha && shaders.shadow_cutout, "native shader creation failed");
       store.programs.push_back({geometry->rigid_vertex_input, std::move(shaders)});
       program = store.programs.end() - 1;
     }
     PipelineState pipeline_state;
-    pipeline_state.native_program = program->shaders.shadow.get();
+    const auto &shader = (plan.object.flags.x & RigidCutout)
+        ? (plan.albedo ? program->shaders.shadow_cutout : program->shaders.shadow_alpha) : program->shaders.shadow;
+    pipeline_state.native_program = shader.get();
     pipeline_state.vertexStrides[0] = uint8_t(geometry->strides[0]);
     pipeline_state.renderTargetFormat = plume::RenderFormat::UNKNOWN;
     pipeline_state.depthStencilFormat = plume::RenderFormat::D32_FLOAT_S8_UINT;
@@ -132,7 +137,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     Require(pipeline != nullptr, "native shadow pipeline unavailable");
     QueuedDraw draw;
     draw.pipeline = pipeline;
-    draw.bindings.layout = program->shaders.shadow->Layout();
+    draw.bindings.layout = shader->Layout();
     draw.vertex_views[0] = geometry->streams[0];
     draw.input_slots[0] = plume::RenderInputSlot(0, geometry->strides[0]);
     draw.vertex_count = 1; draw.index_view = geometry->index;
@@ -146,6 +151,12 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     Require(draw.bindings.Valid(), "invalid native descriptor contract");
     auto item = std::make_shared<NativeRigidBatchItem>();
     item->geometry = geometry; item->input = {plan.object,plan.pass};
+    item->albedo[0] = plan.albedo;
+    if (plan.albedo) {
+      Require(plan.sampler.has_value(), "native cutout sampler unavailable");
+      item->albedo_samplers[0] = ResolveSamplerLocked(MaterialSamplerDesc(*plan.sampler));
+      Require(item->albedo_samplers[0] != nullptr, "native cutout sampler creation failed");
+    }
     item->model_generation = pose.model_generation; item->instance = pose.instance;
     item->regression = geometry->id == 0x258694267A8DBAEEull;
     pending.push_back({std::move(draw), std::move(item)});
@@ -172,7 +183,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
       (store.reported_generation != pose.model_generation || frame - store.reported_frame >= 300)) {
     BD_INFO("[native-rigid-shadow] frame {} submitted {} suppressed {} fence-retired {}; node {} instance {} generation {} phase {}; native program and owned matrices, no interpreter/template/replay",
         frame, store.submitted, store.suppressed, store.retired, node, pose.instance, pose.model_generation, inputs->phase);
-    BD_INFO("[native-caster-family] frame {} nodes {} multi-primitive nodes {} submitted {} emitted {} fence-retired {}; excludes selected regression; whole-node opaque rigid admission",
+    BD_INFO("[native-caster-family] frame {} nodes {} multi-primitive nodes {} submitted {} emitted {} fence-retired {}; excludes selected regression; whole-node rigid admission",
         frame, store.family_nodes, store.family_multi_nodes, store.family_primitives, store.family_emitted, store.family_retired);
     store.reported_frame = frame;
     store.reported_generation = pose.model_generation;
@@ -345,7 +356,17 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   batch.constants->setBuffer(0,upload.ref.ref,placement->bytes,&view);
   draw.bindings = {}; draw.bindings.layout = first.layout;
   draw.bindings.set_count = 1; draw.bindings.sets[0] = batch.constants.get();
-  if (first.view == 3) {
+  if (first.view == 1 && first.albedo[0]) {
+    batch.images = schema.sets[1].create(s.device.get()); batch.samplers = schema.sets[2].create(s.device.get());
+    BatchRequire(batch.images && batch.samplers, "native cutout descriptors unavailable");
+    // Only slot0 is sampled. Populate inactive slots from that same retained
+    // material, never the active depth attachment (no read/write feedback).
+    for (uint32_t layer = 0; layer < 4; ++layer) {
+      batch.images->setTexture(layer,first.albedo[0]->image.get(),plume::RenderTextureLayout::SHADER_READ,first.albedo[0]->view.get());
+      batch.samplers->setSampler(layer,first.albedo_samplers[0]);
+    }
+    draw.bindings.set_count = 3; draw.bindings.sets[1] = batch.images.get(); draw.bindings.sets[2] = batch.samplers.get();
+  } else if (first.view == 3) {
     batch.images = schema.sets[1].create(s.device.get()); batch.samplers = schema.sets[2].create(s.device.get());
     BatchRequire(batch.images && batch.samplers, "native image descriptors unavailable");
     for (uint32_t layer = 0; layer < 3; ++layer) {
@@ -375,7 +396,7 @@ void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_v
     else if (render_view == 1) store.family_emitted += instances;
     else if (render_view == 3) store.scene_family_emitted += instances;
     if (render_view == 3 && bindings.set_count == 3) { store.scene_emitted += instances; ++store.scene_batches; }
-    else if (render_view == 1 && bindings.set_count == 1) { store.emitted += instances; ++store.shadow_batches; }
+    else if (render_view == 1 && (bindings.set_count == 1 || bindings.set_count == 3)) { store.emitted += instances; ++store.shadow_batches; }
     if (instances > 1) store.merged_instances += instances;
     return;
   }

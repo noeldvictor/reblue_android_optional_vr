@@ -684,6 +684,49 @@ void CameraAndRigidCaster() {
   program.ranges[2].policy_step_end = 2; assert(classify() == NativeRigidCasterRoute::Refused);
   program.ranges[2].policy_step_end = 1;
   assert(build());
+  // Mixed opaque/cutout siblings are prepared atomically. No scene material,
+  // light, fog or receiver input is needed by the alpha-only caster.
+  program.policy_steps.push_back({PrimitivePolicyOperation::Alpha,17,0});
+  program.ranges[2].policy_step_end = 2;
+  program.ranges[2].shader.vertex_colour = true;
+  assert(PrepareNativeRigidShadowAdmission(program,policy).route == NativeRigidCasterRoute::Native && !build());
+  std::vector<NativeRigidShadowCutout> cutouts(3);
+  auto &cutout = cutouts[2]; cutout.alpha = .75f; cutout.reference = 128;
+  const auto covered = [&] { return PrepareNativeRigidShadow(program,identity,policy,retained_camera,cutouts); };
+  assert(covered() && (covered()->at(2).object.flags.x & RigidCutout) && !covered()->at(2).albedo);
+  auto image = std::make_shared<NativeTextureGpu>();
+  image->image = std::make_unique<SceneSource>(); image->view = std::make_unique<RenderTextureView>();
+  image->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  cutout.textured = true; cutout.owns_uv = true; cutout.uv = {.25f,.5f,0,0}; cutout.image.primary = image;
+  cutout.sampler = NativeMaterialSampler2D{{},MaterialSampleAddress::Wrap,MaterialSampleAddress::Wrap};
+  auto textured = covered();
+  assert(textured && textured->at(2).albedo == image && textured->at(2).object.diffuse.w == .75f &&
+      textured->at(2).object.flags.y == 1 && textured->at(2).object.uv_scale_offset.z == .25f+1.f/512 &&
+      !textured->at(0).albedo && textured->at(1).geometry == sibling);
+  const auto valid_cutout = cutout;
+  for (uint32_t fault = 0; fault < 8; ++fault) {
+    cutout = valid_cutout;
+    if (fault == 0) cutout.image = {};
+    if (fault == 1) cutout.owns_uv = false;
+    if (fault == 2) cutout.sampler.reset();
+    if (fault == 3) cutout.sampler->u = MaterialSampleAddress::Clamp;
+    if (fault == 4) cutout.alpha = std::numeric_limits<float>::quiet_NaN();
+    if (fault == 5) cutout.uv[0] = std::numeric_limits<float>::infinity();
+    if (fault == 6) cutout.comparison = 8;
+    if (fault == 7) cutout.image.slice_2d = image;
+    assert(!covered());
+  }
+  cutout = valid_cutout;
+  image->dimension = RenderTextureViewDimension::TEXTURE_2D; assert(!covered());
+  image->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  policy.phase = 0; assert(PrepareNativeRigidShadowAdmission(program,policy).route == NativeRigidCasterRoute::Legacy);
+  policy.phase = 1; policy.pass_mode = 2;
+  assert(PrepareNativeRigidShadowAdmission(program,policy).route == NativeRigidCasterRoute::Legacy);
+  policy.pass_mode = 0;
+  cutouts.pop_back(); assert(!covered()); // never use a shorter sibling packet
+  image.reset();
+  assert(textured->at(2).albedo && textured->at(2).object.diffuse.w == .75f);
+  program.policy_steps.pop_back(); program.ranges[2].policy_step_end = 1;
   program.policy_steps = {{PrimitivePolicyOperation::Alpha,17,0}, {PrimitivePolicyOperation::Alpha,0,0}};
   for (auto &range : program.ranges) range.policy_step_end = 2;
   policy.special_shadow_block = true;
@@ -1187,6 +1230,14 @@ void RigidBatches() {
   b = a; b.input.object_data.flags.y = 4; assert(!b.Ready(8,1));
   b.input.object_data.flags.y = 0; assert(!b.Ready(8,1));
   b.input.object_data.flags.x = 0; b.albedo = {}; assert(b.Ready(8,1));
+  NativeRigidBatchItem shadow_cutout = good;
+  shadow_cutout.input.object_data.flags = {RigidCutout | RigidAlbedo,1,RigidCutoutGE,0};
+  shadow_cutout.albedo[0] = a.albedo[0]; shadow_cutout.albedo_samplers[0] = a.albedo_samplers[0];
+  assert(shadow_cutout.Ready(8,1));
+  shadow_cutout.albedo[0].reset(); assert(!shadow_cutout.Ready(8,1));
+  shadow_cutout.input.object_data.flags = {RigidCutout,0,RigidCutoutGE,0};
+  shadow_cutout.albedo_samplers[0] = nullptr; assert(shadow_cutout.Ready(8,1));
+  shadow_cutout.shadow = a.shadow; assert(!shadow_cutout.Ready(8,1)); // no attachment feedback
   for (const uint32_t alignment : {1u,16u,64u,256u,1024u}) for (uint32_t count : {1u,2u,256u}) {
     const auto placement = PlanNativeRigidStorage(count,alignment); assert(placement);
     for (uint64_t base : {0ull,16ull,1024ull,4193792ull}) {

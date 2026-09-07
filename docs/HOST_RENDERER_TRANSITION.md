@@ -76,10 +76,19 @@ pipeline and indirect submission. 314 Python checks, expanded material/output
 C++ fixtures and 23 two-eye GPU modes pass (2.87 s, zero validation errors/warnings).
 This is not game acceptance: host111 is unchanged; the new host link and later
 syntax checks could not start within the unchanged storage reserve. No game run
-or capture. Depth-only admission still refuses alpha; its phase1 texture/colour
-producer and textured caster program remain to implement. Preserve sorted siblings,
-legacy interoperation and all outstanding UV/light/pixel gates.
+or capture. Preserve sorted siblings, legacy interoperation and all outstanding
+UV/light/pixel gates. The subsequent phase1 caster connection is described below.
 [Cutout connection and current evidence](../research/20260907_1713_native-scene-cutouts.md).
+
+Phase1 cutout shadows are now connected in source: assignment-time alpha/image
+gates, object alpha, forced-wrap sampler inputs, textured/zero-layer depth
+programs and retained indirect batches.315 Python checks, both C++ fixtures and
+37 GPU modes pass (1.86 s, validation0 errors/0warnings). The prior23 GPU cases
+remain unchanged; new cases verify cutout caster depth independently of scene
+colour. A missing shader-header build-order dependency was fixed and guarded.
+Host112 still did not launch: transient disk recovery allowed the fixtures, then
+drive-wide activity again exhausted its unchanged peak reserve. No new game or
+pixel acceptance. [Current shadow connection and pending gates](../research/20260907_1742_native-cutout-shadows.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -118,7 +127,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    scene-shaded objects, culling/occlusion and real multi-instance groups. The
    opaque caster family now handles whole multi-primitive nodes without material
    ID or scene texture-layer restrictions; its submission, actual emission and
-   fence gates pass in both reload epochs. Skin/wind, textured cutout casting, deferred and
+   fence gates pass in both reload epochs. Skin/wind, phase0 cutout casting, deferred and
    texture-dependent effect participation remain explicit unsupported families.
    The new ordinary0..3-layer shader, independent third UV owner and whole-node
    scene submission and ordered light inheritance are implemented. Host110/run948
@@ -141,8 +150,10 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    source-reader helper or claim all2,898 light bindings are native draws.
 2. **Material families and characters.** Direct blended-cutout scene ownership
    is now connected and CPU/GPU-tested, pending host compilation and fresh game
-   emission/pixel/interoperation evidence. Next connect phase1 textured cutout
-   casting using its actual image/colour rules, then wind and translucent
+   emission/pixel/interoperation evidence. Phase1 textured/zero-layer cutout
+   casting is also connected and CPU/GPU-tested, pending host compilation and
+   live depth/receiver/ordering/lifetime evidence. Next integrate these paired
+   scene/shadow consumers, then wind and translucent
    materials; deliver native skeleton/skin assets, animation/
    pose production and GPU skinning as connected character paths. Test authored
    changes and field/battle/cutscene/shadow lifetimes. Cook only formats/assets

@@ -171,7 +171,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_caster_family_preflights_all_siblings_without_expanding_reload_counts(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         shadow = direct.split("bool SubmitNativeRigidShadow(", 1)[1].split("bool SubmitNativeRigidScene(", 1)[0]
-        self.assertIn("PrepareNativeRigidCasterAdmission(*model, inputs)", shadow)
+        self.assertIn("PrepareNativeRigidShadowAdmission(*model, inputs)", shadow)
         self.assertLess(shadow.index("pending.push_back("), shadow.index("StageNativeItem("))
         self.assertLess(shadow.index("for (const auto &plan : *plans)"), shadow.index("DrawQueuePush(entry.draw)"))
         self.assertIn("if (item->regression) NoteNativeRigidSubmitted", direct)
@@ -186,7 +186,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
         paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h"]
-        self.assertEqual(len(paths), 6)
+        self.assertEqual(len(paths), 9)
         for path in paths:
             text = path.read_text()
             for forbidden in ("shader_common.h", "g_VSC", "g_PSC", "BD_SHARED", "BOOL_BIT", "GuestShader", "packoffset"):
@@ -225,7 +225,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         schema = (ROOT / "src/gpu/scene/native_rigid_program.h").read_text()
         self.assertIn("layer < 4", schema)
         fixture = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
-        self.assertIn("mode<23", fixture)
+        self.assertIn("mode<37", fixture)
         self.assertIn("detail_colours[layer-1]", fixture)
 
     def test_cutouts_use_owned_recipe_and_shader_not_draw_state(self):
@@ -260,6 +260,32 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         build = (ROOT / "tools/native_scene_snapshot_test/CMakeLists.txt").read_text()
         self.assertIn("../../src/gpu/scene/native_rigid_program.cpp", build)
         self.assertIn("native_rigid_pixels", build)
+        generated = (ROOT / "cmake/generated.cmake").read_text()
+        ordering = generated.split("add_custom_target(native_rigid_shader_headers DEPENDS", 1)[1].split("add_dependencies", 1)[0]
+        for path in (ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"):
+            self.assertIn(path.name + ".spirv.h", ordering)
+
+    def test_shadow_cutouts_use_phase_owned_inputs_and_no_attachment_feedback(self):
+        source = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        consumer = source.split("PrepareNativeRigidShadowForObject(", 1)[1].split(
+            "std::optional<NativeObjectPrimitiveInputs>", 1)[0]
+        for required in ("scope->shadow_phase", "scope->pose.get() != &pose", "range.shadow_uses_texture",
+                         "ComposeMaterialAlphaReferences", "MaterialSampleAddress::Wrap", "mesh->values[n].images[0]"):
+            self.assertIn(required, consumer)
+        for forbidden in ("Word(", "BuildNativeObjectPrimitive", "FindNativeLightingPass", "ReadMaterial", "pipelineState"):
+            self.assertNotIn(forbidden, consumer)
+        replay = source.split("PrepareReplayMaterialMesh(const NodeTag &tag)", 1)[1].split("} // namespace", 1)[0]
+        self.assertIn("scope->shadow_phase", replay)  # No phase0 replay consumers see phase1 recipes.
+        draw = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        descriptors = draw.split("if (first.view == 1 && first.albedo[0])", 1)[1].split("else if (first.view == 3)", 1)[0]
+        self.assertIn("first.albedo[0]->image.get()", descriptors)
+        self.assertNotIn("first.shadow", descriptors)
+        for required in ("program->shaders.shadow_cutout", "program->shaders.shadow_alpha", "item->albedo[0] = plan.albedo"):
+            self.assertIn(required, draw)
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_shadow_cutout_ps.hlsl").read_text()
+        for required in ("RigidCutoutPasses", "texture_alpha * object_data.diffuse.w", "uv.x < 0", "RIGID_SHADOW_UNTEXTURED"):
+            self.assertIn(required, shader)
+        self.assertNotIn("SV_Target", shader)
 
 
 if __name__ == "__main__":

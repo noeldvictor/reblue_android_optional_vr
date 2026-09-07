@@ -25,6 +25,13 @@ struct NativeRigidBatchItem {
   uint64_t model_generation = 0, instance = 0; // Host lifetime metadata, not shader ABI.
   bool regression = false; // Selected asset's reload window, not family admission.
   bool Ready(uint32_t expected_frame, uint32_t expected_slot) const {
+    if (view == 1) {
+      const auto &flags = input.object_data.flags;
+      const bool textured = (flags.x & RigidAlbedo) != 0;
+      if (flags.y != uint32_t(textured) || (textured && !(flags.x & RigidCutout)) ||
+          bool(albedo[0]) != textured || bool(albedo_samplers[0]) != textured ||
+          albedo[1] || albedo[2] || albedo_samplers[1] || albedo_samplers[2] || shadow || shadow_sampler) return false;
+    }
     if (view == 3) {
       const auto layers = input.object_data.flags.y;
       if (layers > 3 || bool(input.object_data.flags.x & RigidAlbedo) != (layers != 0)) return false;

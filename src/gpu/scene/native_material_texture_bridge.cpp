@@ -37,6 +37,7 @@ namespace bd::gpu::scene {
 struct NativeObjectTextureState {
   uint32_t context = 0, visual = 0, graph = 0, table_offset = 0;
   uint32_t render_view = 0;
+  bool shadow_phase = false;
   uint32_t stack = 0;
   uint64_t generation = 0;
   NativeModelRenderHandle model;
@@ -52,6 +53,8 @@ struct NativeObjectTextureState {
   std::optional<PrimitivePolicyInputs> policy_inputs;
   std::optional<NativeMaterialAlphaInputs> alpha_inputs;
   std::optional<NativeRigidCutoutInputs> cutout_pass;
+  std::optional<NativeMaterialShadowInputs> shadow_inputs;
+  std::optional<NativeSamplerFilterPass> shadow_filters;
   struct Mesh {
     std::shared_ptr<const ModelMaterialImport> owner;
     const NativeModelMaterialProgram *program = nullptr;
@@ -98,9 +101,9 @@ MaterialImageSelection<NativeTextureBinding> Capture(uint32_t source) {
   return binding.primary ? MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind, std::move(binding)}
                          : MaterialImageSelection<NativeTextureBinding>{};
 }
-std::optional<NativeRigidCutoutInputs> CaptureCutoutPass() {
+std::optional<NativeRigidCutoutInputs> CaptureCutoutPass(bool shadow = false) {
   const auto alpha = FindNativeAlphaIntent();
-  const auto blend = FindNativeEnabledBlendIntent();
+  const auto blend = shadow ? std::optional(BlendState{}) : FindNativeEnabledBlendIntent();
   if (!alpha || !blend) return {};
   uint32_t comparison;
   switch (alpha->compare) {
@@ -129,31 +132,41 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     const auto table = Word(uint64_t(context) + 12), phase = Word(uint64_t(context) + 16);
     const auto render_view = Word(kRenderViewIdVa);
     const auto selected = Word(kSelection + 4), offset = Word(kSelection), fallback = Word(kSelection + 32);
-    if (!visual || !graph || !*graph || !table || !phase || *phase ||
+    if (!visual || !graph || !*graph || !table || !phase || *phase > 1 ||
         !selected || *selected != *table || !offset || !fallback || !render_view) { ++stats.unsupported; return; }
+    if (*phase == 1 && (!NativeRigidShadowEnabled() || *render_view != 1)) return;
     auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture);
     if (!inputs) { ++stats.unsupported; return; }
     auto publication = std::make_unique<NativeObjectTextureState>();
     publication->model = FindLoadedNativeModel(*graph);
     publication->generation = publication->model ? publication->model->Generation() : 0;
     if (pose && pose->model == publication->model) publication->pose = std::move(pose);
-    publication->object = ReadMaterialObjectInputs(*visual, Word);
-    publication->fog = FindNativeFogLayers();
-    publication->fog_revision = NativeFogRevision();
-    // Per-node light selections execute later than this scope. Do not snapshot
-    // another node's lights as object-wide data; the direct path must own those updates.
-    if (const auto per_node = Word(uint64_t(*visual)+3380); per_node && !*per_node)
-      publication->lights = FindNativeSelectedLights(*visual+3132);
+    if (*phase == 0) {
+      publication->object = ReadMaterialObjectInputs(*visual, Word);
+      publication->fog = FindNativeFogLayers();
+      publication->fog_revision = NativeFogRevision();
+      // Per-node light selections execute later than this scope. Do not snapshot
+      // another node's lights as object-wide data; the direct path must own those updates.
+      if (const auto per_node = Word(uint64_t(*visual)+3380); per_node && !*per_node)
+        publication->lights = FindNativeSelectedLights(*visual+3132);
+    }
     publication->table = *table ? FindLoadedNativeTextureTable(*table) : nullptr;
     if (!publication->generation || (*table && !publication->table)) { ++stats.unsupported; return; }
     publication->context = context; publication->visual = *visual; publication->graph = *graph;
     publication->render_view = *render_view;
+    publication->shadow_phase = *phase == 1;
     publication->stack = stack;
     if (REXCVAR_GET(bd_native_primitive_policies))
       publication->policy_inputs = ReadPrimitivePolicyInputs(context, *visual, Word);
     if (NativeRigidSceneEnabled() && *render_view == 3) {
       publication->alpha_inputs = ReadMaterialAlphaInputs(*visual, Word);
       publication->cutout_pass = CaptureCutoutPass();
+    }
+    if (publication->shadow_phase) {
+      publication->alpha_inputs = ReadMaterialAlphaInputs(*visual, Word);
+      publication->cutout_pass = CaptureCutoutPass(true);
+      publication->shadow_inputs = ReadMaterialShadowInputs(*visual, Word);
+      publication->shadow_filters = FindNativeSamplerFilters(*render_view);
     }
     publication->table_offset = *offset; publication->fallback = Capture(*fallback);
     publication->inputs = std::move(*inputs);
@@ -178,7 +191,7 @@ void InvalidateNativeMaterialLights() {
 bool PublishNativeMaterialLights(uint32_t selection, const NativeSelectedLights &lights) {
   auto *scope = current;
   const auto &tag = CurrentNodeTag();
-  if (!scope || !tag.valid || tag.from_list || tag.ctx_va != scope->context ||
+  if (!scope || scope->shadow_phase || !tag.valid || tag.from_list || tag.ctx_va != scope->context ||
       tag.visual_va != scope->visual || !scope->pose ||
       !FindNativeInstanceNode(*scope->pose, tag.node_index)) return false;
   scope->node_lights.reset();
@@ -321,7 +334,7 @@ NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialPro
       return {value.image.primary ? MaterialImageAction::Bind : MaterialImageAction::Keep, value.image};
     };
     if (!ComposeMaterialTextures(std::span(program.texture_assignments), std::span(program.ranges),
-        scope->inputs, lookup, mesh.values)) { ++stats.refused; return nullptr; }
+        scope->inputs, lookup, mesh.values, 4096, scope->shadow_phase)) { ++stats.refused; return nullptr; }
     if (scope->policy_inputs) {
       auto classify = [&](const PrimitivePolicyStep &step) {
         bool early_image = false;
@@ -364,7 +377,7 @@ NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialPro
 
 NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
   auto *scope = current;
-  if (!scope || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual ||
+  if (!scope || scope->shadow_phase || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual ||
       scope->generation != LoadedNativeModelGeneration(scope->graph)) return nullptr;
   if (auto it = scope->source_meshes.find(tag.mesh_va); it != scope->source_meshes.end()) return it->second;
   constexpr size_t alias_bytes = 128;
@@ -382,6 +395,42 @@ NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
   return mesh;
 }
 } // namespace
+
+std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
+    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera) {
+  const auto *scope = current;
+  if (!scope || !scope->shadow_phase || scope->render_view != 1 || scope->pose.get() != &pose ||
+      scope->model != pose.model || !scope->policy_inputs || !scope->shadow_inputs ||
+      !scope->alpha_inputs || !scope->cutout_pass || node >= pose.transforms.size()) return {};
+  const auto *program = FindNativeInstanceNode(pose, node);
+  if (!program) return {};
+  const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs);
+  if (admission.route != NativeRigidCasterRoute::Native) return {};
+  const auto *mesh = PrepareMaterialMesh(*program);
+  std::vector<uint32_t> references;
+  if (!mesh || mesh->values.size() != program->ranges.size() ||
+      !ComposeMaterialAlphaReferences(program->ranges, admission.policies, *scope->alpha_inputs, references)) return {};
+  std::vector<NativeRigidShadowCutout> cutouts(program->ranges.size());
+  for (size_t n = 0; n < cutouts.size(); ++n) if (admission.policies[n].alpha_test) {
+    auto &cutout = cutouts[n];
+    const auto &range = program->ranges[n];
+    const uint32_t layers = range.shadow_uses_texture ? scope->shadow_inputs->texture_layers : 0;
+    // Modes above3 preserve old shader enables; that inherited producer is not
+    // represented. Detail layers affect RGB only and do not affect depth alpha.
+    if (layers > 3) return {};
+    cutout.textured = layers != 0;
+    cutout.alpha = scope->shadow_inputs->alpha;
+    cutout.reference = references[n]; cutout.comparison = scope->cutout_pass->comparison;
+    cutout.uv = mesh->values[n].uv; cutout.owns_uv = mesh->values[n].owns_uv;
+    if (cutout.textured) {
+      if (!(mesh->values[n].image_mask & 1) || !scope->shadow_filters || !(*scope->shadow_filters)[0]) return {};
+      cutout.image = mesh->values[n].images[0];
+      cutout.sampler = NativeMaterialSampler2D{*(*scope->shadow_filters)[0],
+          MaterialSampleAddress::Wrap, MaterialSampleAddress::Wrap};
+    }
+  }
+  return PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts);
+}
 
 std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
     const NativeInstancePose &pose, uint32_t node, uint32_t primitive) {
@@ -412,7 +461,7 @@ std::optional<NativeMaterialObjectInputs> FindNativeMaterialObjectInputs(const N
 }
 std::optional<NativeSelectedLights> FindNativeMaterialLights(const NodeTag &tag) {
   const auto *scope = current;
-  if (!scope || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual) return {};
+  if (!scope || scope->shadow_phase || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual) return {};
   return SelectNativeObjectLights(scope->lights, scope->node_lights, tag.node_index);
 }
 void NativeMaterialObjectInputCheck(bool same) {

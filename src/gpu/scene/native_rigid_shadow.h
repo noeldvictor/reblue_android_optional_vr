@@ -1,5 +1,5 @@
 /**
- * @brief Complete, source-free admission and inputs for an opaque rigid caster.
+ * @brief Complete, source-free admission and inputs for rigid shadow casters.
  * @copyright Copyright (c) 2026 reblue contributors
  * @license BSD 3-Clause, see LICENSE
  */
@@ -7,8 +7,10 @@
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_rigid_inputs.h"
+#include "gpu/scene/native_texture_binding.h"
 
 namespace bd::gpu::scene {
+struct NativeInstancePose;
 // Temporary acceptance selector, never a substitute for semantic admission.
 inline bool SelectedNativeRigidShadow(const NativeModelMaterialProgram &program) {
   for (const auto &geometry : program.geometries)
@@ -21,6 +23,16 @@ struct NativeRigidShadowPlan {
   NativeRigidPassGPU pass{};
   PrimitiveCull cull = PrimitiveCull::None;
   bool draw = false;
+  NativeTextureGpuHandle albedo;
+  std::optional<NativeMaterialSampler2D> sampler;
+};
+struct NativeRigidShadowCutout {
+  NativeTextureBinding image;
+  std::array<float, 4> uv{};
+  std::optional<NativeMaterialSampler2D> sampler;
+  float alpha = 0;
+  uint32_t reference = 0, comparison = RigidCutoutGE;
+  bool textured = false, owns_uv = false;
 };
 enum class NativeRigidCasterRoute { Legacy, Native, Refused };
 struct NativeRigidCasterAdmission {
@@ -30,8 +42,8 @@ struct NativeRigidCasterAdmission {
 // Classify the authored family before consulting a pose or GPU allocation.
 // Depth-only opaque casting does not consume material colour, texture layers,
 // samplers or lights. Skin/deformation, alpha and volume/effect routing do.
-// Scene admission can request cutouts; depth-only admission must not use that
-// extension until a separate texture-owning caster producer/program is connected.
+// Cutout admission is shared by the scene and texture-owning shadow producers.
+// The opaque-only builder below still refuses missing cutout packets.
 // The original selected asset stays fail-closed even if its contract regresses.
 inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     const NativeModelMaterialProgram &program,
@@ -57,11 +69,28 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     if (!policy.routing_known || policy.deferred || (policy.alpha_test && !scene_cutouts)) return {unsupported};
   return {NativeRigidCasterRoute::Native, std::move(policies)};
 }
+inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
+    const NativeModelMaterialProgram &program, const std::optional<PrimitivePolicyInputs> &inputs) {
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true);
+  if (admission.route != NativeRigidCasterRoute::Native) return admission;
+  for (size_t n = 0; n < admission.policies.size(); ++n) if (admission.policies[n].alpha_test) {
+    // Phase0 casting has a different colour/shader recipe. Do not silently
+    // apply this phase1 producer to it, or borrow a declaration's colour bit.
+    if (inputs->phase != 1) return {SelectedNativeRigidShadow(program)
+        ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy};
+    if (!program.ranges[n].shader.vertex_colour) return {};
+  }
+  return admission;
+}
+std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
+    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera);
 inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadow(
     const NativeModelMaterialProgram &program, const RenderMatrix &world,
-    const PrimitivePolicyInputs &inputs, const RenderCamera &camera) {
-  const auto admission = PrepareNativeRigidCasterAdmission(program, inputs);
+    const PrimitivePolicyInputs &inputs, const RenderCamera &camera,
+    std::span<const NativeRigidShadowCutout> cutouts = {}) {
+  const auto admission = PrepareNativeRigidShadowAdmission(program, inputs);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
+  if (!cutouts.empty() && cutouts.size() != program.ranges.size()) return {};
   NativeRigidObjectGPU object{};
   NativeRigidPassGPU pass{};
   // The depth-only VS consumes exactly these two matrices. Zeroed unused fields
@@ -79,7 +108,26 @@ inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShado
         geometry->stream_mask != 1 || !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref ||
         !geometry->count || geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255) return {};
     const auto &policy = admission.policies[n];
-    result.push_back({geometry, object, pass, policy.cull, policy.direct});
+    NativeRigidShadowPlan plan{geometry, object, pass, policy.cull, policy.direct};
+    if (policy.alpha_test) {
+      if (cutouts.empty()) return {};
+      const auto &cutout = cutouts[n];
+      if (!std::isfinite(cutout.alpha)) return {};
+      plan.object.diffuse.w = cutout.alpha;
+      plan.object.flags.x = *program.ranges[n].shader.vertex_colour ? RigidVertexColour : 0;
+      if (!SetRigidCutout(plan.object, cutout.reference, cutout.comparison)) return {};
+      if (cutout.textured) {
+        const auto &image = cutout.image.primary;
+        if (!cutout.owns_uv || !image || !image->image || !image->view || cutout.image.slice_2d || cutout.image.cube ||
+            image->dimension != plume::RenderTextureViewDimension::TEXTURE_2D_ARRAY || !cutout.sampler ||
+            cutout.sampler->u != MaterialSampleAddress::Wrap || cutout.sampler->v != MaterialSampleAddress::Wrap) return {};
+        plan.object.uv_scale_offset = {1.f/512, 1.f/512, 1.f/512+cutout.uv[0], 1.f/512+cutout.uv[1]};
+        if (!RigidFinite(plan.object.uv_scale_offset)) return {};
+        plan.object.flags.x |= RigidAlbedo; plan.object.flags.y = 1;
+        plan.albedo = image; plan.sampler = cutout.sampler;
+      }
+    }
+    result.push_back(std::move(plan));
   }
   return result;
 }
