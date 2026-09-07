@@ -82,7 +82,8 @@ void Attach(uint32_t visual) {
     ++store.refused; Report(store); return;
   }
   const auto graph = input_source->graph;
-  const auto generation = LoadedNativeModelGeneration(graph);
+  const auto model = FindLoadedNativeModel(graph);
+  const auto generation = model ? model->Generation() : 0;
   auto &store = Instances();
   std::lock_guard lock(store.mutex);
   auto it = store.sources.find(visual);
@@ -94,7 +95,7 @@ void Attach(uint32_t visual) {
     ++store.refused; Report(store); return;
   }
   if (it == store.sources.end()) {
-    const auto id = store.instances.Create(generation);
+    const auto id = store.instances.Create(generation, model);
     if (!id) { Report(store); return; }
     try { it = store.sources.emplace(visual, instance_source::Binding{id, generation, {}}).first; }
     catch (...) { store.instances.Retire(id); throw; }

@@ -22,6 +22,7 @@ enum class NativeShadowPolicy : uint8_t { Unknown, Receive, Disabled };
 // NativeMaterialRange are import recipes, not the finished geometry/texture API.
 // Materials already have persistent content identities in NativeMaterialLibrary.
 struct NativeModelMaterialProgram {
+  std::optional<std::array<float, 4>> bounds; // local centre.xyz, radius
   std::vector<NativeMaterialRange> ranges;
   std::vector<NativeMaterialHandle> materials;
   // The same primitive ordinal selects its material and owned GPU geometry.
@@ -76,7 +77,29 @@ struct ModelMaterialRegistryStats {
 struct ModelMaterialSourceNode {
   uint32_t child = 0, sibling = 0, mesh = 0;
   bool has_geometry = false;
+  uint32_t matrix_index = 0;
 };
+
+struct ModelNodeSourceBinding { uint32_t matrix_index = 0, source_mesh = 0; };
+
+// Immutable model-to-node association. Pointers borrow the model's owned
+// programs, never source storage; the aliasing handle pins that same model.
+// Duplicate matrix indices are ambiguous and cannot select a native node.
+class NativeModelRenderData {
+public:
+  uint64_t Generation() const { return generation_; }
+  const NativeModelMaterialProgram *FindNode(uint32_t matrix_index) const;
+  size_t Nodes() const { return nodes_.size(); }
+  NativeModelRenderData(const NativeModelRenderData &) = delete;
+  NativeModelRenderData &operator=(const NativeModelRenderData &) = delete;
+private:
+  friend class ModelMaterialRegistry;
+  NativeModelRenderData() = default;
+  struct Node { uint32_t matrix_index; const NativeModelMaterialProgram *program; };
+  uint64_t generation_ = 0;
+  std::vector<Node> nodes_;
+};
+using NativeModelRenderHandle = std::shared_ptr<const NativeModelRenderData>;
 
 // Bounded import traversal, independent of source memory and visibility flags.
 // Shared meshes are imported once. Cyclic/aliased nodes are malformed trees.
@@ -84,8 +107,10 @@ struct ModelMaterialSourceNode {
 template <typename Reader>
 bool CollectModelMaterialSources(uint32_t root, Reader &&read,
                                  std::vector<uint32_t> &out,
-                                 size_t max_nodes = 4096) {
+                                 size_t max_nodes = 4096,
+                                 std::vector<ModelNodeSourceBinding> *out_nodes = nullptr) {
   std::vector<uint32_t> pending, sources;
+  std::vector<ModelNodeSourceBinding> nodes;
   std::unordered_set<uint32_t> visited, meshes;
   if (root)
     pending.push_back(root);
@@ -101,10 +126,13 @@ bool CollectModelMaterialSources(uint32_t root, Reader &&read,
       pending.push_back(node->sibling);
     if (node->child)
       pending.push_back(node->child);
-    if (node->has_geometry && node->mesh && meshes.insert(node->mesh).second)
-      sources.push_back(node->mesh);
+    if (node->has_geometry && node->mesh) {
+      if (meshes.insert(node->mesh).second) sources.push_back(node->mesh);
+      if (out_nodes) nodes.push_back({node->matrix_index, node->mesh});
+    }
   }
   out = std::move(sources);
+  if (out_nodes) *out_nodes = std::move(nodes);
   return true;
 }
 
@@ -118,17 +146,19 @@ public:
   static constexpr size_t kMaxMeshes = 4096;
   explicit ModelMaterialRegistry(size_t max_bytes = kMaxBytes,
                                  size_t max_models = 4096);
-  bool Publish(uint32_t source_model, std::vector<ModelMaterialImport> meshes);
+  bool Publish(uint32_t source_model, std::vector<ModelMaterialImport> meshes,
+               std::span<const ModelNodeSourceBinding> nodes = {});
   void Retire(uint32_t source_model);
   std::shared_ptr<const ModelMaterialImport> Find(
       uint32_t source_model, uint32_t source_mesh);
   ModelMaterialRegistryStats Stats() const;
   uint64_t Generation(uint32_t source_model) const;
+  NativeModelRenderHandle FindModel(uint32_t source_model) const;
   // Logical retained vector storage plus a conservative per-model bookkeeping
   // allowance. Shared material assets and geometry have their own library/GPU
   // arena budgets; retired geometry currently remains in the bounded GPU cache.
   static size_t RetainedBytes(std::span<const ModelMaterialImport> meshes,
-                              size_t mesh_capacity);
+                              size_t mesh_capacity, size_t node_capacity = 0);
 
 private:
   struct Accounting {
@@ -137,6 +167,7 @@ private:
   struct Model {
     uint64_t generation = 0;
     std::vector<ModelMaterialImport> meshes;
+    NativeModelRenderData render;
     std::shared_ptr<Accounting> accounting;
     size_t bytes = 0;
     ~Model();

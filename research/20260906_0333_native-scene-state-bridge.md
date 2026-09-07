@@ -2000,3 +2000,88 @@ Aggregate logs175,763 B (-929). Known retained fixture/shader/log growth2,301,48
 B, plus666,544 host exe/PDB/new object. Cleanup-end free58.94 GiB; drive-wide use
 +48,009,216 B from this turn's first free, not all attributed to the task. Same
 original cap/floor/raw0 and retention triggers remain; no budget reset.
+
+### Native model-node association, same checkpoint (2026-09-07)
+
+Parent44cb12d; previous turn verified progress and pushed clean. First current
+free63,282,425,856 B; pre-build63,282,368,512 B, no active producers. Same original
+3 GiB cap/floor62,509,998,080 B/raw0 gate. Load-owned node/primitive associations
+and mesh spheres now travel with native model leases into instance poses; host
+walk consumes those bounds without source mesh reads outside verification.
+This removes the missing model-to-primitive association for direct submission;
+live draw bindings/light/fog and interpreter-free acceptance remain unfinished.
+Four field-ready rigid candidate identities maximum, no per-draw dump/cache.
+
+Reuse material tree7,338,480 B, exe364,032 B; plan <=4 MiB fixture/log growth and
+<=256 MiB host compile/link overlap, existing log10 MiB/diagnostic100 MiB ceilings.
+One target at a time under the existing supervisor; no guest or shader rebuild,
+new tree, cook, raw, perf or dumps. Preserve run918/image and native shader GPU
+evidence until an equivalent replacement qualifies. Runtime/image preflight is
+separate after CPU/build checks; budget overlap before launching, not afterward.
+
+Material19/PID15800 andCPU17/PID28244 pass (0.10 s behavior/0.11 s CTest).
+Host74/PID28140 terminal success, codegen up-to-date, host objects/link only,
+no guest or shader compilation. Host exe48,338,432/PDB107,388,928 B; material
+tree7,461,125 B (+122,645). Logs181,101 B (+5,338).238 Python checks pass.
+Runtime preflight free63,235,993,600 B, image aggregate10,242,361 B leaving
+243,399 B. Plan one<=75 s flat/native-MSAA/precache-on run, all run918 gates
+plus fresh native node/bounds comparisons; <=400 KiB log, one quality60 full
+window JPEG<=160 KiB. Original profile hash verified unchanged. Same raw0/perf/
+dump/cache restrictions; keep run918/image until replacement pixels qualify.
+
+Run919/PID8932 terminal03:04:11, all14 settings effective and exact profile
+restored. Fresh native node reads/checks+1,761,600, unavailable0/mismatch0, existing
+field gates pass. One128,634 B1920x1080 JPEG inspected: coherent scene/player/
+shadows, existing cliff marks/blur remain. No new runtime cache/perf/dump/raw.
+Candidate filter yielded zero IDs, not native-object acceptance. Host75/PID28804
+passes4.298 s after changing ONLY candidate diagnostics to expose actual technique,
+primitive count and unknown skin state. Rendering/ownership behavior is unchanged;
+run919 pixels stay tied to host74, not silently restamped as host75.
+
+Retired8 exact superseded outputs after replacement passed: run918 log/image,
+material18/CPU16 and host73 stdout/stderr.371,420 logical B; immediate free
+62,992,408,576 ->62,992,789,504 B, measured380,928 B reclaimed once. Old reports/
+hashes remain; old field outputs gone, build logs reproducible. Distinct rigid
+shader/snapshot GPU evidence and protected raw/baseline/motion data untouched.
+
+Volume use since first free is now289,636,352 B, beyond the initial compile-only
+overlap estimate; scoped runtime cache/perf/dump inventory since02:49 has0 new
+files. Known host/fixture output growth is much smaller; remaining attribution
+is unknown, not zero. Producers are stopped. Original floor leaves482,791,424 B.
+Next text-only candidate run reuses the same full field gate, no image, <=75 s/
+400 KiB log, with an additional per-run192 MiB drive-growth stop plus the original
+floor. No cumulative budget reset. Keep run919 image/evidence; new candidate
+evidence has a distinct purpose and is replaced at direct-object qualification.
+
+Run920/PID15876 terminal03:09:47, all14 settings effective/profile exact. Full
+field gate passes again with+1,761,600 native bounds reads/checks,0missing/0wrong;
+31 movement samples/+39.002439 units. Four content-keyed candidates recorded.
+Choose geometry258694267A8DBAEE/material63B8D67932573E51, sole primitive of node64
+in bg41_01. Material file68 B inspected: modulation off/specular black/power0;
+canonical geometry is memory-only, no matching v2 cache file. No new runtime
+cache/perf/dump/raw. Direct shader route and source-free load remain pending.
+Current log235,282 B; current image remains run919's128,634 B, tied to host74.
+Source/verification details: `20260907_0312_native-model-node-associations.md`.
+
+Retired run919 full text log only after920 replaced all its field gates; its
+image and actual host74 hash/observations remain.233,579 logical B; immediate
+free63,315,308,544 ->63,315,546,112 B, measured237,568 B reclaimed. Total THIS
+turn cleanup9files604,999 logical B/618,496 B (604 KiB) measured once. Do not
+re-credit prior shader checkpoint cleanup. Final aggregate build logs178,481 B
+(+2,718), images10,235,034 B (-7,327); one latest field log replaces the old one
+(+3,196). Material tree7,461,125 B (+122,645): known comparable retained growth
+121,232 B. Host exe/PDB+136,192; other object/metadata/helper deltas unknown.
+Retention adds node association/lifetime coverage; replace by purpose at the
+next equivalent/direct-object qualification. No owned producer remains.
+
+Cleanup-end free63,315,546,112 B (58.97 GiB), drive-wide gain33,120,256 B from
+current first free; fluctuations are not attributed to task cleanup. Original
+ledger3 GiB exception/floor62,509,998,080 B and raw0 gate remain unchanged.
+
+Final host76/PID29896 passes3.201 s, one host source/link: guard the candidate
+call so normal verification-off rendering does not evaluate its source lookup
+arguments. Verified-on behavior unchanged; no further game run/image. Exe/PDB
+sizes unchanged; actual latest binary hash in dated report.238 guards/scenarios
+pass again. Logs179,228 B (+747 from prior tally), comparable retained growth
+121,979 B plus136,192 host exe/PDB. Build-end free63,313,158,144 B; no additional
+cleanup savings or reset. Run919 pixels/920 text remain tied to host74/75.

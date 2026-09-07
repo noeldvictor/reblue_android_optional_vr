@@ -35,6 +35,18 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         for forbidden in ("PPCContext", "REX_", "bd::mem", "GuestBuffer", "NodeTag", "ofstream"):
             self.assertNotIn(forbidden, self.core)
 
+    def test_model_lease_is_attached_before_pose_and_used_without_source_lookup(self):
+        self.assertIn("FindLoadedNativeModel(graph)", self.bridge)
+        self.assertIn("store.instances.Create(generation, model)", self.bridge)
+        self.assertIn("owner->pose.model = it->second.model", self.core)
+        lookup = self.core.split("FindNativeInstanceNode(", 1)[1]
+        for forbidden in ("bd::mem", "NodeTag", "source_mesh", "LoadedNativeModelGeneration"):
+            self.assertNotIn(forbidden, lookup)
+        self.assertIn("FindNativeInstanceNode(*instance_pose, index)", self.walk)
+        self.assertIn("!bounds || verify_bounds ?", self.walk)
+        self.assertIn("if (instance_pose && REXCVAR_GET(bd_native_materials_verify))\n"
+                      "              NoteNativeModelNodeCandidate", self.walk)
+
     def test_identity_attachment_does_not_import_provisional_poses(self):
         hook = self.bridge.split("REX_HOOK_RAW(bdVisualObjectInitBones)", 1)[1]
         self.assertLess(hook.index("__imp__bdVisualObjectInitBones"), hook.index("Attach(visual)"))

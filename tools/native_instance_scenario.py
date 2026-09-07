@@ -39,6 +39,7 @@ PRIMITIVE_POLICY_METRIC = re.compile(
     r"(\d+) draws (\d+) cull changes (\d+) compound refreshes;")
 LIT_SHADING_METRIC = re.compile(r"\[native-lit-shading\] (\d+) normal-lit queued draws;")
 DRAW_BINDING_METRIC = re.compile(r"\[draw-bindings\] (\d+) emitted draws (\d+) descriptor binds (\d+) layout binds;")
+MODEL_NODE_METRIC = re.compile(r"\[native-model-nodes\] (\d+) owned bounds/primitive associations (\d+) unavailable; (\d+) bounds checks wrong (\d+);")
 
 
 class Pending(ValueError):
@@ -288,6 +289,28 @@ def verify_draw_bindings(text):
                     (b[i] - a[i] for i in range(3))))
 
 
+def verify_model_nodes(text):
+    """Fresh owned-node bounds use and source comparison, not a direct draw gate."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("model-node diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-model-node-mismatch]" in line:
+            raise ValueError("native model-node bounds mismatch")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = MODEL_NODE_METRIC.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[3]:
+                raise ValueError("native model-node bounds differ from source")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] - a[0] < 32 or b[2] - a[2] < 32:
+        raise Pending("need fresh owned node/bounds reads and checks")
+    return {"reads_delta": b[0] - a[0], "checks_delta": b[2] - a[2], "unavailable": b[1]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -333,6 +356,7 @@ def main():
     parser.add_argument("--primitive-policies", action="store_true")
     parser.add_argument("--lit-shading", action="store_true")
     parser.add_argument("--draw-bindings", action="store_true")
+    parser.add_argument("--model-nodes", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -352,6 +376,7 @@ def main():
         policies = verify_primitive_policies(text) if args.primitive_policies else None
         lit = verify_lit_shading(text) if args.lit_shading else None
         bindings = verify_draw_bindings(text) if args.draw_bindings else None
+        nodes = verify_model_nodes(text) if args.model_nodes else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -377,6 +402,8 @@ def main():
         print("PASS: post-event named lit shading " + ", ".join(f"{k}={v}" for k, v in lit.items()))
     if bindings is not None:
         print("PASS: post-event explicit draw bindings " + ", ".join(f"{k}={v}" for k, v in bindings.items()))
+    if nodes is not None:
+        print("PASS: post-event owned model nodes " + ", ".join(f"{k}={v}" for k, v in nodes.items()))
     return 0
 
 

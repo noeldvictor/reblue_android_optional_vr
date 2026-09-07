@@ -9,6 +9,14 @@
 
 namespace bd::gpu::scene {
 
+const NativeModelMaterialProgram *NativeModelRenderData::FindNode(uint32_t matrix_index) const {
+  const auto found = std::lower_bound(nodes_.begin(), nodes_.end(), matrix_index,
+      [](const Node &node, uint32_t index) { return node.matrix_index < index; });
+  if (found == nodes_.end() || found->matrix_index != matrix_index ||
+      (found + 1 != nodes_.end() && (found + 1)->matrix_index == matrix_index)) return nullptr;
+  return found->program;
+}
+
 std::optional<bool> FindModelShadowPolicy(
     const ModelMaterialImport &mesh, uint32_t index_buffer, uint32_t vertex_buffer,
     uint32_t first_index, uint32_t index_count) {
@@ -43,7 +51,7 @@ ModelMaterialRegistry::Model::~Model() {
 }
 
 size_t ModelMaterialRegistry::RetainedBytes(
-    std::span<const ModelMaterialImport> meshes, size_t mesh_capacity) {
+    std::span<const ModelMaterialImport> meshes, size_t mesh_capacity, size_t node_capacity) {
   constexpr size_t limit = std::numeric_limits<size_t>::max();
   size_t bytes = sizeof(Model) + 256;
   auto add = [&](size_t count, size_t stride) {
@@ -54,6 +62,7 @@ size_t ModelMaterialRegistry::RetainedBytes(
     bytes += count * stride;
   };
   add(mesh_capacity, sizeof(ModelMaterialImport));
+  add(node_capacity, sizeof(NativeModelRenderData::Node));
   for (const auto &mesh : meshes) {
     add(mesh.program.ranges.capacity(), sizeof(NativeMaterialRange));
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
@@ -67,14 +76,15 @@ size_t ModelMaterialRegistry::RetainedBytes(
 }
 
 bool ModelMaterialRegistry::Publish(uint32_t source_model,
-                                     std::vector<ModelMaterialImport> meshes) {
+                                     std::vector<ModelMaterialImport> meshes,
+                                     std::span<const ModelNodeSourceBinding> nodes) {
   std::lock_guard lock(mutex_);
   // A failed new load must not leave a previous allocation's recipes visible.
   // Existing leases remain valid, but cannot be found through a reused key.
   if (models_.erase(source_model))
     ++stats_.retired;
-  const size_t bytes = RetainedBytes(meshes, meshes.capacity());
-  if (!source_model || stats_.published == UINT64_MAX || meshes.size() > kMaxMeshes || bytes > max_bytes_ ||
+  size_t bytes = RetainedBytes(meshes, meshes.capacity(), nodes.size());
+  if (!source_model || stats_.published == UINT64_MAX || meshes.size() > kMaxMeshes || nodes.size() > kMaxMeshes || bytes > max_bytes_ ||
       accounting_->bytes.load() > max_bytes_ - bytes ||
       accounting_->live.load() >= max_models_) {
     ++stats_.refused;
@@ -110,6 +120,20 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   auto model = std::make_shared<Model>();
   model->generation = stats_.published + 1;
   model->meshes = std::move(meshes);
+  model->render.generation_ = model->generation;
+  model->render.nodes_.reserve(nodes.size());
+  for (const auto &node : nodes) {
+    const auto found = std::lower_bound(model->meshes.begin(), model->meshes.end(), node.source_mesh,
+        [](const auto &mesh, uint32_t key) { return mesh.source_mesh < key; });
+    if (node.matrix_index >= kMaxMeshes || found == model->meshes.end() || found->source_mesh != node.source_mesh) {
+      ++stats_.refused; return false;
+    }
+    model->render.nodes_.push_back({node.matrix_index, found->program.valid ? &found->program : nullptr});
+  }
+  std::sort(model->render.nodes_.begin(), model->render.nodes_.end(),
+      [](const auto &a, const auto &b) { return a.matrix_index < b.matrix_index; });
+  bytes = RetainedBytes(model->meshes, model->meshes.capacity(), model->render.nodes_.capacity());
+  if (bytes > max_bytes_ || accounting_->bytes.load() > max_bytes_ - bytes) { ++stats_.refused; return false; }
   model->bytes = bytes;
   accounting_->bytes.fetch_add(bytes);
   accounting_->live.fetch_add(1);
@@ -156,6 +180,13 @@ uint64_t ModelMaterialRegistry::Generation(uint32_t source_model) const {
   std::lock_guard lock(mutex_);
   const auto it = models_.find(source_model);
   return it == models_.end() ? 0 : it->second->generation;
+}
+
+NativeModelRenderHandle ModelMaterialRegistry::FindModel(uint32_t source_model) const {
+  std::lock_guard lock(mutex_);
+  const auto found = models_.find(source_model);
+  return found == models_.end() ? NativeModelRenderHandle{} :
+      NativeModelRenderHandle(found->second, &found->second->render);
 }
 
 } // namespace bd::gpu::scene

@@ -1,6 +1,7 @@
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
+#include "gpu/scene/native_instance.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -35,6 +36,49 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
 }
 
 void TestNativeModelMaterials() {
+  {
+    ModelMaterialRegistry models;
+    auto a = Mesh(100), b = Mesh(200, 24);
+    a.program.bounds = std::array<float, 4>{1, 2, 3, 4};
+    std::vector<ModelNodeSourceBinding> bindings{{2, 200}, {0, 100}, {1, 100}};
+    Require(models.Publish(10, {a, b}, bindings), "load-owned node association");
+    auto model = models.FindModel(10);
+    const auto generation = model->Generation();
+    Require(model->Nodes() == 3 && model->FindNode(0) == model->FindNode(1) &&
+            model->FindNode(2) != model->FindNode(0) && !model->FindNode(3), "node order and shared primitives");
+    NativeInstanceRegistry instances;
+    Require(!instances.Create(generation + 1, model), "model/instance generation mismatch refused");
+    const auto instance = instances.Create(generation, model);
+    std::array<RenderMatrix, 3> matrices{};
+    Require(instance && instances.Publish(instance, 1, matrices), "pose retains native model");
+    auto pose = instances.Read(instance, 1);
+    a = {}; b = {}; bindings.clear(); bindings.shrink_to_fit();
+    models.Retire(10); model.reset();
+    Require(!models.FindModel(10) && models.Stats().live == 1 &&
+            FindNativeInstanceNode(*pose, 0)->bounds->at(3) == 4 && !FindNativeInstanceNode(*pose, 3),
+            "native primitive/bounds selection after import storage destruction");
+    const ModelNodeSourceBinding replacement{0, 300};
+    Require(models.Publish(10, {Mesh(300, 42)}, {&replacement, 1}) && models.Generation(10) != generation &&
+            FindNativeInstanceNode(*pose, 0)->ranges[0].material.shininess != 42, "reload cannot repoint leased model");
+    instances.Retire(instance);
+    Require(models.Stats().live == 2, "GPU-facing pose still pins retired model");
+    pose.reset();
+    Require(models.Stats().live == 1, "last pose releases model accounting");
+    models.Retire(10);
+    const ModelNodeSourceBinding duplicate[]{{0, 100}, {0, 200}, {2, 200}};
+    Require(models.Publish(20, {Mesh(100), Mesh(200)}, duplicate), "ambiguous association preserves other nodes");
+    model = models.FindModel(20);
+    Require(!model->FindNode(0) && model->FindNode(2), "duplicate matrix index cannot choose wrong primitive");
+    model.reset(); models.Retire(20);
+    const ModelNodeSourceBinding missing{0, 999}, oversized{4096, 100};
+    Require(!models.Publish(20, {Mesh(100)}, {&missing, 1}) &&
+            !models.Publish(20, {Mesh(100)}, {&oversized, 1}), "unknown mesh and out-of-range node refused");
+    std::vector<ModelMaterialImport> mesh{Mesh(100)};
+    const auto old_size = ModelMaterialRegistry::RetainedBytes(mesh, mesh.capacity());
+    ModelMaterialRegistry tight(old_size);
+    const ModelNodeSourceBinding node{0, 100};
+    Require(!tight.Publish(1, mesh, {&node, 1}), "node storage participates in model byte budget");
+  }
   ModelMaterialRegistry registry;
   Require(!registry.Find(1, 10) && registry.Stats().indexed == 0,
           "lookup must never discover or create a model");
@@ -155,6 +199,14 @@ void TestNativeModelMaterials() {
     return it == tree.end() ? std::nullopt : std::optional(it->second);
   };
   std::vector<uint32_t> sources{42};
+  tree[1].matrix_index = 4; tree[2].matrix_index = 6; tree[3].matrix_index = 8;
+  std::vector<ModelNodeSourceBinding> node_sources;
+  Require(CollectModelMaterialSources(1, read, sources, 4096, &node_sources) && node_sources.size() == 3 &&
+          node_sources[0].matrix_index == 4 && node_sources[1].matrix_index == 6 && node_sources[2].matrix_index == 8,
+          "load traversal preserves every node including shared meshes");
+  const auto previous_nodes = node_sources.size();
+  Require(!CollectModelMaterialSources(1, read, sources, 1, &node_sources) && node_sources.size() == previous_nodes,
+          "node publication failure leaves prior result untouched");
   Require(CollectModelMaterialSources(1, read, sources) &&
           sources == std::vector<uint32_t>{20, 10}, "complete tree and shared meshes");
   const auto before = sources;

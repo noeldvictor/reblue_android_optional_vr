@@ -1,5 +1,6 @@
 import unittest
 import re
+from native_instance_scenario import verify_model_nodes
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -482,6 +483,35 @@ class DrawBindingScenarioTest(unittest.TestCase):
             verify_draw_bindings("x" * (MAX_LOG_BYTES + 1))
         with self.assertRaises(Pending):
             verify_draw_bindings("\n".join(self.rows() + ["[native-material-context] mode Loading"]))
+
+
+class ModelNodeScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-model-nodes] 100 owned bounds/primitive associations 5 unavailable; 100 bounds checks wrong 0;"
+        rows[4] = "[native-model-nodes] 150 owned bounds/primitive associations 8 unavailable; 145 bounds checks wrong 0;"
+        return rows
+
+    def test_fresh_owned_use(self):
+        self.assertEqual(verify_model_nodes("\n".join(self.rows())),
+                         dict(reads_delta=50, checks_delta=45, unavailable=8))
+
+    def test_stale_unused_reset_startup_and_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150", "100"), text.replace("145", "100"),
+                    text.replace("150", "1"), text.replace("bg41_01", "bg42_01"),
+                    "\n".join(self.rows()[1:]), "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2])):
+            with self.assertRaises(Pending):
+                verify_model_nodes(bad)
+
+    def test_mismatch_cannot_be_hidden_and_input_is_bounded(self):
+        text = "\n".join(self.rows())
+        for bad in ("[native-model-node-mismatch]\n" + text, text.replace("wrong 0", "wrong 1", 1),
+                    "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_model_nodes(bad)
+        with self.assertRaises(Pending):
+            verify_model_nodes(text + "\n[native-material-context] mode Loading")
 
 
 if __name__ == "__main__":

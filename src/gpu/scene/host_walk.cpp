@@ -52,6 +52,7 @@
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
+#include "gpu/scene/native_material.h"
 #include "gpu/scene/host_frustum_bridge.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/shadow_fit.h"
@@ -60,6 +61,7 @@
 REXCVAR_DECLARE(bool, bd_host_walk);
 REXCVAR_DECLARE(bool, bd_host_cull);
 REXCVAR_DECLARE(bool, bd_host_cull_diag);
+REXCVAR_DECLARE(bool, bd_native_materials_verify);
 REXCVAR_DECLARE(f64, bd_shadow_cull_distance);
 REXCVAR_DECLARE(f64, bd_reflection_cull_distance);
 REXCVAR_DECLARE(bool, bd_occlusion_cull);
@@ -68,6 +70,7 @@ u32 g_cull_walks = 0, g_cull_host_walks = 0, g_cull_tested = 0,
     g_cull_disagreed = 0;
 u32 g_view_dist_culled = 0;
 u32 g_light_culled = 0;
+uint64_t g_native_nodes = 0, g_node_missing = 0, g_node_checks = 0, g_node_wrong = 0;
 } // namespace
 REXCVAR_DECLARE(bool, bd_reflections);
 REXCVAR_DECLARE(bool, bd_walk_skip_stubs);
@@ -201,6 +204,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
                 g_view_dist_culled / 300.0, g_light_culled / 300.0);
       g_cull_walks = g_cull_host_walks = g_cull_tested = g_cull_disagreed = 0;
       g_view_dist_culled = g_light_culled = 0;
+      BD_INFO("[native-model-nodes] {} owned bounds/primitive associations {} unavailable; "
+              "{} bounds checks wrong {}; instance leases pin loaded models; source tree and draw adapters remain",
+              g_native_nodes, g_node_missing, g_node_checks, g_node_wrong);
       last_frame = f;
     }
   }
@@ -236,23 +242,36 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           float m[16];
           float c[3];
           const bool native_pose = instance_pose && index < instance_pose->transforms.size();
+          const auto *program = native_pose ? FindNativeInstanceNode(*instance_pose, index) : nullptr;
+          const auto *bounds = program && program->bounds ? &*program->bounds : nullptr;
+          const bool verify_bounds = bounds && REXCVAR_GET(bd_native_materials_verify);
           const auto *mp = native_pose ? nullptr : bd::mem::try_at<const be_u32>(matrix);
-          const auto *cp = bd::mem::try_at<const be_u32>(mesh + offsetof(GuestMesh, centre));
-          if ((!native_pose && !mp) || !cp)
+          const auto *cp = !bounds || verify_bounds ? bd::mem::try_at<const be_u32>(mesh + offsetof(GuestMesh, centre)) : nullptr;
+          if ((!native_pose && !mp) || (!bounds && !cp))
             goto children; // nothing to draw; the subtree still walks
+          ++(bounds ? g_native_nodes : g_node_missing);
+          if (verify_bounds) {
+            bool same = cp != nullptr;
+            for (u32 i = 0; cp && i < 4; ++i) same &= std::bit_cast<float>(u32(cp[i])) == (*bounds)[i];
+            ++g_node_checks;
+            if (!same) {
+              if (g_node_wrong++ < 3) BD_WARN("[native-model-node-mismatch] index {} generation {}", index, instance_pose->model_generation);
+            }
+          }
           for (u32 i = 0; i < 16; ++i) {
             if (native_pose) { m[i] = instance_pose->transforms[index][i]; continue; }
             const u32 bits = static_cast<u32>(mp[i]);
             std::memcpy(&m[i], &bits, sizeof(float));
           }
           for (u32 i = 0; i < 3; ++i) {
+            if (bounds) { c[i] = (*bounds)[i]; continue; }
             const u32 bits = static_cast<u32>(cp[i]);
             std::memcpy(&c[i], &bits, sizeof(float));
           }
           float out[3];
           for (u32 k = 0; k < 3; ++k)
             out[k] = m[12 + k] + c[0] * m[k] + c[1] * m[4 + k] + c[2] * m[8 + k];
-          const float radius = radius_scale * LoadF32(mesh + offsetof(GuestMesh, radius));
+          const float radius = radius_scale * (bounds ? (*bounds)[3] : LoadF32(mesh + offsetof(GuestMesh, radius)));
           // The node's world sphere, for the draw queue's blended gather: two
           // draws whose spheres do not overlap in the view cannot write the
           // same pixel, so their order is free (draw_queue.cpp).
@@ -356,6 +375,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
                 bd::mem::try_store<u8>(at, u8(bd::mem::try_load<u8>(at) + 1));
               }
             }
+            if (instance_pose && REXCVAR_GET(bd_native_materials_verify))
+              NoteNativeModelNodeCandidate(*instance_pose, index, view_id,
+                  bd::mem::try_field<u32>(bd::mem::try_load<u32>(ctx_va), kVisualTech, ~0u));
             ctx.r3.u64 = mesh;
             ctx.r4.u64 = index;
             ctx.r5.u64 = matrix;

@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after native rigid shader GPU checks and host73. The first
+Updated 2026-09-07 after native model-node association checks and field runs919/920. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -62,6 +62,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    No game producer uses the native programs yet, and instance-record gathering
    remains translated. Connect the owned object packet and live pass producers next,
    not another broad compatibility layer.
+   Model-node associations and local bounds are now load-owned and pinned by
+   native instance poses; `FindNativeInstanceNode` selects primitives without a
+   source graph/mesh/buffer lookup. The host walk consumes these bounds with
+   matching field checks. Object texture/color/pass assembly and direct draw
+   submission must now consume the same association, not discover it from replay.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -111,23 +116,29 @@ drop participants from the initial acceptance scene.
 
 ### Direct rigid-object dependency map
 
-Source audit at `11f5d94`, updated for native rigid shaders (2026-09-07).
+Source audit at `11f5d94`, updated for native model-node associations (2026-09-07).
 This records why the latest component
 checks are not an end-to-end object conversion, and where the next implementation
 must connect. It is not a second roadmap or a new renderer framework.
 
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
-| An object/primitive packet selected by owned handles | `NativeModelMaterialProgram`, `NativeGeometry`, `NativeInstancePose`, object image/UV/policy publications | `PrepareMaterialMesh` still selects by `NodeTag`/source graph and consumers match source IB/VB/range keys. Publish an immutable model/instance-to-primitive association before drawing; the submission core must not discover it from captured draws. |
+| An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeInstanceNode`, owned geometry/materials/bounds and object image/UV/policy publications | Model-to-primitive association is published at load and retained by instances; native bounds are live consumers. Assemble direct object color/UV/image/policy packets from this association. `PrepareMaterialMesh` and replay still select by `NodeTag`/source graph and match source IB/VB/range keys; remove that discovery from the new direct consumer. |
 | Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass` and explicit GPU layout | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The live normal shader still imports these from registers. Publish owned lights/fog and associate native material/UV inputs with actual model primitives; do not repack translated registers per draw as the finished producer. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Actual native shaders now work in the Vulkan fixture, using the production factory/description/binding cores. Connect the game object producer and shared cache selection; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
 
-Start by selecting and recording an actual model/content identity and primitive
-family in `bg41_01`; the latest logs qualify that field but do not identify a
-completed direct-object candidate. Do not hard-code a transient source address as
-its asset identity. The first family may exclude skin, wind, volume and special
-overrides, but eligibility must be explicit and other families must keep drawing.
+Selected investigation target from field run920: geometry `258694267A8DBAEE`,
+material `63B8D67932573E51`, model-local node64, sole primitive, technique0/view3
+in `bg41_01`. Runtime instance144/generation93 identify that observation only,
+not persistent asset IDs. The material has modulation off, black specular/power0;
+diffuse comes from the live object color. Its skin command is unspecified and
+its canonical vertex schema still needs explicit eligibility checking. No v2
+cache file exists for that geometry yet: verification cooks it in memory and
+disables persistence. Persist/validate only this selected asset under existing
+budgets, not the whole library. Complete color/UV/image/light/fog ownership and
+whole-node preflight before routing it. Other families must keep drawing; these
+IDs identify a target, not a completed direct object or permission to drop siblings.
 
 Work backward from the final submit call, defining the packet/binding contract
 first and connecting its missing producers next. Each implementation checkpoint
@@ -159,10 +170,24 @@ Both revised repository skills passed their frontmatter validator. That tooling
 checkpoint made no renderer change or new runtime output. The subsequent binding
 checkpoint expanded the selection to 113 rigid-path /228 broader checks; native
 program guards brought these to 116 /231; rigid shader guards now bring them to
-119 /234 respectively. Their
+119 /234 respectively; model-node guards/scenarios now bring these to123 /238. Their
 separate C++ and runtime evidence follows below.
 
 ## Latest qualified checkpoint
+
+Native model-node associations (2026-09-07): load traversal preserves every
+node-to-program association, including shared meshes; duplicate matrix indices
+cannot select an arbitrary primitive. Instance poses pin the model generation
+and its bounds/primitive programs through retirement and source reuse. The host
+walk uses owned bounds, with source reads only for comparison or unavailable
+native data. Material19/CPU17, host74–76, 238 Python checks and eight runner tests
+pass. Run919 adds1,761,600 fresh matching bounds reads and an inspected1920x1080
+image; run920 repeats all field gates and identifies four actual content-keyed
+targets without another capture. Source-free node/bounds consumption is not
+source-free geometry loading or direct rendering. No game shader route, native
+light/fog producer, interpreter/template-free cold-load/reload or complete
+desktop/both-eye gate is established. No measured speedup. Evidence:
+`research/20260907_0312_native-model-node-associations.md`.
 
 Native rigid shaders (2026-09-07): production scene VS/PS and shadow VS use named
 geometry, explicit object/pass buffers and texture/sampler sets, with no translated

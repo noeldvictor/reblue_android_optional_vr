@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_transform.h"
+#include "gpu/scene/native_model_materials.h"
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -19,6 +20,7 @@ using NativeInstanceId = uint64_t;
 struct NativeInstancePose {
   NativeInstanceId instance = 0;
   uint64_t model_generation = 0;
+  NativeModelRenderHandle model;
   std::vector<RenderMatrix> transforms;
 };
 struct NativeInstanceStats {
@@ -42,12 +44,13 @@ public:
     accounting_->bytes.fetch_sub(entries_.size() * kEntryBytes);
   }
 
-  NativeInstanceId Create(uint64_t model_generation) {
+  NativeInstanceId Create(uint64_t model_generation, NativeModelRenderHandle model = {}) {
     std::lock_guard lock(mutex_);
-    if (!model_generation || next_ == UINT64_MAX || entries_.size() >= max_instances_ ||
+    if (!model_generation || (model && model->Generation() != model_generation) ||
+        next_ == UINT64_MAX || entries_.size() >= max_instances_ ||
         !Fits(kEntryBytes)) { ++stats_.refused; return 0; }
     const auto id = next_++;
-    entries_.emplace(id, Entry{model_generation, {}});
+    entries_.emplace(id, Entry{model_generation, std::move(model), {}});
     accounting_->bytes.fetch_add(kEntryBytes);
     ++stats_.created;
     return id;
@@ -74,6 +77,7 @@ public:
     auto owner = std::make_shared<PoseOwner>();
     owner->pose.instance = id;
     owner->pose.model_generation = it->second.model_generation;
+    owner->pose.model = it->second.model;
     owner->pose.transforms.assign(transforms.begin(), transforms.end());
     const size_t retained = sizeof(PoseOwner) + 128 +
         owner->pose.transforms.capacity() * sizeof(RenderMatrix);
@@ -131,6 +135,7 @@ private:
   };
   struct Entry {
     uint64_t model_generation;
+    NativeModelRenderHandle model;
     std::array<std::shared_ptr<const NativeInstancePose>, 2> poses;
   };
   bool Fits(size_t bytes) const {
@@ -143,4 +148,13 @@ private:
   std::unordered_map<NativeInstanceId, Entry> entries_;
   NativeInstanceStats stats_;
 };
+
+// Borrowed only while the pose lease lives. No source graph, mesh/buffer key,
+// palette address or registry lookup is needed to select the owned primitives.
+inline const NativeModelMaterialProgram *FindNativeInstanceNode(
+    const NativeInstancePose &pose, uint32_t matrix_index) {
+  if (!pose.model || pose.model_generation != pose.model->Generation() ||
+      matrix_index >= pose.transforms.size()) return nullptr;
+  return pose.model->FindNode(matrix_index);
+}
 } // namespace bd::gpu::scene

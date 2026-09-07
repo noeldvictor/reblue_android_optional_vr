@@ -6,6 +6,7 @@
  */
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
+#include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
 #include "gpu/scene/native_material_texture_bridge.h"
@@ -176,6 +177,7 @@ bool PublishModelMaterials(uint32_t graph) {
   const auto *control_table = bd::mem::try_at<const be_u32>(graph + 8);
   const auto table = control_table ? std::optional(uint32_t(*control_table)) : std::nullopt;
   std::vector<uint32_t> mesh_keys;
+  std::vector<ModelNodeSourceBinding> node_bindings;
   if (!CollectModelMaterialSources(uint32_t(*root), [](uint32_t node_va)
       -> std::optional<ModelMaterialSourceNode> {
         if (!node_va || node_va > UINT32_MAX - sizeof(GuestDrawNode) + 1 ||
@@ -187,8 +189,8 @@ bool PublishModelMaterials(uint32_t graph) {
         // Visibility is live instance state. Include initially hidden/pruned
         // nodes too, rather than freezing visibility into material ownership.
         return ModelMaterialSourceNode{uint32_t(node->child), uint32_t(node->sibling),
-            uint32_t(node->mesh), bool(uint32_t(node->flags) & kNodeHasGeometry)};
-      }, mesh_keys, ModelMaterialRegistry::kMaxMeshes))
+            uint32_t(node->mesh), bool(uint32_t(node->flags) & kNodeHasGeometry), uint32_t(node->matrixIndex)};
+      }, mesh_keys, ModelMaterialRegistry::kMaxMeshes, &node_bindings))
     return false;
   std::vector<ModelMaterialImport> meshes;
   meshes.reserve(mesh_keys.size());
@@ -198,6 +200,17 @@ bool PublishModelMaterials(uint32_t graph) {
     if (!commands)
       return false;
     auto program = ReadCommands(uint32_t(*commands), word_budget);
+    // NodeProcess copies all 36 bytes of the mesh header, including its asset
+    // sphere. Own that value with the primitive program at load completion.
+    std::array<float, 4> bounds{};
+    bool valid_bounds = true;
+    for (uint32_t n = 0; n < 4; ++n) {
+      const uint64_t address = uint64_t(mesh_va) + offsetof(GuestMesh, centre) + n * 4;
+      const auto *value = address <= UINT32_MAX - 3 ? bd::mem::try_at<const be_f32>(uint32_t(address)) : nullptr;
+      if (!value || !std::isfinite(float(*value))) { valid_bounds = false; break; }
+      bounds[n] = float(*value);
+    }
+    if (valid_bounds && bounds[3] >= 0) program.bounds = bounds;
     // The completed graph builder has relocated the asset control table. Own
     // its per-primitive result now, under the same generation as the material
     // and geometry. Visual overrides and pass/visibility inputs are not frozen.
@@ -217,11 +230,11 @@ bool PublishModelMaterials(uint32_t graph) {
       unsupported_meshes.fetch_add(1, std::memory_order_relaxed);
     meshes.push_back({mesh_va, std::move(program)});
     LoadModelGeometry(meshes.back());
-    if (!word_budget || ModelMaterialRegistry::RetainedBytes(meshes, meshes.capacity()) >
+    if (!word_budget || ModelMaterialRegistry::RetainedBytes(meshes, meshes.capacity(), node_bindings.size()) >
                             ModelMaterialRegistry::kMaxBytes)
       return false;
   }
-  return Models().Publish(graph, std::move(meshes));
+  return Models().Publish(graph, std::move(meshes), node_bindings);
 }
 
 std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {
@@ -237,6 +250,37 @@ std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {
 
 uint64_t LoadedNativeModelGeneration(uint32_t source_model) {
   return Models().Generation(source_model);
+}
+
+std::shared_ptr<const NativeModelRenderData> FindLoadedNativeModel(uint32_t source_model) {
+  return Models().FindModel(source_model);
+}
+
+void NoteNativeModelNodeCandidate(const NativeInstancePose &pose, uint32_t index, uint32_t view, uint32_t technique) {
+  // Four stable primitive identities at most, only after actual interactive
+  // field readiness. This identifies the next direct-object acceptance target;
+  // it is neither a native draw counter nor permission to drop other families.
+  static thread_local std::array<uint64_t, 4> seen{};
+  static thread_local size_t count = 0;
+  if (!REXCVAR_GET(bd_native_materials_verify) || count == seen.size() || view != 3) return;
+  const auto &game = bd::engine::Game::Get();
+  if (game.Mode() != bd::engine::EngineMode::FieldActive || game.FieldState() || !game.Field().HasPlayer() ||
+      bd::engine::EventScenePlaying() || bd::engine::SofdecMoviePlaying() || game.IsLoading() || game.LoadingScreenUp()) return;
+  const auto *program = FindNativeInstanceNode(pose, index);
+  if (!program || program->ranges.empty() || !program->bounds) return;
+  const auto &range = program->ranges[0];
+  const auto &geometry = program->geometries[0];
+  const auto &material = program->materials[0];
+  if (!geometry || !geometry->canonical_vertices || !material || (range.skin && range.skin->count) || range.reflection.enabled) return;
+  if (std::find(seen.begin(), seen.begin() + count, geometry->id) != seen.begin() + count) return;
+  seen[count++] = geometry->id;
+  const auto &bounds = *program->bounds;
+  BD_INFO("[native-rigid-candidate] stage {} instance {} generation {} node {} primitive 0/{} geometry {:016X} material {:016X}; "
+          "technique {} view {} canonical, skin known {} count {}; diffuse/specular/power known {}/{}/{}; local sphere {:.5g} {:.5g} {:.5g} {:.5g}; "
+          "candidate only, live texture/pass eligibility and direct scene/shadow acceptance pending",
+          game.Stage().Name(), pose.instance, pose.model_generation, index, program->ranges.size(), geometry->id, material->id,
+          technique, view, range.skin.has_value(), range.skin ? range.skin->count : 0, range.material.has_diffuse_multiplier, range.material.has_specular_colour,
+          range.material.has_shininess, bounds[0], bounds[1], bounds[2], bounds[3]);
 }
 
 std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelMaterials(
