@@ -58,7 +58,17 @@ inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
 inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     const NativeModelMaterialProgram &program,
     const NativeObjectPrimitive<NativeTextureBinding> &packet,
-    const NativeRigidReceiver &receiver) {
+    const NativeRigidReceiver &receiver, const char **refusal = nullptr) {
+  const auto refuse = [&](const char *reason) -> std::optional<NativeRigidScenePlan> {
+    if (refusal) *refusal = reason;
+    return {};
+  };
+  // Object colour always modulates the result, but specular values are consumed
+  // only when the owned material/pass feature enables them. Reflection values
+  // may be present without being used by this shader. No exact-mask restriction.
+  const uint32_t required_material = 1u | (packet.features && packet.features->specular ? 2u : 0u);
+  if ((packet.material_mask & required_material) != required_material)
+    return refuse("active diffuse/specular material values unavailable");
   if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
       program.ranges.size() != program.geometries.size() || program.materials.size() != program.ranges.size() ||
       packet.primitive >= program.ranges.size() ||
@@ -69,14 +79,15 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       !packet.features || packet.features->reflection || packet.features->normal_mapping ||
       !packet.lights || !packet.fog || !packet.camera || !packet.lighting ||
       !packet.policy.routing_known || packet.policy.deferred || packet.policy.alpha_test ||
-      packet.material_mask != 3 || !packet.textures.owns_uv ||
-      packet.receiver_shadow == NativeShadowPolicy::Unknown) return {};
+      !packet.textures.owns_uv ||
+      packet.receiver_shadow == NativeShadowPolicy::Unknown) return refuse("native primitive owners or shader features unavailable");
   const auto &geometry = packet.geometry;
   const uint32_t layers = packet.shader.texture_layers;
   const auto vertex_input = layers == 3 ? geometry->layered_rigid_vertex_input : geometry->rigid_vertex_input;
   if (!geometry->canonical_vertices || !vertex_input || geometry->stream_mask != 1 ||
       !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref || !geometry->count ||
-      geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255) return {};
+      geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255)
+    return refuse("native rigid vertex layout or geometry unavailable");
   std::array<NativeTextureGpuHandle, 3> albedo;
   std::array<NativeMaterialSampler2D, 3> samplers{};
   for (uint32_t n = 0; n < layers; ++n) {
@@ -85,13 +96,14 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     if (!(packet.textures.image_mask & (1u << n)) || !image || !image->image || !image->view ||
         binding.slice_2d || binding.cube || image->dimension != plume::RenderTextureViewDimension::TEXTURE_2D_ARRAY ||
         !packet.samplers[n] || packet.samplers[n]->u == MaterialSampleAddress::Unknown ||
-        packet.samplers[n]->v == MaterialSampleAddress::Unknown) return {};
+        packet.samplers[n]->v == MaterialSampleAddress::Unknown)
+      return refuse("active native texture array or sampler unavailable");
     albedo[n] = image; samplers[n] = *packet.samplers[n];
   }
   const auto &shadow = receiver.image;
   if (!shadow || !shadow->Sampled() || !shadow->view || !shadow->shape.width || !shadow->shape.height || shadow->shape.layers != 1 ||
       shadow->shape.samples != 1 || shadow->shape.format != plume::RenderFormat::D32_FLOAT_S8_UINT ||
-      shadow->layout != plume::RenderTextureLayout::SHADER_READ) return {};
+      shadow->layout != plume::RenderTextureLayout::SHADER_READ) return refuse("native primary depth image unavailable");
   const auto vector = [](const LightingVector &v) { return RigidFloat4{v[0],v[1],v[2],v[3]}; };
   const bool receives = ReceivesNativeShadow(receiver.visibility,
       packet.receiver_shadow == NativeShadowPolicy::Disabled);
@@ -104,7 +116,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   const auto &uv2 = packet.textures.secondary_uv;
   const auto offset = [](float u, float v) { return RigidFloat4{1.f/512,1.f/512,1.f/512+u,1.f/512+v}; };
   const auto object = BuildRigidObject(packet.world, vector(packet.material_values[0]),
-      vector(packet.material_values[1]), offset(uv[0],uv[1]), flags,
+      packet.features->specular ? vector(packet.material_values[1]) : RigidFloat4{}, offset(uv[0],uv[1]), flags,
       {offset(uv[2],uv[3]), offset(uv2[0],uv2[1])}, layers ? layers-1 : 0);
   NativeRigidPassInputs inputs;
   // Initial acceptance is a mono scene; the backend refuses a layered target.
@@ -121,7 +133,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       .65f/float(shadow->shape.width), 0};
   inputs.lights = *packet.lights; inputs.fog = *packet.fog;
   const auto pass = BuildRigidPass(inputs);
-  if (!object || !pass) return {};
+  if (!object || !pass) return refuse("nonfinite native object/pass GPU inputs");
   return NativeRigidScenePlan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
       packet.policy.cull, packet.policy.direct};
 }

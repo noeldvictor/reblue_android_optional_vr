@@ -1,7 +1,8 @@
 # Ordered native scene-light inheritance
 
-2026-09-07, parent4a33339. Connected implementation and host108 build; game
-acceptance is pending. Host107/run945 remains the last accepted live checkpoint.
+2026-09-07, parent4a33339. Initial implementation built as host108; follow-up
+host110/run948 exercises wider native scene draws but stops at a reloaded-field
+UV mismatch. Host107/run945 remains the last accepted live/pixel checkpoint.
 
 ## Recovered contract and implementation
 
@@ -114,3 +115,79 @@ to70,291,504 B; exe+37,376/PDB+258,048; build logs-221 to191,504 B/136files.
 Other host objects/CMake/source/Git and drive-wide activity remain unallocated.
 First measured62,592,278,528 ->cleanup-end65,604,390,912 B is a drive-wide
 3,012,112,384 B gain, **not** a cleanup claim. Final free check belongs in handoff.
+
+## Follow-up: active material channels and a precise integration boundary
+
+After ccb8dc2 was pushed, capture-disabled run946/PID30068 (15:50:41-15:51:18,
+session11109) submitted the selected native node and then refused the next
+node's shader resources. Its generic refusal was narrowed in host109/run947:
+instance129/generation78/node1/primitive0, geometryF9F0B95507EC870C,
+material63B8D67932573E51, material mask1/layers1/image-mask1. All21 temporary
+settings applied and exact profiles were restored after both terminal failures.
+
+The producer contract in `native_material_data.cpp:192` and
+`native_material_data.h:48` intentionally omits specular when the owned object's
+shininess flag is off; the same flag disables specular shading. This object uses
+the same immutable material as the passing mask3 object. Requiring both channels
+unconditionally was therefore a native consumer error, not a missing asset.
+The earlier exact-mask3 check also unnecessarily rejected unused reflection data.
+
+The scene builder now requires diffuse (always used as object colour), and
+specular only if its owned feature is enabled. Disabled specular GPU fields are
+canonical zero; missing active data cannot turn an authored feature off.
+Inactive reflection values, including nonfinite unused data, are not consumed.
+The existing scene fixture tests masks0..7, inactive specular/reflection and
+missing active channels. Failure-only diagnostics identify the native packet
+and failed owner group before submission; no partial node or weaker comparator.
+
+Output33/PID24532 and CPU16/PID572 pass (0.44/0.47 s); the final causal fixture
+passes output34/PID27960 and CPU17/PID26656 (0.44/0.46 s). Host109/PID33228/
+session97407 and host110/PID33656 pass, no guest/shader compilation.312 Python
+checks pass. Host110 exe48,662,016 B SHA
+`1E7C4CD87DFEC71D548C9A7080F70898A5F80E0CBEEF59B36F597C4682AE119F`,
+PDB109,334,528 B. The source's subsequent light-order log-label correction adds
+the previously omitted unowned-observation placeholder; it does not restamp this
+binary. Its unowned-observation total was not emitted and cannot be inferred.
+
+Run948/PID19644/session83944 (16:01:09-16:03:21) exercises the fixed consumer.
+The fresh, interactive cold-field window1899->2199 adds1,265 wider-family native
+scene submissions, emissions and fence retirements, plus300 multi-primitive node
+visits. Selected scene/caster generation91/instance144 progresses763->1663 and
+closes at title with1664/1664/1664 submitted/emitted/retired in each view.
+Reload creates generation207/instance438 and continues native scene emission.
+Light reads remain fresh/missing0 in sampled windows. All batches are singletons;
+layered submissions and inherited preparations are0. These are repeated visits,
+not unique assets, multi-instance reduction or broad authored-family acceptance.
+
+At16:03:17.835 the strict comparison reports
+`[native-material-texture-mismatch] visual 23820098 channel 16`.
+The supervisor stops/restores the profile. Channel16 is the exact comparison of
+owned UV values with VS vector2 in `host_draw.cpp:1593`, not an image slot.
+This new failure is **unresolved**; no successful reload/pixel gate or fix is
+claimed. Source follow-up must trace the object UV recipe and ordered native/
+legacy writers, then add a causal regression before a changed-code probe.
+Do not assume it is an export issue, weaken the comparison, or conflate it with
+the separately preserved941 light-selection failure. No game images, raw frames,
+performance files or Quest work were produced. An attempted image-helper review
+did not launch a capture; the failure had already stopped the game.
+
+| Evidence | Retention / SHA-256 |
+| --- | --- |
+| 946 generic refusal,76,605 B | Superseded by947's exact packet; removed after948 clears that earlier refusal. Hash `E52260819C74EA4F318D6D9CB35055FE188BD96479195806D278AAE090FFC76B` retained. |
+| 947 exact material refusal,74,436 B | Retained causal regression context, review after equivalent field/reload qualification. `5A68EB5ED2837607EBE527DE11E9517703F196CB96848DDACB65F49E44F022F1` |
+| 948 new UV failure,397,691 B | Retained until its cause and replacement pass. `BB9A0485A1939C7EDBC405D6E927583377FFFEB4F4E76C90780F566194841D9A` |
+
+Same storage limits throughout. After final fixture/build acceptance, removed
+12 superseded output32/CPU15/output33/CPU16/host108/host109 logs plus946's
+superseded generic refusal:86,236 logical B. Concurrent volume free rose
+64,831,266,816 ->64,831,401,984 B (135,168 B observed); unrelated drive activity
+means that increase is not isolated cleanup attribution. Total removed this turn
+23files/94,360 logical B; the earlier16,384 B recovery is not credited again.
+Current build logs188,192 B/136files. Known retained net+887,586 B relative to
+turn start: material+68,065,texture+44,751,exe+39,936,PDB+266,240,logs-3,533,
+retained947/948 text+472,127. GPU fixture/image/raw bytes unchanged. Source/object/
+CMake/Git changes and volume activity remain unallocated. Firstfree62,592,278,528
+->cleanup-end64,831,401,984 B is a2,239,123,456 B drive-wide gain, not cleanup.
+No owned producer remains; reused PID27960 was verified to belong to a later
+unrelated Android build, which was not touched. Protected945/940/941, original
+game data, profiles and build trees remain. Final free measurement follows push.

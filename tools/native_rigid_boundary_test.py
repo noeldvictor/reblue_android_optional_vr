@@ -116,6 +116,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
             body = parameters.split("void " + name + "(", 1)[1].split("\n}", 1)[0]
             self.assertLess(body.index("ObserveNativeSceneLightParameters"), body.index("std::lock_guard"))
         self.assertIn("REX_HOOK_RAW(sub_8218ADA0)", bridge)
+        self.assertIn("unowned observations {}; no guessed defaults", bridge)
 
     def test_native_batches_use_owned_storage_and_shared_queue_without_translated_gather(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()

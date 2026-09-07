@@ -62,7 +62,8 @@ and replace complete rendering paths; it does not make ownership automatic.
 
 **Substantial implementation and qualification remain.** Live-qualified native
 rigid rendering covers one scene object and a wider shadow-caster family. New
-multi-primitive scene shading is CPU/GPU-fixture verified, but not yet game-qualified. No complete
+multi-primitive scene shading now runs in the field, but its reload/pixel acceptance
+is not complete. No complete
 host-only frame or whole native game scene has passed the full acceptance gate.
 The foundations below are reusable, but remaining work spans scenery/material
 families, characters/skinning, effects/UI, frame/pass ownership, asset streaming
@@ -90,7 +91,8 @@ UVs/samplers and retained image lifetimes. It no longer selects one material ID
 or only primitive0. Unsupported siblings and missing active resources fail closed
 before submission. Its production shaders pass 12 two-eye GPU cases, including
 layer composition, alpha, UV addressing and instancing; C++ behavior fixtures and
-six real host-consumer syntax checks pass. Host108 now links the whole connection.
+six real host-consumer syntax checks pass. Host110 links the whole connection and
+requires only the material channels enabled by owned object/pass features.
 [Layered scene implementation and pending gates](research/20260907_1501_layered-rigid-scene.md).
 
 Ordered native light values now support authored "keep the previous lights"
@@ -99,6 +101,14 @@ consumers. Missing inputs and unknown intervening writes still refuse; no defaul
 lights or old shader values are guessed. The new C++ fixtures pass; inherited
 game draws and representative layered-scene pixels still need live verification.
 [Ordered light ownership and current build](research/20260907_1544_ordered-scene-lighting.md).
+
+Latest integration, **host110/run948**: a fresh 300-frame cold-field window emitted
+and fence-retired **1,265 additional native scene primitives**, beyond the selected
+regression object. Its cold title teardown also completed. The reloaded field
+then hit a strict **UV mismatch in a remaining legacy draw**, so full reload and
+pixel acceptance remain open. This run took no images and sampled zero layered
+or inherited-light draws; no speedup is claimed. The failure is preserved, not
+hidden by disabling its comparison.
 
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, alpha/deferred,
@@ -115,7 +125,7 @@ material/object families, visual sequences and both-eye game checks remain.
 Verification: 312 Python source/scenario checks and current C++ fixtures pass.
 The new GPU evidence covers twelve 8x8 two-eye pixel cases in 1.08 seconds with
 zero Vulkan validation errors/warnings, including three-layer instanced draws
-with different per-instance values. Host108 is built; host107/run945 remains
+with different per-instance values. Host110 is built; host107/run945 remains
 the last accepted live result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 

@@ -270,7 +270,7 @@ std::optional<NativeSceneLightTicket> FindNativeSceneLights(uint64_t instance,
         frame, scene.current.Update(frame), pass.light_update, pass.light_view, scene.published, scene.refused,
         scene.current.Bindings(), scene.unavailable, scene.reads, scene.missing, instance, model_generation, node);
     scene.reported = frame;
-    BD_INFO("[native-light-order] frame {} inherited preparations {} native commits {} owned callback observations {} unowned observations; no guessed defaults",
+    BD_INFO("[native-light-order] frame {} inherited preparations {} native commits {} owned callback observations {} unowned observations {}; no guessed defaults",
         frame,scene.inherited,scene.commits,scene.observed,scene.unowned);
   }
   return result;

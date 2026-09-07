@@ -203,8 +203,15 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
     packet->lights = lights->lights; // values survive publication/source/GPU retirement
     refusal = "whole-node scene shader resources unavailable";
     auto plan = PrepareNativeRigidScene(*program, *packet,
-        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility});
-    if (!plan) return {}; // No partial replacement of a multi-primitive node.
+        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal);
+    if (!plan) {
+      // Failure-only context for the exact next producer decision. No probe
+      // loop, frame dump, weakened admission or partial sibling replacement.
+      BD_ERROR("[native-scene-packet] instance {} generation {} node {} primitive {} geometry {:016X} material {:016X} material mask {} layers {} image mask {}; {}",
+          pose.instance,pose.model_generation,node,primitive,packet->geometry->id,packet->material->id,
+          packet->material_mask,packet->shader.texture_layers,packet->textures.image_mask,refusal);
+      return {};
+    }
     plan->light_ticket = *lights;
     result.push_back(std::move(*plan));
   }

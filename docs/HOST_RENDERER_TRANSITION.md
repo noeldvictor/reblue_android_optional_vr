@@ -42,11 +42,16 @@ reloaded-field window. Both epochs pass the new non-regression family gate and
 all existing reload/receiver/owned-lighting checks; mono pixels were inspected.
 That last live scene-shading result remains the selected object's route.
 The new source connects whole opaque rigid nodes with0..3 texture layers to
-native submission. Host108 now also connects ordered inherited light tickets and
-an outbound mirror for retained legacy consumers;312 Python checks and expanded
-C++ fixtures pass. The preceding12 two-eye GPU shader cases remain unchanged.
-The host link completed after unrelated free-space recovery within the unchanged
-allowance; live representative scene/inheritance acceptance is still pending.
+native submission. Host110 also connects ordered inherited light tickets, an
+outbound mirror for retained legacy consumers, and active material-channel
+requirements;312 Python checks and expanded C++ fixtures pass. The preceding12
+two-eye GPU shader cases remain unchanged. Run948's fresh cold-field window adds
+1,265 wider-family native scene emissions/retirements and cold teardown completes.
+It then fails a strict legacy UV comparison in the reloaded field (visual23820098,
+channel16). No new pixels; sampled layered/inherited draws0. Preserve948 and
+investigate that exact producer/consumer boundary before another probe.
+The host link fit after unrelated free-space recovery within the unchanged
+allowance; full scene/reload/inheritance/pixel acceptance remains pending.
 Do not restamp host107/run945 or enable normal acceptance
 switches on fixture evidence alone. Run941's legacy dirty-bit mismatch remains unexplained;
 keep its strict comparison and failure evidence. There is no qualified complete
@@ -55,7 +60,7 @@ host frame, broad scene, full-game stereo or Quest result.
 [owned-lighting contract](../research/20260907_1342_owned-scene-lighting.md),
 [preserved receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md).
 [New layered-scene connection and pending gates](../research/20260907_1501_layered-rigid-scene.md).
-[Ordered light ownership and host108](../research/20260907_1544_ordered-scene-lighting.md).
+[Ordered light ownership, host110 and preserved UV failure](../research/20260907_1544_ordered-scene-lighting.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -97,8 +102,13 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    fence gates pass in both reload epochs. Skin/wind, alpha/deferred and
    texture-dependent effect participation remain explicit unsupported families.
    The new ordinary0..3-layer shader, independent third UV owner and whole-node
-   scene submission are now implemented and fixture-verified. Host108 links these
-   and ordered light inheritance. Next, verify representative fresh
+   scene submission and ordered light inheritance are implemented. Host110/run948
+   clears the observed non-specular object's unused-channel refusal and exercises
+   wider native scene emissions. Next, recover the cause of948's reloaded-field
+   UV mismatch at `host_draw.cpp`'s channel16 comparison: trace the owned object
+   UV recipe and intervening native/legacy writers; do not assume an outgoing
+   mirror alone fixes it or rerun unchanged code. Keep the comparison strict,
+   add a causal boundary fixture, then verify representative fresh
    layered/multi-primitive scene emission and retained lifetimes with inspected
    game pixels and selected-object reload regression. Verify actual inherited
    consumption and legacy interoperation; an unseeded/invalid inherited chain,

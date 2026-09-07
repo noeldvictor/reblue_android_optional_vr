@@ -910,6 +910,25 @@ void RigidScenePacket() {
   assert(plan->object.uv_scale_offset.z == .25f+1.f/512 && plan->object.uv_scale_offset.w == -.5f+1.f/512);
   assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo[0] == albedo);
   auto good = packet;
+  packet.material_mask = 7;
+  packet.material_values[2][0] = std::numeric_limits<float>::quiet_NaN();
+  assert(build()); // Inactive reflection channel is not a diffuse/specular dependency.
+  for (uint32_t mask : {0u,1u,2u,4u,5u,6u}) {
+    packet.material_mask = mask;
+    const char *reason = nullptr;
+    assert(!PrepareNativeRigidScene(program,packet,receiver,&reason) &&
+        std::string_view(reason) == "active diffuse/specular material values unavailable");
+  }
+  packet = good; packet.features->specular = false;
+  packet.material_values[1][0] = std::numeric_limits<float>::quiet_NaN();
+  for (uint32_t mask : {1u,3u,5u,7u}) {
+    packet.material_mask = mask;
+    const auto non_specular = build();
+    assert(non_specular && !(non_specular->object.flags.x & RigidSpecular) &&
+        non_specular->object.specular.x == 0 && non_specular->object.specular.w == 0);
+  }
+  packet.features->specular = true; packet.material_mask = 1;
+  assert(!build()); // Missing specular data cannot disable an authored feature.
   for (uint32_t fault=0;fault<15;++fault) {
     packet = good;
     if (fault == 0) packet.lights.reset();

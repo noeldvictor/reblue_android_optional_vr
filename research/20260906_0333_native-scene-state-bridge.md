@@ -3246,3 +3246,65 @@ Other objects/CMake/source/Git/volume changes unallocated. Firstfree62,592,278,5
 ->cleanup-end65,604,390,912 B is a3,012,112,384 B drive-wide gain, not attributed
 cleanup savings. No runtime/raw/image/profile/game/build deletion or new capture.
 Details and source provenance:20260907_1544_ordered-scene-lighting.md.
+
+ccb8dc2 committed/pushed and remote verified. One targeted host108 integration
+now budgets <=192 MiB peak,180 s and800 KiB text with all existing rigid/reload/
+receiver/scene-light/caster-family comparisons retained. Captures/perf/cook/dumps
+off; no new raw/image. This first run asks which broader scene packet boundary
+is actually reachable/refused after connecting ordered light ownership; text is
+not pixel or representative inherited-draw qualification. The exact owner profile
+must be restored in the existing supervisor's finally block. Git reported auto
+packing at commit; no continuing Git/build/game process was found before the run.
+
+Run946/PID30068/session11109 terminal15:51:18 after15:50:41 start. All21settings
+applied, profile restored exactly, no capture requested. Atframe807 the selected
+native scene node submits after its light commit; the next admitted node refuses
+whole-node shader resources before field readiness. This is not inherited/family/
+reload acceptance. Keep946 text76,605 B, SHA
+E52260819C74EA4F318D6D9CB35055FE188BD96479195806D278AAE090FFC76B;945 and941 remain.
+Follow-up source check identifies an independently overstrict material mask:
+the shader consumes diffuse/specular bits, not an inactive reflection channel.
+Add its causal fixture and precise failure-only packet reason/identity before
+another probe. Output33/CPU16 <=32 MiB each and host109 <=192 MiB reuse the same
+trees and original supervised floor; no new GPU/shader/raw/image work.
+
+Output33/PID24532,CPU16/PID572 (0.44/0.47 s),host109/PID33228/session97407
+pass. Run947/PID32972/session29432 terminal15:57:21 after15:56:58 start,
+all21settings applied/profile restored. Atframe645 the next packet is instance129/
+generation78/node1/primitive0, geometryF9F0B95507EC870C, material63B8D67932573E51,
+mask1/layers1/image-mask1. It fails the still-unconditional specular requirement.
+947 text74,436 B SHA5A68EB5ED2837607EBE527DE11E9517703F196CB96848DDACB65F49E44F022F1.
+The shared material has the specular fields (selected object hasmask3); the object
+producer disables shininess and ComposeNativeMaterialFeatures disables specular
+with that same owned flag. Follow-up removes only this unused dependency and
+canonically packs its inactive GPU fields; active specular still requiresbit2.
+Output34/CPU17 <=32 MiB andhost110 <=192 MiB, same cumulative gates, no new
+shader/GPU/raw/image output. Keep946/947 evidence until equivalent qualification
+resolves/replaces its purpose, not just because a later probe exists.
+
+Final output34/PID27960 and CPU17/PID26656 pass (0.44/0.46 s); host110/PID33656
+passes with no guest/shader compilation. Exe48,662,016 B SHA
+1E7C4CD87DFEC71D548C9A7080F70898A5F80E0CBEEF59B36F597C4682AE119F;
+PDB109,334,528 B. Run948/PID19644/session83944 ends16:03:21 after16:01:09 start.
+All21 settings applied, exact116 B profile restored, no capture/perf/raw output.
+Fresh cold-field frames1899->2199 add1,265 wider-family scene submissions,
+emissions and retirements. Selected scene/shadow close1664/1664/1664 at title;
+the reloaded field then fails strict UV comparison visual23820098/channel16.
+This is unresolved, not reload/pixel acceptance;945 remains last accepted live.
+Retain948 text397,691 B SHA
+BB9A0485A1939C7EDBC405D6E927583377FFFEB4F4E76C90780F566194841D9A, plus947.
+Sampled layered/inherited draws0; no speed or complete native-frame claim.
+
+After final fixture/build acceptance, removed12 superseded output32/CPU15/
+output33/CPU16/host108/host109 logs and946's generic refusal, now replaced by947's
+precise packet diagnosis and948 clearing that earlier refusal.13files/86,236
+logical B removed; free64,831,266,816 ->64,831,401,984 B (135,168 B observed,
+not isolated from unrelated volume activity). Total cleanup this turn23files/
+94,360 logical B; earlier16,384 B measured recovery is not credited again.
+Known retained net+887,586 B: material+68,065,texture+44,751,exe+39,936,
+PDB+266,240,build logs-3,533,retained947/948+472,127. Logs188,192 B/136files;
+GPU fixture/images/raw unchanged. Other objects/CMake/source/Git unallocated.
+Firstfree62,592,278,528 ->cleanup-end64,831,401,984 B is a2,239,123,456 B
+drive-wide gain, not a cleanup claim. No owned producer remains; a reused PID
+was verified as an unrelated Android build and left untouched. No game/profile/
+protected baseline/build-tree deletion. Original allowance/floor unchanged.
