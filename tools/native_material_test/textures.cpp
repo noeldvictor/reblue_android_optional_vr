@@ -50,6 +50,8 @@ void TestNativeMaterialTextures() {
   Require(compose() && out[0].images[0] == 301 && out[0].uv == std::array<float, 4>{9, 10, 3, 4} &&
           out[1].uv == std::array<float, 4>{5, 6, 3, 4},
           "first UV match stops scan, skips its own image, earlier image skips late override, UV resets on next token");
+  Require(out[0].secondary_uv == inputs.initial_uv && out[1].secondary_uv == inputs.initial_uv,
+          "third layer retains initial object UV through layer-0 override and reset");
   inputs.overrides.erase(inputs.overrides.begin());
   Require(compose() && out[0].images[0] == 401, "UV-only early match still allows late image");
   inputs.late_images.push_back({1, 0, {}, true, Bind(402)});
@@ -120,6 +122,14 @@ void TestNativeMaterialTextures() {
   Require(!ReadMaterialTextureInputs<Image>(visual, read, Bind), "special callback route not guessed");
   Require(!ReadMaterialTextureInputs<Image>(UINT32_MAX - 3, read, Bind), "object extent overflow");
   memory.clear();
+  const MaterialImageAssignment layered_assignments[]{{MaterialImageSource::Table,0,1},
+      {MaterialImageSource::Table,1,2}, {MaterialImageSource::Table,2,3}};
+  NativeMaterialRange layered_range; layered_range.texture_assignment_end = 3;
+  Require(ComposeMaterialTextures(std::span(layered_assignments),std::span<const NativeMaterialRange>(&layered_range,1),*imported,
+      [](uint8_t key) { return Bind(key); },out) && out[0].owns_uv &&
+      out[0].uv == std::array<float,4>{9,10,2,3} &&
+      out[0].secondary_uv == std::array<float,4>{0,1,2,3},
+      "source destruction preserves independently owned UV01 and third-layer offsets");
   Require(object->colour[3] == .75f && object->writes_shininess, "object input survives source destruction");
   Require(imported->overrides[0].uv == std::array<float, 2>{9, 10} &&
           imported->late_images[0].image.image == 88, "owned publication survives all source storage destruction");

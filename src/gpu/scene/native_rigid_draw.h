@@ -15,7 +15,8 @@ bool NativeRigidSceneEnabled();
 // it cannot silently warm a template. Unsupported participation stays legacy.
 bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
                              const std::optional<PrimitivePolicyInputs> &inputs);
-bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node);
+bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
+                            const std::optional<PrimitivePolicyInputs> &inputs);
 // Called only after the shared emitter records a real draw command.
 void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances, uint64_t generation);
 // Shared queue calls this under the renderer lock after exact batch admission.

@@ -15,10 +15,13 @@ struct NativeRigidDescriptorSchema {
     sets[0].begin();
     sets[0].addStructuredBuffer(0); // NativeRigidInstanceGPU[], indexed by SV_InstanceID
     sets[0].end();
-    // Explicit TEXTURE_2D_ARRAY sampled views: ordinary albedo and mono sun
+    // Explicit TEXTURE_2D_ARRAY sampled views: three albedo layers and mono sun
     // depth, both using layer zero. Do not bind a texture's default 2D view.
-    sets[1].begin(); sets[1].addTexture(0); sets[1].addTexture(1); sets[1].end();
-    sets[2].begin(); sets[2].addSampler(0); sets[2].addSampler(1); sets[2].end();
+    sets[1].begin(); sets[2].begin();
+    for (uint32_t layer = 0; layer < 4; ++layer) {
+      sets[1].addTexture(layer); sets[2].addSampler(layer);
+    }
+    sets[1].end(); sets[2].end();
   }
   NativeRigidDescriptorSchema(const NativeRigidDescriptorSchema &) = delete;
   NativeRigidDescriptorSchema &operator=(const NativeRigidDescriptorSchema &) = delete;
@@ -30,26 +33,30 @@ NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device,
                                               NativeVertexInputHandle input);
 
 // Native shader locations come from the named asset schema, not the translated
-// shader signature. This first family requires all four values explicitly;
+// shader signature. Layer 2 additionally requires the asset's TexCoord2;
 // unsupported/missing layouts remain ineligible, never inferred from a template.
 inline NativeVertexInputHandle NativeRigidVertexInput(const NativeMeshData &mesh,
-                                                     NativeVertexInputLibrary &library) {
+                                                     NativeVertexInputLibrary &library,
+                                                     bool layered = false) {
   if (mesh.attributes.empty() || mesh.streams.size() != 1 || mesh.streams[0].slot != 0 ||
       !mesh.streams[0].stride || mesh.streams[0].stride > 255) return {};
-  std::array<plume::RenderInputElement, 4> elements{};
-  const MeshSemantic semantics[]{MeshSemantic::Position, MeshSemantic::Normal, MeshSemantic::TexCoord, MeshSemantic::Color};
-  const char *names[]{"POSITION", "NORMAL", "TEXCOORD", "COLOR"};
-  for (uint32_t n = 0; n < 4; ++n) {
+  std::array<plume::RenderInputElement, 5> elements{};
+  const MeshSemantic semantics[]{MeshSemantic::Position, MeshSemantic::Normal, MeshSemantic::TexCoord, MeshSemantic::Color, MeshSemantic::TexCoord};
+  const char *names[]{"POSITION", "NORMAL", "TEXCOORD", "COLOR", "TEXCOORD"};
+  const uint32_t count = layered ? 5 : 4;
+  for (uint32_t n = 0; n < count; ++n) {
     bool found = false;
-    for (const auto &attribute : mesh.attributes) if (attribute.semantic == semantics[n] && attribute.index == 0) {
+    const uint32_t index = n == 4 ? 2 : 0;
+    for (const auto &attribute : mesh.attributes) if (attribute.semantic == semantics[n] && attribute.index == index) {
       if (found || attribute.offset > mesh.streams[0].stride || mesh.streams[0].stride - attribute.offset < 16) return {};
       found = true;
       elements[n].semanticName = names[n]; elements[n].location = n;
+      elements[n].semanticIndex = index;
       elements[n].format = plume::RenderFormat::R32G32B32A32_FLOAT;
       elements[n].alignedByteOffset = attribute.offset;
     }
     if (!found) return {};
   }
-  return library.Resolve(elements, 1, {});
+  return library.Resolve(std::span(elements).first(count), 1, {});
 }
 } // namespace bd::gpu::scene

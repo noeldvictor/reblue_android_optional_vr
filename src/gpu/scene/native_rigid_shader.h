@@ -7,12 +7,16 @@ struct RigidVertex {
   [[vk::location(1)]] float4 normal : NORMAL;
   [[vk::location(2)]] float4 uv : TEXCOORD0;
   [[vk::location(3)]] float4 colour : COLOR0;
+#ifdef RIGID_LAYERED_INPUT
+  [[vk::location(4)]] float4 secondary_uv : TEXCOORD2;
+#endif
 };
 struct RigidFragment {
   float4 clip : SV_Position;
   float3 world : TEXCOORD0;
   float3 normal : TEXCOORD1;
-  float2 uv : TEXCOORD2;
+  float4 uv : TEXCOORD2;
+  float2 secondary_uv : TEXCOORD4;
   float4 colour : COLOR0;
   nointerpolation uint instance : TEXCOORD3;
 };

@@ -40,7 +40,8 @@ struct NativeRigidObjectGPU {
   RigidFloat4 normal_rows[3]; // inverse transpose, row-vector convention
   RigidFloat4 diffuse, specular; // diffuse RGBA; specular RGB/shininess
   RigidFloat4 uv_scale_offset; // named UV scale.xy + offset.zw
-  RigidUint4 flags; // x flags above; yzw reserved zero
+  RigidFloat4 detail_uv_scale_offset[2];
+  RigidUint4 flags; // x flags above; y texture layer count (0..3); zw zero
 };
 struct NativeRigidPassGPU {
   RigidMatrix world_to_clip[2], world_to_shadow;
@@ -58,16 +59,17 @@ struct NativeRigidInstanceGPU {
 
 #ifdef __cplusplus
 static_assert(sizeof(RigidLightGPU) == 64 && sizeof(RigidFogGPU) == 64);
-static_assert(sizeof(NativeRigidObjectGPU) == 176 && alignof(NativeRigidObjectGPU) == 16);
+static_assert(sizeof(NativeRigidObjectGPU) == 208 && alignof(NativeRigidObjectGPU) == 16);
 static_assert(offsetof(NativeRigidObjectGPU, normal_rows) == 64);
 static_assert(offsetof(NativeRigidObjectGPU, diffuse) == 112);
-static_assert(offsetof(NativeRigidObjectGPU, flags) == 160);
+static_assert(offsetof(NativeRigidObjectGPU, detail_uv_scale_offset) == 160);
+static_assert(offsetof(NativeRigidObjectGPU, flags) == 192);
 static_assert(sizeof(NativeRigidPassGPU) == 608 && alignof(NativeRigidPassGPU) == 16);
 static_assert(offsetof(NativeRigidPassGPU, cameras) == 192);
 static_assert(offsetof(NativeRigidPassGPU, lights) == 288);
 static_assert(offsetof(NativeRigidPassGPU, fog) == 480);
-static_assert(sizeof(NativeRigidInstanceGPU) == 784 && alignof(NativeRigidInstanceGPU) == 16);
-static_assert(offsetof(NativeRigidInstanceGPU, pass_data) == 176);
+static_assert(sizeof(NativeRigidInstanceGPU) == 816 && alignof(NativeRigidInstanceGPU) == 16);
+static_assert(offsetof(NativeRigidInstanceGPU, pass_data) == 208);
 static_assert(std::is_trivially_copyable_v<NativeRigidInstanceGPU>);
 static_assert(std::is_trivially_copyable_v<NativeRigidObjectGPU> &&
               std::is_trivially_copyable_v<NativeRigidPassGPU>);
@@ -89,11 +91,13 @@ inline bool RigidFinite(const RigidMatrix &matrix) {
 // Source-free object producer. Normal matrices handle nonuniform scale; singular
 // or non-affine worlds are not silently accepted as rigid objects.
 inline std::optional<NativeRigidObjectGPU> BuildRigidObject(const RenderMatrix &world,
-    RigidFloat4 diffuse, RigidFloat4 specular, RigidFloat4 uv, uint32_t flags) {
+    RigidFloat4 diffuse, RigidFloat4 specular, RigidFloat4 uv, uint32_t flags,
+    std::array<RigidFloat4, 2> detail_uv = {}, uint32_t detail_layers = 0) {
   NativeRigidObjectGPU result{};
   result.world = PackRigidMatrix(world);
   if (!RigidFinite(result.world) || !RigidFinite(diffuse) || !RigidFinite(specular) ||
-      !RigidFinite(uv) || specular.w < 0 || (flags & ~63u) ||
+      !RigidFinite(uv) || !RigidFinite(detail_uv[0]) || !RigidFinite(detail_uv[1]) ||
+      detail_layers > 2 || (detail_layers && !(flags & RigidAlbedo)) || specular.w < 0 || (flags & ~63u) ||
       world[3] != 0 || world[7] != 0 || world[11] != 0 || world[15] != 1) return {};
   const float a = world[0], b = world[1], c = world[2];
   const float d = world[4], e = world[5], f = world[6];
@@ -107,6 +111,8 @@ inline std::optional<NativeRigidObjectGPU> BuildRigidObject(const RenderMatrix &
   for (const auto &row : result.normal_rows) if (!RigidFinite(row)) return {};
   result.diffuse = diffuse; result.specular = specular;
   result.uv_scale_offset = uv; result.flags.x = flags;
+  result.flags.y = (flags & RigidAlbedo) ? 1 + detail_layers : 0;
+  for (uint32_t n = 0; n < 2; ++n) result.detail_uv_scale_offset[n] = detail_uv[n];
   return result;
 }
 

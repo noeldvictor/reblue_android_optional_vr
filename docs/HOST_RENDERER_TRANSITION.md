@@ -40,13 +40,19 @@ Host107/run945 extends native opaque rigid casting to multi-primitive nodes,
 with 12,532 additional native shadow emissions/retirements in a fresh300-frame
 reloaded-field window. Both epochs pass the new non-regression family gate and
 all existing reload/receiver/owned-lighting checks; mono pixels were inspected.
-310 Python checks and the expanded C++ fixture pass. Scene shading remains the
-selected object's route. Run941's legacy dirty-bit mismatch remains unexplained;
+That last live scene-shading result remains the selected object's route.
+The new source connects whole opaque rigid nodes with0..3 texture layers to
+native submission; 311 Python checks, expanded C++ fixtures, six real consumer
+syntax checks and 12 two-eye GPU cases pass. Host integration/live representative
+scene acceptance is still pending: its 192 MiB estimate does not fit the remaining
+cumulative allowance. Do not restamp host107/run945 or enable normal acceptance
+switches on fixture evidence alone. Run941's legacy dirty-bit mismatch remains unexplained;
 keep its strict comparison and failure evidence. There is no qualified complete
 host frame, broad scene, full-game stereo or Quest result.
 [Current caster-family evidence](../research/20260907_1420_native-caster-families.md),
 [owned-lighting contract](../research/20260907_1342_owned-scene-lighting.md),
 [preserved receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md).
+[New layered-scene connection and pending gates](../research/20260907_1501_layered-rigid-scene.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -87,8 +93,12 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    ID or scene texture-layer restrictions; its submission, actual emission and
    fence gates pass in both reload epochs. Skin/wind, alpha/deferred and
    texture-dependent effect participation remain explicit unsupported families.
-   Extend scene shading through its real material contract, not by applying the
-   selected one-texture program to the observed three-layer materials. Preserve sibling,
+   The new ordinary0..3-layer shader, independent third UV owner and whole-node
+   scene submission are now implemented and fixture-verified. Next, resolve the
+   existing storage allowance, link the host, then verify representative fresh
+   layered/multi-primitive scene emission and retained lifetimes with inspected
+   game pixels and selected-object reload regression. Missing inherited lights,
+   layouts or other owners remain explicit refusal, not warm-up fallback. Preserve sibling,
    deferred and volume participation; no silent omission or warm-up fallback.
    The selected asset's cold-start hard-off/reload proof stays a regression case.
    Reuse `NativeObjectTextureScope`, owned instance/model/primitive data, existing

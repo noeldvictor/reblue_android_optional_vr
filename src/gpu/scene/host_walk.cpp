@@ -171,7 +171,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
   const u32 view_id = bd::mem::try_load<u32>(kRenderViewIdVa);
   // Transitional object producer boundary, before visiting any primitive. The
   // direct consumer receives values and owned pose/model handles, never VAs.
-  const auto shadow_policy = view_id == 1 && NativeRigidShadowEnabled()
+  const auto shadow_policy = ((view_id == 1 && NativeRigidShadowEnabled()) || (view_id == 3 && NativeRigidSceneEnabled()))
       ? ReadPrimitivePolicyInputs(ctx_va, bd::mem::try_load<u32>(ctx_va), [](uint64_t address) -> std::optional<uint32_t> {
           if (!address || address > UINT32_MAX - 3 || (address & 3)) return {};
           const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -395,7 +395,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             ctx.r6.u64 = ctx_va;
             if (!(view_id == 1 && instance_pose &&
                   SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)) &&
-                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index)))
+                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index, shadow_policy)))
               bdSceneNodeDrawSingle(ctx, base);
             // Diagnostic only: per-node light callbacks publish during the draw.
             if (instance_pose && REXCVAR_GET(bd_native_materials_verify))

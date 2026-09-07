@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_rigid_shadow.h"
+#include "gpu/scene/native_rigid_scene.h"
 
 namespace bd::gpu::scene {
 enum class NativeRigidRoute { Legacy, Scene, Shadow, Refused };
@@ -33,11 +34,12 @@ inline NativeRigidRouteDecision PrepareNativeRigidRoute(
   if (!NativeRigidFamilyKnown(*program))
     return {NativeRigidRoute::Refused, "load-owned geometry identity unavailable"};
   if (!SelectedNativeRigidShadow(*program)) {
-    if (view != 1) return {NativeRigidRoute::Legacy};
-    const auto caster = PrepareNativeRigidCasterAdmission(*program, inputs);
+    if (view != 1 && view != 3) return {NativeRigidRoute::Legacy};
+    const auto caster = view == 1 ? PrepareNativeRigidCasterAdmission(*program, inputs)
+                                  : PrepareNativeRigidSceneAdmission(*program, inputs);
     if (caster.route == NativeRigidCasterRoute::Legacy) return {NativeRigidRoute::Legacy};
     if (caster.route == NativeRigidCasterRoute::Refused)
-      return {NativeRigidRoute::Refused, "native caster family or object policy unavailable"};
+      return {NativeRigidRoute::Refused, "native rigid family or object policy unavailable"};
   }
   if (!pose) return {NativeRigidRoute::Refused, "selected native pose unavailable"};
   if (!pose->instance || pose->model != model || pose->model_generation != model->Generation())
@@ -53,6 +55,8 @@ inline NativeRigidRouteDecision PrepareNativeRigidRoute(
 inline bool NativeRigidLegacyAllowed(const ModelMaterialImport *mesh, uint32_t view = ~0u,
                                     const std::optional<PrimitivePolicyInputs> &inputs = {}) {
   if (!mesh || !NativeRigidFamilyKnown(mesh->program) || SelectedNativeRigidShadow(mesh->program)) return false;
-  return view != 1 || PrepareNativeRigidCasterAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
+  if (view == 1) return PrepareNativeRigidCasterAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
+  if (view == 3) return PrepareNativeRigidSceneAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
+  return true;
 }
 } // namespace bd::gpu::scene

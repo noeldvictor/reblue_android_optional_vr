@@ -60,8 +60,9 @@ and replace complete rendering paths; it does not make ownership automatic.
 
 ### How much is left?
 
-**Substantial implementation and qualification remain.** Native rigid rendering
-covers one scene object and a wider shadow-caster family, not a finished renderer. No complete
+**Substantial implementation and qualification remain.** Live-qualified native
+rigid rendering covers one scene object and a wider shadow-caster family. New
+multi-primitive scene shading is CPU/GPU-fixture verified, but not yet game-qualified. No complete
 host-only frame or whole native game scene has passed the full acceptance gate.
 The foundations below are reusable, but remaining work spans scenery/material
 families, characters/skinning, effects/UI, frame/pass ownership, asset streaming
@@ -83,12 +84,20 @@ image shows coherent terrain, trees, fences, Shu and shadows; known cliff marks
 remain. Batches are still singletons: no draw-call reduction or speedup is claimed.
 [Caster-family implementation and evidence](research/20260907_1420_native-caster-families.md).
 
-**Scene shading remains narrower than shadow casting.** One selected rigid scene
-consumer uses native programs and handoff-owned scene/object lights without guest
-dirty masks, selected slots, shader IDs or parameter descriptors. Its publication
-contains 2,898 node bindings; these are not all native scene draws. Broader scene
-materials, skin/deformation, alpha/deferred and texture-dependent effects remain
-unconverted. Source tree, object/pass and other producer adapters also remain.
+**New implementation, pending game integration:** the native scene route now
+handles whole opaque rigid nodes with zero-to-three texture layers, independent
+UVs/samplers and retained image lifetimes. It no longer selects one material ID
+or only primitive0. Unsupported siblings and missing active resources fail closed
+before submission. Its production shaders pass 12 two-eye GPU cases, including
+layer composition, alpha, UV addressing and instancing; C++ behavior fixtures and
+six real host-consumer syntax checks pass. The full host build/live scene gate is
+paused for the cumulative storage allowance, not silently replaced by fixtures.
+[Layered scene implementation and pending gates](research/20260907_1501_layered-rigid-scene.md).
+
+The handoff-owned lighting publication contains 2,898 node bindings; these are
+not all verified native scene draws. Skin/deformation, alpha/deferred,
+normal/reflection and texture-dependent effects remain unconverted here.
+Source tree, object/pass and other producer adapters also remain.
 [Owned-lighting contract](research/20260907_1342_owned-scene-lighting.md).
 
 Run941's separate legacy light-selection dirty-bit failure remains unresolved;
@@ -97,16 +106,17 @@ are preserved. Authored update producers, inherited node bindings, broader
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification: 310 Python source/scenario checks and the current C++ fixtures
-pass. Existing GPU evidence covers five 8x8 two-eye pixel cases in 1.22 seconds
-with zero Vulkan validation errors/warnings, including two instanced scene/shadow
-draws with different per-instance values. These fixtures are not full-game stereo
+Verification: 311 Python source/scenario checks and current C++ fixtures pass.
+The new GPU evidence covers twelve 8x8 two-eye pixel cases in 1.08 seconds with
+zero Vulkan validation errors/warnings, including three-layer instanced draws
+with different per-instance values. The game binary is still host107/run945;
+these fixtures do not update its live qualification. They are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive/light packets, multi-primitive opaque native casters, native scene/caster indirect route and selected-object reload proof | Broader native scene shading, real multi-instance groups, remaining source producers/material families and lifecycle coverage |
+| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, fixture-verified layered scene route, native indirect draws and selected-object reload proof | Live layered-scene acceptance, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |

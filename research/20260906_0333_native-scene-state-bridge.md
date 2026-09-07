@@ -3151,3 +3151,61 @@ or attributed renderer growth. Only185,749,504 B (177.14 MiB) remains above the
 original operational floor: the planned192 MiB next integration overlap does
 not fit. Do not launch that producer without rechecking free space and resolving
 the existing cumulative budget. Source work/Git handoff need no build or capture.
+
+### 2026-09-07 layered rigid scene bundle
+
+Same original65,462,788,096 B baseline,3 GiB exception,62,509,998,080 B floor,
+100 MiB diagnostics,10 MiB build logs/images and incoming raw0. First measured
+free62,550,061,056 B; pre-fixture62,628,921,344 B. No owned build, game or fixture
+process remains from the preceding source investigation. Drive-wide fluctuation
+is unallocated, not claimed cleanup or renderer growth. The192 MiB host integration
+estimate does not fit; that producer remains paused. An asynchronous request to
+increase the cumulative allowance to4 GiB is pending, not approval. Do not change
+the floor or start a larger job on that request alone.
+
+Connected edits now carry independent third-layer UV ownership through native
+material packets, explicit four/five-attribute programs, three sampled layers,
+whole-node scene admission/queue retention and extended CPU/GPU fixtures.
+311 artifact-free Python source/scenario checks pass; no new binary/pixel claim.
+Small sequential fixture replacements can fit the existing allowance after a
+fresh preflight: material33/CPU31 and output31/CPU14 plan <=32 MiB peak per job;
+GPU27/rigid06 plans <=64 MiB including CMake/shader headers and fixture replacement.
+The existing supervisor now accepts a tighter per-job free-drop cap, still using
+the unchanged original floor,300 s timeout and10 MiB aggregate log limit. No new
+tree, guest rebuild, asset cook, raw/image output or owner-profile changes.
+Retain current logs until replacement acceptance, then remove exact superseded
+fixture logs; keep945 current runtime and940/941 baseline/failure evidence.
+
+Material33/PID31468 and CPU31/PID23768 pass (0.12 s assertions/0.13 s CTest).
+Output31/PID30772 and CPU14/PID7612 pass (0.34/0.36 s). GPU27/PID26616 builds
+all four production native shaders; final GPU28/PID26900 rebuilds only the
+fixture for production inactive-descriptor coverage. Rigid07/PID26432 passes
+all12 two-eye8x8 cases in1.08 s, zero validation errors/warnings, max error
+3.39895e-5. Raw/images0; one unrelated GOG loader message. Fixture exe SHA
+ACF89F7C69B61D2A5A93F8FBDAB23E5D7A086B0011F824416ADC5FFEC94220E9.
+Host107 exe/PDB and the owner's profile are byte-unchanged; no game launch/link.
+Six real host consumer files pass exact-settings/PCH `-fsyntax-only`: PIDs25168,
+23732,29284,31428,24140,31048. All producers terminal. The initial tighter-cap
+parameter call failed before creating a producer/output; the ignored-wrapper
+edit was corrected before actual material33 launch.
+
+After CPU acceptance removed eight exact old material32/CPU30/output30/CPU13
+logs,4,896 logical B:62,627,069,952 ->62,627,082,240 B free,12,288 B reclaimed.
+After final GPU28/rigid07 acceptance removed20 exact old GPU26/rigid05,
+intermediate GPU27/rigid06 and empty syntax01..06 logs,10,672 logical B. Their
+cleanup command measured before/after, but PowerShell's mixed table formatting
+hid the values; no second physical-recovery amount is claimed.28 files/15,568
+logical B removed in total, with at least12,288 B measured recovery. Logs are
+reproducible and replaced; no protected runtime/raw/game/profile/build deletion.
+
+Known fixture/log retained net+806,314 B: material8,159,345 B (+29,859),
+texture70,274,593 B (+678,570), GPU10,585,571 B (+97,780), build logs191,725 B
+(+105;136files). The added shader header50,885 B and other shader/CMake/source/Git
+changes are separate; all four current native shader headers total326,650 B.
+First measured free62,550,061,056 ->post-cleanup62,608,248,832 B:58,187,776 B
+drive-wide gain,58.31 GiB ending free, not attributed cleanup savings. Only
+98,250,752 B remain above the original floor;192 MiB host integration still
+does not fit.4 GiB request remains pending, not approval. Recheck before further
+producers. New scene game/reload/pixel acceptance remains open;945 is unchanged
+last live evidence and941 stays strict/unresolved. Details in
+20260907_1501_layered-rigid-scene.md; final post-push free check belongs in handoff.

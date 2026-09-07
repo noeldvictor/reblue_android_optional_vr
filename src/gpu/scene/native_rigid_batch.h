@@ -12,9 +12,10 @@ inline constexpr uint32_t kNativeRigidBatchLimit = 256;
 struct NativeRigidBatchItem {
   NativeRigidInstanceGPU input{};
   std::shared_ptr<const NativeGeometry> geometry;
-  NativeTextureGpuHandle albedo;
+  std::array<NativeTextureGpuHandle, 3> albedo;
   NativeTargetImageHandle shadow;
-  const plume::RenderSampler *albedo_sampler = nullptr, *shadow_sampler = nullptr;
+  std::array<const plume::RenderSampler *, 3> albedo_samplers{};
+  const plume::RenderSampler *shadow_sampler = nullptr;
   const plume::RenderPipeline *pipeline = nullptr;
   const plume::RenderPipelineLayout *layout = nullptr;
   plume::RenderFramebuffer *framebuffer = nullptr;
@@ -24,14 +25,20 @@ struct NativeRigidBatchItem {
   uint64_t model_generation = 0, instance = 0; // Host lifetime metadata, not shader ABI.
   bool regression = false; // Selected asset's reload window, not family admission.
   bool Ready(uint32_t expected_frame, uint32_t expected_slot) const {
+    if (view == 3) {
+      const auto layers = input.object_data.flags.y;
+      if (layers > 3 || bool(input.object_data.flags.x & RigidAlbedo) != (layers != 0)) return false;
+      for (uint32_t n = 0; n < 3; ++n)
+        if (!albedo_samplers[n] || (n < layers && !albedo[n]) || (n >= layers && albedo[n])) return false;
+    }
     return frame == expected_frame && slot == expected_slot && model_generation && instance && geometry && pipeline && layout && framebuffer &&
-        (view == 1 || (view == 3 && albedo && shadow && albedo_sampler && shadow_sampler));
+        (view == 1 || (view == 3 && shadow && shadow_sampler));
   }
 };
 inline bool SameNativeRigidBatch(const NativeRigidBatchItem &a, const NativeRigidBatchItem &b) {
   return a.frame == b.frame && a.slot == b.slot && a.view == b.view && a.model_generation == b.model_generation &&
       a.regression == b.regression && a.geometry == b.geometry && a.pipeline == b.pipeline && a.layout == b.layout && a.framebuffer == b.framebuffer &&
-      a.albedo == b.albedo && a.shadow == b.shadow && a.albedo_sampler == b.albedo_sampler && a.shadow_sampler == b.shadow_sampler &&
+      a.albedo == b.albedo && a.shadow == b.shadow && a.albedo_samplers == b.albedo_samplers && a.shadow_sampler == b.shadow_sampler &&
       a.viewport.x == b.viewport.x && a.viewport.y == b.viewport.y &&
       a.viewport.width == b.viewport.width && a.viewport.height == b.viewport.height &&
       a.viewport.minDepth == b.viewport.minDepth && a.viewport.maxDepth == b.viewport.maxDepth &&
@@ -58,7 +65,7 @@ inline bool PackNativeRigidBatch(std::span<const NativeRigidBatchItem *const> it
 }
 // Structured-view offsets are ELEMENTS, Vulkan alignment is BYTES. The upload
 // arena accepts power-of-two alignment; reserve enough headroom for both without
-// padding every 784-byte GPU record or making a separate buffer per draw.
+// padding every GPU record or making a separate buffer per draw.
 struct NativeRigidStoragePlan {
   uint32_t bytes, quantum, reserve;
   uint64_t Offset(uint64_t allocation_offset) const {

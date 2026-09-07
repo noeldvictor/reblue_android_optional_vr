@@ -1,13 +1,17 @@
-// Native single-albedo rigid family. Detail/normal maps, reflections, wind, skin
+// Native zero-to-three-layer rigid family. Normal maps, reflections, wind, skin
 // and alpha-tested/translucent recipes require their own explicit eligibility.
 #include "src/gpu/scene/native_rigid_shader.h"
 // The native texture uploader and native target owner publish array views even
 // for mono images. Both eyes sample layer zero of this ordinary material and
 // the shared sun shadow; SV_ViewID selects cameras, not these image layers.
 [[vk::binding(0, 1)]] Texture2DArray<float4> albedo_image : register(t0, space1);
-[[vk::binding(1, 1)]] Texture2DArray<float> shadow_image : register(t1, space1);
+[[vk::binding(1, 1)]] Texture2DArray<float4> detail1_image : register(t1, space1);
+[[vk::binding(2, 1)]] Texture2DArray<float4> detail2_image : register(t2, space1);
+[[vk::binding(3, 1)]] Texture2DArray<float> shadow_image : register(t3, space1);
 [[vk::binding(0, 2)]] SamplerState albedo_sampler : register(s0, space2);
-[[vk::binding(1, 2)]] SamplerComparisonState shadow_sampler : register(s1, space2);
+[[vk::binding(1, 2)]] SamplerState detail1_sampler : register(s1, space2);
+[[vk::binding(2, 2)]] SamplerState detail2_sampler : register(s2, space2);
+[[vk::binding(3, 2)]] SamplerComparisonState shadow_sampler : register(s3, space2);
 
 float RigidShadow(float3 world, float3 normal, NativeRigidObjectGPU object_data, NativeRigidPassGPU pass_data) {
   if (!(object_data.flags.x & RigidReceiveShadow)) return 1;
@@ -30,8 +34,24 @@ float4 main(RigidFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
   const NativeRigidObjectGPU object_data = rigid_instances[fragment.instance].object_data;
   const NativeRigidPassGPU pass_data = rigid_instances[fragment.instance].pass_data;
   const uint flags = object_data.flags.x;
-  float4 albedo = object_data.diffuse * fragment.colour;
-  if (flags & RigidAlbedo) albedo *= albedo_image.Sample(albedo_sampler, float3(fragment.uv, 0));
+  float4 texture_colour = 1;
+  if (object_data.flags.y > 0) {
+    const float4 base = albedo_image.Sample(albedo_sampler, float3(fragment.uv.xy, 0));
+    // Negative U is an authored absent-layer sentinel, independent of sampler
+    // addressing. Reflective families have a different fallback and are refused.
+    texture_colour = fragment.uv.x < 0 ? 0 : base;
+    if (object_data.flags.y > 1) {
+      float4 detail = detail1_image.Sample(detail1_sampler, float3(fragment.uv.zw, 0));
+      if (fragment.uv.z < 0) detail = 0;
+      texture_colour.rgb = lerp(texture_colour.rgb, detail.rgb, detail.a);
+    }
+    if (object_data.flags.y > 2) {
+      float4 detail = detail2_image.Sample(detail2_sampler, float3(fragment.secondary_uv, 0));
+      if (fragment.secondary_uv.x < 0) detail = 0;
+      texture_colour.rgb = lerp(texture_colour.rgb, detail.rgb, detail.a);
+    }
+  }
+  const float4 albedo = texture_colour * object_data.diffuse * fragment.colour;
   const float3 normal = normalize(fragment.normal);
   const LitVector position = RigidVector(fragment.world);
   const LitVector camera = RigidVector(pass_data.cameras[eye].xyz);

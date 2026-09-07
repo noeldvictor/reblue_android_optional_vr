@@ -42,20 +42,25 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
 void Run(RenderDevice &device, uint32_t mode) {
   // Canonical asset semantics, deliberately unrelated to translated locations.
   NativeMeshData mesh;
-  mesh.streams.push_back({0,64,{}});
+  mesh.streams.push_back({0,80,{}});
   mesh.attributes = {{MeshSemantic::Position,0,0}, {MeshSemantic::Normal,0,16},
-                     {MeshSemantic::TexCoord,0,32}, {MeshSemantic::Color,0,48}};
+                     {MeshSemantic::TexCoord,0,32}, {MeshSemantic::Color,0,48}, {MeshSemantic::TexCoord,2,64}};
   NativeVertexInputLibrary inputs;
-  auto input = NativeRigidVertexInput(mesh, inputs);
+  auto input = NativeRigidVertexInput(mesh, inputs, mode >= 6 && mode != 10);
   Need(bool(input), "Native rigid input");
   auto programs = CreateNativeRigidPrograms(device, input);
   Need(programs.scene && programs.shadow, "Production rigid shader programs");
   mesh = {}; input.reset(); // consuming owned inputs after source data retires
 
   auto world = Identity(); world[0] = 1.2f; world[5] = 1.25f; world[12] = .1f; world[13] = -.1f;
-  const uint32_t flags = RigidAlbedo | RigidVertexColour | RigidDiffuse | RigidSpecular |
-      (mode == 1 || mode == 4 ? RigidReceiveShadow : 0) | (mode >= 2 ? RigidFogEnabled : 0);
-  const auto object = BuildRigidObject(world, {.5f,.75f,1,.8f}, {.1f,.2f,.15f,8}, {.5f,.5f,.5f,.5f}, flags);
+  const bool instanced = mode == 4 || mode == 11;
+  const uint32_t flags = (mode == 10 ? 0 : RigidAlbedo) | RigidVertexColour | RigidDiffuse | RigidSpecular |
+      (mode == 1 || instanced ? RigidReceiveShadow : 0) | (mode >= 2 ? RigidFogEnabled : 0);
+  const uint32_t detail_layers = mode == 5 ? 1 : mode >= 6 && mode != 10 ? 2 : 0;
+  const RigidFloat4 base_uv{.5f,.5f,mode == 7 ? -2.f : .5f,.5f};
+  const std::array<RigidFloat4,2> detail_uv{{{.75f,.5f,mode == 8 ? -2.f : 1.05f,.7f},
+                                          {.6f,.65f,mode == 9 ? -2.f : 1.15f,.35f}}};
+  const auto object = BuildRigidObject(world, {.5f,.75f,1,.8f}, {.1f,.2f,.15f,8}, base_uv, flags, detail_uv, detail_layers);
   world[14] = -.25f;
   const auto caster = BuildRigidObject(world, {1,1,1,1}, {0,0,0,8}, {1,1,0,0}, 0);
   Need(object && caster, "Native rigid object inputs");
@@ -75,11 +80,11 @@ void Run(RenderDevice &device, uint32_t mode) {
   pass.fog[0] = {LitVec(0,0,0), LitVec(0,0,1), LitVec(.2f,.4f,.6f), 0,8,.3f,mode < 2,mode == 2,LitFogBlend};
   pass.fog[1] = {LitVec(0,0,0), LitVec(1,0,0), LitVec(.1f,.2f,.1f), -2,2,.2f,mode < 2,false,LitFogAdd};
   const auto packed_pass = BuildRigidPass(pass); Need(bool(packed_pass), "Native rigid pass inputs");
-  const uint32_t instance_count = mode == 4 ? 2 : 1;
+  const uint32_t instance_count = instanced ? 2 : 1;
   std::array<NativeRigidInstanceGPU,2> scene_instances, shadow_instances;
   std::array<NativeRigidPassInputs,2> references{pass,pass};
   scene_instances[0] = {*object,*packed_pass}; shadow_instances[0] = {*caster,*packed_pass};
-  if (mode == 4) for (uint32_t n=0;n<2;++n) {
+  if (instanced) for (uint32_t n=0;n<2;++n) {
     auto transform = Identity(); transform[0] = .5f; transform[5] = n ? 1.1f : 1.f;
     transform[12] = n ? .5f : -.5f; transform[14] = n ? -.125f : 0;
     // Distinct worlds, colour/alpha, lights and fog within one GPU draw, in both
@@ -87,8 +92,10 @@ void Run(RenderDevice &device, uint32_t mode) {
     references[n].lights[0].colour.x += .2f*n;
     references[n].fog[0].opacity += .15f*n;
     references[n].colour_grade.x += .1f*n;
+    auto instance_uv = detail_uv;
+    instance_uv[0].w += .27f*n; instance_uv[1].z -= .18f*n;
     scene_instances[n] = {*BuildRigidObject(transform,{.5f+.25f*n,.75f,1,.8f-.2f*n},
-        {.1f,.2f,.15f,8},{.5f,.5f,.5f,.5f},flags),*BuildRigidPass(references[n])};
+        {.1f,.2f,.15f,8},base_uv,flags,instance_uv,detail_layers),*BuildRigidPass(references[n])};
     transform[14] -= .25f;
     shadow_instances[n] = {*BuildRigidObject(transform,{1,1,1,1},{0,0,0,8},{1,1,0,0},0),scene_instances[n].pass_data};
   }
@@ -100,11 +107,12 @@ void Run(RenderDevice &device, uint32_t mode) {
   std::memcpy(storage_bytes.data()+scene_offset,scene_instances.data(),placement->bytes);
   std::memcpy(storage_bytes.data()+shadow_offset,shadow_instances.data(),placement->bytes);
   auto storage = Upload(device,storage_bytes.data(),uint32_t(storage_bytes.size()),RenderBufferFlag::STORAGE);
-  struct Vertex { RigidFloat4 position, normal, uv, colour; };
+  struct Vertex { RigidFloat4 position, normal, uv, colour, secondary_uv; };
   std::array<Vertex, 4> vertices{};
   const float xy[4][2]{{-1,-1},{1,-1},{1,1},{-1,1}};
   for (uint32_t i = 0; i < 4; ++i) vertices[i] = {{xy[i][0],xy[i][1],.5f,1},
-      {.3f,.4f,1,0},{xy[i][0],xy[i][1],0,0},{.8f,.6f,.4f,.5f}};
+      {.3f,.4f,1,0},{xy[i][0],xy[i][1],-xy[i][1],xy[i][0]},
+      {.8f,.6f,.4f,.5f},{xy[i][1],-xy[i][0],0,0}};
   auto vb = Upload(device, vertices.data(), sizeof(vertices), RenderBufferFlag::VERTEX);
   const uint16_t indices[]{0,1,2,0,2,3};
   auto ib = Upload(device, indices, sizeof(indices), RenderBufferFlag::INDEX);
@@ -130,6 +138,15 @@ void Run(RenderDevice &device, uint32_t mode) {
   fb = {}; fb.colorAttachments = &albedo_ptr; fb.colorAttachmentsCount = 1;
   auto albedo_fb = device.createFramebuffer(fb);
   Need(scene_fb && shadow_fb && albedo_fb, "Rigid framebuffers");
+  std::array<std::unique_ptr<RenderTexture>,2> details;
+  std::array<std::unique_ptr<RenderTextureView>,2> detail_views;
+  std::array<std::unique_ptr<RenderFramebuffer>,2> detail_fbs;
+  for (uint32_t n=0;n<2;++n) {
+    details[n] = device.createTexture(colour_desc); Need(bool(details[n]), "Rigid detail image");
+    detail_views[n] = SampledArrayView(*details[n],colour_desc.format);
+    const RenderTexture *pointer = details[n].get(); fb.colorAttachments = &pointer;
+    detail_fbs[n] = device.createFramebuffer(fb); Need(bool(detail_fbs[n]), "Rigid detail framebuffer");
+  }
   NativeRigidDescriptorSchema schema;
   std::array<std::unique_ptr<RenderDescriptorSet>, 3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]), "Rigid descriptors"); }
@@ -138,17 +155,29 @@ void Run(RenderDevice &device, uint32_t mode) {
   const RenderBufferStructuredView caster_view(sizeof(NativeRigidInstanceGPU),uint32_t(shadow_offset/sizeof(NativeRigidInstanceGPU)));
   sets[0]->setBuffer(0,storage.get(),placement->bytes,&scene_view);
   shadow_set->setBuffer(0,storage.get(),placement->bytes,&caster_view);
-  sets[1]->setTexture(0, albedo.get(), RenderTextureLayout::SHADER_READ, albedo_view.get());
-  sets[1]->setTexture(1, shadow.get(), RenderTextureLayout::SHADER_READ, shadow_view.get());
+  // Match the real queue's legal inactive descriptors too: these point at the
+  // owned depth image but must never supply a material sample for disabled layers.
+  sets[1]->setTexture(0, mode == 10 ? shadow.get() : albedo.get(), RenderTextureLayout::SHADER_READ,
+      mode == 10 ? shadow_view.get() : albedo_view.get());
+  for (uint32_t n=0;n<2;++n)
+    sets[1]->setTexture(n+1, n < detail_layers ? details[n].get() : shadow.get(), RenderTextureLayout::SHADER_READ,
+        n < detail_layers ? detail_views[n].get() : shadow_view.get());
+  sets[1]->setTexture(3, shadow.get(), RenderTextureLayout::SHADER_READ, shadow_view.get());
   RenderSamplerDesc sampler_desc;
   sampler_desc.minFilter = sampler_desc.magFilter = RenderFilter::NEAREST;
   sampler_desc.mipmapMode = RenderMipmapMode::NEAREST;
   sampler_desc.addressU = sampler_desc.addressV = sampler_desc.addressW = RenderTextureAddressMode::CLAMP;
   auto sampler = device.createSampler(sampler_desc);
+  sampler_desc.addressU = sampler_desc.addressV = RenderTextureAddressMode::MIRROR;
+  auto detail1_sampler = device.createSampler(sampler_desc);
+  sampler_desc.addressU = sampler_desc.addressV = RenderTextureAddressMode::WRAP;
+  auto detail2_sampler = device.createSampler(sampler_desc);
+  sampler_desc.addressU = sampler_desc.addressV = RenderTextureAddressMode::CLAMP;
   sampler_desc.comparisonEnabled = true; sampler_desc.comparisonFunc = RenderComparisonFunction::LESS_EQUAL;
   auto compare = device.createSampler(sampler_desc);
-  Need(sampler && compare, "Rigid samplers");
-  sets[2]->setSampler(0,sampler.get()); sets[2]->setSampler(1,compare.get());
+  Need(sampler && compare && detail1_sampler && detail2_sampler, "Rigid samplers");
+  sets[2]->setSampler(0,sampler.get()); sets[2]->setSampler(1,detail1_sampler.get());
+  sets[2]->setSampler(2,detail2_sampler.get()); sets[2]->setSampler(3,compare.get());
   const RenderInputSlot slot(0, sizeof(Vertex));
   RenderGraphicsPipelineDesc pipeline_desc;
   ApplyNativePipelineProgram(*programs.scene, pipeline_desc);
@@ -180,6 +209,21 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->clearColor(0,RenderColor(.25f,.75f,.5f,.5f),&right,1);
   commands->setFramebuffer(nullptr);
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(albedo.get(),RenderTextureLayout::SHADER_READ));
+  const std::array<std::array<RigidFloat4,4>,2> detail_colours{{
+      {{{.8f,.1f,.2f,0},{.1f,.8f,.2f,.25f},{.2f,.1f,.8f,.75f},{.8f,.8f,.2f,1}}},
+      {{{.9f,.1f,.2f,.6f},{.2f,.9f,.1f,.3f},{.1f,.2f,.9f,.8f},{.8f,.8f,.1f,0}}}}};
+  for (uint32_t n=0;n<2;++n) {
+    commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(details[n].get(),RenderTextureLayout::COLOR_WRITE));
+    commands->setFramebuffer(detail_fbs[n].get());
+    for (uint32_t q=0;q<4;++q) {
+      const uint32_t x=(q&1)*size/2, y=(q>>1)*size/2;
+      const RenderRect rect(x,y,x+size/2,y+size/2);
+      const auto &c=detail_colours[n][q];
+      commands->clearColor(0,RenderColor(c.x,c.y,c.z,c.w),&rect,1);
+    }
+    commands->setFramebuffer(nullptr);
+    commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(details[n].get(),RenderTextureLayout::SHADER_READ));
+  }
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::DEPTH_WRITE));
   commands->setFramebuffer(shadow_fb.get()); commands->clearDepthStencil(true,true,1,0);
   GraphicsBindings bindings;
@@ -241,7 +285,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   const auto *pixels=static_cast<const float *>(readback->map()); Need(pixels!=nullptr,"Rigid readback map");
   float maximum_error=0;
   for (uint32_t eye=0;eye<2;++eye) for (uint32_t y=0;y<size;++y) for (uint32_t x=0;x<size;++x) {
-    const uint32_t n = mode == 4 && x >= size/2 ? 1 : 0;
+    const uint32_t n = instanced && x >= size/2 ? 1 : 0;
     const auto &reference = references[n];
     const auto &object_reference = scene_instances[n].object_data;
     const auto &matrix = object_reference.world.rows;
@@ -250,17 +294,38 @@ void Run(RenderDevice &device, uint32_t mode) {
     const LitVector normal=LitNormalize(LitVec(.3f/matrix[0].x,.4f/matrix[1].y,1));
     const auto camera=LitVec(reference.cameras[eye].x,reference.cameras[eye].y,reference.cameras[eye].z);
     const auto view=LitNormalize(LitSubtract(camera,position));
-    const bool second=(position.x-matrix[3].x)/matrix[0].x>=0;
-    const auto texture=second?LitVec(.25f,.75f,.5f):LitVec(.5f,.25f,.75f);
+    const float asset_x=(position.x-matrix[3].x)/matrix[0].x, asset_y=(position.y-matrix[3].y)/matrix[1].y;
+    const bool second=asset_x*.5f+base_uv.z>=.5f;
+    auto texture=second?LitVec(.25f,.75f,.5f):LitVec(.5f,.25f,.75f);
+    float texture_alpha=second?.5f:1.f;
+    if (asset_x*.5f+base_uv.z < 0) { texture=LitVec(0,0,0); texture_alpha=0; }
+    if (!object_reference.flags.y) { texture=LitVec(1,1,1); texture_alpha=1; }
+    // Independent scalar oracle for UV-channel mapping, mirror/wrap addressing,
+    // negative-U sentinels and ordered RGB overlays. Base alpha is never blended.
+    for (uint32_t layer=1;layer<object_reference.flags.y;++layer) {
+      const auto &uv=object_reference.detail_uv_scale_offset[layer-1];
+      const float u=(layer==1?-asset_y:asset_y)*uv.x+uv.z;
+      const float v=(layer==1?asset_x:-asset_x)*uv.y+uv.w;
+      if (u < 0) continue;
+      const auto address=[&](float value) {
+        if (layer==2) return value-std::floor(value);
+        const float repeat=value-2*std::floor(value/2);
+        return repeat <= 1 ? repeat : 2-repeat;
+      };
+      const auto &detail=detail_colours[layer-1][(address(u)>=.5f?1:0)+(address(v)>=.5f?2:0)];
+      texture.x += (detail.x-texture.x)*detail.w;
+      texture.y += (detail.y-texture.y)*detail.w;
+      texture.z += (detail.z-texture.z)*detail.w;
+    }
     const auto &diffuse = object_reference.diffuse;
     LitSurface surface{LitMultiply(texture,LitVec(.8f*diffuse.x,.6f*diffuse.y,.4f*diffuse.z)),LitVec(.1f,.2f,.15f),
-      LitVec(.2f,.15f,.1f),LitVec(.15f,.2f,.1f),.5f,mode==1||mode==4?0.f:1.f,true,true};
+      LitVec(.2f,.15f,.1f),LitVec(.15f,.2f,.1f),.5f,mode==1||instanced?0.f:1.f,true,true};
     LitResponse response[3];
     for (uint32_t light=0;light<3;++light) response[light]=EvaluateLitLight(reference.lights[light],position,normal,view,8);
     auto expected=ComposeLitSurface(surface,reference.lights[0],reference.lights[1],reference.lights[2],response[0],response[1],response[2]);
     if(mode>=2) for(const auto &fog:reference.fog) expected=ApplyLitFog(expected,position,camera,fog);
     expected=LitScale(LitAdd(expected,LitVec(reference.colour_grade.x,.02f,.03f)),.9f);
-    const float rgba[]{expected.x,expected.y,expected.z,diffuse.w*(second?.25f:.5f)};
+    const float rgba[]{expected.x,expected.y,expected.z,diffuse.w*.5f*texture_alpha};
     const auto pixel=eye*size*size+y*size+x;
     for(uint32_t c=0;c<4;++c) {
       const float actual=pixels[pixel*4+c], error=std::abs(actual-rgba[c]);
@@ -278,4 +343,4 @@ void Run(RenderDevice &device, uint32_t mode) {
            <<"; instances="<<instance_count<<" native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
 }
 }
-void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<5;++mode) Run(device,mode); }
+void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<12;++mode) Run(device,mode); }

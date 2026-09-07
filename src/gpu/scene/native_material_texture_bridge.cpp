@@ -169,7 +169,7 @@ bool PublishNativeMaterialLights(uint32_t selection, const NativeSelectedLights 
   return true;
 }
 
-std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
+std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject(
     const NativeInstancePose &pose, uint32_t node, const char *&refusal) {
   auto *scope = current;
   refusal = "fresh ordinary object scope unavailable";
@@ -178,12 +178,8 @@ std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
       scope->policy_inputs->technique != 0) return {};
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
-  refusal = "owned ordinary scene packet or lighting pass unavailable";
-  auto packet = FindNativeObjectPrimitive(pose, node, 0);
-  if (!packet || !packet->lighting) return {};
-  refusal = "owned scene/object lighting publication unavailable";
-  const auto lights = FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
-  if (!lights) return {};
+  refusal = "whole-node ordinary scene family unavailable";
+  if (PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs).route != NativeRigidCasterRoute::Native) return {};
   refusal = "fresh completed primary shadow or receiver colour unavailable";
   const auto receiver = FindNativePrimaryReceiver(scope->visual,scope->render_view);
   if (!receiver) return {};
@@ -193,10 +189,23 @@ std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
   refusal = "live receiver visibility unavailable";
   const auto visibility = ImportNodeShadowInputs(tag);
   if (!visibility) return {};
-  packet->lights = lights; // copied values remain valid through update/reload/GPU retirement
-  refusal = "whole-node scene shader contract unsupported";
-  return PrepareNativeRigidScene(*program, *packet,
-      {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility});
+  std::vector<NativeRigidScenePlan> result;
+  result.reserve(program->ranges.size());
+  for (uint32_t primitive = 0; primitive < program->ranges.size(); ++primitive) {
+    refusal = "owned ordinary scene packet or lighting pass unavailable";
+    auto packet = FindNativeObjectPrimitive(pose, node, primitive);
+    if (!packet || !packet->lighting) return {};
+    refusal = "owned scene/object lighting publication unavailable";
+    const auto lights = FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
+    if (!lights) return {};
+    packet->lights = lights; // values survive publication/source/GPU retirement
+    refusal = "whole-node scene shader resources unavailable";
+    auto plan = PrepareNativeRigidScene(*program, *packet,
+        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility});
+    if (!plan) return {}; // No partial replacement of a multi-primitive node.
+    result.push_back(std::move(*plan));
+  }
+  return result;
 }
 
 namespace {

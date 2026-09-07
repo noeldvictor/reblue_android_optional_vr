@@ -44,6 +44,7 @@ struct NativeGeometry {
   // upload/load time. Null means the explicit rigid inputs are unavailable;
   // never discover them later from a translated draw or source declaration.
   NativeVertexInputHandle rigid_vertex_input;
+  NativeVertexInputHandle layered_rigid_vertex_input; // explicit TexCoord2, no substituted UV
   uint32_t strides[16]{};
   plume::RenderVertexBufferView streams[16]{};
   uint32_t stream_mask = 0;

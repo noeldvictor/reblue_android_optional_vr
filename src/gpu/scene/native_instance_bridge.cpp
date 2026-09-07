@@ -275,7 +275,7 @@ void RequireNativeRigidLegacyNode(uint32_t context, uint32_t mesh) {
   const auto view = Word(kRenderViewIdVa);
   RouteRequire(view.has_value(), "legacy render view unavailable");
   const auto visual = Word(context);
-  const auto inputs = *view == 1 && visual ? ReadPrimitivePolicyInputs(context, *visual, Word) : std::nullopt;
+  const auto inputs = (*view == 1 || *view == 3) && visual ? ReadPrimitivePolicyInputs(context, *visual, Word) : std::nullopt;
   RouteRequire(NativeRigidLegacyAllowed(owned.get(), *view, inputs), "native family reached legacy node entry");
 }
 } // namespace bd::gpu::scene

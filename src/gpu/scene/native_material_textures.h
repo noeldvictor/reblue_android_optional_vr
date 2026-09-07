@@ -45,7 +45,7 @@ template <class Image> struct MaterialTextureInputs {
 template <class Image> struct MaterialTextureValues {
   std::array<Image, 16> images{};
   uint16_t image_mask = 0;
-  std::array<float, 4> uv{};
+  std::array<float, 4> uv{}, secondary_uv{};
   bool owns_uv = false;
   bool operator==(const MaterialTextureValues &) const = default;
 };
@@ -67,6 +67,10 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
   values.reserve(ranges.size());
   MaterialTextureValues<Image> state;
   state.uv = inputs.initial_uv;
+  // Ordinary node setup initializes both UV pairs from the object. Subsequent
+  // channel 0/1 overrides/reset affect only uv; layer 2 keeps this initial pair.
+  // Do not borrow the final layer-0 offset or an earlier object's shader state.
+  state.secondary_uv = inputs.initial_uv;
   state.owns_uv = inputs.owns_uv;
   std::array<bool, 2> uv_overridden{};
   size_t cursor = 0;

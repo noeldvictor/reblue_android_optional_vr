@@ -20,7 +20,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         for forbidden in ("Word(","ResolveGuestTexture","FindCompletedNativePrimaryShadow"):
             self.assertNotIn(forbidden,reader)
         consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text().split(
-            "std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject",1)[1].split("\n}",1)[0]
+            "std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject",1)[1].split("\n}",1)[0]
         self.assertIn("receiver->image, receiver->world_to_shadow, receiver->colour",consumer)
         self.assertNotIn("FindCompletedNativePrimaryShadow",consumer)
         self.assertNotIn("value_or(ReadColour",source) # Eager fallback reads can outlive the validated late-read boundary.
@@ -63,10 +63,10 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_direct_scene_has_a_live_producer_and_an_emission_gate(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("SubmitNativeRigidScene(*instance_pose, index)", walk)
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy)", walk)
         for required in ("PrepareNativeRigidSceneForObject(pose, node, refusal)",
-                         "shape->layers == 1", "first.albedo->view.get()", "first.shadow->view.get()",
-                         "ResolveSamplerLocked(", "item->input = {plan->object,plan->pass}", "store.scene_retired",
+                         "shape->layers == 1", "first.albedo[layer]", "first.shadow->view.get()",
+                         "ResolveSamplerLocked(", "item->input = {plan.object,plan.pass}", "store.scene_retired",
                          "store.scene_emitted += instances", "draw.bindings.set_count = 3"):
             self.assertIn(required, direct)
         emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
@@ -89,7 +89,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         for forbidden in ("selection+4)", "selection+8", "selection+216", "+276", "PrepareSelectedLights"):
             self.assertNotIn(forbidden, source)
         consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text().split(
-            "std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject", 1)[1].split("\n}", 1)[0]
+            "std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject", 1)[1].split("\n}", 1)[0]
         self.assertIn("FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs)", consumer)
         for forbidden in ("Word(", "+3132", "+3376", "+3380", "PrepareNativeSelectedLightValues"):
             self.assertNotIn(forbidden, consumer)
@@ -119,7 +119,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
         self.assertIn("Texture2DArray<float4> albedo_image", shader)
         self.assertIn("Texture2DArray<float> shadow_image", shader)
-        self.assertIn("float3(fragment.uv, 0)", shader)
+        self.assertIn("float3(fragment.uv.xy, 0)", shader)
         self.assertIn("float3(uv + offset, 0)", shader)
         # Ordinary assets and the mono sun shadow share layer zero between eyes;
         # framebuffer multiview does not make these sampled inputs stereo arrays.
@@ -136,7 +136,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)", walk)
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         for required in ("PrepareNativeRigidShadow(", "FindNativePassCamera(1)",
-                         "CreateNativeRigidPrograms(", "GetOrCreatePipeline(", "DrawQueuePush(draw)",
+                         "CreateNativeRigidPrograms(", "GetOrCreatePipeline(", "DrawQueuePush(entry.draw)",
                          "plans->size() <= 4096-records.size()", "store.programs.size() < 8", "store.records[slot].clear()",
                          "draw.bindings.set_count = 1", "throw std::runtime_error(reason)"):
             self.assertIn(required, direct)
@@ -162,8 +162,8 @@ class NativeRigidBoundaryTest(unittest.TestCase):
 
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
-        paths += [ROOT / "src/gpu/scene/native_rigid_shader.h"]
-        self.assertEqual(len(paths), 4)
+        paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h"]
+        self.assertEqual(len(paths), 6)
         for path in paths:
             text = path.read_text()
             for forbidden in ("shader_common.h", "g_VSC", "g_PSC", "BD_SHARED", "BOOL_BIT", "GuestShader", "packoffset"):
@@ -172,11 +172,38 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_gpu_fixture_uses_production_programs_and_real_pixels(self):
         text = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
         for required in ("CreateNativeRigidPrograms(device, input)", "ApplyGraphicsBindings(",
-                         "ApplyNativePipelineProgram(", "drawIndexedIndirect(", "instance_count = mode == 4 ? 2 : 1", "vkWaitForFences(",
+                         "ApplyNativePipelineProgram(", "drawIndexedIndirect(", "instance_count = instanced ? 2 : 1", "vkWaitForFences(",
                          "Rigid colour mismatch", "Rigid per-eye depth mismatch", "Rigid caster depth mismatch"):
             self.assertIn(required, text)
         self.assertNotIn("ofstream", text)
         self.assertNotIn("fopen", text)
+
+    def test_layered_scene_connects_whole_node_and_retains_every_image(self):
+        scene = (ROOT / "src/gpu/scene/native_rigid_scene.h").read_text()
+        for required in ("PrepareNativeRigidSceneAdmission", "packet.primitive", "packet.textures.secondary_uv",
+                         "geometry->layered_rigid_vertex_input", "packet.samplers[n]", "binding.slice_2d || binding.cube"):
+            self.assertIn(required, scene)
+        self.assertNotIn("0x63B8D67932573E51", scene)
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        submit = direct.split("bool SubmitNativeRigidScene(", 1)[1].split("void PrepareNativeRigidBatchDraw(", 1)[0]
+        self.assertLess(submit.index("PrepareNativeRigidSceneAdmission(*model, inputs)"), submit.index("PrepareNativeRigidSceneForObject"))
+        self.assertLess(submit.index("pending.push_back("), submit.index("StageNativeItem("))
+        self.assertIn("item->regression = geometry->id == 0x258694267A8DBAEEull", submit)
+        self.assertIn("scene_family_emitted += instances", direct)
+        self.assertIn("++store.scene_family_retired", direct)
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
+        for required in ("object_data.flags.y > 2", "fragment.uv.x < 0", "fragment.uv.z < 0",
+                         "fragment.secondary_uv.x < 0", "texture_colour.rgb = lerp", "texture_colour * object_data.diffuse"):
+            self.assertIn(required, shader)
+        self.assertNotIn("texture_colour.a =", shader)
+        vertex = (ROOT / "src/gpu/scene/native_rigid_vertex.h").read_text()
+        self.assertIn("vertex.uv.zw", vertex)
+        self.assertIn("vertex.secondary_uv.xy", vertex)
+        schema = (ROOT / "src/gpu/scene/native_rigid_program.h").read_text()
+        self.assertIn("layer < 4", schema)
+        fixture = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
+        self.assertIn("mode<12", fixture)
+        self.assertIn("detail_colours[layer-1]", fixture)
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()

@@ -113,6 +113,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   result->canonical_vertices = !data.attributes.empty();
   result->vertex_input = std::move(vertex_input);
   result->rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs);
+  result->layered_rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs, true);
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
   result->start_index = chunk.used / 4;

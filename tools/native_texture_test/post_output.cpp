@@ -9,6 +9,7 @@
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_rigid_route.h"
 #include "gpu/scene/native_rigid_lifecycle.h"
@@ -702,7 +703,9 @@ void RigidHardOffRouting() {
   const auto mesh = [](uint32_t key, bool selected, bool bounds = true) {
     ModelMaterialImport result; result.source_mesh = key;
     auto &p = result.program; p.valid = true; p.ranges.resize(1); p.ranges[0].shader.vertex_bones = 0;
+    p.ranges[0].shader.vertex_colour = true;
     p.materials.resize(1); p.shadow_policies.resize(1); result.source_bindings.resize(1);
+    p.materials[0] = std::make_shared<NativeMaterial>();
     auto geometry = std::make_shared<NativeGeometry>();
     geometry->id = selected ? 0x258694267A8DBAEEull : 42;
     p.geometries.push_back(std::move(geometry));
@@ -718,7 +721,14 @@ void RigidHardOffRouting() {
     return PrepareNativeRigidRoute(model,&pose,node,view).route;
   };
   assert(route(0,1) == NativeRigidRoute::Shadow && route(0,3) == NativeRigidRoute::Scene);
-  assert(route(1,3) == NativeRigidRoute::Legacy);
+  assert(route(1,3) == NativeRigidRoute::Refused); // Missing pass policy cannot select legacy.
+  PrimitivePolicyInputs scene_policy;
+  assert(PrepareNativeRigidRoute(model,&pose,1,3,scene_policy).route == NativeRigidRoute::Scene);
+  assert(PrepareNativeRigidRoute(model,nullptr,1,3,scene_policy).route == NativeRigidRoute::Refused);
+  assert(!NativeRigidLegacyAllowed(models.Find(10,200).get(),3,scene_policy));
+  scene_policy.technique = 3;
+  assert(PrepareNativeRigidRoute(model,nullptr,1,3,scene_policy).route == NativeRigidRoute::Legacy);
+  assert(NativeRigidLegacyAllowed(models.Find(10,200).get(),3,scene_policy));
   PrimitivePolicyInputs caster_policy; caster_policy.phase = 1;
   assert(PrepareNativeRigidRoute(model,&pose,1,1,caster_policy).route == NativeRigidRoute::Shadow);
   assert(PrepareNativeRigidRoute(model,nullptr,1,1,caster_policy).route == NativeRigidRoute::Refused);
@@ -729,7 +739,7 @@ void RigidHardOffRouting() {
   assert(NativeRigidLegacyAllowed(models.Find(10,200).get(),1,caster_policy));
   // Selection exists before the first pose handoff, not after an old draw.
   assert(PrepareNativeRigidRoute(model,nullptr,0,3).route == NativeRigidRoute::Refused);
-  assert(PrepareNativeRigidRoute(model,nullptr,1,3).route == NativeRigidRoute::Legacy);
+  assert(PrepareNativeRigidRoute(model,nullptr,1,3).route == NativeRigidRoute::Refused);
   assert(PrepareNativeRigidRoute({},&pose,0,3).route == NativeRigidRoute::Refused);
   for (uint32_t view : {0u,2u,4u,~0u}) assert(route(0,view) == NativeRigidRoute::Refused);
   assert(route(2,3) == NativeRigidRoute::Refused);
@@ -849,9 +859,23 @@ void RigidScenePacket() {
   geometry->streams[0].buffer.ref = reinterpret_cast<RenderBuffer *>(&buffer_token);
   geometry->index.buffer.ref = geometry->streams[0].buffer.ref;
   NativeVertexInputLibrary library;
-  RenderInputElement element{}; element.semanticName = "POSITION";
-  element.format = RenderFormat::R32G32B32A32_FLOAT;
-  geometry->rigid_vertex_input = library.Resolve(std::span(&element,1),1,{});
+  NativeMeshData asset;
+  asset.streams.push_back({0,96,{}});
+  asset.attributes = {{MeshSemantic::Position,0,0},{MeshSemantic::Normal,0,16},
+      {MeshSemantic::TexCoord,0,32},{MeshSemantic::Color,0,48},{MeshSemantic::TexCoord,2,64}};
+  geometry->rigid_vertex_input = NativeRigidVertexInput(asset,library);
+  geometry->layered_rigid_vertex_input = NativeRigidVertexInput(asset,library,true);
+  assert(geometry->rigid_vertex_input->Elements().size() == 4 &&
+      geometry->layered_rigid_vertex_input->Elements().size() == 5);
+  assert(geometry->layered_rigid_vertex_input->Elements()[4].semanticIndex == 2 &&
+      geometry->layered_rigid_vertex_input->Elements()[4].alignedByteOffset == 64);
+  asset.attributes.back().index = 1;
+  assert(!NativeRigidVertexInput(asset,library,true) && NativeRigidVertexInput(asset,library));
+  asset.attributes.back().index = 2; asset.attributes.back().offset = 84;
+  assert(!NativeRigidVertexInput(asset,library,true));
+  asset.attributes.back().offset = 64; asset.attributes.push_back(asset.attributes.back());
+  assert(!NativeRigidVertexInput(asset,library,true));
+  asset = {}; // Both immutable shader signatures survive source retirement.
   auto material = std::make_shared<NativeMaterial>(); material->id = 0x63B8D67932573E51ull;
   program.geometries = {geometry}; program.materials = {material};
   auto albedo = std::make_shared<NativeTextureGpu>();
@@ -884,7 +908,7 @@ void RigidScenePacket() {
   auto plan = build(); assert(plan && plan->draw && plan->cull == PrimitiveCull::Back);
   assert(plan->object.flags.x == 63 && plan->object.uv_scale_offset.x == 1.f/512);
   assert(plan->object.uv_scale_offset.z == .25f+1.f/512 && plan->object.uv_scale_offset.w == -.5f+1.f/512);
-  assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo == albedo);
+  assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo[0] == albedo);
   auto good = packet;
   for (uint32_t fault=0;fault<15;++fault) {
     packet = good;
@@ -907,6 +931,52 @@ void RigidScenePacket() {
   }
   packet = good;
   program.ranges.push_back(program.ranges[0]); assert(!build()); program.ranges.pop_back();
+  // No asset-ID ceiling and no dropped sibling: semantic admission precedes
+  // resources. The individual packet builder refuses missing active inputs.
+  material->id = 19; program.ranges[0].shader = packet.shader;
+  PrimitivePolicyInputs scene_policy;
+  const auto classify = [&] { return PrepareNativeRigidSceneAdmission(program,scene_policy).route; };
+  assert(classify() == NativeRigidCasterRoute::Native && build());
+  auto detail1 = std::make_shared<NativeTextureGpu>();
+  detail1->image = std::make_unique<SceneSource>(); detail1->view = std::make_unique<RenderTextureView>();
+  detail1->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  auto detail2 = std::make_shared<NativeTextureGpu>();
+  detail2->image = std::make_unique<SceneSource>(); detail2->view = std::make_unique<RenderTextureView>();
+  detail2->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  packet.textures.images[1].primary = detail1; packet.textures.images[2].primary = detail2;
+  packet.textures.image_mask = 7; packet.textures.uv = {1,2,3,4}; packet.textures.secondary_uv = {5,6,7,8};
+  packet.samplers[1] = *packet.samplers[0]; packet.samplers[2] = *packet.samplers[0];
+  for (uint8_t layers=0;layers<=3;++layers) {
+    packet.shader.texture_layers = layers; program.ranges[0].shader = packet.shader;
+    auto layered = build(); assert(layered && layered->object.flags.y == layers && classify() == NativeRigidCasterRoute::Native);
+    assert(layered->object.detail_uv_scale_offset[0].z == 3+1.f/512 && layered->object.detail_uv_scale_offset[1].z == 5+1.f/512);
+    for (uint32_t n=0;n<3;++n) assert(bool(layered->albedo[n]) == (n<layers));
+  }
+  auto layered = build();
+  const auto layered_input = geometry->layered_rigid_vertex_input;
+  geometry->layered_rigid_vertex_input.reset(); assert(classify() == NativeRigidCasterRoute::Native && !build());
+  geometry->layered_rigid_vertex_input = layered_input;
+  for (uint32_t n=0;n<3;++n) {
+    packet.textures.image_mask &= ~(1u<<n); assert(!build()); packet.textures.image_mask |= 1u<<n;
+    auto saved = packet.samplers[n]; packet.samplers[n].reset(); assert(!build()); packet.samplers[n] = saved;
+  }
+  packet.textures.images[2].slice_2d = detail2; assert(!build()); packet.textures.images[2].slice_2d.reset();
+  packet.textures.secondary_uv[0] = std::numeric_limits<float>::quiet_NaN(); assert(!build()); packet.textures.secondary_uv[0] = 5;
+  program.ranges.push_back(program.ranges[0]); program.geometries.push_back(geometry); program.materials.push_back(material);
+  packet.primitive = 1; assert(classify() == NativeRigidCasterRoute::Native && build());
+  program.ranges[1].reflection.enabled = true; assert(classify() == NativeRigidCasterRoute::Legacy);
+  program.ranges[1].reflection.enabled = false; program.ranges[1].features.normal_mapping_requested = true;
+  assert(classify() == NativeRigidCasterRoute::Legacy); program.ranges[1].features.normal_mapping_requested = false;
+  program.ranges[1].shader.vertex_colour.reset(); assert(classify() == NativeRigidCasterRoute::Refused);
+  program.ranges[1].shader = program.ranges[0].shader;
+  program.policy_steps.push_back({PrimitivePolicyOperation::Alpha,1,0}); program.ranges[1].policy_step_end = 1;
+  assert(classify() == NativeRigidCasterRoute::Legacy); // Unsupported sibling cannot be omitted.
+  program.policy_steps.clear(); program.ranges.resize(1); program.geometries.resize(1); program.materials.resize(1);
+  packet = good;
+  const std::weak_ptr<NativeTextureGpu> retired_detail1 = detail1, retired_detail2 = detail2;
+  detail1.reset(); detail2.reset();
+  assert(!retired_detail1.expired() && !retired_detail2.expired());
+  layered.reset(); assert(retired_detail1.expired() && retired_detail2.expired());
   albedo->dimension = RenderTextureViewDimension::TEXTURE_2D; assert(!build());
   albedo->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
   depth->layout = RenderTextureLayout::DEPTH_WRITE; assert(!build()); depth->layout = RenderTextureLayout::SHADER_READ;
@@ -920,7 +990,7 @@ void RigidScenePacket() {
   program = {}; packet = {}; good = {}; receiver = {};
   geometry.reset(); material.reset(); albedo.reset(); depth.reset();
   assert(retired_geometry.use_count() == 1 && retired_albedo.use_count() == 1 && retired_depth.use_count() == 1);
-  assert(plan->geometry->count == 474 && plan->albedo->view && plan->shadow->image);
+  assert(plan->geometry->count == 474 && plan->albedo[0]->view && plan->shadow->image);
   plan.reset();
   assert(retired_geometry.expired() && retired_albedo.expired() && retired_depth.expired());
 }
@@ -1018,9 +1088,9 @@ void RigidBatches() {
     if (fault == 8) b.viewport.width = 64;
     if (fault == 9) b.viewport.minDepth = .2f;
     if (fault == 10) b.scissor.right = 8;
-    if (fault == 11) b.albedo = std::make_shared<NativeTextureGpu>();
+    if (fault == 11) b.albedo[0] = std::make_shared<NativeTextureGpu>();
     if (fault == 12) b.shadow = std::make_shared<NativeTargetImage>();
-    if (fault == 13) b.albedo_sampler = reinterpret_cast<RenderSampler *>(&token);
+    if (fault == 13) b.albedo_samplers[0] = reinterpret_cast<RenderSampler *>(&token);
     if (fault == 14) ++b.model_generation;
     if (fault == 15) b.instance = 0;
     if (fault == 16) b.regression = true;
@@ -1037,10 +1107,22 @@ void RigidBatches() {
   assert(!PackNativeRigidBatch(pair,std::span(packed).first(1),8,1));
   a.view = b.view = 3;
   assert(!NativeRigidBatchLength(pair,8,1));
-  a.albedo = std::make_shared<NativeTextureGpu>(); a.shadow = std::make_shared<NativeTargetImage>();
-  a.albedo_sampler = a.shadow_sampler = reinterpret_cast<RenderSampler *>(&token);
+  a.albedo[0] = std::make_shared<NativeTextureGpu>(); a.shadow = std::make_shared<NativeTargetImage>();
+  a.input.object_data.flags = {RigidAlbedo,1,0,0};
+  a.shadow_sampler = reinterpret_cast<RenderSampler *>(&token); a.albedo_samplers.fill(a.shadow_sampler);
   b = a; assert(NativeRigidBatchLength(pair,8,1) == 2);
   b.shadow_sampler = nullptr; assert(NativeRigidBatchLength(pair,8,1) == 1);
+  a.albedo[1] = std::make_shared<NativeTextureGpu>(); a.albedo[2] = std::make_shared<NativeTextureGpu>();
+  a.input.object_data.flags.y = 3; b = a;
+  assert(NativeRigidBatchLength(pair,8,1) == 2);
+  for (uint32_t n=0;n<3;++n) {
+    b = a; b.albedo[n].reset(); assert(NativeRigidBatchLength(pair,8,1) == 1);
+    b = a; b.albedo_samplers[n] = nullptr; assert(NativeRigidBatchLength(pair,8,1) == 1);
+    b = a; b.albedo[n] = std::make_shared<NativeTextureGpu>(); assert(NativeRigidBatchLength(pair,8,1) == 1);
+  }
+  b = a; b.input.object_data.flags.y = 4; assert(!b.Ready(8,1));
+  b.input.object_data.flags.y = 0; assert(!b.Ready(8,1));
+  b.input.object_data.flags.x = 0; b.albedo = {}; assert(b.Ready(8,1));
   for (const uint32_t alignment : {1u,16u,64u,256u,1024u}) for (uint32_t count : {1u,2u,256u}) {
     const auto placement = PlanNativeRigidStorage(count,alignment); assert(placement);
     for (uint64_t base : {0ull,16ull,1024ull,4193792ull}) {

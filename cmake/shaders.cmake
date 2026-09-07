@@ -40,6 +40,7 @@ function(reblue_host_shader STEM PROFILE)
         list(APPEND hlsl_includes
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_inputs.h"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_shader.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_vertex.h"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_lit_shading.h")
     endif()
 

@@ -227,6 +227,19 @@ void TestNativeLitShading() {
   bad_world = world; bad_world[3] = 1;
   Require(!BuildRigidObject(bad_world,{1,1,1,1},{0,0,0,8},{1,1,0,0},0), "projective object refused");
   Require(!BuildRigidObject(world,{1,1,1,1},{0,0,0,8},{1,1,0,0},64), "unknown rigid flags refused");
+  const std::array<RigidFloat4,2> layer_uv{{{1,2,3,4},{5,6,7,8}}};
+  for (uint32_t layers=0;layers<=3;++layers) {
+    const auto layered = BuildRigidObject(world,{1,1,1,1},{0,0,0,8},{1,1,0,0},layers?RigidAlbedo:0,
+        layer_uv,layers?layers-1:0);
+    Require(layered && layered->flags.y == layers && layered->detail_uv_scale_offset[1].z == 7,
+            "zero-to-three explicit layers and independent UVs in production GPU layout");
+  }
+  Require(!BuildRigidObject(world,{1,1,1,1},{0,0,0,8},{1,1,0,0},0,layer_uv,1) &&
+          !BuildRigidObject(world,{1,1,1,1},{0,0,0,8},{1,1,0,0},RigidAlbedo,layer_uv,3),
+          "detail layers require base enable and bounded count");
+  auto invalid_uv = layer_uv; invalid_uv[1].w = std::numeric_limits<float>::quiet_NaN();
+  Require(!BuildRigidObject(world,{1,1,1,1},{0,0,0,8},{1,1,0,0},RigidAlbedo,invalid_uv,2),
+          "nonfinite secondary layer UV refused");
   NativeRigidPassInputs pass;
   pass.world_to_clip = {world, world}; pass.world_to_shadow = world;
   for (auto &fog : pass.fog) fog.disabled = true;
