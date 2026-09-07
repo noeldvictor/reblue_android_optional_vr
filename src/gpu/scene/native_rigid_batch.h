@@ -28,7 +28,7 @@ struct NativeRigidBatchItem {
     if (view == 1) {
       const auto &flags = input.object_data.flags;
       const bool textured = (flags.x & RigidAlbedo) != 0;
-      if (flags.y != uint32_t(textured) || (textured && !(flags.x & RigidCutout)) ||
+      if (flags.y != uint32_t(textured) || textured != bool(flags.x & RigidCutout) ||
           bool(albedo[0]) != textured || bool(albedo_samplers[0]) != textured ||
           albedo[1] || albedo[2] || albedo_samplers[1] || albedo_samplers[2] || shadow || shadow_sampler) return false;
     }

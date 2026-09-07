@@ -43,9 +43,6 @@ function(reblue_host_shader STEM PROFILE)
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_vertex.h"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_lit_shading.h")
     endif()
-    if(STEM STREQUAL "native_rigid_shadow_alpha_ps")
-        list(APPEND hlsl_includes "${REBLUE_HLSL_DIR}/native_rigid_shadow_cutout_ps.hlsl")
-    endif()
 
     foreach(target_list IN ITEMS REBLUE_D3D12_TARGETS REBLUE_VULKAN_TARGETS)
         if(NOT ${target_list})

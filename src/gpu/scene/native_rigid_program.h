@@ -26,7 +26,7 @@ struct NativeRigidDescriptorSchema {
   NativeRigidDescriptorSchema(const NativeRigidDescriptorSchema &) = delete;
   NativeRigidDescriptorSchema &operator=(const NativeRigidDescriptorSchema &) = delete;
 };
-struct NativeRigidPrograms { NativePipelineHandle scene, shadow, shadow_alpha, shadow_cutout; };
+struct NativeRigidPrograms { NativePipelineHandle scene, shadow, shadow_cutout; };
 // Caller retains/reuses the returned immutable programs per compatible vertex input;
 // this function does not accumulate a global cache or read any source resources.
 NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device,

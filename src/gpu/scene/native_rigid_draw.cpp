@@ -128,13 +128,12 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     if (program == store.programs.end()) {
       Require(store.programs.size() < 8, "native program capacity reached");
       auto shaders = CreateNativeRigidPrograms(*s.device, geometry->rigid_vertex_input);
-      Require(shaders.shadow && shaders.scene && shaders.shadow_alpha && shaders.shadow_cutout, "native shader creation failed");
+      Require(shaders.shadow && shaders.scene && shaders.shadow_cutout, "native shader creation failed");
       store.programs.push_back({geometry->rigid_vertex_input, std::move(shaders)});
       program = store.programs.end() - 1;
     }
     PipelineState pipeline_state;
-    const auto &shader = (plan.object.flags.x & RigidCutout)
-        ? (plan.albedo ? program->shaders.shadow_cutout : program->shaders.shadow_alpha) : program->shaders.shadow;
+    const auto &shader = plan.albedo ? program->shaders.shadow_cutout : program->shaders.shadow;
     pipeline_state.native_program = shader.get();
     pipeline_state.vertexStrides[0] = uint8_t(geometry->strides[0]);
     pipeline_state.renderTargetFormat = plume::RenderFormat::UNKNOWN;

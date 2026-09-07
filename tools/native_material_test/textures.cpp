@@ -158,12 +158,18 @@ void TestNativeMaterialTextures() {
       out[1].uv[0] == 5, "first UV match skips its image even on a gated shadow command");
   memory[visual+3068] = 3; memory[visual+3416] = std::bit_cast<uint32_t>(.375f);
   const auto shadow_object = ReadMaterialShadowInputs(visual,read);
-  Require(shadow_object && shadow_object->texture_layers == 3 && shadow_object->alpha == .375f,
-      "shadow object consumes alpha and full texture mode without phase0 material fields");
+  Require(shadow_object && shadow_object->texture_layers == 3,
+      "shadow object consumes texture mode without phase0 material fields");
   memory[visual+3416] = 0x7fc00000;
-  Require(!ReadMaterialShadowInputs(visual,read) && !ReadMaterialShadowInputs(UINT32_MAX-3,read),
-      "shadow alpha nonfinite and overflow refused");
+  Require(ReadMaterialShadowInputs(visual,read).has_value(), "unused scene alpha cannot invalidate shadow input");
+  memory.erase(visual+3416);
+  Require(ReadMaterialShadowInputs(visual,read).has_value(), "shadow input never reads scene alpha");
+  memory[visual+3068] = 4;
+  Require(!ReadMaterialShadowInputs(visual,read), "unowned inherited texture enables refused");
+  memory.erase(visual+3068);
+  Require(!ReadMaterialShadowInputs(visual,read) && !ReadMaterialShadowInputs(visual+1,read) &&
+      !ReadMaterialShadowInputs(UINT32_MAX-3,read), "missing mode, alignment and overflow refused");
   memory.clear();
-  Require(shadow_object->alpha == .375f && shadow_compose(), "shadow recipes survive source retirement");
+  Require(shadow_object->texture_layers == 3 && shadow_compose(), "shadow recipes survive source retirement");
   std::cout << "native material texture order, null inheritance, live overrides, source-free ownership and bounds passed\n";
 }

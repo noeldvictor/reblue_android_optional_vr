@@ -43,6 +43,8 @@ void Run(RenderDevice &device, uint32_t mode) {
   const bool cutout = (mode >= 12 && mode < 23) || mode == 40, untextured = mode == 10 || mode == 21;
   const bool shadow_cutout = mode >= 23, shadow_untextured = mode == 31 || mode == 36 || mode == 38;
   const bool cutout_receiver = mode >= 37;
+  const bool overlap = mode >= 44;
+  const float right_alpha = mode == 36 || mode == 41 ? .6f : mode == 42 ? .599f : mode == 43 ? .601f : .5f;
   // Canonical asset semantics, deliberately unrelated to translated locations.
   NativeMeshData mesh;
   mesh.streams.push_back({0,80,{}});
@@ -52,11 +54,11 @@ void Run(RenderDevice &device, uint32_t mode) {
   auto input = NativeRigidVertexInput(mesh, inputs, mode >= 6 && !untextured);
   Need(bool(input), "Native rigid input");
   auto programs = CreateNativeRigidPrograms(device, input);
-  Need(programs.scene && programs.shadow && programs.shadow_alpha && programs.shadow_cutout, "Production rigid shader programs");
+  Need(programs.scene && programs.shadow && programs.shadow_cutout, "Production rigid shader programs");
   mesh = {}; input.reset(); // consuming owned inputs after source data retires
 
   auto world = Identity(); world[0] = 1.2f; world[5] = 1.25f; world[12] = .1f; world[13] = -.1f;
-  const bool instanced = mode == 4 || mode == 11 || mode == 20 || mode == 32 || mode == 39;
+  const bool instanced = mode == 4 || mode == 11 || mode == 20 || mode == 32 || mode == 39 || overlap;
   const uint32_t flags = (untextured ? 0 : RigidAlbedo) | RigidVertexColour | RigidDiffuse | RigidSpecular |
       (mode == 1 || cutout_receiver || (instanced && !shadow_cutout) ? RigidReceiveShadow : 0) | (mode >= 2 ? RigidFogEnabled : 0);
   const uint32_t detail_layers = mode == 5 ? 1 : mode >= 6 && !untextured ? 2 : 0;
@@ -112,13 +114,26 @@ void Run(RenderDevice &device, uint32_t mode) {
         mode < 20 ? mode-12 : RigidCutoutGE), "Rigid cutout pack");
   }
   if (shadow_cutout) for (uint32_t n=0;n<instance_count;++n) {
+    // Poison irrelevant scene alpha/comparison inputs: none may change fixed
+    // shadowmap coverage. Scene tests 0..22 still exercise all scene comparisons.
     auto &data = shadow_instances[n].object_data;
-    data.diffuse.w = mode == 34 || ((mode == 32 || mode == 39) && n) ? 1.f : 2.f;
+    data.diffuse.w = mode <= 30 ? float(mode-23)/8 : mode == 34 || ((mode == 32 || mode == 39) && n) ? 1.f : 2.f;
     data.flags.x = (shadow_untextured ? 0 : RigidAlbedo) | (mode == 34 ? 0 : RigidVertexColour);
     data.flags.y = shadow_untextured ? 0 : 1;
-    data.uv_scale_offset = {.5f,.5f,mode == 33 ? -2.f : mode == 35 ? 1.5f : .5f,.5f};
+    data.uv_scale_offset = {.5f,.5f,mode == 33 ? -2.f : mode == 35 ? 1.5f : .5f+.25f*n,.5f};
     Need(SetRigidCutout(data, mode == 36 || mode == 38 ? 256 : (mode == 32 || mode == 39) && n ? 128 : 255,
         mode <= 30 ? mode-23 : RigidCutoutGE), "Rigid shadow cutout pack");
+  }
+  if (overlap) {
+    // Overlapping near/far cutouts with complementary holes. Reverse actual
+    // GPU instance order in mode45: holes must never erase an earlier caster.
+    for (uint32_t n=0;n<2;++n) {
+      auto &data = shadow_instances[n].object_data;
+      // Both depths precede the nearer scene instance (.375), including bias.
+      data.world = caster->world; data.world.rows[3].z = n ? -.1875f : -.25f;
+      data.uv_scale_offset = {.5f,.5f,.5f+.5f*n,.5f};
+    }
+    if (mode == 45) std::swap(shadow_instances[0],shadow_instances[1]);
   }
   const auto alignment = static_cast<VulkanDevice &>(device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment;
   const auto placement = PlanNativeRigidStorage(instance_count,uint32_t(alignment));
@@ -220,7 +235,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   pipeline_desc.depthFunction = RenderComparisonFunction::LESS; pipeline_desc.cullMode = RenderCullMode::NONE;
   pipeline_desc.viewMask = 3;
   auto scene_pipeline = device.createGraphicsPipeline(pipeline_desc);
-  const auto &shadow_program = shadow_cutout ? (shadow_untextured ? programs.shadow_alpha : programs.shadow_cutout) : programs.shadow;
+  const auto &shadow_program = shadow_cutout && !shadow_untextured ? programs.shadow_cutout : programs.shadow;
   ApplyNativePipelineProgram(*shadow_program, pipeline_desc);
   pipeline_desc.viewMask = 0; pipeline_desc.renderTargetCount = 0;
   pipeline_desc.depthTargetFormat = depth_desc.format;
@@ -238,7 +253,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->setFramebuffer(albedo_fb.get());
   const RenderRect left(0,0,size/2,size), right(size/2,0,size,size);
   commands->clearColor(0,RenderColor(.5f,.25f,.75f,1),&left,1);
-  commands->clearColor(0,RenderColor(.25f,.75f,.5f,.5f),&right,1);
+  commands->clearColor(0,RenderColor(.25f,.75f,.5f,right_alpha),&right,1);
   commands->setFramebuffer(nullptr);
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(albedo.get(),RenderTextureLayout::SHADER_READ));
   const std::array<std::array<RigidFloat4,4>,2> detail_colours{{
@@ -322,29 +337,22 @@ void Run(RenderDevice &device, uint32_t mode) {
   const auto *pixels=static_cast<const float *>(readback->map()); Need(pixels!=nullptr,"Rigid readback map");
   // Independent mono caster oracle. Use authored fixture values, not the GPU
   // readback or production cutout predicate, for both depth and receiver checks.
-  const auto caster_depth = [&](uint32_t x) {
-    const uint32_t n = instanced && x >= size/2 ? 1 : 0;
+  const auto single_caster_depth = [&](uint32_t x, uint32_t n) {
     const auto &matrix = shadow_instances[n].object_data.world.rows;
     bool casts = true;
-    if (shadow_cutout) {
+    if (shadow_cutout && !shadow_untextured) {
       const float source_x = (2*(x+.5f)/size-1-matrix[3].x)/matrix[0].x;
-      const float u = source_x*.5f+(mode == 33 ? -2.f : mode == 35 ? 1.5f : .5f);
-      const float image_alpha = shadow_untextured ? 1.f : u < 0 ? 0.f : u-std::floor(u) >= .5f ? .5f : 1.f;
-      const float object_alpha = mode == 34 || ((mode == 32 || mode == 39) && n) ? 1.f : 2.f;
-      const float alpha = image_alpha*object_alpha*(mode == 34 ? 1.f : .5f);
-      const float cutoff = mode == 36 || mode == 38 ? 256.f/255 : (mode == 32 || mode == 39) && n ? 128.f/255 : 1.f;
-      switch (mode <= 30 ? mode-23 : 0) {
-      case 0: casts = alpha >= cutoff; break;
-      case 1: casts = false; break;
-      case 2: casts = alpha < cutoff; break;
-      case 3: casts = alpha == cutoff; break;
-      case 4: casts = alpha <= cutoff; break;
-      case 5: casts = alpha > cutoff; break;
-      case 6: casts = alpha < cutoff || alpha > cutoff; break;
-      case 7: casts = true; break;
-      }
+      const float offset = overlap ? .5f+.5f*(mode == 45 ? 1-n : n) :
+          mode == 33 ? -2.f : mode == 35 ? 1.5f : .5f+.25f*n;
+      const float u = source_x*.5f+offset;
+      const float image_alpha = u-std::floor(u) >= .5f ? right_alpha : 1.f;
+      casts = image_alpha >= .6f;
     }
     return casts ? .5f+matrix[3].z : 1.f;
+  };
+  const auto caster_depth = [&](uint32_t x) {
+    return overlap ? (std::min)(single_caster_depth(x,0),single_caster_depth(x,1)) :
+        single_caster_depth(x,instanced && x >= size/2 ? 1 : 0);
   };
   uint32_t lit_receivers = 0, shadowed_receivers = 0, filtered_receivers = 0;
   float maximum_error=0;
@@ -361,7 +369,7 @@ void Run(RenderDevice &device, uint32_t mode) {
     const float asset_x=(position.x-matrix[3].x)/matrix[0].x, asset_y=(position.y-matrix[3].y)/matrix[1].y;
     const bool second=asset_x*.5f+base_uv.z>=.5f;
     auto texture=second?LitVec(.25f,.75f,.5f):LitVec(.5f,.25f,.75f);
-    float texture_alpha=second?.5f:1.f;
+    float texture_alpha=second?right_alpha:1.f;
     if (asset_x*.5f+base_uv.z < 0) { texture=LitVec(0,0,0); texture_alpha=0; }
     if (!object_reference.flags.y) { texture=LitVec(1,1,1); texture_alpha=1; }
     // Independent scalar oracle for UV-channel mapping, mirror/wrap addressing,
@@ -443,8 +451,13 @@ void Run(RenderDevice &device, uint32_t mode) {
   }
   readback->unmap();
   if (cutout_receiver) {
-    Need(lit_receivers > 0,"Cutout holes must light receiver pixels");
-    if (!shadow_untextured) Need(shadowed_receivers > 0 && filtered_receivers > 0,"Cutout receiver needs both occluded pixels and filtered edges");
+    if (!shadow_untextured && right_alpha < .6f && !overlap) {
+      Need(lit_receivers > 0,"Cutout holes must light receiver pixels");
+      Need(shadowed_receivers > 0 && filtered_receivers > 0,"Cutout receiver needs both occluded pixels and filtered edges");
+    } else {
+      Need(shadowed_receivers == 128 && lit_receivers == 0 && filtered_receivers == 0,
+          "Solid, threshold-passing or complementary casters must occlude both eyes completely");
+    }
   }
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" eyes=2 pixels=128 max_error="<<maximum_error
            <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" shadow cutout="<<shadow_cutout
@@ -452,4 +465,4 @@ void Run(RenderDevice &device, uint32_t mode) {
            <<"; native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
 }
 }
-void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<41;++mode) Run(device,mode); }
+void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<46;++mode) Run(device,mode); }

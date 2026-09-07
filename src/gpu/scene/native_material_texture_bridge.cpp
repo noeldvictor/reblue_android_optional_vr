@@ -101,9 +101,9 @@ MaterialImageSelection<NativeTextureBinding> Capture(uint32_t source) {
   return binding.primary ? MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind, std::move(binding)}
                          : MaterialImageSelection<NativeTextureBinding>{};
 }
-std::optional<NativeRigidCutoutInputs> CaptureCutoutPass(bool shadow = false) {
+std::optional<NativeRigidCutoutInputs> CaptureCutoutPass() {
   const auto alpha = FindNativeAlphaIntent();
-  const auto blend = shadow ? std::optional(BlendState{}) : FindNativeEnabledBlendIntent();
+  const auto blend = FindNativeEnabledBlendIntent();
   if (!alpha || !blend) return {};
   uint32_t comparison;
   switch (alpha->compare) {
@@ -163,8 +163,6 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
       publication->cutout_pass = CaptureCutoutPass();
     }
     if (publication->shadow_phase) {
-      publication->alpha_inputs = ReadMaterialAlphaInputs(*visual, Word);
-      publication->cutout_pass = CaptureCutoutPass(true);
       publication->shadow_inputs = ReadMaterialShadowInputs(*visual, Word);
       publication->shadow_filters = FindNativeSamplerFilters(*render_view);
     }
@@ -402,34 +400,24 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
   refusal = "shadow object scope/pose/phase unavailable";
   if (!scope || !scope->shadow_phase || scope->render_view != 1 || scope->pose.get() != &pose ||
       scope->model != pose.model || !scope->policy_inputs || node >= pose.transforms.size()) return {};
-  refusal = "shadow object mode/alpha unavailable";
+  refusal = "shadow object texture mode unavailable";
   if (!scope->shadow_inputs) return {};
-  refusal = "shadow alpha-reference producer unavailable";
-  if (!scope->alpha_inputs) return {};
-  refusal = "shadow alpha comparison producer unavailable";
-  if (!scope->cutout_pass) return {};
   refusal = "shadow owned node/admission unavailable";
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
   const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const auto *mesh = PrepareMaterialMesh(*program);
-  std::vector<uint32_t> references;
-  refusal = "shadow texture recipe or ordered cutoff composition unavailable";
-  if (!mesh || mesh->values.size() != program->ranges.size() ||
-      !ComposeMaterialAlphaReferences(program->ranges, admission.policies, *scope->alpha_inputs, references)) return {};
+  refusal = "shadow owned texture recipe unavailable";
+  if (!mesh || mesh->values.size() != program->ranges.size()) return {};
   std::vector<NativeRigidShadowCutout> cutouts(program->ranges.size());
   for (size_t n = 0; n < cutouts.size(); ++n) if (admission.policies[n].alpha_test) {
     auto &cutout = cutouts[n];
     const auto &range = program->ranges[n];
     const uint32_t layers = range.shadow_uses_texture ? scope->shadow_inputs->texture_layers : 0;
-    // Modes above3 preserve old shader enables; that inherited producer is not
-    // represented. Detail layers affect RGB only and do not affect depth alpha.
-    refusal = "shadow texture mode exceeds represented layers";
-    if (layers > 3) return {};
-    cutout.textured = layers != 0;
-    cutout.alpha = scope->shadow_inputs->alpha;
-    cutout.reference = references[n]; cutout.comparison = scope->cutout_pass->comparison;
+    // The direct phase1 callback selects shadownull; the list callback selects
+    // shadowmap. Neither consumes scene colour, vertex alpha or cutoff state.
+    cutout.textured = layers != 0 && admission.policies[n].deferred;
     cutout.uv = mesh->values[n].uv; cutout.owns_uv = mesh->values[n].owns_uv;
     if (cutout.textured) {
       refusal = "shadow base image assignment unavailable";

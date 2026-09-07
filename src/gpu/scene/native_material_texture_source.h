@@ -11,19 +11,17 @@
 
 namespace bd::gpu::scene {
 struct NativeMaterialShadowInputs {
-  float alpha = 0;
   uint32_t texture_layers = 0;
 };
-// Phase1 skips 90xx colour writes; only object alpha affects cutout coverage.
+// Phase1's shadowmap PS consumes only texture enable and base alpha, with a
+// fixed 0.6 cutoff. It has no object/vertex colour or alpha-reference input.
 // Texture mode is the complete +3068 value, not its sorted-participation bool.
 template <class Read>
 std::optional<NativeMaterialShadowInputs> ReadMaterialShadowInputs(uint32_t visual, Read read) {
-  if (!visual || (visual & 3) || visual > UINT32_MAX - 3419) return {};
-  const auto mode = read(uint64_t(visual) + 3068), alpha = read(uint64_t(visual) + 3416);
-  if (!mode || !alpha) return {};
-  const float value = std::bit_cast<float>(*alpha);
-  if (!std::isfinite(value)) return {};
-  return NativeMaterialShadowInputs{value, *mode};
+  if (!visual || (visual & 3) || visual > UINT32_MAX - 3071) return {};
+  const auto mode = read(uint64_t(visual) + 3068);
+  if (!mode || *mode > 3) return {}; // larger modes retain unowned boolean state
+  return NativeMaterialShadowInputs{*mode};
 }
 // bdSceneTreeDraw publishes colour at +3404 before its setup callbacks and
 // traversal. Read the final value at traversal entry, not the earlier +3004

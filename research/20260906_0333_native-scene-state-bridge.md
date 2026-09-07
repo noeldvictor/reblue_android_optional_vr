@@ -3489,3 +3489,49 @@ logs199,175 B/136 (-1,644), exe/PDB+8,192/+28,672. Counted retained growth472,88
 other objects/CMake/source/Git unallocated. Inventory free71,608,135,680 B, down
 7,316,447,232 B drive-wide, not attributed to the~462 KiB subtotal. No allowance
 reset, no new raw exception. Pending reload/textured-shadow/pixels remain explicit.
+
+## 2026-09-07 phase1 coverage correction (same allowance)
+
+The intervening push-only turn was no renderer progress. First free78,655,266,816 B.
+Source investigation now distinguishes direct shadownull from deferred shadowmap:
+the latter uses fixed texture alpha0.6, no object/vertex alpha or cutoff state.
+The ordinary deferred rigid family connects to the existing native depth queue;
+zero-texture casters use the solid program.320 artifact-free Python checks pass.
+Reuse material38/CPU36, output37/CPU20, GPU33/rigid12 sequentially, each32 MiB
+peak/free-drop,300 s supervisor/original62,509,998,080 B floor,10 MiB aggregate
+logs. New text <=64 KiB, no raw/image/perf/cook outputs. Current baseline trees:
+material8,331,276 B,texture70,636,050 B,GPU10,670,060 B,logs199,175 B.
+Only after fixture success and another preflight may host116 use192 MiB peak.
+An unrelated Android build is visible; it is not ours to stop. All prior game
+failure/pixel evidence remains protected. No host/game acceptance yet.
+
+Commit checkpoint: material38/CPU36 pass (0.25 s test /0.29 s CTest), output37/
+CPU20 pass (0.88/0.94 s). GPU33 stopped on32 MiB free-drop during regeneration;
+GPU34 exposed Windows' min macro, corrected with `(std::min)`. GPU35 built.
+Rigid12 passed modes0..43, then failed the overlap coverage assertion: the far
+caster was level with the nearer receiver. Both pixel/depth oracles agreed;
+validation0 errors/0warnings. Fixed the fixture's far translation to -.1875
+(depth .3125, before receiver .375), preserving tolerances. GPU36 builds.
+Rigid13/PID31548/session49661 stopped on the32 MiB free-drop guard; supervisor
+reported its owned child tree terminated. No completed46-mode result, host116
+build, run956 or new game pixels. Commit/push request does not restart producers.
+
+Contract sources: generated/reblue_recomp.62.cpp sub_82198138 publishes modes0..3
+as texture enable booleans; generated67 sub_821981E0 flushes them. Generated64
+sub_82174270 chooses ordinary technique0 shadowmap for the list callback versus
+technique24 shadownull VS for the direct callback; both table entries use
+bd_shadowmap_ps (tools/shader_cache/shader_table_descriptors.csv). Retained
+bd_shadowmap_ps.hlsl, hash0x3646F81DE849C63C, rejects sampled base alpha below
+asfloat(0x3F19999A), with no scene float/colour inputs. Generated40's node phase1
+branch forces the sorted route when visual+3068 is nonzero. The ordinary
+deferred_consumer light-space path skips depth sorting/scene alpha enable and
+retains depth writes. This scopes the native min-depth substitution; general
+scene/translucent ordering is not removed. Earlier37/41-mode shadow acceptance
+does not establish this corrected contract. Preserve the authored-texture gate.
+
+No cleanup or new producer during this push-only handoff. Ending measured free
+81,861,353,472 B is3,206,086,656 B above the continuation's first measurement;
+that drive-wide gain is not attributed to cleanup. Existing attempt logs and
+fixture outputs remain retained pending replacement verification; their final
+growth inventory is still pending. Original allowance/floor and protected
+failure/pixel evidence remain unchanged. Host115/profile are not restamped.

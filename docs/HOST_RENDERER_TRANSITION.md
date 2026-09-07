@@ -80,16 +80,11 @@ sorted siblings, legacy interoperation and all outstanding
 UV/light/pixel gates. The subsequent phase1 caster connection is described below.
 [Cutout connection and current evidence](../research/20260907_1713_native-scene-cutouts.md).
 
-Phase1 cutout shadows are now connected in source: assignment-time alpha/image
-gates, object alpha, forced-wrap sampler inputs, textured/zero-layer depth
-programs and retained indirect batches.315 Python checks, both C++ fixtures and
-37 GPU modes pass (1.86 s, validation0 errors/0warnings). The prior23 GPU cases
-remain unchanged; new cases verify cutout caster depth independently of scene
-colour. A missing shader-header build-order dependency was fixed and guarded.
-Host112 initially failed preflight, then later drive-wide recovery allowed its
-host-only compile/link under the original192 MiB bound. Both cutout connections
-are now in the executable, with no guest object rebuild. No new game or pixel
-acceptance. [Current shadow connection and pending gates](../research/20260907_1742_native-cutout-shadows.md).
+Historical phase1 shadow connection: host112 added owned images, forced-wrap
+samplers and retained indirect batches, but its object/vertex alpha and generic
+cutoff model was incorrect. The earlier37/41 GPU modes verified that implementation,
+not the recovered authored shadow contract. Preserve those results as history,
+not current equivalence evidence. [Earlier shadow connection](../research/20260907_1742_native-cutout-shadows.md).
 
 Host115/run955 follow-up: the first live cutout refusal was caused by treating
 the light-space colour flag as a cutoff override. The exact translated branch
@@ -104,6 +99,23 @@ The disk guard stops the reloaded opening event, with no image or reload accepta
 Textured shadow emissions remain0, so the new strict cutout-family gate stays
 pending. Keep948/941 failures and the normal profile unchanged.
 [Current integration, source correction and evidence](../research/20260907_1838_cutout-integration.md).
+
+Current correction (source/fixtures, not host115): `sub_82174270` selects the
+phase1 shadowmap route for ordinary deferred casters; their texture-enabled
+participation was excluded by native admission. The original shadowmap PS uses
+fixed base alpha0.6, no object/vertex alpha, generic cutoff or negative-U sentinel.
+Ordinary phase1 depth-only deferred casters now join the existing native queue;
+zero-texture casters use the solid shader. Unsupported effects/skin/wind/forced
+passes remain excluded, and scene deferred ordering is unchanged.
+Material CPU36 and output CPU20 pass. GPU36 compiles the corrected fixture;
+rigid12 passed modes0..43 before the overlap fixture's far caster was found level
+with the nearer receiver. Placement is corrected without relaxed tolerances.
+Rigid13 was stopped by the32 MiB free-drop guard before completion: no46-mode
+pass, host116 build, new game run or pixels. Next finish the bounded GPU check,
+then host integration and fresh textured-shadow/lifetime/reload/pixel gates.
+Keep948/941 and host107/run945 unchanged; run955's zero-texture counts do not
+qualify this corrected coverage. Contract and attempt details are in the
+[cumulative ledger](../research/20260906_0333_native-scene-state-bridge.md#2026-09-07-phase1-coverage-correction-same-allowance).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -142,7 +154,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    scene-shaded objects, culling/occlusion and real multi-instance groups. The
    opaque caster family now handles whole multi-primitive nodes without material
    ID or scene texture-layer restrictions; its submission, actual emission and
-   fence gates pass in both reload epochs. Skin/wind, phase0 cutout casting, deferred and
+   fence gates pass in both reload epochs. Skin/wind, phase0 cutout casting, scene deferred and
    texture-dependent effect participation remain explicit unsupported families.
    The new ordinary0..3-layer shader, independent third UV owner and whole-node
    scene submission and ordered light inheritance are implemented. Host110/run948
@@ -165,14 +177,14 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    source-reader helper or claim all2,898 light bindings are native draws.
 2. **Material families and characters.** Direct blended-cutout scene ownership
    is now connected, host-built and CPU/GPU-tested, pending fresh game
-   emission/pixel/interoperation evidence. Phase1 textured/zero-layer cutout
-   casting is also connected, host-built and CPU/GPU-tested. Run955 proves fresh
-   textured scene and zero-layer caster cutouts in the cold field, not a complete
-   reload/pixel result. Next establish a representative textured-shadow participant
-   from owned material/object inputs instead of repeating the same zero-coverage
-   scenario. Separately recover the original light-space alpha multiplier contract:
-   its colour writes are skipped while the native caster currently copies object
-   alpha. The cutoff fix alone does not qualify that equivalence. Preserve the new
+   emission/pixel/interoperation evidence. Phase1 casting now has corrected
+   source/CPU coverage for the actual fixed-alpha shadowmap and ordinary deferred
+   participants. Complete the46-mode GPU rerun and incremental host integration
+   before a changed-code game probe; host115 still has the superseded shader.
+   Run955 proves fresh textured scene emission, not authored shadow coverage or
+   a complete reload/pixel result. Verify representative textured shadow draws
+   from the newly admitted family and min-depth ordering with retained consumers.
+   Preserve the new
    textured emission/fence gate and all ordering/legacy/pixel gates. Integrate these paired
    scene/shadow consumers, then wind and translucent
    materials; deliver native skeleton/skin assets, animation/

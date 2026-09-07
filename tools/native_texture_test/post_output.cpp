@@ -691,16 +691,23 @@ void CameraAndRigidCaster() {
   program.ranges[2].shader.vertex_colour = true;
   assert(PrepareNativeRigidShadowAdmission(program,policy).route == NativeRigidCasterRoute::Native && !build());
   std::vector<NativeRigidShadowCutout> cutouts(3);
-  auto &cutout = cutouts[2]; cutout.alpha = .75f; cutout.reference = 128;
+  auto &cutout = cutouts[2];
   const auto covered = [&] { return PrepareNativeRigidShadow(program,identity,policy,retained_camera,cutouts); };
-  assert(covered() && (covered()->at(2).object.flags.x & RigidCutout) && !covered()->at(2).albedo);
+  assert(covered() && !covered()->at(2).object.flags.x && !covered()->at(2).albedo);
   auto image = std::make_shared<NativeTextureGpu>();
   image->image = std::make_unique<SceneSource>(); image->view = std::make_unique<RenderTextureView>();
   image->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
   cutout.textured = true; cutout.owns_uv = true; cutout.uv = {.25f,.5f,0,0}; cutout.image.primary = image;
   cutout.sampler = NativeMaterialSampler2D{{},MaterialSampleAddress::Wrap,MaterialSampleAddress::Wrap};
+  assert(!covered()); // direct callback selects shadownull, not textured shadowmap
+  policy.shadow_modulates_colour = true;
+  assert(classify() == NativeRigidCasterRoute::Legacy); // scene admission stays strict
+  assert(PrepareNativeRigidShadowAdmission(program,policy).policies[2].deferred);
+  program.ranges[2].shader.vertex_colour.reset(); // not a shadow shader input
   auto textured = covered();
-  assert(textured && textured->at(2).albedo == image && textured->at(2).object.diffuse.w == .75f &&
+  assert(textured && textured->at(2).draw && textured->at(2).albedo == image &&
+      textured->at(2).object.diffuse.w == 0 && !(textured->at(2).object.flags.x & RigidVertexColour) &&
+      std::bit_cast<float>(textured->at(2).object.flags.w) == .6f &&
       textured->at(2).object.flags.y == 1 && textured->at(2).object.uv_scale_offset.z == .25f+1.f/512 &&
       !textured->at(0).albedo && textured->at(1).geometry == sibling);
   const auto valid_cutout = cutout;
@@ -710,9 +717,9 @@ void CameraAndRigidCaster() {
     if (fault == 1) cutout.owns_uv = false;
     if (fault == 2) cutout.sampler.reset();
     if (fault == 3) cutout.sampler->u = MaterialSampleAddress::Clamp;
-    if (fault == 4) cutout.alpha = std::numeric_limits<float>::quiet_NaN();
+    if (fault == 4) cutout.sampler->v = MaterialSampleAddress::Clamp;
     if (fault == 5) cutout.uv[0] = std::numeric_limits<float>::infinity();
-    if (fault == 6) cutout.comparison = 8;
+    if (fault == 6) cutout.image.cube = image;
     if (fault == 7) cutout.image.slice_2d = image;
     assert(!covered());
   }
@@ -725,7 +732,8 @@ void CameraAndRigidCaster() {
   policy.pass_mode = 0;
   cutouts.pop_back(); assert(!covered()); // never use a shorter sibling packet
   image.reset();
-  assert(textured->at(2).albedo && textured->at(2).object.diffuse.w == .75f);
+  assert(textured->at(2).albedo && textured->at(2).object.diffuse.w == 0);
+  policy.shadow_modulates_colour = false;
   program.policy_steps.pop_back(); program.ranges[2].policy_step_end = 1;
   program.policy_steps = {{PrimitivePolicyOperation::Alpha,17,0}, {PrimitivePolicyOperation::Alpha,0,0}};
   for (auto &range : program.ranges) range.policy_step_end = 2;
@@ -1236,7 +1244,8 @@ void RigidBatches() {
   assert(shadow_cutout.Ready(8,1));
   shadow_cutout.albedo[0].reset(); assert(!shadow_cutout.Ready(8,1));
   shadow_cutout.input.object_data.flags = {RigidCutout,0,RigidCutoutGE,0};
-  shadow_cutout.albedo_samplers[0] = nullptr; assert(shadow_cutout.Ready(8,1));
+  shadow_cutout.albedo_samplers[0] = nullptr; assert(!shadow_cutout.Ready(8,1)); // no invented alpha-only program
+  shadow_cutout.input.object_data.flags = {}; assert(shadow_cutout.Ready(8,1));
   shadow_cutout.shadow = a.shadow; assert(!shadow_cutout.Ready(8,1)); // no attachment feedback
   for (const uint32_t alignment : {1u,16u,64u,256u,1024u}) for (uint32_t count : {1u,2u,256u}) {
     const auto placement = PlanNativeRigidStorage(count,alignment); assert(placement);

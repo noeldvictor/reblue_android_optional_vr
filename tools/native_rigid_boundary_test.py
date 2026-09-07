@@ -201,7 +201,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
         paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h"]
-        self.assertEqual(len(paths), 9)
+        self.assertEqual(len(paths), 8)
         for path in paths:
             text = path.read_text()
             for forbidden in ("shader_common.h", "g_VSC", "g_PSC", "BD_SHARED", "BOOL_BIT", "GuestShader", "packoffset"):
@@ -240,7 +240,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         schema = (ROOT / "src/gpu/scene/native_rigid_program.h").read_text()
         self.assertIn("layer < 4", schema)
         fixture = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
-        self.assertIn("mode<41", fixture)
+        self.assertIn("mode<46", fixture)
         self.assertIn("if (cutout_receiver) sampler_desc.minFilter = sampler_desc.magFilter = RenderFilter::LINEAR", fixture)
         self.assertIn("compare_z <= caster_depth(", fixture)
         self.assertIn("shadowed_receivers > 0 && filtered_receivers > 0", fixture)
@@ -293,9 +293,10 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         consumer = source.split("PrepareNativeRigidShadowForObject(", 1)[1].split(
             "std::optional<NativeObjectPrimitiveInputs>", 1)[0]
         for required in ("scope->shadow_phase", "scope->pose.get() != &pose", "range.shadow_uses_texture",
-                         "ComposeMaterialAlphaReferences", "MaterialSampleAddress::Wrap", "mesh->values[n].images[0]"):
+                         "admission.policies[n].deferred", "MaterialSampleAddress::Wrap", "mesh->values[n].images[0]"):
             self.assertIn(required, consumer)
-        for forbidden in ("Word(", "BuildNativeObjectPrimitive", "FindNativeLightingPass", "ReadMaterial", "pipelineState"):
+        for forbidden in ("Word(", "BuildNativeObjectPrimitive", "FindNativeLightingPass", "ReadMaterial", "pipelineState",
+                          "ComposeMaterialAlphaReferences", "cutout_pass", "cutout.alpha"):
             self.assertNotIn(forbidden, consumer)
         replay = source.split("PrepareReplayMaterialMesh(const NodeTag &tag)", 1)[1].split("} // namespace", 1)[0]
         self.assertIn("scope->shadow_phase", replay)  # No phase0 replay consumers see phase1 recipes.
@@ -303,11 +304,13 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         descriptors = draw.split("if (first.view == 1 && first.albedo[0])", 1)[1].split("else if (first.view == 3)", 1)[0]
         self.assertIn("first.albedo[0]->image.get()", descriptors)
         self.assertNotIn("first.shadow", descriptors)
-        for required in ("program->shaders.shadow_cutout", "program->shaders.shadow_alpha", "item->albedo[0] = plan.albedo"):
+        for required in ("program->shaders.shadow_cutout", "program->shaders.shadow", "item->albedo[0] = plan.albedo"):
             self.assertIn(required, draw)
         shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_shadow_cutout_ps.hlsl").read_text()
-        for required in ("RigidCutoutPasses", "texture_alpha * object_data.diffuse.w", "uv.x < 0", "RIGID_SHADOW_UNTEXTURED"):
+        for required in ("sampled < .6f", "discard", "float3(uv, 0)"):
             self.assertIn(required, shader)
+        for forbidden in ("RigidCutoutPasses", "diffuse", "vertex_alpha", "uv.x < 0", "rigid_instances"):
+            self.assertNotIn(forbidden, shader)
         self.assertNotIn("SV_Target", shader)
 
 
