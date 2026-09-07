@@ -143,6 +143,14 @@ No speedup claim; real batches are still singletons.
 [Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
 [Corrected contract, live reload and open pixel issue](research/20260907_1927_corrected-shadow-coverage.md).
 
+Native occlusion is still unconnected: native scene-end does not issue the
+existing legacy-path queries. A source-only checkpoint adds owned query inputs,
+conservative history and a separate native push-packet shader/pipeline, leaving
+the current shader interface intact. The 320 existing Python checks and new
+header syntax checks pass; runtime wiring, C++ behavior tests, shader builds and
+GPU/live verification remain pending. This does not fix or explain the tree gaps.
+See the [active queue](docs/HOST_RENDERER_TRANSITION.md#active-work-queue).
+
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, phase0 cutout casting,
 sorted/translucent materials,

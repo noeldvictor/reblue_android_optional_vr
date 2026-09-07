@@ -119,6 +119,21 @@ a matched-state correctness question rather than retrying for nicer framing.
 Keep948/941 failures and host107/run945's last accepted pixels unchanged.
 [Corrected contract, current live proof and pixel question](../research/20260907_1927_corrected-shadow-coverage.md).
 
+Occlusion source checkpoint (not runtime-connected): native scene-end currently
+flushes and finishes its owned attachments without calling `OcclusionCullEmit`;
+the only emitter call remains in legacy framebuffer switching. The new owned
+identity/history, world-space near-plane guard and 80-byte push-packet pipeline
+are therefore groundwork, not functioning native scene occlusion or a fix for
+run956's tree gaps. The native shader has a separate name so the still-active
+legacy emitter retains its existing binding contract. Next: connect bounded
+observations, query submission before native depth retirement, fence collection
+and native draw consumers; verify camera/generation changes and actual GPU query
+results. The 320 existing Python source/scenario checks and syntax-only checks of
+both new headers pass; these do not exercise the new history or GPU program.
+Stereo queries, C++ behavior tests, full C++/shader builds, GPU and live gates
+remain pending. No build, game run, capture or retained diagnostic was produced.
+Host116/run956 and host107/run945 retain their existing evidence/limitations.
+
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
 The direct consumer now uses `NativeSceneLightingPublication`: semantic lights

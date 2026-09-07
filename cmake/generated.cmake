@@ -68,6 +68,8 @@ endif()
 # The occlusion proxy (gpu/occlusion_cull.cpp): a cube per node under a query.
 reblue_host_shader(occ_proxy_vs vs_6_1 -D REBLUE_RECOMP)
 reblue_host_shader(occ_proxy_ps ps_6_0)
+# Separate native push-packet ABI; the legacy emitter still uses occ_proxy_vs.
+reblue_host_shader(native_occ_proxy_vs vs_6_1)
 reblue_host_shader(bd_normal_wind_lit ps_6_1 -D REBLUE_RECOMP)
 # The host-owned post chain (gpu/post_chain.cpp): downsample, separable blur
 # and bright mask, producing the guest's pyramid textures without the tile.
