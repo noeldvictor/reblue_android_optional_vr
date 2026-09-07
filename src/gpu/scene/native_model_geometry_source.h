@@ -14,6 +14,20 @@ struct ModelGeometrySource {
   uint32_t vertex_count = 0, declaration_slot = 0;
 };
 
+// bdSceneNodeDrawSingle consumes byte 2 (bone count) and halfword 8 bit 0
+// (vertex-colour enable) of the selected declaration slot. Read both at load,
+// before source retirement; neither is inferred from the canonical attributes.
+template <typename Reader>
+bool ReadModelVertexShaderInputs(uint32_t slot, NativePrimitiveShaderInputs &inputs,
+                                Reader &&reader) {
+  if (!slot || (slot & 3) || slot > UINT32_MAX - 11) return false;
+  const auto header = reader(slot), flags = reader(slot + 8);
+  if (!header || !flags) return false;
+  inputs.vertex_bones = uint8_t((*header >> 8) & 0xff);
+  inputs.vertex_colour = bool((*flags >> 16) & 1);
+  return true;
+}
+
 // bdSceneGraphNodeProcess creates these tables before graph publication.
 // Reader returns optional<uint32_t> in host endian. This function neither
 // owns source addresses nor accesses resources/GPU state, and is never a draw

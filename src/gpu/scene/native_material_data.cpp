@@ -111,6 +111,10 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
         return false;
     } else if ((command & 0xff00) == 0x0100) {
       m.modulate_diffuse = (command & 0xff) == 0;
+      // sub_82198138 updates the three texture enables only for modes 0..3.
+      // Higher values change its serial/mode but preserve the previous enables.
+      if ((command & 0xff) <= 3)
+        current.shader.texture_layers = uint8_t(command & 0xff);
     } else if ((command & 0xff00) == 0x0400) {
       const uint8_t shininess = command & 0xff;
       // The interpreter skips a repeated power command, even if an RGB

@@ -3,6 +3,7 @@
 #include "gpu/scene/native_model_shadow_source.h"
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_object_primitive.h"
+#include "gpu/scene/lighting_shader_bridge.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -38,9 +39,52 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
 
 void TestNativeModelMaterials() {
   {
+    std::unordered_map<uint32_t, uint32_t> words{{400, 0x12340756}, {408, 0x0001abcd}};
+    unsigned reads = 0;
+    const auto read = [&](uint32_t address) -> std::optional<uint32_t> {
+      ++reads;
+      const auto it = words.find(address);
+      return it == words.end() ? std::nullopt : std::optional(it->second);
+    };
+    NativePrimitiveShaderInputs inputs;
+    Require(!PackPrimitiveShaderBits(inputs), "unknown colour is not disabled");
+    Require(ReadModelVertexShaderInputs(400, inputs, read) && inputs.vertex_bones == 7 &&
+            inputs.vertex_colour == true && inputs.texture_layers == 1, "BE declaration fields imported once");
+    const auto before = inputs;
+    reads = 0;
+    Require(!ReadModelVertexShaderInputs(0, inputs, read) &&
+            !ReadModelVertexShaderInputs(401, inputs, read) &&
+            !ReadModelVertexShaderInputs(UINT32_MAX - 3, inputs, read) && !reads,
+            "null, unaligned and overflow declaration refused without reads");
+    words.erase(408);
+    Require(!ReadModelVertexShaderInputs(400, inputs, read) && inputs == before, "partial import is transactional");
+    words[400] = 0; words[408] = 0xfffeffff;
+    Require(ReadModelVertexShaderInputs(400, inputs, read) && inputs.vertex_bones == 0 &&
+            inputs.vertex_colour == false, "zero bones and disabled colour are explicitly known");
+    words.clear();
+    for (uint8_t layers = 0; layers <= 3; ++layers) {
+      inputs.texture_layers = layers;
+      for (bool colour : {false, true}) {
+        inputs.vertex_colour = colour;
+        const auto bits = PackPrimitiveShaderBits(inputs);
+        for (uint32_t initial : {0u, UINT32_MAX, 0xa5a5a5a5u}) {
+          uint32_t vs = initial, ps = initial;
+          Require(bits.has_value(), "owned shader bits pack after source destruction");
+          ApplyPrimitiveShaderBits(*bits, vs, ps);
+          Require((vs & 16u) == (colour ? 16u : 0u) && (ps & 7u) == ((1u << layers) - 1) &&
+                  (vs & ~16u) == (initial & ~16u) && (ps & ~7u) == (initial & ~7u),
+                  "compatibility packing changes only the four owned bits");
+        }
+      }
+    }
+    inputs.texture_layers = 4;
+    Require(!PackPrimitiveShaderBits(inputs), "invalid native layer count refused");
+  }
+  {
     ModelMaterialRegistry models;
     NativeInstanceRegistry instances;
     auto source = Mesh(10);
+    source.program.ranges[0].shader = {2, true, 0};
     // Opaque GPU-handle lifetime only: this core must never inspect backend
     // geometry bytes. Production geometry/layout pixels have separate fixtures.
     auto gpu_owner = std::make_shared<const uint32_t>(91);
@@ -80,7 +124,8 @@ void TestNativeModelMaterials() {
     models.Retire(100); instances.Retire(id); pose.reset(); model.reset(); stale = {};
     Require(!gpu_lifetime.expired() && !image_lifetime.expired() && *packet->textures.images[0] == 73 &&
             packet->textures.uv[3] == 4 && packet->world[12] == 7 && packet->material_values[0][0] == .5f &&
-            packet->lights && (*packet->lights)[0].colour.x == .75f,
+            packet->lights && (*packet->lights)[0].colour.x == .75f &&
+            packet->shader == NativePrimitiveShaderInputs{2, true, 0},
             "queued packet survives object scope, source and model/instance retirement");
     Require(models.Publish(100, {Mesh(20, 42)}), "same source key may be reused");
     Require(packet->material->asset.properties.shininess != 42, "replacement model cannot repoint packet");

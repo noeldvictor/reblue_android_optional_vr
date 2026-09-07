@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after owned fog publication and field run926. The first
+Updated 2026-09-07 after owned primitive shader inputs and field run927. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -76,7 +76,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    scoring, snapshot/animation updates and shader staging remain adapters. Both
    fog layers now come from a checked host publisher, preserving inactive state
    and signed endpoints; late/nested updates invalidate old active scopes.
-   Exact material-family and remaining pass inputs are next, before direct submission.
+   Primitive texture-layer count, declaration vertex-color enable and declaration
+   bone count are now load-owned and retained in that same packet. Ordinary
+   scene replay consumes the first two with matching field comparisons. The
+   selected object's exact shader pair/UV formula are identified; remaining
+   lighting switches, samplers and pass inputs precede direct submission.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -146,9 +150,12 @@ diffuse comes from the live object color. Its skin command is unspecified and
 its canonical vertex schema now has all four required native inputs. Its17,572 B
 v2 file is persisted and independently inspected;162 vertices/158 triangles.
 Upload/load retains `rigid_vertex_input`, independent of translated locations.
-UV0 values16383..16895 still require the actual material-family conversion; the
-related cached CS-normal shader uses `(uv+1)/512+offset`, not yet proven as this
-object's exact live variant. Run922 observes its owned packet: material mask3,
+Run927 identifies its exact live pair: VS`B5C88BB6295138CC`, PS`FB83DD3F5E67CEB7`.
+The matching VS dump is `bd_mirror_vs_norm.hlsl` (deduplicated with
+`bd_normal_vs_norm`), not the related CS variant. Its UV formula is
+`(uv+1)/512+offset`: UV0 values16383..16895 map to32..33 before the live offset,
+so do not subtract32 from the asset. The packet owns one texture layer, enabled
+vertex color and zero declaration bones. Run922 observes its owned packet: material mask3,
 image mask0001, known UV offsets `(0,0,0,0)`, diffuse `(1,1,1,1)`, known direct
 non-deferred/non-alpha participation. These are that object's live values, not
 defaults to freeze into its asset or proof of exact shader eligibility. Run924
@@ -156,9 +163,20 @@ also observes its owned light kinds `(directional, disabled, disabled)` after
 the per-node callback. Run923's object-wide-only snapshot missed these updates;
 the consumer gate failed instead of accepting startup publisher checks.
 Reuse this selected asset, not a library-wide recook. Connect its owned packet,
-connect remaining pass inputs, resolve material-family interpretation and
+connect remaining lighting/sampler/pass inputs and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
+
+[Primitive shader evidence](../research/20260907_0535_owned-primitive-shader-inputs.md):
+material25/CPU23,257 Python checks and host85 pass. Run927 adds1,332 matching
+ordinary-pair comparisons and42,166 owned-input draws in fresh field windows,
+with existing light/fog/movement gates passing. Actual pixels remain coherent
+with known cliff marks/blur. This removes captured texture-enable/vertex-color
+values as the source for these supported draws, not template/interpreter use.
+Remaining diffuse/specular/normal-map/reflection/shadow switches must come from
+their object/pass/control producers; the two observed target PS words are not
+permission to freeze pass flags. The native UV packer can now use the exact
+family formula. No full direct object, reload, both-eye or speedup claim.
 
 [Fog evidence](../research/20260907_0510_owned-fog.md): material24/CPU22,
 254 source/scenario checks and host84 pass. Run926 adds2,400 matching fog

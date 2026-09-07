@@ -117,7 +117,7 @@ void LoadModelGeometry(ModelMaterialImport &mesh) {
     return value ? std::optional(uint32_t(*value)) : std::nullopt;
   };
   for (size_t i = 0; i < program.ranges.size(); ++i) {
-    const auto &range = program.ranges[i];
+    auto &range = program.ranges[i];
     const auto source = ReadModelGeometrySource(mesh.source_mesh, range, word);
     if (!source) {
       ++geometry_unconverted;
@@ -125,6 +125,7 @@ void LoadModelGeometry(ModelMaterialImport &mesh) {
     }
     auto &binding = mesh.source_bindings[i];
     binding = source->binding;
+    ReadModelVertexShaderInputs(source->declaration_slot, range.shader, word);
     const auto declaration = word(uint64_t(source->declaration_slot) + 12);
     ResourceType type;
     const auto *decl = declaration && HostResourceHeap::GetType(*declaration, &type) &&
@@ -297,6 +298,10 @@ void NoteNativeModelNodeCandidate(const NativeInstancePose &pose, uint32_t index
         packet->fog ? (*packet->fog)[1].disabled : true,
         packet->fog ? (*packet->fog)[0].start : 0, packet->fog ? (*packet->fog)[0].end : 0,
         packet->fog ? (*packet->fog)[1].start : 0, packet->fog ? (*packet->fog)[1].end : 0);
+    BD_INFO("[native-rigid-shader-inputs] geometry {:016X} layers {} vertex colour known {} enabled {} declaration bones known {} count {}; remaining material/pass eligibility pending",
+        packet->geometry->id, packet->shader.texture_layers, packet->shader.vertex_colour.has_value(),
+        packet->shader.vertex_colour.value_or(false), packet->shader.vertex_bones.has_value(),
+        packet->shader.vertex_bones.value_or(0));
   }
 }
 

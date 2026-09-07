@@ -48,9 +48,21 @@ struct NativeReflectionRecipe {
   bool operator==(const NativeReflectionRecipe &) const = default;
 };
 
+// Ordinary scene-family inputs, not captured shader bools. Texture layers are
+// initialized to one by the scene interpreter, then selected by material commands.
+// Declaration-dependent values stay unknown until the load adapter resolves them;
+// a COLOR attribute or an omitted bone command does not establish either value.
+struct NativePrimitiveShaderInputs {
+  uint8_t texture_layers = 1;
+  std::optional<bool> vertex_colour;
+  std::optional<uint8_t> vertex_bones;
+  bool operator==(const NativePrimitiveShaderInputs &) const = default;
+};
+
 struct NativeMaterialRange {
   NativeMaterialProperties material;
   NativeReflectionRecipe reflection;
+  NativePrimitiveShaderInputs shader;
   // Unknown until a bone-index command; an explicit empty binding is unskinned.
   std::optional<NativeSkinBinding> skin;
   uint32_t index_count = 0;

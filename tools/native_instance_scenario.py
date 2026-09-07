@@ -389,6 +389,29 @@ def verify_fog(text):
                     (b[i] - a[i] for i in (0, 1, 2, 3, 4, 6, 7, 8, 9))))
 
 
+def verify_primitive_shader(text):
+    """Fresh comparisons and actual consumption of owned primitive shader inputs."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("primitive shader diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-primitive-shader\] (\d+) checks wrong (\d+); (\d+) owned-input draws;")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-primitive-shader-mismatch]" in line:
+            raise ValueError("native primitive shader mismatch")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[1]:
+                raise ValueError("owned primitive shader input differs from live draw")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] - a[0] < 32 or b[2] - a[2] < 32:
+        raise Pending("need fresh primitive shader comparisons and owned-input draws")
+    return dict(checks_delta=b[0] - a[0], draws_delta=b[2] - a[2])
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -438,6 +461,7 @@ def main():
     parser.add_argument("--object-inputs", action="store_true")
     parser.add_argument("--selected-lights", action="store_true")
     parser.add_argument("--fog", action="store_true")
+    parser.add_argument("--primitive-shader", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -461,6 +485,7 @@ def main():
         objects = verify_object_inputs(text) if args.object_inputs else None
         lights = verify_selected_lights(text) if args.selected_lights else None
         fog = verify_fog(text) if args.fog else None
+        primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -494,6 +519,8 @@ def main():
         print("PASS: post-event owned selected lights " + ", ".join(f"{k}={v}" for k, v in lights.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
+    if primitive_shader is not None:
+        print("PASS: post-event owned primitive shader " + ", ".join(f"{k}={v}" for k, v in primitive_shader.items()))
     return 0
 
 

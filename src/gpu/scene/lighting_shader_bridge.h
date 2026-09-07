@@ -6,9 +6,19 @@
  */
 #pragma once
 #include "gpu/scene/native_lighting.h"
+#include "gpu/scene/native_material_data.h"
 #include <bit>
 
 namespace bd::gpu::scene {
+struct PrimitiveShaderBits { uint32_t vertex, pixel; };
+inline std::optional<PrimitiveShaderBits> PackPrimitiveShaderBits(const NativePrimitiveShaderInputs &inputs) {
+  if (inputs.texture_layers > 3 || !inputs.vertex_colour) return {};
+  return PrimitiveShaderBits{*inputs.vertex_colour ? 16u : 0u, (1u << inputs.texture_layers) - 1};
+}
+inline void ApplyPrimitiveShaderBits(const PrimitiveShaderBits &bits, uint32_t &vertex, uint32_t &pixel) {
+  vertex = (vertex & ~16u) | bits.vertex;
+  pixel = (pixel & ~7u) | bits.pixel;
+}
 using LightingStagingImage = std::array<uint32_t, 103>;
 inline LightingStagingImage PackLightingStaging(const NativeLightingPass &pass) {
   LightingStagingImage result{};

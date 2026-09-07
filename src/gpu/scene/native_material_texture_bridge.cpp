@@ -70,6 +70,7 @@ struct PolicyStats {
 thread_local PolicyStats policy_stats;
 struct ObjectStats { uint64_t publications = 0, reads = 0, missing = 0, checked = 0, wrong = 0, packets = 0; };
 thread_local ObjectStats object_stats;
+thread_local uint64_t shader_checked = 0, shader_wrong = 0, shader_draws = 0;
 std::optional<uint32_t> Word(uint64_t address) {
   if (!address || (address & 3) || address > UINT32_MAX - 3) return {};
   const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -318,6 +319,24 @@ std::optional<NativePrimitivePolicy> FindNativePrimitivePolicy(
   ++(found ? policy_stats.reads : policy_stats.missing);
   return found;
 }
+std::optional<NativePrimitiveShaderInputs> FindNativePrimitiveShaderInputs(
+    const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count) {
+  const auto *mesh = PrepareReplayMaterialMesh(tag);
+  if (!mesh) return {};
+  std::optional<NativePrimitiveShaderInputs> found;
+  for (size_t i = 0; i < mesh->program->ranges.size(); ++i) {
+    const auto &range = mesh->program->ranges[i];
+    if (!ModelPrimitiveMatches(range, mesh->owner->source_bindings[i], index, vertex, first, count)) continue;
+    if (found && *found != range.shader) return {};
+    found = range.shader;
+  }
+  return found;
+}
+void NativePrimitiveShaderCheck(bool same) {
+  ++shader_checked;
+  if (!same && ++shader_wrong <= 4) BD_WARN("[native-primitive-shader-mismatch] texture layers/vertex colour");
+}
+void NativePrimitiveShaderNoteDraw() { ++shader_draws; }
 std::optional<NativePrimitivePlan> FindNativePrimitivePlan(const NodeTag &tag) {
   if (!REXCVAR_GET(bd_native_primitive_policies)) return {};
   const auto *mesh = PrepareReplayMaterialMesh(tag);
@@ -338,6 +357,8 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  BD_INFO("[native-primitive-shader] {} checks wrong {}; {} owned-input draws; remaining material/pass inputs and direct submission pending",
+      shader_checked, shader_wrong, shader_draws);
   NativeFogReport();
   NativeSelectedLightsReport();
   BD_INFO("[native-object-inputs] {} publications {} owned colour reads {} unavailable; {} checks wrong {}; {} owned primitive packets; no direct draw claimed",

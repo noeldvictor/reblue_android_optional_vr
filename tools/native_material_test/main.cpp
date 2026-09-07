@@ -45,6 +45,18 @@ static int RunTests(int argc, char **argv) {
     return 1;
   std::vector<NativeMaterialRange> ranges;
   Check(DecodeMeshMaterials(words, ranges));
+  Check(ranges[0].shader.texture_layers == 0 && ranges[1].shader.texture_layers == 1);
+  {
+    for (uint16_t mode = 0; mode <= 255; ++mode) {
+      const uint16_t layers[]{0x1000, 1, 0, 0x0102, 0x1000, 1, 3,
+          uint16_t(0x0100 | mode), 0x1000, 1, 6, 0xff};
+      std::vector<NativeMaterialRange> decoded;
+      Check(DecodeMeshMaterials(layers, decoded) && decoded.size() == 3);
+      Check(decoded[0].shader.texture_layers == 1 && decoded[1].shader.texture_layers == 2 &&
+            decoded[2].shader.texture_layers == (mode <= 3 ? mode : 2));
+      Check(!decoded[2].shader.vertex_colour && !decoded[2].shader.vertex_bones);
+    }
+  }
   Check(ranges.size() == 2);
   Check(ranges[0].index_count == 10 && ranges[0].first_index == 4);
   Check(ranges[0].vertex_record == 7 && ranges[0].index_record == 2);

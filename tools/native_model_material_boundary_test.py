@@ -42,6 +42,16 @@ class ModelMaterialBoundaryTest(unittest.TestCase):
         self.assertIn("ReadModelGeometrySource", loader)
         self.assertNotIn("PrecacheEnabled", loader)
 
+    def test_shader_inputs_are_load_owned_and_replay_only_packs_them(self):
+        loader = self.bridge.split("void LoadModelGeometry", 1)[1].split("bool PublishModelMaterials", 1)[0]
+        self.assertIn("ReadModelVertexShaderInputs(source->declaration_slot, range.shader, word)", loader)
+        self.assertIn("FindNativePrimitiveShaderInputs(tag", self.draw)
+        self.assertIn("NativePrimitiveShaderCheck(same)", self.draw)
+        self.assertIn("ApplyPrimitiveShaderBits(*bits, bools[0], bools[4])", self.draw)
+        self.assertNotIn("ReadModelVertexShaderInputs", self.draw)
+        self.assertIn("vs_hash == 0xB5C88BB6295138CCull", self.draw)
+        self.assertIn("ps_hash == 0xFB83DD3F5E67CEB7ull", self.draw)
+
     def test_consumers_do_not_read_buffer_association_tables(self):
         consumers = self.bridge.split("bool ModelOwnsReflectionBinding", 1)[1]
         for forbidden in ("tag.mesh_va +", "range.index_record *", "range.vertex_record *"):

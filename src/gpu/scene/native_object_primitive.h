@@ -18,6 +18,7 @@ template <class Image> struct NativeObjectPrimitive {
   RenderMatrix world{};
   std::shared_ptr<const NativeGeometry> geometry;
   NativeMaterialHandle material;
+  NativePrimitiveShaderInputs shader;
   MaterialTextureValues<Image> textures;
   NativePrimitivePolicy policy;
   std::optional<NativeSelectedLights> lights;
@@ -43,6 +44,7 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
   result.pose = std::move(pose); result.node = node; result.primitive = primitive;
   result.world = result.pose->transforms[node];
   result.geometry = program->geometries[primitive]; result.material = program->materials[primitive];
+  result.shader = program->ranges[primitive].shader;
   result.textures = textures; result.policy = policy;
   result.lights = std::move(lights);
   result.fog = std::move(fog);

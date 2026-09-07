@@ -80,6 +80,7 @@
 #include "gpu/scene/native_texture_table_bridge.h"
 #include "gpu/scene/native_texture_table_source.h"
 #include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/lighting_shader_bridge.h"
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/native_texture_binding.h"
@@ -145,6 +146,7 @@ struct SubDraw {
   uint16_t native_texture_recipe_mask = 0;
   bool native_uv_recipe = false;
   bool native_primitive_policy = false;
+  std::optional<NativePrimitiveShaderInputs> native_shader_inputs;
   std::optional<NativeSkinBinding> skin;
   std::optional<bool> material_disables_shadow;
   std::optional<NativeReflectionRecipe> reflection;
@@ -836,6 +838,7 @@ bool MergeDraws(std::vector<SubDraw> &have, const std::vector<SubDraw> &now) {
     x.native_texture_recipe_mask = y.native_texture_recipe_mask;
     x.native_uv_recipe = y.native_uv_recipe;
     x.native_primitive_policy = y.native_primitive_policy;
+    x.native_shader_inputs = y.native_shader_inputs;
     x.material_disables_shadow = y.material_disables_shadow;
     // Keep each binding with its original inherited-state snapshot. Replacing
     // only the native half here can pair an old dynamic surface with a newly
@@ -1609,6 +1612,29 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
     d.bools_set[4 + i] = p.ps_bools_set[i] | (d.bools[4 + i] ^ p.ps_bools_before[i]);
   }
   d.scene_textures = p.scene_texture_recipe;
+  // Exact ordinary scene pair only. Named load-owned inputs also reach the
+  // direct object packet; this bool packing is the temporary replay ABI boundary.
+  const auto *vertex_shader = s.pipelineState.vertexShader;
+  const auto *pixel_shader = s.pipelineState.pixelShader;
+  const uint64_t vs_hash = vertex_shader && vertex_shader->shaderCacheEntry ? vertex_shader->shaderCacheEntry->hash : 0;
+  const uint64_t ps_hash = pixel_shader && pixel_shader->shaderCacheEntry ? pixel_shader->shaderCacheEntry->hash : 0;
+  if (d.indexed && vs_hash == 0xB5C88BB6295138CCull && ps_hash == 0xFB83DD3F5E67CEB7ull) {
+    if (const auto inputs = FindNativePrimitiveShaderInputs(tag, d.index_va, d.stream_va[0], d.start_index, d.count)) {
+      if (const auto bits = PackPrimitiveShaderBits(*inputs)) {
+        const bool same = (d.bools[0] & 16u) == bits->vertex && (d.bools[4] & 7u) == bits->pixel;
+        NativePrimitiveShaderCheck(same);
+        if (same) d.native_shader_inputs = inputs;
+        else p.replayable = false;
+      }
+    }
+  }
+  if (REXCVAR_GET(bd_native_materials_verify) && tag.tech == 0 && tag.render_view == 3 &&
+      tag.node_index == 64 && d.native_material && d.native_material->id == 0x63B8D67932573E51ull) {
+    static thread_local uint32_t samples = 0;
+    if (samples++ < 2)
+      BD_INFO("[native-rigid-shader-live] node {} material {:016X} VS {:016X} PS {:016X} VS bools {:08X} PS bools {:08X}; owned input match {}",
+          tag.node_index, d.native_material->id, vs_hash, ps_hash, d.bools[0], d.bools[4], d.native_shader_inputs.has_value());
+  }
   if (REXCVAR_GET(bd_native_materials_verify) && s.pipelineState.pixelShader &&
       s.pipelineState.pixelShader->shaderCacheEntry &&
       s.pipelineState.pixelShader->shaderCacheEntry->hash == 0xFB83DD3F5E67CEB7ull)
@@ -2906,6 +2932,12 @@ bool HostDrawReplay(const NodeTag &tag) {
       bools[i] = (rest_vs & ~d.bools_set[i]) | (d.bools[i] & d.bools_set[i]);
       bools[4 + i] = (rest_ps & ~d.bools_set[4 + i]) |
                      (d.bools[4 + i] & d.bools_set[4 + i]);
+    }
+    if (d.native_shader_inputs) {
+      const auto bits = PackPrimitiveShaderBits(*d.native_shader_inputs);
+      assert(bits); // only verified, fully known inputs enter a template
+      ApplyPrimitiveShaderBits(*bits, bools[0], bools[4]);
+      NativePrimitiveShaderNoteDraw();
     }
     if (has_foliage) {
       std::memcpy(t_vs_block + 57 * 16, foliage.v, sizeof(foliage.v));

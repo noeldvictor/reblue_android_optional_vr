@@ -2324,3 +2324,48 @@ verification by purpose at the next checkpoint. Other objects/metadata/source/Gi
 deltas unknown. Ending free58.85 GiB; drive-wide use+43,388,928 B (41.38 MiB)
 from this continuation's first measurement, not all attributable to task files.
 Original exception/floor/raw0 gate unchanged; no new storage allowance.
+
+### Primitive shader-input continuation, 2026-09-07
+
+Parent04490b1 verified/pushed. First measured free62,890,655,744 B; pre-build
+05:29:41 free62,857,560,064 B. No active renderer/build. Scoped inventories of
+material fixture, verification, native caches and shader dumps show no writes
+since05:14; exe/PDB/run926/image sizes and times match the preceding checkpoint.
+Build logs179,494 B, window images10,233,543 B, material tree7,659,974 B.
+Drive-wide decrease since prior push is not attributed to these unchanged
+outputs; other-process/source/Git effects remain unknown. Existing original
+3 GiB exception and62,509,998,080 B operational floor remain, not a new budget.
+
+Plan: reuse material tree (material25/CPU23) and host tree (host85), no guest
+or shader regeneration expected. Estimate <=192 MiB transient additional build
+space, enforce existing floor and256 MiB free-drop/log10 MiB stops. One <=75 s
+field run afterward, <=400 KiB text and <=160 KiB replacement JPEG (overlap fits
+10 MiB image cap); raw/perf/dumps/cook/cache persistence off,192 MiB runtime stop.
+Keep926/image until replacement comparisons and actual pixels qualify, then
+retire equivalent previous agent-created logs/image. No new tools or build tree.
+
+Material25/PID28736 and CPU23/PID16220 pass (behavior0.10 s/CTest0.11 s).
+Host85/PID25316 passes, only host objects/link; codegen up-to-date, no shader
+regeneration. Build-end free62,855,606,272 B. All257 Python checks pass. Run927/
+PID31504 terminal05:33:02, all15 temporary settings audited and exact profile
+restored. Fresh post-event frames2015/2315 add1,332 matching shader-input checks
+and42,166 owned-input draws; all prior field/light/fog/movement gates pass.
+No raw/cache/perf/dump/cook outputs. Retain231,185 B text and135,419 B JPEG;
+actual pixels inspected, known cliff marks/blur remain. Binary/evidence hashes
+and source contract in20260907_0535_owned-primitive-shader-inputs.md.
+
+After replacement qualification, removed8 exact superseded agent outputs:
+material24/CPU22/host84 stdout/stderr, run926 text and native_fog_window.jpg.
+358,685 logical B removed; immediate free62,806,982,656 ->62,807,351,296 B:
+**368,640 B (360 KiB) actually reclaimed**, credited once. Build logs can be
+regenerated; exact retired runtime text/image no longer retained. Keep current
+material25/CPU23/host85 logs,927/image, selected cooked asset, and all distinct
+protected GPU/baseline/motion/failure/raw evidence. No active owned producer.
+
+Post-cleanup material tree7,683,155 B, build logs182,749 B, images10,241,819 B.
+Known retained growth91,068 B: material+23,181, logs+3,255, image+8,276, field
+text+3,108, exe+8,192/PDB+45,056. Code/fixture growth covers load-owned shader
+inputs; replace equivalent verification by purpose at the next checkpoint.
+Other objects/source/metadata/Git deltas unknown. Ending free58.49 GiB;
+drive-wide use+83,304,448 B (79.45 MiB) since this continuation's first measure,
+not all attributable to task files. Original cumulative limits remain unchanged.

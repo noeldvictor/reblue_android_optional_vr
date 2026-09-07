@@ -1,7 +1,7 @@
 import unittest
 import re
 from native_instance_scenario import verify_model_nodes, verify_object_inputs, verify_selected_lights
-from native_instance_scenario import verify_fog
+from native_instance_scenario import verify_fog, verify_primitive_shader
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -573,6 +573,29 @@ class SelectedLightScenarioTest(unittest.TestCase):
                     text.replace("draw checks wrong 0", "draw checks wrong 1", 1), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_selected_lights(bad)
+
+
+class PrimitiveShaderScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-primitive-shader] 100 checks wrong 0; 100 owned-input draws;"
+        rows[4] = "[native-primitive-shader] 150 checks wrong 0; 160 owned-input draws;"
+        return rows
+
+    def test_fresh_comparisons_and_consumption(self):
+        self.assertEqual(verify_primitive_shader("\n".join(self.rows())), dict(checks_delta=50, draws_delta=60))
+
+    def test_stale_reset_scene_and_mismatch(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150", "100"), text.replace("160", "100"),
+                    text.replace("150", "1"), text.replace("bg41_01", "bg42_01"),
+                    "\n".join(self.rows()[1:]), text + "\n[native-material-context] mode Loading"):
+            with self.assertRaises(Pending):
+                verify_primitive_shader(bad)
+        for bad in (text.replace("wrong 0", "wrong 1", 1), "[native-primitive-shader-mismatch]\n" + text,
+                    "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_primitive_shader(bad)
 
 
 class FogScenarioTest(unittest.TestCase):
