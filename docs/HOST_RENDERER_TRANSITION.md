@@ -30,7 +30,8 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after the first direct rigid caster and field run935.
+Updated 2026-09-07 after the rigid array-view fix (19c9da6); the last
+live-game-qualified executable remains host93/field run935.
 The dependency map below owns the detail; keep this queue outcome-oriented.
 
 1. **Finish one direct native static object, then expand material families.**
@@ -50,8 +51,9 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
      The direct caster consumes pass-local, frame/view-fresh camera matrices,
      owned model geometry and the immutable pose. Receiver values remain open:
      publish them at their real producer/consumer timing, not captured registers
-     or an early colour snapshot. Match the uploader's actual 2D-array views to
-     the native scene shader's texture contract in the focused GPU fixture.
+     or an early colour snapshot. The uploader's actual 2D-array views now match
+     the native scene shader in the focused GPU fixture (19c9da6); bind those
+     retained explicit views, not a texture's default plain-2D view.
      Own the correctly
      timed per-node light producer currently reached through the shader callback.
      Selection/scoring now have a host implementation and source-to-pass fixture;
@@ -120,6 +122,32 @@ rules currently have CPU coverage only, and volume-dependent dual participation
 is explicitly unconverted. These are expansion work, not permission to silently
 drop participants from the initial acceptance scene.
 
+### Next three implementation checkpoints
+
+These are dependency gates, not three parallel workstreams or a new percentage
+complete. Keep checkpoint1 in focus until its live consumer works. The array-view
+fix is a verified prerequisite; it does not satisfy that checkpoint by itself.
+
+| Checkpoint | Existing implementation to extend | Exit evidence |
+| --- | --- | --- |
+| 1. Direct rigid scene and receiver | `native_shadow_pass_bridge.cpp` / `native_scene_result_bridge.h` for completed shadow ownership and fresh receiver inputs; `native_selected_lights_bridge.cpp` for native per-node preparation; `native_material_texture_bridge.cpp` / `native_rigid_draw.cpp` / `host_walk.cpp` for retained packets and routing | Whole-node preflight before side effects; source-free packet consumption in fixtures; positive native scene GPU draw emissions after field readiness, not only queued submissions; selected-node interpreter/capture/replay absent after admission; actual scene and shadow pixels inspected. Unsupported selected inputs fail visibly. |
+| 2. Native batching and lifecycle acceptance | Existing queue/culling/instancing/indirect backend, native model/instance owners and `native_instance_scenario.py`; extend the existing runner rather than creating another harness | Selected-family legacy rendering disabled before its first draw; cold load, movement, teardown and reload with fresh generations and no retained templates/warm-up. Batches preserve per-object transforms/materials and fence lifetimes. Both scene and shadow consumers must be exercised. |
+| 3. Expand rigid material families | Existing policy/material/shader programs, native image/sampler owners and the accepted direct route | Alpha-test, wind and translucent families added as complete producer-to-consumer paths, with authored changes, sibling/deferred participation and matching lifecycle/pixel checks. Delete temporary adapters at last use; no library-wide recook unless a measured format requirement needs it. |
+
+Use cheap boundary fixtures to resolve view types, coordinate units and late
+publication before a runtime retry. A changed shared header can rebuild many
+host dependents (host93 scheduled104 steps); keep private changes local where
+possible. Do not rebuild the guest, create another build tree or boot the game
+to validate a shader that still has no live scene consumer. Once routing changes,
+the host build and targeted game/pixel gate are required. Commit/push verified
+connections regularly; distinguish prerequisites from accepted runtime paths.
+
+The latest array-view fixture (GPU build25/rigid04) passes four two-eye cases
+in1.16 s with zero validation errors/warnings and no image files. It reuses the
+production program factory and explicit descriptors; it does not qualify the
+full asset uploader or live scene route.
+[Evidence](../research/20260907_0906_rigid-array-view-contract.md).
+
 ### Direct rigid-object dependency map
 
 Source audit at `11f5d94`, updated for owned object/light/fog inputs (2026-09-07).
@@ -130,7 +158,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | Packet assembly and shared material preparation now select owned programs, with no `NodeTag`/source lookup. Packets retain resources after scope retirement; ordinary color composition is a live consumer. Feed these packets into direct submission. Only `PrepareReplayMaterialMesh` keeps the bounded source alias index; remove it when replay's last consumer migrates. Source-to-object publication itself still needs replacement. |
-| Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | The caster consumes fresh pass camera/world matrices; native shadow images have copy-free publication. Receiver projection/colour timing and the production array-view texture contract remain for scene submission. Host selection/scoring and publishers produce three semantic light records; scoped lights/fog feed retained packets. The light caller's shader-callback timing, authored snapshot/storage updates, fog initialization/updates and compatibility staging/flush remain. Do not import registers per draw as the finished producer. |
+| Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | The caster consumes fresh pass camera/world matrices; native shadow images have copy-free publication. Production-style array views and D32/S8 shadow sampling pass the GPU fixture; receiver projection/colour timing remains. Host selection/scoring and publishers produce three semantic light records; scoped lights/fog feed retained packets. The light caller's shader-callback timing, authored snapshot/storage updates, fog initialization/updates and compatibility staging/flush remain. Do not import registers per draw as the finished producer. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Actual native shaders now work in the Vulkan fixture, using the production factory/description/binding cores. Connect the game object producer and shared cache selection; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Opt-in selected rigid casting bypasses `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission feeds the native shader, queue and pipeline cache; descriptors/geometry retire at the matching fence. Scene/receiver routing and native instance batching remain, as do source object/pass publication and unsupported families. Cold-load/reload acceptance is not yet complete. |
 

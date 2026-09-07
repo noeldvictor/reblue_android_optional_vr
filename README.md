@@ -53,185 +53,101 @@ not replace the host-renderer goal.
 
 ## Current state
 
-**The full host-renderer transition is not complete.** Gameplay stays statically
-recompiled; the local generated executable contains 18,777 function bodies, not
-the original high-level source project. There is no defensible conversion
-percentage based on function or host-draw counts.
+**This is not yet a fully host-owned renderer.** We have the statically
+translated game executable (18,777 function bodies in the local census), not
+the original high-level source project. That source lets us trace exact behavior
+and replace complete rendering paths; it does not make ownership automatic.
 
-Latest desktop checkpoint (2026-09-07): **a real field object's shadow now uses
-the native rigid shader**, through the existing queue and pipeline cache. The
-opt-in `bd_native_rigid_shadow` acceptance mode bypasses that selected caster's
-interpreter, template capture and replay; a recognized but unsupported node
-fails visibly. Run935 verifies 300 fresh submissions and fence retirements,
-alongside the existing field/movement and native shadow-image gates. Camera
-matrices are owned by the active pass and checked for frame/view freshness.
-The CPU fixture, 275 source/scenario checks, host93 and four tiny two-eye Vulkan
-pixel cases pass. The inspected field image retains coherent shadows and known
-cliff marks/blur. No new raw captures or cooked assets; 14 superseded small
-verification files were removed. This path is not enabled in the normal profile.
+Latest **live-game** checkpoint: `ce56e24` (2026-09-07) draws one real rigid
+field object's shadow with native shaders and pass-owned camera matrices.
+The opt-in acceptance path bypasses that caster's interpreter, capture and
+replay. Run935 observes fresh submissions and fence retirements; its inspected
+field image retains coherent shadows and known cliff marks/distant blur.
+The switch is off in the normal profile.
+[Direct-caster evidence](research/20260907_0846_direct-rigid-shadow.md).
 
-Next: connect the packet for the already-persisted 162-vertex rigid field asset to
-remaining live pass inputs and direct **scene/receiver** submission, then prove
-interpreter/template-free cold-load and reload. Its exact shader pair and UV
-formula are now identified; one layer, enabled vertex color and zero declaration
-bones are confirmed. The packet now retains lighting pass values, composed
-material features and ordinary 2D sampler recipes. The shadow image now has a
-native owner and the caster consumes fresh camera/projection values. Shadow
-receiver values and the production uploader's array-view texture contract still
-need to feed complete native scene routing. Host light selection is
-available, but its caller still sits inside the old shader callback; direct
-submission must invoke the producer before that path. Observed flags must not
-become frozen defaults.
-**No live game scene draw uses the new native rigid scene shader yet.** The
-caster still receives source-published pose/pass inputs; native batching,
-source-free cold-load/reload, full-game/both-eye qualification and any speedup
-remain unproven. [Evidence and next integration](research/20260907_0846_direct-rigid-shadow.md).
+Latest **GPU-fixture** checkpoint: `19c9da6` fixes the native scene shader's
+texture-view mismatch. Both albedo and mono shadow now use the uploader's actual
+2D-array view contract; the fixture uses D32/S8 shadow depth. Four 8x8 two-eye
+pixel cases pass in 1.16 seconds with zero Vulkan validation errors/warnings.
+All 276 Python boundary/scenario checks pass. No game launch or new captures
+were needed; the last field-qualified executable remains host93/run935.
+[Array-view evidence](research/20260907_0906_rigid-array-view-contract.md).
 
-The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
-color/depth cases on an RTX 3060, with zero validation errors/warnings and no
-translated shader/register inputs. That focused GPU check takes 1.21 seconds
-without writing captures. [Shader evidence](research/20260907_0245_native-rigid-shaders.md).
+**No live game scene draw uses the native rigid scene shader yet.** The next
+connection is the same already-cooked 162-vertex object: correctly timed
+receiver values and per-node lights, then direct scene submission. Native
+batching and interpreter/template-free cold-load/reload acceptance follow.
+Passing individual components is not this end-to-end result.
 
-Canonical geometry owns named values and immutable vertex inputs independently
-of the imported declaration. Unsupported layouts still use transitional packed
-data. **Source-free GPU loading was not exercised; shader-register ABI, source
-lookup and retained draw templates remain. This is not direct static drawing,
-complete sequence/both-eye qualification or a measured speedup.** Float4 storage
-is an initial checked representation, not the final compact headset format.
-[Format and remaining work](docs/NATIVE_MESH_FORMAT.md).
-
-The desktop test loop now starts walking after verified field readiness instead
-of waiting a fixed 150 seconds. A roughly 61-second run observes actual player
-displacement, fresh native-component checks and three inspected motion images;
-walking starts on observed readiness, not a guaranteed boot time. This improves short
-field coverage, not renderer ownership. Reloads, longer sequences, cliff-edge
-artifacts, distant blur and both-eye qualification remain open.
-[Test-loop evidence](research/20260906_2120_readiness-driven-autoplay.md).
-
-The preceding texture-table checkpoint publishes native image
-leases after completed synchronous/asynchronous loading, with atomic image/table
-publication and generation-safe replacement/retirement. The field has 5,736
-tables /2.07 MiB. Comparison adds 22,326 matching lookups and 22,006 matching image
-checks; the latest field check adds 20,912 normal lookups with zero original
-comparison or fallback calls. Ordinary material draws now consume native leases
-and live object overrides as described above. Source publication/selection ABI,
-special override families and remaining resource consumers are still adapters; the direct native
-reflection consumer was not exercised. **Broader movement/reload sequences, both eyes and
-full-game qualification remain open.**
-[Texture-table implementation and evidence](research/20260906_1955_native-texture-tables.md).
-
-Native instance IDs and immutable render poses feed host traversal/replay after
-the final handoff, including late edits. The pulling-enabled field check adds 118,987
-matching pose reads with no misses/refusals. Original pose calculation/copy,
-secondary palettes, source lookup and retained draw templates remain.
-[Instance implementation and evidence](research/20260906_1850_native-instance-render-poses.md).
-
-The preceding load-owned geometry path supplies 2,973 primitive geometries and
-their material associations. Its earlier field check added 51,785 native-handle
-draws and 2,700 matching geometry checks. Canonical rigid layouts are now exercised
-above; complete native object/texture/pass records, source-free GPU loading and
-direct scene/shadow submission remain next.
-[Geometry implementation](research/20260906_1743_load-owned-model-geometry.md).
-The [corrected loader/field observations](research/20260906_1638_field-state-observations.md)
-remain the scenario gate; water activity alone is not a field identifier.
-
-The prior [Toon checkpoint](research/20260906_1505_native-toon-materials.md)
-retains a normal flat standing-scene image and desktop XR parameter comparisons.
-Its water/camera activity markers do not independently prove interactive-field
-execution; full-game and both-eye pixel qualification remain open.
-
-Native mesh persistence now has independent 256 MiB /16,384-file limits, a
-20 GiB free-space reserve and a non-waiting writer lease. All 3,510 existing
-mesh files load unchanged in a source-free, read-only check; host/storage tests
-pass. This closes the disk-growth prerequisite for load-time geometry work,
-not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-storage.md).
-
-| Area | Implemented foundation | Ownership still required |
+| Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
-| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
-| Scene submission | Host traversal/replay, native instance identities/render poses retaining load-owned node/primitive associations and bounds, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production and direct consumers; replace source-tree discovery, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, owned object color/image/UV/light/fog packets, GPU-tested native rigid shaders with explicit bindings, lighting/state producers, pass binders, water and Toon callbacks | Connect live native rigid consumers and remaining pass inputs; volume/deferred and remaining override families; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
-| Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
-| Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
-| Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |
-| Desktop VR | Layered multiview presentation, native eye extents and headless OpenXR test runtime | Complete host frame, broader both-eye/animated-effect qualification and remaining modern-GPU/VR requirements |
-| Quest 2 | Earlier ARM64/APK and OpenXR/controller foundations | Full desktop gate first; then fresh device qualification, foveation and optimization |
+| Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
+| Scene and materials | Owned instance/primitive packets, native rigid shaders, first direct caster, culling/instancing/indirect infrastructure | Direct scene inputs and routing, native batching, lifetime/reload proof, remaining material families |
+| Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
+| Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
+| Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |
+| Desktop VR | Layered multiview presentation and headless OpenXR runtime | Complete host frame and representative both-eye/animated-effect qualification |
+| Quest 2 | Earlier APK/OpenXR/controller foundations | Desktop acceptance first, then device qualification, foveation and optimization |
 
-Existing native scene/post integration is published with Plume `3094b35`.
-Normal supported paths own source/resolve images and their fence-retained
-lifetimes without inferred EDRAM sources or seed copies. Unconverted scopes
-and consumers still prevent claiming removal of all console rendering machinery.
+Plume integration is at `3094b35`. Remaining source lookups, register/resource
+adapters, retained templates and compatibility scopes prevent claiming removal
+of all Xbox 360 rendering machinery. Historical checkpoint detail belongs in
+the [transition document](docs/HOST_RENDERER_TRANSITION.md) and linked research,
+not a second chronological worklog here.
 
-### Next ownership milestones
+### How we finish faster
 
-The dependency-ordered queue is maintained in
-[Host renderer transition](docs/HOST_RENDERER_TRANSITION.md#active-work-queue).
-Work is organized around complete producer-to-consumer paths, not isolated
-callback counts:
+Finish **one complete static object** using the owners and backend already
+built, prove it from cold load through teardown/reload with its old rendering
+path disabled, then expand material families. Characters follow; effects, UI
+and remaining passes follow them. Delete compatibility code as its last
+consumer migrates, and complete the full desktop gate before Quest work.
 
-The [static-model dependency map](research/20260906_1531_static-model-ownership-frontier.md)
-identifies the existing load-time integration points and remaining template/data
-dependencies. The source-index tool now exposes indirect and hook boundaries;
-this tooling checkpoint does not itself convert additional rendering.
+The [active queue](docs/HOST_RENDERER_TRANSITION.md#active-work-queue) owns the
+dependency order, concrete files and acceptance gates. Do not start another
+renderer framework, bulk recook or unrelated adapter campaign. Use translated
+source to recover behavior, not to reproduce every console helper one-for-one.
 
-1. Complete one real native static-object path from cooked geometry/materials
-   and instance updates through direct scene/shadow submission. The first opt-in
-   caster now reaches the backend; finish scene/receiver inputs and native batching. Establish
-   live producers for the GPU-tested native shader/texture/pass contracts; remove its
-   guest-renderer warm-up, source lookup and captured templates. Verify movement
-   and reload behavior, then expand material families.
-2. Complete character asset, pose, joint-palette and GPU skinning ownership.
-3. Finish dynamic geometry, effects, UI and remaining reflection/pass producers.
-4. Remove unused compatibility machinery and complete the representative desktop
-   gate before Quest 2 work.
+Use the smallest test that can falsify the change:
 
-Small, coherent, verified commits and pushes remain the default. Focused CPU
-fixtures and incremental builds form the inner loop; rendering changes still
-need appropriate GPU/pixel checks. Startup-only counters or an empty effect
-queue do not qualify an authored field/effect path.
+1. Trace the producer, owned data and actual consumer. Name the dependency being
+   removed before coding; preserve live values, ordering and lifetime.
+2. Exercise their real representations in existing CPU/GPU fixtures. A failed
+   runtime admission becomes a focused regression before another game boot.
+3. Build the host incrementally and run a bounded readiness-gated scene check
+   for a connected runtime change. Reserve broad sequences/reloads/both-eye
+   checks for the relevant integration gates; do not omit them.
+4. Commit and push each coherent verified checkpoint, replace superseded
+   evidence and report the remaining boundary.
 
-**Faster delivery focus:** select one ordinary opaque rigid field family and
-connect its owned inputs to the native shaders and direct scene/shadow consumer using the
-owners already built. Its acceptance test must cold-load and reload with its
-guest rendering interpreter and template capture disabled. Add another adapter
-only if it removes a named blocker for that path; defer broad recooking and
-material-family expansion until this end-to-end consumer works. The generated
-C++ is our exact behavior reference, not a reason to translate every console
-rendering helper one-for-one. This changes development order, not the full goal.
-
-Test each connection using the producer's real output shapes and lifetime rules
-before a game boot. Group the remaining pass-input work around direct submission,
-then spend the runtime check on that complete connection. A passing helper with
-zero eligible game consumers is unfinished work, not a conversion milestone.
-
-The capture-free inner loop is now one command:
+The capture-free source/scenario loop is:
 
 ```powershell
 python -B tools/host_checks.py
 ```
 
-It runs the rigid-path Python source/scenario checks, fails fast and creates no
-logs or caches. Use `--area material` (repeatable), `--list`, or
-`--all-boundaries` for broader source checks. C++ fixtures, incremental host
-builds and targeted GPU/pixel checks remain separate. The
-[active queue's concrete dependency map](docs/HOST_RENDERER_TRANSITION.md#direct-rigid-object-dependency-map)
-names the missing contracts; passing these tests is not a completed native draw.
+Use repeatable `--area material`, `--list`, or `--all-boundaries` as appropriate.
+These Python checks do not replace C++ fixtures or GPU pixels. The existing
+`native_rigid_pixels` CTest exercises the production shader programs without
+booting the game; build its `native_scene_snapshot_test` target only when its
+code or shaders change. See the [dev-loop guide](.claude/skills/devloop/SKILL.md)
+for the configured trees and storage-supervised build/run rules.
 
 ### Evidence limits and performance
 
-The full gate still includes fields, battles, cutscenes, menus, transitions,
-reloads, animated effects and both eyes. Earlier later-scene scenery/text
-failures remain unresolved evidence, not superseded by a standing-field smoke
-image. VR character shadows, distant blur, title artwork, per-eye optics and
-special-effect coverage also remain unqualified. Experimental native sun-camera
-fitting remains disabled by default.
+There is **no defensible overall conversion percentage or measured speedup**.
+Host-call counts and fewer imported words are not FPS gains. The recorded
+desktop field median of 16.667 ms (~60 FPS) was frame-limited; it does not
+establish the benefit of the conversion or predict Quest performance.
+[Measurements and limitations](research/20260906_1323_native-visual-schedule.md).
 
-The sorted-scheduler check reduced imported float words per native parameter
-block from about 13.00 to 0.757 (94% less import work), **not a 94% FPS gain**.
-Its desktop field median was 16.667 ms (~60 FPS), with 6.610 ms `other_ms` and
-5.677 ms GPU time. No controlled overall speedup or Quest performance result
-is established. [Measurements and limitations](research/20260906_1323_native-visual-schedule.md).
-The latest vertex-input checks are correctness evidence, not performance benchmarks.
+The desktop gate still includes fields, battles, cutscenes, menus, transitions,
+reloads, animated effects and both eyes. Later-scene scenery/text failures,
+cliff artifacts, distant blur, VR character shadows, title artwork, per-eye
+optics and special effects remain unresolved or unqualified. A single field
+image or tiny stereo fixture does not supersede those requirements.
+Experimental native sun-camera fitting remains disabled by default.
 
 ## Project documentation
 

@@ -161,6 +161,11 @@ interpreter mentioned in research is distinct from CPU emulation.
   related changes into coherent, verified commits; keep required GPU/pixel
   checks proportional to risk. Target the actual feature with scene/event
   readiness checks, not a fixed boot delay or an unexercised queue.
+  Keep one incomplete consumer path in focus: group its missing producers and
+  bindings around that consumer before expanding families. A prerequisite-only
+  checkpoint must name the concrete connection it enables and leave the runtime
+  acceptance pending. Avoid widening shared headers or rebuilding unrelated
+  targets for private implementation changes.
 - Test producer-to-consumer boundaries with the representations the production
   producer actually emits: view types, coordinate units, identities and lifetime
   stamps. Isolated helper tests and source-string guards cannot establish that
@@ -174,7 +179,10 @@ interpreter mentioned in research is distinct from CPU emulation.
   GPU/pixel acceptance. Keep runtime evidence tied to the actual tested binary.
 - Maintain one dependency-ordered active queue in the transition document;
   README summarizes it and research retains evidence. Do not duplicate a long
-  chronological worklog across active documents.
+  chronological worklog across active documents. Keep the next coherent
+  checkpoints explicit: implementation boundary, reused files and a falsifiable
+  exit test. Distinguish latest source/fixture verification from the last
+  live-game-tested binary; a docs or fixture-only commit does not restamp it.
 
 ## Verification rules
 
