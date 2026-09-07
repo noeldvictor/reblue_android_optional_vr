@@ -8,6 +8,7 @@
 #include "gpu/scene/native_object_primitive.h"
 #include "gpu/scene/native_texture_binding.h"
 #include "gpu/scene/native_shadow.h"
+#include "gpu/scene/native_scene_lights.h"
 #include "gpu/native_target_images.h"
 
 namespace bd::gpu::scene {
@@ -27,11 +28,13 @@ struct NativeRigidScenePlan {
   NativeRigidPassGPU pass;
   PrimitiveCull cull;
   bool draw;
+  std::optional<NativeSceneLightTicket> light_ticket;
 };
 // Transitional object producer: resolves source bindings before returning the
 // retained, address-free plan. It never interprets/captures/replays the node.
 std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject(
     const NativeInstancePose &pose, uint32_t node, const char *&refusal);
+bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans);
 // Share opaque participation rules with casting, then classify the scene shader
 // from authored recipes, before a missing pose/texture can choose legacy drawing.
 inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(

@@ -143,8 +143,9 @@ void Handoff(uint32_t container) {
 }
 } // namespace
 
-bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out, size_t &unavailable) {
-  out.clear(); unavailable = 0;
+bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out,
+    std::vector<NativeLightSourceBinding> &sources, size_t &unavailable) {
+  out.clear(); sources.clear(); unavailable = 0;
   if (!REXCVAR_GET(bd_native_instances)) return false;
   auto &store = Instances();
   std::lock_guard lock(store.mutex);
@@ -155,13 +156,19 @@ bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out, 
     }
     for (uint32_t node = 0; node < pose->transforms.size(); ++node) {
       if (!FindNativeInstanceNode(*pose, node)) continue;
-      const auto inputs = ReadNativeObjectLightInputs(visual, node, Word);
-      if (!inputs) { ++unavailable; continue; }
-      if (out.size() == NativeSceneLightingPublication::kMaxBindings) { out.clear(); return false; }
+      const auto source = ReadNativeObjectLightSource(visual, node, Word);
+      if (!source) { ++unavailable; continue; }
+      if (out.size() == NativeSceneLightingPublication::kMaxBindings) { out.clear(); sources.clear(); return false; }
       if (out.size() == out.capacity())
         out.reserve(std::min(NativeSceneLightingPublication::kMaxBindings,
             std::max(size_t(64), out.size()*2)));
-      out.push_back({binding.instance, binding.model_generation, node, *inputs});
+      out.push_back({binding.instance, binding.model_generation, node, source->inputs});
+      if (source->selection) {
+        if (sources.size() == sources.capacity())
+          sources.reserve(std::min(NativeSceneLightingPublication::kMaxBindings,
+              std::max(size_t(64), sources.size()*2)));
+        sources.push_back({source->selection,binding.instance,binding.model_generation,node});
+      }
     }
   }
   return true;

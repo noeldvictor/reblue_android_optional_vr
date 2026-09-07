@@ -16,6 +16,15 @@ struct NativeLightDefinition {
   int kind = LitDisabled;
 };
 using NativeSelectedLights = std::array<LitLight, 3>;
+inline bool SameNativeSelectedLights(const NativeSelectedLights &a, const NativeSelectedLights &b) {
+  const auto vector = [](LitVector x, LitVector y) { return x.x == y.x && x.y == y.y && x.z == y.z; };
+  for (size_t n = 0; n < a.size(); ++n)
+    if (a[n].kind != b[n].kind || !vector(a[n].position,b[n].position) ||
+        !vector(a[n].direction,b[n].direction) || !vector(a[n].colour,b[n].colour) ||
+        a[n].inverse_range != b[n].inverse_range || a[n].cone_strength != b[n].cone_strength ||
+        a[n].cone_cosine != b[n].cone_cosine) return false;
+  return true;
+}
 struct NativeNodeSelectedLights {
   size_t node = 0;
   NativeSelectedLights lights{};

@@ -9,6 +9,7 @@
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
+#include "gpu/scene/host_parameter_bridge.h"
 #include "gpu/frame_stats.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
@@ -21,8 +22,10 @@
 
 REX_EXTERN(__imp__sub_8218B0F0);
 REX_EXTERN(__imp__sub_8218A8C8);
+REX_EXTERN(__imp__sub_8218ADA0);
 REXCVAR_DECLARE(bool, bd_native_lighting);
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
+REXCVAR_DECLARE(bool, bd_native_rigid_scene);
 
 namespace bd::gpu::scene {
 namespace {
@@ -34,6 +37,7 @@ constexpr uint32_t kOne = (uint32_t(-32251) << 16) + 20908;
 constexpr uint32_t kZero = (uint32_t(-32251) << 16) + 21040;
 thread_local SelectedLightSourceState current;
 thread_local uint32_t current_selection = 0, current_frame = ~0u;
+thread_local bool exporting_lights = false;
 struct Stats {
   uint64_t publications = 0, changes = 0, compatibility = 0, checked = 0, wrong = 0;
   uint64_t snapshots = 0, unavailable = 0;
@@ -47,10 +51,29 @@ thread_local SelectionStats selection_stats;
 struct SceneLights {
   std::mutex mutex;
   NativeSceneLightingPublication current;
+  std::vector<NativeLightSourceBinding> sources;
   uint64_t published = 0, refused = 0, unavailable = 0, reads = 0, missing = 0;
+  uint64_t inherited = 0, commits = 0, observed = 0, unowned = 0;
   uint32_t reported = 0;
 };
 SceneLights &Scene() { static SceneLights result; return result; }
+void ObserveCompatibilityLightSelection(uint32_t selection, uint32_t view) {
+  if (!REXCVAR_GET(bd_native_rigid_scene)) return;
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  const auto it = std::lower_bound(scene.sources.begin(),scene.sources.end(),selection,
+      [](const auto &binding, uint32_t key) { return binding.selection < key; });
+  const auto frame = FrameStatFrameCount();
+  const auto ticket = it != scene.sources.end() && it->selection == selection
+      ? scene.current.Prepare(frame,scene.current.Update(frame),it->instance,it->model_generation,it->node,view)
+      : std::nullopt;
+  // The observer computes from handoff-owned inputs. The compatibility result
+  // is only a guard: stale/unsupported selection cannot seed native inheritance.
+  // It is never copied into a native ticket or used to recover missing inputs.
+  if (ticket && current.known == 7 && SameNativeSelectedLights(ticket->lights,current.lights) &&
+      scene.current.Commit(frame,*ticket)) ++scene.observed;
+  else { scene.current.InvalidateInherited(); ++scene.unowned; }
+}
 std::optional<uint32_t> Word(uint64_t address) {
   if (!address || (address & 3) || address > UINT32_MAX-3) return {};
   const auto *value = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -177,6 +200,7 @@ bool Publish(PPCContext &ctx, uint8_t *base) {
   current = publication->state;
   current_selection = selection;
   current_frame = FrameStatFrameCount();
+  ObserveCompatibilityLightSelection(selection,*view);
   if (current.known == 7 && PublishNativeMaterialLights(selection, current.lights)) ++stats.snapshots;
   else InvalidateNativeMaterialLights();
   ++stats.publications; stats.changes += publication->changed;
@@ -188,6 +212,7 @@ void PublishNativeSceneLights(uint32_t manager) {
   auto &scene = Scene();
   std::optional<NativeSceneLightSet> lights;
   std::vector<NativeNodeLightBinding> bindings;
+  std::vector<NativeLightSourceBinding> sources;
   size_t unavailable = 0;
   try {
     // bdMainGameStep waited for DrawEnd, completed scene preparation and the
@@ -205,7 +230,7 @@ void PublishNativeSceneLights(uint32_t manager) {
       lights = ReadNativeSceneLightSet(manager, *mode == 1,
           {std::bit_cast<float>(*scale),std::bit_cast<float>(*angle),std::bit_cast<float>(*low),std::bit_cast<float>(*high)},
           std::bit_cast<float>(*strength), Word);
-      if (lights && !CollectNativeInstanceLightInputs(bindings, unavailable)) lights.reset();
+      if (lights && !CollectNativeInstanceLightInputs(bindings, sources, unavailable)) lights.reset();
     }
   } catch (const std::exception &error) {
     lights.reset();
@@ -214,31 +239,91 @@ void PublishNativeSceneLights(uint32_t manager) {
   std::lock_guard lock(scene.mutex);
   const auto frame = FrameStatFrameCount();
   const bool published = lights && scene.current.Publish(frame, std::move(*lights), std::move(bindings));
-  if (!published) scene.current.Reset();
+  if (!published) { scene.current.Reset(); scene.sources.clear(); }
+  else {
+    std::sort(sources.begin(),sources.end(),[](const auto &a, const auto &b) { return a.selection < b.selection; });
+    sources.erase(std::unique(sources.begin(),sources.end(),
+        [](const auto &a, const auto &b) { return a.selection == b.selection; }),sources.end());
+    scene.sources = std::move(sources);
+  }
   ++(published ? scene.published : scene.refused);
   scene.unavailable += unavailable;
+  if (!REXCVAR_GET(bd_native_rigid_scene)) scene.current.InvalidateInherited();
 }
 uint64_t NativeSceneLightUpdate(uint32_t frame) {
   auto &scene = Scene();
   std::lock_guard lock(scene.mutex);
   return scene.current.Update(frame);
 }
-std::optional<NativeSelectedLights> FindNativeSceneLights(uint64_t instance,
+std::optional<NativeSceneLightTicket> FindNativeSceneLights(uint64_t instance,
     uint64_t model_generation, uint32_t node, const NativeLightingInputs &pass) {
   if (!REXCVAR_GET(bd_native_lighting)) return {};
   auto &scene = Scene();
   std::lock_guard lock(scene.mutex);
   const auto frame = FrameStatFrameCount();
-  const auto result = scene.current.Select(frame, pass.light_update, instance, model_generation, node, pass.light_view);
+  const auto result = scene.current.Prepare(frame, pass.light_update, instance, model_generation, node, pass.light_view);
   ++(result ? scene.reads : scene.missing);
+  scene.inherited += result && result->inherited;
   if (frame-scene.reported >= 300 || (!result && scene.missing <= 3)) {
     BD_INFO("[native-scene-lights] frame {} update {} pass update {} light view {}; {} publications {} refused; "
             "{} bindings {} unavailable imports; {} native reads {} missing; instance {} generation {} node {}; no legacy selection/cache reads",
         frame, scene.current.Update(frame), pass.light_update, pass.light_view, scene.published, scene.refused,
         scene.current.Bindings(), scene.unavailable, scene.reads, scene.missing, instance, model_generation, node);
     scene.reported = frame;
+    BD_INFO("[native-light-order] frame {} inherited preparations {} native commits {} owned callback observations {} unowned observations; no guessed defaults",
+        frame,scene.inherited,scene.commits,scene.observed,scene.unowned);
   }
-  return result ? std::optional(result->lights) : std::nullopt;
+  return result;
+}
+bool CommitNativeSceneLights(const NativeSceneLightTicket &ticket, uint32_t stack) {
+  if (!REXCVAR_GET(bd_native_lighting) || stack < 256 || (stack & 15)) return false;
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  const auto frame = FrameStatFrameCount();
+  if (!scene.current.CanCommit(frame,ticket)) return false;
+  const auto safe_word = [&](uint64_t address) -> std::optional<uint32_t> {
+    return address < stack && address+4 > uint64_t(stack)-256 ? std::nullopt : Word(address);
+  };
+  const auto mirror = PrepareNativeLightMirror(kPublisher,ticket.lights,safe_word);
+  const auto first = safe_word(kPublisher+16), second = safe_word(kPublisher+28);
+  if (!mirror || !first || !second || !*first || !*second ||
+      !CanFlushHostParameterDescriptor(*first,stack) || !CanFlushHostParameterDescriptor(*second,stack)) return false;
+  for (size_t n = 0; n < mirror->count; ++n) {
+    const auto address = mirror->writes[n].address;
+    if ((uint64_t(address) < uint64_t(*first)+16 && uint64_t(address)+4 > *first) ||
+        (uint64_t(address) < uint64_t(*second)+16 && uint64_t(address)+4 > *second) ||
+        address == kPublisher+16 || address == kPublisher+28 || address == kView ||
+        address == kManager+46816 || address == kStrength || address == kOne || address == kZero ||
+        address == (uint32_t(-32133)<<16)-31532) return false;
+  }
+  // All CPU plans/participation are known before this call. Flush outgoing
+  // compatibility values now, before backend locking or the next legacy draw.
+  // A later backend refusal is terminal, never a partially replaced fallback.
+  struct ExportScope {
+    ExportScope() { exporting_lights = true; }
+    ~ExportScope() { exporting_lights = false; }
+  } exporting;
+  for (size_t n = 0; n < mirror->count; ++n)
+    bd::mem::store<uint32_t>(mirror->writes[n].address,mirror->writes[n].word);
+  if (!FlushHostParameterDescriptor(*first,stack) || !FlushHostParameterDescriptor(*second,stack))
+    throw std::runtime_error("Native light mirror changed after preflight");
+  current = {}; current_selection = 0; current_frame = ~0u;
+  InvalidateNativeMaterialLights();
+  if (!scene.current.Commit(frame,ticket)) throw std::runtime_error("Native light order changed during commit");
+  ++scene.commits;
+  return true;
+}
+void ObserveNativeSceneLightParameters(bool vertex, uint32_t first, uint32_t count, const void *words) {
+  if (exporting_lights || vertex) return;
+  if (first <= 256 && count <= 256-first && (!count || first >= 32 || uint64_t(first)+count <= 20)) return;
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  ObserveNativeLightParameterWrite(scene.current,vertex,first,count,static_cast<const uint32_t *>(words));
+}
+void InvalidateNativeSceneLightInheritance() {
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  scene.current.InvalidateInherited();
 }
 std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection) {
   if (!REXCVAR_GET(bd_native_lighting) || current.known != 7 || current_selection != selection ||
@@ -277,6 +362,7 @@ void CheckNativeSelectedLights(const NativeSelectedLights &lights, const uint8_t
 }
 void PublishNativeSelectedLights(PPCContext &ctx, uint8_t *base) {
   if (!REXCVAR_GET(bd_native_lighting) || !Publish(ctx, base)) {
+    InvalidateNativeSceneLightInheritance();
     current = {}; current_selection = 0; current_frame = ~0u;
     InvalidateNativeMaterialLights();
     ++stats.compatibility;
@@ -296,4 +382,8 @@ REX_HOOK_RAW(sub_8218B0F0) {
 }
 REX_HOOK_RAW(sub_8218A8C8) {
   bd::gpu::scene::UpdateNativeLightSelection(ctx, base);
+}
+REX_HOOK_RAW(sub_8218ADA0) {
+  bd::gpu::scene::InvalidateNativeSceneLightInheritance();
+  __imp__sub_8218ADA0(ctx, base);
 }

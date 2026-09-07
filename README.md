@@ -84,15 +84,21 @@ image shows coherent terrain, trees, fences, Shu and shadows; known cliff marks
 remain. Batches are still singletons: no draw-call reduction or speedup is claimed.
 [Caster-family implementation and evidence](research/20260907_1420_native-caster-families.md).
 
-**New implementation, pending game integration:** the native scene route now
+**New implementation, built but pending game acceptance:** the native scene route now
 handles whole opaque rigid nodes with zero-to-three texture layers, independent
 UVs/samplers and retained image lifetimes. It no longer selects one material ID
 or only primitive0. Unsupported siblings and missing active resources fail closed
 before submission. Its production shaders pass 12 two-eye GPU cases, including
 layer composition, alpha, UV addressing and instancing; C++ behavior fixtures and
-six real host-consumer syntax checks pass. The full host build/live scene gate is
-paused for the cumulative storage allowance, not silently replaced by fixtures.
+six real host-consumer syntax checks pass. Host108 now links the whole connection.
 [Layered scene implementation and pending gates](research/20260907_1501_layered-rigid-scene.md).
+
+Ordered native light values now support authored "keep the previous lights"
+bindings, with stale-ticket checks and an outgoing mirror for remaining legacy
+consumers. Missing inputs and unknown intervening writes still refuse; no default
+lights or old shader values are guessed. The new C++ fixtures pass; inherited
+game draws and representative layered-scene pixels still need live verification.
+[Ordered light ownership and current build](research/20260907_1544_ordered-scene-lighting.md).
 
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, alpha/deferred,
@@ -102,15 +108,15 @@ Source tree, object/pass and other producer adapters also remain.
 
 Run941's separate legacy light-selection dirty-bit failure remains unresolved;
 this passing run does not explain it. Its strict comparison and failure evidence
-are preserved. Authored update producers, inherited node bindings, broader
+are preserved. Authored update producers, live inherited-binding acceptance, broader
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification: 311 Python source/scenario checks and current C++ fixtures pass.
+Verification: 312 Python source/scenario checks and current C++ fixtures pass.
 The new GPU evidence covers twelve 8x8 two-eye pixel cases in 1.08 seconds with
 zero Vulkan validation errors/warnings, including three-layer instanced draws
-with different per-instance values. The game binary is still host107/run945;
-these fixtures do not update its live qualification. They are not full-game stereo
+with different per-instance values. Host108 is built; host107/run945 remains
+the last accepted live result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |

@@ -6,6 +6,7 @@
  *            See LICENSE file in the project root for full license text.
  */
 #include "gpu/constant_buffers.h"
+#include "gpu/scene/native_lighting_bridge.h"
 
 #if defined(_M_X64) || defined(__x86_64__)
 #include <immintrin.h>
@@ -786,6 +787,7 @@ void CopyNativeParameterBlock(u32 device, bool vertex, u8 *out) {
 } // namespace
 
 void InitializeNativeShaderParameters(u32 device_guest) {
+  scene::InvalidateNativeSceneLightInheritance();
   std::lock_guard lock(g_parameter_mutex);
   g_parameter_device = device_guest;
   // Called on actual zeroed device creation, including address reuse. Do not
@@ -796,6 +798,9 @@ void InitializeNativeShaderParameters(u32 device_guest) {
 }
 void PublishNativeShaderParameters(u32 device_guest, bool vertex, u32 first,
                                    u32 count, const void *host_words) {
+  // Observe the producer's words, never read old shader storage to seed lights.
+  // Keep the order Scene -> parameter mutex, including outbound native mirrors.
+  scene::ObserveNativeSceneLightParameters(vertex,first,count,host_words);
   std::lock_guard lock(g_parameter_mutex);
   if (!device_guest || first > 256 || count > 256 - first)
     throw std::runtime_error("Invalid native shader parameter publication");
@@ -807,6 +812,7 @@ void PublishNativeShaderParameters(u32 device_guest, bool vertex, u32 first,
   NoteGuestConstantWrite();
 }
 void InvalidateNativeShaderParameters(bool vertex, u32 first, u32 count) {
+  scene::ObserveNativeSceneLightParameters(vertex,first,count,nullptr);
   std::lock_guard lock(g_parameter_mutex);
   auto &parameters = g_parameters[vertex ? 0 : 1];
   if (first > 256 || count > 256 - first) parameters.Clear();

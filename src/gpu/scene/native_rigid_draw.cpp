@@ -199,6 +199,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   for (const auto &plan : *plans)
     require(camera && std::memcmp(&plan.pass.world_to_clip[0],
         camera->world_to_clip.data(), sizeof(RenderMatrix)) == 0, "scene camera changed before submission");
+  require(CommitNativeRigidSceneLights(*plans), "ordered native lighting or outgoing compatibility publication unavailable");
   auto &s = state();
   std::lock_guard lock(s.mutex);
   auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,

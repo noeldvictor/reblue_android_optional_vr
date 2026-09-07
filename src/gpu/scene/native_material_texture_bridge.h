@@ -19,7 +19,7 @@ class NativeObjectTextureScope {
   std::unique_ptr<NativeObjectTextureState> owned_;
   NativeObjectTextureState *previous_;
 public:
-  NativeObjectTextureScope(uint32_t traverse_context, std::shared_ptr<const NativeInstancePose> pose);
+  NativeObjectTextureScope(uint32_t traverse_context, std::shared_ptr<const NativeInstancePose> pose, uint32_t stack);
   ~NativeObjectTextureScope();
   NativeObjectTextureScope(const NativeObjectTextureScope &) = delete;
   NativeObjectTextureScope &operator=(const NativeObjectTextureScope &) = delete;

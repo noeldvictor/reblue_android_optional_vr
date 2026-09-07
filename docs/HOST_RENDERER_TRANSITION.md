@@ -42,10 +42,12 @@ reloaded-field window. Both epochs pass the new non-regression family gate and
 all existing reload/receiver/owned-lighting checks; mono pixels were inspected.
 That last live scene-shading result remains the selected object's route.
 The new source connects whole opaque rigid nodes with0..3 texture layers to
-native submission; 311 Python checks, expanded C++ fixtures, six real consumer
-syntax checks and 12 two-eye GPU cases pass. Host integration/live representative
-scene acceptance is still pending: its 192 MiB estimate does not fit the remaining
-cumulative allowance. Do not restamp host107/run945 or enable normal acceptance
+native submission. Host108 now also connects ordered inherited light tickets and
+an outbound mirror for retained legacy consumers;312 Python checks and expanded
+C++ fixtures pass. The preceding12 two-eye GPU shader cases remain unchanged.
+The host link completed after unrelated free-space recovery within the unchanged
+allowance; live representative scene/inheritance acceptance is still pending.
+Do not restamp host107/run945 or enable normal acceptance
 switches on fixture evidence alone. Run941's legacy dirty-bit mismatch remains unexplained;
 keep its strict comparison and failure evidence. There is no qualified complete
 host frame, broad scene, full-game stereo or Quest result.
@@ -53,6 +55,7 @@ host frame, broad scene, full-game stereo or Quest result.
 [owned-lighting contract](../research/20260907_1342_owned-scene-lighting.md),
 [preserved receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md).
 [New layered-scene connection and pending gates](../research/20260907_1501_layered-rigid-scene.md).
+[Ordered light ownership and host108](../research/20260907_1544_ordered-scene-lighting.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -65,7 +68,7 @@ dirty masks, selected source slots, cached shader IDs or legacy descriptors.
 | Boundary | Existing owner | Current result / remaining work |
 | --- | --- | --- |
 | Authored updates -> owned scene-light data | `bdLightListUpdateSnapshot` in `frame_interp.cpp`; existing selection/composition math and lighting bridges | Bounded300 semantic records, scoring/priority/exclusion data and update identity. Pass-owned lighting view remains distinct from render view. Original authored updates/snapshot helper still execute at the producer. |
-| Object updates -> selection inputs | Existing native instance source index and model/pose owners | Copies class/centre/radius and per-node binding at the handoff, keyed only by native instance/model/node.2,898 field bindings available; missing poses and null/inherited/invalid bindings remain explicitly unconverted. No guessed bounds or draw-time light reimport. |
+| Object updates -> selection inputs | Existing native instance source index and model/pose owners | Copies class/centre/radius and explicit Bind/Keep at handoff, keyed only by native instance/model/node. Last live result had2,898 explicit bindings; new inherited actions/tickets are built and CPU-tested, pending game acceptance. Missing poses/invalid bindings remain unowned. No guessed bounds or draw-time light reimport. |
 | Native light/object inputs -> actual scene packet | Existing `PrepareNativeRigidSceneForObject` and native scene/shadow queue/programs | Pure owned selection/composition, copied packet values survive replacement/retirement. Existing instancing/indirect/image/fence path unchanged. Current live acceptance remains the selected rigid consumer, not all imported bindings or a whole scene. |
 
 CPU fixtures consume after source destruction, reject stale frame/update/native
@@ -94,10 +97,11 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    fence gates pass in both reload epochs. Skin/wind, alpha/deferred and
    texture-dependent effect participation remain explicit unsupported families.
    The new ordinary0..3-layer shader, independent third UV owner and whole-node
-   scene submission are now implemented and fixture-verified. Next, resolve the
-   existing storage allowance, link the host, then verify representative fresh
+   scene submission are now implemented and fixture-verified. Host108 links these
+   and ordered light inheritance. Next, verify representative fresh
    layered/multi-primitive scene emission and retained lifetimes with inspected
-   game pixels and selected-object reload regression. Missing inherited lights,
+   game pixels and selected-object reload regression. Verify actual inherited
+   consumption and legacy interoperation; an unseeded/invalid inherited chain,
    layouts or other owners remain explicit refusal, not warm-up fallback. Preserve sibling,
    deferred and volume participation; no silent omission or warm-up fallback.
    The selected asset's cold-start hard-off/reload proof stays a regression case.

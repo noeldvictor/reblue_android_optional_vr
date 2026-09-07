@@ -32,6 +32,7 @@ namespace bd::gpu::scene {
 struct NativeObjectTextureState {
   uint32_t context = 0, visual = 0, graph = 0, table_offset = 0;
   uint32_t render_view = 0;
+  uint32_t stack = 0;
   uint64_t generation = 0;
   NativeModelRenderHandle model;
   std::shared_ptr<const NativeInstancePose> pose;
@@ -93,7 +94,7 @@ MaterialImageSelection<NativeTextureBinding> Capture(uint32_t source) {
 }
 
 NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
-    std::shared_ptr<const NativeInstancePose> pose) : previous_(current) {
+    std::shared_ptr<const NativeInstancePose> pose, uint32_t stack) : previous_(current) {
   current = nullptr;
   ++depth;
   if (!REXCVAR_GET(bd_native_material_textures)) return;
@@ -122,6 +123,7 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     if (!publication->generation || (*table && !publication->table)) { ++stats.unsupported; return; }
     publication->context = context; publication->visual = *visual; publication->graph = *graph;
     publication->render_view = *render_view;
+    publication->stack = stack;
     if (REXCVAR_GET(bd_native_primitive_policies))
       publication->policy_inputs = ReadPrimitivePolicyInputs(context, *visual, Word);
     publication->table_offset = *offset; publication->fallback = Capture(*fallback);
@@ -198,14 +200,27 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
     refusal = "owned scene/object lighting publication unavailable";
     const auto lights = FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
     if (!lights) return {};
-    packet->lights = lights; // values survive publication/source/GPU retirement
+    packet->lights = lights->lights; // values survive publication/source/GPU retirement
     refusal = "whole-node scene shader resources unavailable";
     auto plan = PrepareNativeRigidScene(*program, *packet,
         {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility});
     if (!plan) return {}; // No partial replacement of a multi-primitive node.
+    plan->light_ticket = *lights;
     result.push_back(std::move(*plan));
   }
   return result;
+}
+bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans) {
+  if (!current || plans.empty() || !plans.front().light_ticket) return false;
+  const auto &ticket = *plans.front().light_ticket;
+  bool draws = false;
+  for (const auto &plan : plans) {
+    if (!plan.light_ticket || plan.light_ticket->update != ticket.update ||
+        plan.light_ticket->revision != ticket.revision ||
+        !SameNativeSelectedLights(plan.light_ticket->lights,ticket.lights)) return false;
+    draws |= plan.draw;
+  }
+  return !draws || CommitNativeSceneLights(ticket,current->stack);
 }
 
 namespace {

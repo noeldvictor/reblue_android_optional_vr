@@ -14,8 +14,8 @@ class MaterialTextureBoundaryTest(unittest.TestCase):
     def test_object_publication_precedes_traversal_and_restores_nested_scope(self):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
         self.assertLess(walk.index("const auto instance_pose = FindNativeInstancePose("),
-                        walk.index("NativeObjectTextureScope textures(ctx_va, instance_pose)"))
-        self.assertLess(walk.index("NativeObjectTextureScope textures(ctx_va, instance_pose)"),
+                        walk.index("NativeObjectTextureScope textures(ctx_va, instance_pose, ctx.r1.u32)"))
+        self.assertLess(walk.index("NativeObjectTextureScope textures(ctx_va, instance_pose, ctx.r1.u32)"),
                         walk.index("const u32 saved_r1"))
         self.assertIn("previous_(current)", self.bridge)
         self.assertIn("current = previous_; --depth;", self.bridge)

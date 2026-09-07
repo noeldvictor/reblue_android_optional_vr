@@ -7,6 +7,7 @@
 #pragma once
 #include "gpu/scene/native_lighting.h"
 #include "gpu/scene/native_selected_lights.h"
+#include "gpu/scene/native_scene_lights.h"
 namespace bd::gpu::scene {
 struct NodeTag;
 std::optional<NativeLightingPass> FindNativeLightingPass(uint32_t render_view);
@@ -19,8 +20,13 @@ std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection)
 void PublishNativeSceneLights(uint32_t manager);
 uint64_t NativeSceneLightUpdate(uint32_t frame);
 // Native IDs and owned pass only; no source slots, dirty flags or descriptors.
-std::optional<NativeSelectedLights> FindNativeSceneLights(uint64_t instance,
+std::optional<NativeSceneLightTicket> FindNativeSceneLights(uint64_t instance,
     uint64_t model_generation, uint32_t node, const NativeLightingInputs &pass);
+// Commit at draw participation, never during a speculative/suppressed prepare.
+// Stack belongs only to the outgoing compatibility descriptor adapter.
+bool CommitNativeSceneLights(const NativeSceneLightTicket &ticket, uint32_t stack);
+void ObserveNativeSceneLightParameters(bool vertex, uint32_t first, uint32_t count, const void *words);
+void InvalidateNativeSceneLightInheritance();
 void NativeSelectedLightsReport();
 void CheckNativeSelectedLights(const NativeSelectedLights &lights, const uint8_t *pixel_constants);
 std::optional<LightingVector> NativeNodeShadowSampling(const NodeTag &tag);

@@ -3209,3 +3209,40 @@ does not fit.4 GiB request remains pending, not approval. Recheck before further
 producers. New scene game/reload/pixel acceptance remains open;945 is unchanged
 last live evidence and941 stays strict/unresolved. Details in
 20260907_1501_layered-rigid-scene.md; final post-push free check belongs in handoff.
+
+### 2026-09-07 ordered inherited scene lighting bundle
+
+Same original65,462,788,096 B baseline,3 GiB exception,62,509,998,080 B floor,
+100 MiB diagnostics,10 MiB aggregate build logs/images, incoming raw0. The4 GiB
+request remains unanswered and is not used. First source-only free62,592,278,528 B;
+later62,353,035,264 B paused producers, then65,844,150,272 B before fixture work.
+This drive-wide fluctuation is unallocated, not cleanup or renderer savings.
+No prior CMake/Ninja/compiler/game/fixture process remains. Existing build logs
+191,725 B/136files; material fixture8,159,345 B and texture fixture70,274,593 B
+are the replacement baselines. Existing shader/GPU fixture bytes are unchanged.
+
+Connected changes own ordered Bind/Keep light values and speculative tickets,
+handoff callback identity imports, direct-node commit and the outbound mirror
+for retained consumers. Unknown writes invalidate rather than seed native data.
+Devloop reuses material34/CPU32 and output32/CPU15 with <=32 MiB peak each,
+300 s supervision, tighter32 MiB free-drop and the unchanged original floor.
+Host108's <=192 MiB integration estimate now fits after free-space recovery;
+recheck before starting it. No new tree, guest rebuild, shader/GPU rebuild, cook,
+raw/image output or profile change is needed for these checks. Retain prior
+fixture logs until replacements pass, then remove only exact superseded logs.
+945 remains last live evidence;940/941 and protected baseline/VR/raw are unchanged.
+
+Material34/PID28764,CPU32/PID29920 (0.56/0.62 s), output32/PID29284 and
+CPU15/PID33180 (0.44/0.48 s) pass.312 Python checks pass. Host108/PID29072/
+session2796 terminal/exit0, codegen0 written, no guest/shader compilation.
+Exe48,659,456 B SHA4DBABAED0B02FEB65085B0B6D02F0EC68620CD817CCA8425BD8BE22D34375DD1;
+PDB109,326,336 B; owner profile unchanged. Game acceptance remains pending.
+
+After acceptance removed10 exact superseded material33/CPU31/output31/CPU14/
+host107 stdout/stderr logs,8,124 logical B.65,604,374,528 ->65,604,390,912 B free,
+16,384 B reclaimed once. Current logs191,504 B/136files. Known retained net
++380,179 B: material+68,065,texture+16,911,exe+37,376,PDB+258,048,logs-221.
+Other objects/CMake/source/Git/volume changes unallocated. Firstfree62,592,278,528
+->cleanup-end65,604,390,912 B is a3,012,112,384 B drive-wide gain, not attributed
+cleanup savings. No runtime/raw/image/profile/game/build deletion or new capture.
+Details and source provenance:20260907_1544_ordered-scene-lighting.md.

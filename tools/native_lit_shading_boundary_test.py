@@ -91,7 +91,8 @@ class LitShadingBoundaryTest(unittest.TestCase):
         self.assertIn("SelectNativeObjectLights(scope->lights, scope->node_lights, node)", owner)
         self.assertIn("if (expected != selection) return false", owner)
         self.assertIn("PublishNativeMaterialLights(selection, current.lights)", bridge)
-        self.assertEqual(bridge.count("InvalidateNativeMaterialLights();"), 2)
+        # Original refusal/publication guards plus the new outgoing native mirror.
+        self.assertEqual(bridge.count("InvalidateNativeMaterialLights();"), 3)
         self.assertIn("current->lights.reset(); current->node_lights.reset();", owner)
         draw = (ROOT / "src/gpu/scene/host_draw.cpp").read_text()
         self.assertIn("0xFB83DD3F5E67CEB7ull", draw)

@@ -32,12 +32,18 @@ struct NativeObjectLightInputs {
 struct NativeNodeLightBinding {
   uint64_t instance = 0, model_generation = 0;
   uint32_t node = 0;
-  NativeObjectLightInputs inputs;
+  // Empty is an authored Keep, not a missing/invalid import (which has no key).
+  std::optional<NativeObjectLightInputs> inputs;
   auto Key() const { return std::tuple(instance, model_generation, node); }
 };
 struct NativeSceneLightSelection {
   NativeLightSelection selection;
   NativeSelectedLights lights{};
+};
+struct NativeSceneLightTicket {
+  NativeSelectedLights lights{};
+  uint64_t update = 0, revision = 0;
+  bool inherited = false;
 };
 
 inline std::optional<NativeSceneLightSelection> SelectNativeSceneLights(
@@ -72,22 +78,30 @@ class NativeSceneLightingPublication {
 public:
   static constexpr size_t kMaxBindings = 65536, kMaxBindingBytes = 4u << 20;
   bool Publish(uint32_t frame, NativeSceneLightSet lights, std::vector<NativeNodeLightBinding> objects) {
-    Reset();
-    if (update_ == UINT64_MAX) return false;
+    // The authored snapshot invalidates lookup IDs, not the last light VALUES.
+    // Keep known values across a successful handoff; an invalid producer breaks
+    // the chain. No prior source/model lease is needed by these copies.
+    valid_ = false; objects_.clear();
+    const auto refuse = [&] { Reset(); return false; };
+    if (update_ == UINT64_MAX) return refuse();
     ++update_;
     if (lights.count > lights.kMaxLights || lights.mode > 2 ||
         objects.size() > kMaxBindings || objects.capacity() > kMaxBindingBytes / sizeof(NativeNodeLightBinding))
-      return false;
+      return refuse();
     for (size_t n = 0; n < lights.count; ++n)
-      if (lights.lights[n].candidate.id != int32_t(n)) return false;
+      if (lights.lights[n].candidate.id != int32_t(n)) return refuse();
     std::sort(objects.begin(), objects.end(), [](const auto &a, const auto &b) { return a.Key() < b.Key(); });
     for (size_t n = 0; n < objects.size(); ++n)
       if (!objects[n].instance || !objects[n].model_generation ||
-          (n && objects[n-1].Key() == objects[n].Key())) return false;
+          objects[n].node >= 4096 || (n && objects[n-1].Key() == objects[n].Key())) return refuse();
     lights_ = std::move(lights); objects_ = std::move(objects); frame_ = frame; valid_ = true;
     return true;
   }
-  void Reset() { valid_ = false; objects_.clear(); }
+  void Reset() { valid_ = false; objects_.clear(); InvalidateInherited(); }
+  void InvalidateInherited() {
+    inherited_.reset();
+    if (revision_ != UINT64_MAX) ++revision_;
+  }
   uint64_t Update(uint32_t frame) const { return valid_ && frame_ == frame ? update_ : 0; }
   size_t Bindings() const { return valid_ ? objects_.size() : 0; }
   std::optional<NativeSceneLightSelection> Select(uint32_t frame, uint64_t update,
@@ -97,12 +111,37 @@ public:
     const auto it = std::lower_bound(objects_.begin(), objects_.end(), key,
         [](const auto &binding, const auto &value) { return binding.Key() < value; });
     if (it == objects_.end() || it->Key() != key) return {};
-    return SelectNativeSceneLights(lights_, it->inputs, light_view);
+    return it->inputs ? SelectNativeSceneLights(lights_, *it->inputs, light_view) : std::nullopt;
+  }
+  std::optional<NativeSceneLightTicket> Prepare(uint32_t frame, uint64_t update,
+      uint64_t instance, uint64_t model_generation, uint32_t node, uint32_t light_view) const {
+    if (!update || Update(frame) != update || light_view >= 16 || revision_ == UINT64_MAX) return {};
+    const auto key = std::tuple(instance, model_generation, node);
+    const auto it = std::lower_bound(objects_.begin(), objects_.end(), key,
+        [](const auto &binding, const auto &value) { return binding.Key() < value; });
+    if (it == objects_.end() || it->Key() != key) return {};
+    if (!it->inputs)
+      return inherited_ ? std::optional(NativeSceneLightTicket{*inherited_,update,revision_,true}) : std::nullopt;
+    const auto selected = SelectNativeSceneLights(lights_, *it->inputs, light_view);
+    return selected ? std::optional(NativeSceneLightTicket{selected->lights,update,revision_,false}) : std::nullopt;
+  }
+  bool CanCommit(uint32_t frame, const NativeSceneLightTicket &ticket) const {
+    return ticket.update && Update(frame) == ticket.update && ticket.revision == revision_ && revision_ != UINT64_MAX;
+  }
+  bool Commit(uint32_t frame, const NativeSceneLightTicket &ticket) {
+    if (!CanCommit(frame,ticket)) return false;
+    inherited_ = ticket.lights; ++revision_;
+    return true;
+  }
+  template <class Matches> void ValidateInherited(Matches matches) {
+    if (inherited_ && !matches(*inherited_)) InvalidateInherited();
   }
 private:
   NativeSceneLightSet lights_;
   std::vector<NativeNodeLightBinding> objects_;
   uint64_t update_ = 0;
+  uint64_t revision_ = 0;
+  std::optional<NativeSelectedLights> inherited_;
   uint32_t frame_ = 0;
   bool valid_ = false;
 };

@@ -1,4 +1,5 @@
 #include "gpu/scene/native_scene_lights_source.h"
+#include "gpu/scene/native_selected_lights_source.h"
 #include "gpu/scene/native_rigid_inputs.h"
 #include <iostream>
 #include <limits>
@@ -56,12 +57,83 @@ void TestNativeSceneLights() {
       !publication.Select(7,old_update,12,93,0,0) && !publication.Select(7,old_update,11,94,0,0) &&
       !publication.Select(7,old_update,11,93,1,0), "frame/instance/model/node identities cannot borrow lights");
 
+  {
+    NativeSceneLightingPublication ordered;
+    auto authored = *lights;
+    std::vector<NativeNodeLightBinding> nodes{{11,93,20,*input},{11,93,3,std::nullopt},
+        {12,94,0,std::nullopt}};
+    Require(ordered.Publish(7,authored,nodes), "ordered bindings import without inventing traversal order");
+    auto next = [&] (uint32_t node, uint32_t view = 0) {
+      return ordered.Prepare(7,ordered.Update(7),11,93,node,view);
+    };
+    Require(!next(3), "initial Keep has no guessed dark/default seed");
+    const auto prepared = next(20);
+    Require(prepared && !prepared->inherited && !next(3), "preflight/culled or suppressed work does not bind lights");
+    Require(ordered.Commit(7,*prepared), "actual bound draw commits copied native values");
+    auto keep = next(3,3);
+    Require(keep && keep->inherited && SameNativeSelectedLights(keep->lights,prepared->lights),
+        "Keep follows actual draw order, not node order or a new light-view selection");
+    Require(!ordered.Commit(7,*prepared), "one ticket cannot be committed twice");
+    const auto cross_object = ordered.Prepare(7,ordered.Update(7),12,94,0,0);
+    Require(cross_object && cross_object->inherited, "copied global light values may cross object boundaries");
+    Require(!ordered.Prepare(7,ordered.Update(7),12,93,0,0), "missing native identity is not an authored Keep");
+    const auto changed = next(20,3); // no lights in view 3
+    Require(changed && ordered.Commit(7,*changed) && !ordered.Commit(7,*keep),
+        "intervening bind invalidates speculative Keep ticket");
+    Require(next(3)->lights[0].kind == LitDisabled, "known disabled selection can be inherited");
+    Require(ordered.Commit(7,*next(20)), "restore actual lit draw");
+    std::array<uint32_t,48> shader_words{};
+    for (uint32_t slot = 0; slot < 3; ++slot) {
+      const auto values = NativeSelectedLightWords(prepared->lights[slot]);
+      for (uint32_t n = 0; n < 16; ++n) shader_words[slot*16+n] = std::bit_cast<uint32_t>(values[n]);
+    }
+    ObserveNativeLightParameterWrite(ordered,false,20,12,shader_words.data());
+    Require(next(3).has_value(), "matching compatibility flush preserves known native values");
+    shader_words[15] = std::bit_cast<uint32_t>(99.f);
+    ObserveNativeLightParameterWrite(ordered,false,20,12,shader_words.data());
+    Require(next(3).has_value(), "unused cone lanes cannot corrupt semantic inheritance");
+    shader_words[8] = std::bit_cast<uint32_t>(.99f);
+    ObserveNativeLightParameterWrite(ordered,false,20,12,shader_words.data());
+    Require(!next(3), "unowned changed shader write breaks the chain, never becomes its input");
+    Require(ordered.Commit(7,*next(20)), "owned bind re-establishes chain after unowned writer");
+    ObserveNativeLightParameterWrite(ordered,true,20,12,nullptr);
+    ObserveNativeLightParameterWrite(ordered,false,3,1,nullptr);
+    Require(next(3).has_value(), "unrelated vertex and material writes do not invalidate lighting");
+    ObserveNativeLightParameterWrite(ordered,false,21,1,nullptr);
+    Require(!next(3), "unknown relevant write invalidates without a register read");
+    Require(ordered.Commit(7,*next(20)), "native bind restores chain");
+    keep = next(3);
+    authored.lights[0].value->colour.x = .8f;
+    Require(ordered.Publish(8,authored,{{13,207,0,std::nullopt},{13,207,1,*input}}),
+        "next handoff retires all previous source/model keys");
+    const auto inherited = ordered.Prepare(8,ordered.Update(8),13,207,0,0);
+    Require(inherited && inherited->lights[0].colour.x == .25f &&
+        !ordered.Commit(8,*keep), "handoff retains copied values, not stale ticket eligibility");
+    const auto fresh = ordered.Prepare(8,ordered.Update(8),13,207,1,0);
+    Require(fresh && fresh->lights[0].colour.x == .8f && ordered.Commit(8,*fresh),
+        "next explicit bind consumes changed authored values even when IDs did not change");
+    authored.mode = 3;
+    Require(!ordered.Publish(9,authored,{{13,207,0,std::nullopt}}), "invalid producer breaks inherited chain");
+    authored.mode = 2;
+    Require(ordered.Publish(9,authored,{{13,207,0,std::nullopt}}) &&
+        !ordered.Prepare(9,ordered.Update(9),13,207,0,0), "recovery cannot borrow pre-failure values");
+    NativeRigidPassInputs retained;
+    for (auto &fog : retained.fog) fog.disabled = true;
+    retained.lights = inherited->lights;
+    Require(BuildRigidPass(retained).has_value(), "inherited packet reaches GPU packing after chain/source retirement");
+  }
+
   words[visual+3380] = 1; words[visual+3376] = 90000;
   words[90000] = other; words[90004] = 0;
   object(other,1,8.f);
   input = ReadNativeObjectLightInputs(visual,0,read);
   Require(input && input->object_class == 1 && !ReadNativeObjectLightInputs(visual,1,read),
-      "per-node override replaces default; null inheritance refuses rather than borrowing");
+      "per-node override replaces default; null does not borrow default spatial inputs");
+  const auto inherited_source = ReadNativeObjectLightSource(visual,1,read);
+  Require(inherited_source && !inherited_source->inputs && !inherited_source->selection,
+      "null entry imports explicit Keep without source identity");
+  words.erase(90004);
+  Require(!ReadNativeObjectLightSource(visual,1,read), "unreadable entry is missing, not Keep");
   words[90004] = other+232; object(other+232,2,30.f);
   const auto second = ReadNativeObjectLightInputs(visual,1,read);
   Require(second && second->object_class == 2 && second->centre.z == 30.f, "distinct per-node spatial inputs");
@@ -135,5 +207,46 @@ void TestNativeSceneLights() {
   Require(!ReadNativeObjectLightInputs(visual,0,read), "nonfinite spatial input rejected");
   Require(!ReadNativeObjectLightInputs(UINT32_MAX-3,0,read) &&
       !ReadNativeSceneLightSet(UINT32_MAX-3,false,scoring,2.f,read), "source address overflow rejected");
+
+  {
+    constexpr uint32_t owner = 1000, buffer = 5000, data = 6000;
+    words.clear();
+    words[buffer+12] = data;
+    for (uint32_t n = 0; n < 48; ++n) words[data+n*4] = 0;
+    for (uint32_t slot = 0; slot < 3; ++slot) {
+      for (uint32_t vector = 0; vector < 4; ++vector) {
+        const auto descriptor = owner+36+vector*60+slot*20;
+        words[descriptor+4] = buffer; words[descriptor+12] = slot*4+vector;
+        words[descriptor+16] = 0;
+      }
+      words[owner+276+slot*4] = 123;
+    }
+    words[owner+288] = 123; words[owner+292] = 456;
+    const auto source_before = words;
+    const auto mirror = PrepareNativeLightMirror(owner,old_packet->lights,read);
+    Require(mirror && mirror->count == 44 && words == source_before,
+        "native-to-compatibility mirror preflights all three slots and caches with no side effects");
+    for (size_t n = 0; n < mirror->count; ++n) words[mirror->writes[n].address] = mirror->writes[n].word;
+    std::array<uint32_t,48> exported{};
+    for (uint32_t n = 0; n < 48; ++n) exported[n] = words[data+n*4];
+    Require(MatchesNativeLightParameterWrite(old_packet->lights,20,exported),
+        "next legacy inherited draw receives the exact native semantic light values");
+    Require(words[owner+276] == uint32_t(-2) && words[owner+280] == uint32_t(-2) &&
+        words[owner+284] == uint32_t(-2) && !words[owner+288] && words[owner+292] == ~0u,
+        "later explicit legacy node cannot skip publication using pre-native caches");
+    words = source_before;
+    words[owner+36+12] = words[owner+96+12];
+    Require(!PrepareNativeLightMirror(owner,old_packet->lights,read), "aliased vector destinations refuse before stores");
+    words = source_before; words[buffer+12] = owner+36;
+    Require(!PrepareNativeLightMirror(owner,old_packet->lights,read), "descriptor/control alias refuses");
+    words = source_before; words[owner+216+16] = 4;
+    Require(!PrepareNativeLightMirror(owner,old_packet->lights,read), "invalid scalar lane refuses");
+    words = source_before; words.erase(data+188);
+    Require(PrepareNativeLightMirror(owner,old_packet->lights,read).has_value(),
+        "unwritten unused cone lanes need no destination");
+    words.erase(data+176);
+    Require(!PrepareNativeLightMirror(owner,old_packet->lights,read), "missing written destination refuses");
+    Require(!PrepareNativeLightMirror(UINT32_MAX-3,old_packet->lights,read), "mirror address overflow refuses");
+  }
   std::cout << "native scene lighting: coherent import, selection, late updates, node/reload lifetime and GPU packing passed\n";
 }

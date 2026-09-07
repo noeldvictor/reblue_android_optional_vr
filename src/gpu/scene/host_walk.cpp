@@ -126,7 +126,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
   const auto instance_pose = FindNativeInstancePose(
       bd::mem::try_load<u32>(ctx_va), bd::mem::try_load<u32>(ctx_va + 4), palette);
   const auto route_model = LoadNativeRigidRouteModel(ctx_va);
-  NativeObjectTextureScope textures(ctx_va, instance_pose);
+  NativeObjectTextureScope textures(ctx_va, instance_pose, ctx.r1.u32);
 
   const u32 saved_r1 = ctx.r1.u32;
   const u32 frame = saved_r1 - kFrameBytes;

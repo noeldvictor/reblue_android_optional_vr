@@ -5,11 +5,32 @@
  */
 #pragma once
 #include "gpu/scene/native_scene_lights.h"
+#include "gpu/scene/native_selected_lights_source.h"
 #include <bit>
 
 namespace bd::gpu::scene {
+inline void ObserveNativeLightParameterWrite(NativeSceneLightingPublication &publication,
+    bool vertex, uint32_t first, uint32_t count, const uint32_t *words) {
+  if (vertex) return;
+  if (first > 256 || count > 256-first) { publication.InvalidateInherited(); return; }
+  if (!count || uint64_t(first)+count <= 20 || first >= 32) return;
+  if (!words) publication.InvalidateInherited();
+  else publication.ValidateInherited([&](const auto &lights) {
+    return MatchesNativeLightParameterWrite(lights,first,{words,size_t(count)*4});
+  });
+}
+// Transitional callback identity index. Never part of a native packet or key.
+struct NativeLightSourceBinding {
+  uint32_t selection = 0;
+  uint64_t instance = 0, model_generation = 0;
+  uint32_t node = 0;
+};
+struct NativeObjectLightSource {
+  uint32_t selection = 0;
+  std::optional<NativeObjectLightInputs> inputs;
+};
 template <class Read>
-std::optional<NativeObjectLightInputs> ReadNativeObjectLightInputs(
+std::optional<NativeObjectLightSource> ReadNativeObjectLightSource(
     uint32_t visual, uint32_t node, Read read) {
   const auto word = [&](uint64_t address) -> std::optional<uint32_t> {
     return !address || (address & 3) || address > UINT32_MAX-3 ? std::nullopt : read(address);
@@ -20,9 +41,8 @@ std::optional<NativeObjectLightInputs> ReadNativeObjectLightInputs(
   if (*per_node) {
     const auto table = word(uint64_t(visual)+3376);
     const auto entry = table && *table ? word(uint64_t(*table)+uint64_t(node)*4) : std::nullopt;
-    // Null means inherited callback state, not the default object selection.
-    // Refuse until that inheritance has a native producer of its own.
-    if (!entry || !*entry) return {};
+    if (!entry) return {};
+    if (!*entry) return NativeObjectLightSource{}; // authored Keep
     selection = *entry;
   }
   const auto kind = word(selection), x = word(selection+200), y = word(selection+204);
@@ -32,7 +52,13 @@ std::optional<NativeObjectLightInputs> ReadNativeObjectLightInputs(
       std::bit_cast<float>(*z)), std::bit_cast<float>(*radius), *kind};
   if (!std::isfinite(result.centre.x) || !std::isfinite(result.centre.y) ||
       !std::isfinite(result.centre.z) || !std::isfinite(result.radius) || result.radius < 0) return {};
-  return result;
+  return NativeObjectLightSource{uint32_t(selection),result};
+}
+template <class Read>
+std::optional<NativeObjectLightInputs> ReadNativeObjectLightInputs(
+    uint32_t visual, uint32_t node, Read read) {
+  const auto source = ReadNativeObjectLightSource(visual,node,read);
+  return source ? source->inputs : std::nullopt;
 }
 
 // The caller owns synchronization, not this reader. Invoke only at the completed

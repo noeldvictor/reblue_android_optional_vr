@@ -73,9 +73,9 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,", emitter)
         self.assertIn("d.native_rigid && d.native_rigid->regression ? d.native_rigid->model_generation : 0", emitter)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
-        preview = lights.split("std::optional<NativeSelectedLights> FindNativeSceneLights(", 1)[1].split(
-            "std::optional<NativeSelectedLights> FindNativeSelectedLights", 1)[0]
-        self.assertIn("scene.current.Select(frame, pass.light_update, instance, model_generation, node, pass.light_view)", preview)
+        preview = lights.split("std::optional<NativeSceneLightTicket> FindNativeSceneLights(", 1)[1].split(
+            "bool CommitNativeSceneLights(", 1)[0]
+        self.assertIn("scene.current.Prepare(frame, pass.light_update, instance, model_generation, node, pass.light_view)", preview)
         for forbidden in ("__imp__", "bd::mem::", "Word(", "PrepareSelection(", "PrepareSelectedLights("):
             self.assertNotIn(forbidden, preview)
 
@@ -94,6 +94,28 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         for forbidden in ("Word(", "+3132", "+3376", "+3380", "PrepareNativeSelectedLightValues"):
             self.assertNotIn(forbidden, consumer)
         self.assertNotIn("PreviewSelectedLightValues", (ROOT / "src/gpu/scene/native_light_selection_source.h").read_text())
+
+    def test_ordered_lights_commit_after_preparation_and_guard_compatibility_writers(self):
+        bridge = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
+        observer = bridge.split("void ObserveCompatibilityLightSelection(", 1)[1].split("std::optional<uint32_t> Word(", 1)[0]
+        self.assertIn("scene.current.Prepare(", observer)
+        self.assertIn("SameNativeSelectedLights(ticket->lights,current.lights)", observer)
+        self.assertNotIn("Word(", observer)
+        self.assertNotIn("ticket->lights = current.lights", observer)
+        mirror = bridge.split("bool CommitNativeSceneLights(", 1)[1].split("void ObserveNativeSceneLightParameters(", 1)[0]
+        self.assertLess(mirror.index("CanFlushHostParameterDescriptor"), mirror.index("bd::mem::store"))
+        self.assertIn("PrepareNativeLightMirror(kPublisher,ticket.lights,safe_word)", mirror)
+        self.assertNotIn("__imp__", mirror)
+        draw = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text().split("bool SubmitNativeRigidScene(", 1)[1]
+        self.assertLess(draw.index("PrepareNativeRigidSceneForObject("), draw.index("CommitNativeRigidSceneLights(*plans)"))
+        self.assertLess(draw.index("CommitNativeRigidSceneLights(*plans)"), draw.index("std::lock_guard lock(s.mutex)"))
+        consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        self.assertIn("return !draws || CommitNativeSceneLights(ticket,current->stack)", consumer)
+        parameters = (ROOT / "src/gpu/constant_buffers.cpp").read_text()
+        for name in ("PublishNativeShaderParameters", "InvalidateNativeShaderParameters"):
+            body = parameters.split("void " + name + "(", 1)[1].split("\n}", 1)[0]
+            self.assertLess(body.index("ObserveNativeSceneLightParameters"), body.index("std::lock_guard"))
+        self.assertIn("REX_HOOK_RAW(sub_8218ADA0)", bridge)
 
     def test_native_batches_use_owned_storage_and_shared_queue_without_translated_gather(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()

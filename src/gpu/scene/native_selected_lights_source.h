@@ -8,8 +8,34 @@
 #include <bit>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 namespace bd::gpu::scene {
+// Outbound compatibility format only. Native packets use LitLight directly.
+inline std::array<float,16> NativeSelectedLightWords(const LitLight &light) {
+  return {light.position.x,light.position.y,light.position.z,float(light.kind),
+      light.direction.x,light.direction.y,light.direction.z,light.cone_strength,
+      light.colour.x,light.colour.y,light.colour.z,light.inverse_range,
+      light.cone_cosine,0,0,0};
+}
+inline bool MatchesNativeLightParameterWrite(const NativeSelectedLights &lights,
+    uint32_t first, std::span<const uint32_t> words) {
+  for (size_t n = 0; n < words.size(); ++n) {
+    const uint64_t word = uint64_t(first)*4+n;
+    if (word < 80 || word >= 128) continue;
+    const auto slot = (word-80)/16, component = (word-80)%16;
+    const auto &light = lights[slot];
+    // Disabled/unused original lanes may retain irrelevant previous bytes.
+    bool consumed = component == 3 || (component >= 8 && component <= 10);
+    if (light.kind != LitDisabled) {
+      consumed |= (light.kind == LitDirectional || light.kind == LitSpot) && component >= 4 && component <= 6;
+      consumed |= (light.kind == LitPoint || light.kind == LitSpot) && (component < 3 || component == 11);
+      consumed |= light.kind == LitSpot && (component == 7 || component == 12);
+    }
+    if (consumed && std::bit_cast<float>(words[n]) != NativeSelectedLightWords(light)[component]) return false;
+  }
+  return true;
+}
 // Source identities stop here. A native consumer gets only NativeSelectedLights.
 struct SelectedLightSourceState {
   uint32_t owner = 0, known = 0;
@@ -119,6 +145,62 @@ std::optional<SelectedLightPublication> PrepareSelectedLights(uint32_t owner,
     for (uint32_t slot = 0; slot < 3; ++slot)
       if (result.writes[i].address == uint64_t(owner)+276+slot*4 &&
           !result.writes[i].identity) return {};
+  }
+  return result;
+}
+// Outgoing adapter for retained consumers after a direct native draw. All light
+// values come from the native ticket; descriptors only locate destinations.
+// Invalidate original selection/node caches so a later non-null callback cannot
+// skip a necessary update. No original selected slot or register value is input.
+struct NativeLightMirrorPlan {
+  std::array<SelectedLightWrite,44> writes{};
+  size_t count = 0;
+};
+template <class Read>
+std::optional<NativeLightMirrorPlan> PrepareNativeLightMirror(
+    uint32_t owner, const NativeSelectedLights &lights, Read read) {
+  if (!owner || (owner & 3)) return {};
+  NativeLightMirrorPlan result;
+  std::array<uint32_t,48> dependencies{};
+  size_t dependency_count = 0;
+  bool valid = true;
+  const auto word = [&](uint64_t address) {
+    const auto value = !address || (address & 3) || address > UINT32_MAX-3 ? std::nullopt : read(address);
+    if (!value || dependency_count == dependencies.size()) { valid = false; return 0u; }
+    dependencies[dependency_count++] = uint32_t(address);
+    return *value;
+  };
+  const auto destination = [&](uint64_t descriptor, bool component) {
+    const auto buffer = word(descriptor+4), index = word(descriptor+12);
+    const auto begin = buffer ? word(uint64_t(buffer)+12) : 0;
+    const auto lane = component ? word(descriptor+16) : 0;
+    if (!begin || lane > 3) valid = false;
+    return uint64_t(begin)+uint64_t(index)*16+lane*4;
+  };
+  const auto write = [&](uint64_t address, uint32_t value) {
+    if (!address || (address & 3) || address > UINT32_MAX-3 ||
+        result.count == result.writes.size() || !read(address)) { valid = false; return; }
+    result.writes[result.count++] = {uint32_t(address),value};
+  };
+  for (uint32_t slot = 0; slot < 3; ++slot) {
+    const auto &light = lights[slot];
+    if (light.kind < LitDisabled || light.kind > LitPoint) return {};
+    const auto values = NativeSelectedLightWords(light);
+    for (const auto value : values) if (!std::isfinite(value)) return {};
+    for (uint32_t vector = 0; vector < 4; ++vector) {
+      const auto at = destination(uint64_t(owner)+36+vector*60+slot*20,vector == 3);
+      for (uint32_t lane = 0; lane < (vector == 3 ? 1u : 4u); ++lane)
+        write(at+lane*4,std::bit_cast<uint32_t>(values[vector*4+lane]));
+    }
+    write(uint64_t(owner)+276+slot*4,std::bit_cast<uint32_t>(int32_t(-2)));
+  }
+  write(uint64_t(owner)+288,0); write(uint64_t(owner)+292,~0u);
+  if (!valid) return {};
+  for (size_t n = 0; n < result.count; ++n) {
+    for (size_t d = 0; d < dependency_count; ++d)
+      if (result.writes[n].address == dependencies[d]) return {};
+    for (size_t d = 0; d < n; ++d)
+      if (result.writes[n].address == result.writes[d].address) return {};
   }
   return result;
 }
