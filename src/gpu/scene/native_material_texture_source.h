@@ -18,9 +18,11 @@ template <class Read>
 std::optional<NativeMaterialObjectInputs> ReadMaterialObjectInputs(uint32_t visual, Read read) {
   if (!visual || (visual & 3) || visual > UINT32_MAX - 3419) return {};
   const auto shininess = read(uint64_t(visual) + 3044);
-  if (!shininess) return {};
+  const auto diffuse = read(uint64_t(visual) + 3052);
+  if (!shininess || !diffuse) return {};
   NativeMaterialObjectInputs result;
   result.writes_shininess = *shininess != 0;
+  result.diffuse_enabled = *diffuse != 0;
   for (uint32_t n = 0; n < 4; ++n) {
     const auto value = read(uint64_t(visual) + 3404 + n * 4);
     if (!value) return {};

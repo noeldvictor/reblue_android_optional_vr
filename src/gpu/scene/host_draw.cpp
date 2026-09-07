@@ -148,6 +148,7 @@ struct SubDraw {
   bool native_primitive_policy = false;
   std::optional<NativePrimitiveShaderInputs> native_shader_inputs;
   bool native_lighting_pass = false;
+  bool native_material_features = false;
   std::optional<NativeSkinBinding> skin;
   std::optional<bool> material_disables_shadow;
   std::optional<NativeReflectionRecipe> reflection;
@@ -841,6 +842,7 @@ bool MergeDraws(std::vector<SubDraw> &have, const std::vector<SubDraw> &now) {
     x.native_primitive_policy = y.native_primitive_policy;
     x.native_shader_inputs = y.native_shader_inputs;
     x.native_lighting_pass = y.native_lighting_pass;
+    x.native_material_features = y.native_material_features;
     x.material_disables_shadow = y.material_disables_shadow;
     // Keep each binding with its original inherited-state snapshot. Replacing
     // only the native half here can pair an old dynamic surface with a newly
@@ -1621,6 +1623,12 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
   const uint64_t vs_hash = vertex_shader && vertex_shader->shaderCacheEntry ? vertex_shader->shaderCacheEntry->hash : 0;
   const uint64_t ps_hash = pixel_shader && pixel_shader->shaderCacheEntry ? pixel_shader->shaderCacheEntry->hash : 0;
   if (d.indexed && vs_hash == 0xB5C88BB6295138CCull && ps_hash == 0xFB83DD3F5E67CEB7ull) {
+    if (const auto features = FindNativeMaterialFeatures(tag, d.index_va, d.stream_va[0], d.start_index, d.count)) {
+      const bool same = (d.bools[4] & kNativeMaterialFeatureMask) == PackNativeMaterialFeatures(*features);
+      NativeMaterialFeatureCheck(same);
+      d.native_material_features = same;
+      if (!same) p.replayable = false;
+    }
     if (const auto pass = NativeNodeLightingPass(tag)) {
       d.native_lighting_pass = CheckNativeLightingPass(*pass, t_ps_block);
       if (!d.native_lighting_pass) p.replayable = false;
@@ -2308,6 +2316,7 @@ bool HostDrawReplay(const NodeTag &tag) {
     std::array<float, 4> values[3];
     const NativeMaterialTextureValues *textures = nullptr;
     std::optional<NativePrimitivePolicy> policy;
+    std::optional<NativeMaterialFeatures> features;
   };
   static thread_local std::vector<MaterialValues> native_values;
   const u32 frame = FrameStatFrameCount();
@@ -2370,6 +2379,11 @@ bool HostDrawReplay(const NodeTag &tag) {
       const auto &draw = t->draws[i];
       if (draw.native_lighting_pass && !lighting_pass) return false;
       values.policy.reset();
+      values.features.reset();
+      if (draw.native_material_features) {
+        values.features = FindNativeMaterialFeatures(tag, draw.index_va, draw.stream_va[0], draw.start_index, draw.count);
+        if (!values.features) return false;
+      }
       if (draw.native_primitive_policy) {
         values.policy = FindNativePrimitivePolicy(tag, draw.index_va, draw.stream_va[0], draw.start_index, draw.count);
         if (!values.policy || (values.policy->routing_known && !values.policy->direct)) return false;
@@ -2956,6 +2970,10 @@ bool HostDrawReplay(const NodeTag &tag) {
       assert(bits); // only verified, fully known inputs enter a template
       ApplyPrimitiveShaderBits(*bits, bools[0], bools[4]);
       NativePrimitiveShaderNoteDraw();
+    }
+    if (native_values[di].features) {
+      ApplyNativeMaterialFeatures(*native_values[di].features, bools[4]);
+      NativeMaterialFeatureNoteDraw();
     }
     if (has_foliage) {
       std::memcpy(t_vs_block + 57 * 16, foliage.v, sizeof(foliage.v));

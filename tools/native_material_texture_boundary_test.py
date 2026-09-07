@@ -86,6 +86,30 @@ class MaterialTextureBoundaryTest(unittest.TestCase):
         self.assertIn("channel == 5", self.draw)  # reflection owns its separate producer
         self.assertIn("p.scene_texture_recipe.UsesSlot(channel)", self.draw)
 
+    def test_ordered_features_use_live_owners_and_preflight_before_replay(self):
+        data = (ROOT / "src/gpu/scene/native_material_data.h").read_text()
+        decode = (ROOT / "src/gpu/scene/native_material_data.cpp").read_text()
+        packet = (ROOT / "src/gpu/scene/native_object_primitive.h").read_text()
+        source = (ROOT / "src/gpu/scene/native_material_texture_source.h").read_text()
+        for required in ("NativeMaterialFeatureRecipe", "MaterialDiffuseMode::Unknown", "object.diffuse_enabled",
+                         "object.writes_shininess", "pass.specular_enabled", "pass.normal_mapping", "pass.fog_enabled"):
+            self.assertIn(required, data)
+        self.assertIn("current.features.specular_requested = false", decode)
+        self.assertIn("ComposeNativeMaterialFeatures", packet)
+        self.assertIn("read(uint64_t(visual) + 3052)", source)
+        getter = self.bridge.split("std::optional<NativeMaterialFeatures> FindNativeMaterialFeatures(", 1)[1].split(
+            "void NativeMaterialFeatureCheck", 1)[0]
+        for forbidden in ("bd::mem", "Word(", "Video::", "DecodeMeshMaterials", "d.bools"):
+            self.assertNotIn(forbidden, getter)
+        self.assertIn("NativeNodeLightingPass(tag)", getter)
+        self.assertIn("if (tag.tech != 0)", getter)
+        self.assertIn("if (!value || (found && *found != *value)) return {}", getter)
+        self.assertIn("NativeMaterialFeatureCheck(same)", self.draw)
+        self.assertIn("values.features = FindNativeMaterialFeatures", self.draw)
+        self.assertLess(self.draw.index("values.features = FindNativeMaterialFeatures"),
+                        self.draw.index("ApplyNativeMaterialFeatures(*native_values[di].features"))
+        self.assertIn("NativeMaterialFeatureNoteDraw()", self.draw)
+
 
 if __name__ == "__main__":
     unittest.main()

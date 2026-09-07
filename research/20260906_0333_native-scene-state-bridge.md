@@ -2407,3 +2407,39 @@ Growth covers ownership/test code, not an extra retained verification set.
 Cleanup-end free58.46 GiB; drive-wide use+5,267,456 B (5.02 MiB) from first measure.
 Same original budgets/floor/raw0 gate; no new allowance. Review equivalent
 verification for replacement at the next checkpoint, not accumulation.
+
+### Ordered material-feature continuation, 2026-09-07
+
+Parent892ef66 verified/pushed; first free62,964,940,800 B, no active producers.
+The prior post-push free62,961,704,960 B and this first measure differ by3,235,840 B;
+not credited to cleanup. Same original3 GiB exception,62,509,998,080 B floor,
+raw0 allowance. Planned <=192 MiB link overlap; enforced build256 MiB/runtime
+192 MiB free-drop stops,400 KiB log/160 KiB JPEG and10 MiB aggregate logs/images.
+
+Material27/PID28560 and CPU25/PID26240 pass; host88/PID22220 passes with host
+objects/link only, no guest objects or shader regeneration.261 Python checks
+pass. One initial source-guard spelling error and one wrapper patch-order error
+were corrected before runtime; no failed renderer attempt. Run930/PID30484,
+06:22:52-06:23:53, passes fresh material-feature/lighting and existing field gates.
+All15 settings audited, exact116 B profile restored; no owned producer remains.
+The234,945 B text and inspected147,837 B image replace equivalent prior evidence.
+Post-run cache/dump/perf/raw inventory finds zero new files. Known cliff marks
+and distant blur remain; no native direct game shader, reload/both-eye or speedup
+claim. Sources, exact windows and hashes:20260907_0625_owned-material-features.md.
+
+After replacement qualification, removed eight exact obsolete agent-created files:
+host87, material26/CPU24 stdout/stderr,929 text and lighting-pass JPEG.
+364,432 logical B removed. Immediate free62,939,676,672 ->62,938,685,440 B fell
+991,232 B while cleanup ran: actual reclaimed bytes cannot be isolated, and no
+positive measured recovery is credited. Build logs reproducible; exact retired
+runtime text/image gone, hashes and observations retained in the previous report.
+Keep current fixture/host88 logs,930/image, selected cooked asset and all distinct
+protected GPU/baseline/flat/VR/movement/unresolved-failure/raw evidence.
+
+Retained material tree7,732,718 B; aggregate build logs183,980 B; window images
+10,254,237 B. Known component growth109,084 B: material+46,638, logs+3,988,
+image+18,705, runtime text+2,377, exe+4,608/PDB+32,768. Growth covers new ownership
+code/tests and replacement evidence, not another verification set. Other objects,
+source/Git/metadata deltas unknown. Cleanup-end58.62 GiB free; drive-wide use
++26,255,360 B (25.04 MiB) from first measure, not wholly attributed to task files.
+Original floor/budgets and next-checkpoint replacement review remain unchanged.

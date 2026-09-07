@@ -58,24 +58,25 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **ordinary draws now take ambient light,
-camera position and color grading from a fresh native pass, not captured pixel
-constant history.** Run929 adds 1,242 matching comparisons and 38,435 owned-pass
-draws in post-event field windows. Lighting/material fixtures, 259 source/scenario
-checks and host87 pass. Movement and existing field/light/fog/shadow gates pass;
-the inspected image retains known cliff marks/blur. No raw captures or cache
-files were added; superseded small verification outputs were removed.
+Latest desktop checkpoint (2026-09-07): **ordinary material switches now compose
+from load-owned command ordering and live object/pass values.** Diffuse,
+specular, normal mapping, reflection and fog no longer borrow captured switches
+for the supported shader pair. Run930 adds 1,326 matching comparisons and 41,061
+owned-input draws in post-event field windows. The material fixture, 261
+source/scenario checks and host88 pass, as do existing movement/light/fog/shadow
+gates. The inspected image retains known cliff marks/blur. No new raw captures
+or cache files; superseded small verification outputs were removed.
 
 Next: connect the packet for the already-persisted 162-vertex rigid field asset to
 remaining live pass inputs and direct scene/shadow submission, then prove
 interpreter/template-free cold-load and reload. Its exact shader pair and UV
 formula are now identified; one layer, enabled vertex color and zero declaration
-bones are confirmed. The packet now retains lighting pass values too. Ordered
-material switches, sampler recipes, shadow inputs and complete native pass/draw
-routing remain; observed flags must not become frozen defaults.
+bones are confirmed. The packet now retains lighting pass values and composed
+material features too. Sampler recipes, remaining shadow/vertex-pass inputs and
+complete native pass/draw routing remain; observed flags must not become frozen defaults.
 **No live game object uses the new native rigid shaders yet.** Source-free GPU
 loading, full-game/both-eye qualification and any speedup remain unproven.
-[Evidence and next integration](research/20260907_0602_owned-lighting-pass.md).
+[Evidence and next integration](research/20260907_0625_owned-material-features.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no

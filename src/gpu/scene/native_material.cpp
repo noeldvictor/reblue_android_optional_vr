@@ -60,7 +60,7 @@ NativeMaterialLibrary &Library() {
   return library;
 }
 
-NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget) {
+NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget, std::optional<uint32_t> control_table) {
   NativeModelMaterialProgram result;
   std::vector<uint16_t> words;
   if (!source)
@@ -89,7 +89,12 @@ NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget) {
       if (!read())
         return result;
     if (command == 0xff) {
-      result.valid = DecodeMeshMaterials(words, result.ranges, &result.texture_assignments, &result.policy_steps);
+      result.valid = DecodeMeshMaterials(words, result.ranges, &result.texture_assignments, &result.policy_steps,
+          [&](uint16_t record) { return ReadModelMaterialControl(control_table, record,
+              [](uint32_t address) -> std::optional<uint32_t> {
+                const auto *word = bd::mem::try_at<const be_u32>(address);
+                return word ? std::optional(uint32_t(*word)) : std::nullopt;
+              }); });
       if (result.valid) {
         result.materials.reserve(result.ranges.size());
         for (const auto &range : result.ranges)
@@ -201,7 +206,7 @@ bool PublishModelMaterials(uint32_t graph) {
     const auto *commands = bd::mem::try_at<const be_u32>(mesh_va);
     if (!commands)
       return false;
-    auto program = ReadCommands(uint32_t(*commands), word_budget);
+    auto program = ReadCommands(uint32_t(*commands), word_budget, table);
     // NodeProcess copies all 36 bytes of the mesh header, including its asset
     // sphere. Own that value with the primitive program at load completion.
     std::array<float, 4> bounds{};

@@ -8,10 +8,12 @@
 #include "gpu/scene/native_skin.h"
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_primitive_policy.h"
+#include "gpu/scene/native_lighting.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <vector>
 
@@ -20,8 +22,37 @@ namespace bd::gpu::scene {
 struct NativeMaterialObjectInputs {
   std::array<float, 4> colour{};
   bool writes_shininess = false;
+  bool diffuse_enabled = true;
   bool operator==(const NativeMaterialObjectInputs &) const = default;
 };
+
+enum class MaterialDiffuseMode : uint8_t { Object, Disabled, Enabled, Unknown };
+struct NativeMaterialControl {
+  bool applies = false;
+  bool disable_diffuse = false, disable_specular = false, disable_shadow = false;
+};
+// Folded in command order at load, including repeated-command elision and
+// control-table null semantics. Live object/pass gates remain separate.
+struct NativeMaterialFeatureRecipe {
+  MaterialDiffuseMode diffuse = MaterialDiffuseMode::Object;
+  std::optional<bool> specular_requested = false;
+  bool normal_mapping_requested = false;
+  bool operator==(const NativeMaterialFeatureRecipe &) const = default;
+};
+struct NativeMaterialFeatures {
+  bool diffuse = false, specular = false, normal_mapping = false;
+  bool reflection = false, fog = false;
+  bool operator==(const NativeMaterialFeatures &) const = default;
+};
+inline std::optional<NativeMaterialFeatures> ComposeNativeMaterialFeatures(
+    const NativeMaterialFeatureRecipe &recipe, const NativeMaterialObjectInputs &object,
+    const NativeLightingInputs &pass, bool reflection) {
+  if (recipe.diffuse == MaterialDiffuseMode::Unknown || !recipe.specular_requested) return {};
+  return NativeMaterialFeatures{
+      recipe.diffuse == MaterialDiffuseMode::Object ? object.diffuse_enabled : recipe.diffuse == MaterialDiffuseMode::Enabled,
+      *recipe.specular_requested && object.writes_shininess && pass.specular_enabled != 0,
+      recipe.normal_mapping_requested && pass.normal_mapping != 0, reflection, pass.fog_enabled != 0};
+}
 
 // Named asset properties, not a captured shader register file. Unknown fields
 // stay unknown: an omitted command inherits state and is not a white default.
@@ -63,6 +94,7 @@ struct NativeMaterialRange {
   NativeMaterialProperties material;
   NativeReflectionRecipe reflection;
   NativePrimitiveShaderInputs shader;
+  NativeMaterialFeatureRecipe features;
   // Unknown until a bone-index command; an explicit empty binding is unskinned.
   std::optional<NativeSkinBinding> skin;
   uint32_t index_count = 0;
@@ -87,7 +119,8 @@ int MeshCommandOperands(uint16_t command);
 bool DecodeMeshMaterials(std::span<const uint16_t> commands,
                          std::vector<NativeMaterialRange> &out,
                          std::vector<MaterialImageAssignment> *textures = nullptr,
-                         std::vector<PrimitivePolicyStep> *policies = nullptr);
+                         std::vector<PrimitivePolicyStep> *policies = nullptr,
+                         const std::function<std::optional<NativeMaterialControl>(uint16_t)> &control = {});
 
 // Compose only fully known values; no staging globals or sibling draw state.
 // Specular power is written by the game only when the visual permits it.

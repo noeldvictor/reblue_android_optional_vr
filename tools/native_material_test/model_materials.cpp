@@ -39,6 +39,53 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
 
 void TestNativeModelMaterials() {
   {
+    // Load-time control ordering; ranges must not retain a command interpreter.
+    const uint16_t commands[]{0x1000, 1, 0, 0x0301, 0x040c, 0x0500, 0x1000, 1, 3,
+        0xe000, 0x040c, 0x1000, 1, 6, 0x040d, 0x1000, 1, 9,
+        0x0300, 0x05ff, 0x1000, 1, 12, 0xff};
+    for (bool applies : {false, true}) for (bool disable : {false, true}) {
+      std::vector<NativeMaterialRange> ranges;
+      Require(DecodeMeshMaterials(commands, ranges, nullptr, nullptr,
+          [&](uint16_t index) -> std::optional<NativeMaterialControl> {
+            Require(index == 0, "control index imported at decode");
+            return NativeMaterialControl{applies, disable, disable, disable};
+          }) && ranges.size() == 5, "ordered feature recipe decode");
+      for (unsigned flags = 0; flags < 64; ++flags) {
+        NativeMaterialObjectInputs object{};
+        object.diffuse_enabled = flags & 1; object.writes_shininess = flags & 2;
+        NativeLightingInputs pass{};
+        pass.specular_enabled = flags & 4; pass.normal_mapping = flags & 8; pass.fog_enabled = flags & 16;
+        const bool reflection = flags & 32;
+        for (size_t i = 0; i < ranges.size(); ++i) {
+          const auto value = ComposeNativeMaterialFeatures(ranges[i].features, object, pass, reflection);
+          const bool diffuse = i == 4 ? false : i == 0 ? object.diffuse_enabled :
+              (i >= 2 && applies) ? !disable && object.diffuse_enabled : true;
+          const bool specular = (i == 1 || i >= 3 || (i == 2 && !applies)) &&
+              object.writes_shininess && pass.specular_enabled;
+          Require(value && value->diffuse == diffuse && value->specular == specular &&
+              value->normal_mapping == (i > 0 && i < 4 && pass.normal_mapping) &&
+              value->reflection == reflection && value->fog == bool(pass.fog_enabled),
+              "live object/pass gates, restore/default and repeated power ordering");
+          for (uint32_t initial : {0u, UINT32_MAX, 0xa5a5a5a5u}) {
+            auto ps = initial; ApplyNativeMaterialFeatures(*value, ps);
+            Require((ps & ~kNativeMaterialFeatureMask) == (initial & ~kNativeMaterialFeatureMask) &&
+                (ps & kNativeMaterialFeatureMask) == PackNativeMaterialFeatures(*value),
+                "feature ABI adapter preserves all unowned bits");
+          }
+        }
+      }
+    }
+    std::vector<NativeMaterialRange> ranges;
+    Require(DecodeMeshMaterials(commands, ranges), "unknown control preserves other owned data");
+    Require(!ComposeNativeMaterialFeatures(ranges[2].features, {}, {}, false) &&
+        !ComposeNativeMaterialFeatures(ranges[3].features, {}, {}, false) &&
+        ComposeNativeMaterialFeatures(ranges[4].features, {}, {}, false).has_value(),
+        "unknown controls refuse consumption until both switches are explicitly known");
+    const auto before = ranges[4].features;
+    Require(!DecodeMeshMaterials(std::span(commands).first(std::size(commands) - 1), ranges) &&
+        ranges[4].features == before, "truncated feature import cannot replace retained ranges");
+  }
+  {
     std::unordered_map<uint32_t, uint32_t> words{{400, 0x12340756}, {408, 0x0001abcd}};
     unsigned reads = 0;
     const auto read = [&](uint32_t address) -> std::optional<uint32_t> {
@@ -110,6 +157,7 @@ void TestNativeModelMaterials() {
     NativeSelectedLights lights{}; lights[0].kind = LitDirectional; lights[0].colour.x = .75f;
     NativeLightingPass lighting;
     lighting.inputs.ambient = {.125f, .25f, .5f, 1};
+    lighting.inputs.specular_enabled = 1;
     auto packet = BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy, lights, {}, lighting);
     Require(packet && packet->geometry && packet->world[12] == 7 && packet->policy.direct &&
             packet->receiver_shadow == NativeShadowPolicy::Receive && (packet->material_mask & kNativeDiffuse) &&
@@ -128,6 +176,7 @@ void TestNativeModelMaterials() {
             packet->textures.uv[3] == 4 && packet->world[12] == 7 && packet->material_values[0][0] == .5f &&
             packet->lights && (*packet->lights)[0].colour.x == .75f &&
             packet->lighting && packet->lighting->inputs.ambient[0] == .125f &&
+            packet->features == NativeMaterialFeatures{true, true, false, false, false} &&
             packet->shader == NativePrimitiveShaderInputs{2, true, 0},
             "queued packet survives object scope, source and model/instance retirement");
     Require(models.Publish(100, {Mesh(20, 42)}), "same source key may be reused");
@@ -402,6 +451,19 @@ void TestNativeModelMaterials() {
   Require(ReadModelShadowPolicy(1000, 0, controls) == NativeShadowPolicy::Disabled &&
           ReadModelShadowPolicy(1000, 1, controls) == NativeShadowPolicy::Receive,
           "shadow disable requires both present and feature bits");
+  Require(!ReadModelMaterialControl({}, 0, controls) &&
+          !ReadModelMaterialControl(0, 0, controls)->applies &&
+          ReadModelMaterialControl(1000, 1, controls)->applies &&
+          !ReadModelMaterialControl(1000, 1, controls)->disable_shadow,
+          "missing table, null no-op and absent-present-bit default restoration differ");
+  for (uint32_t present = 0; present < 4; ++present) for (uint32_t flags = 0; flags < 16; ++flags) {
+    words[1000] = present; words[1004] = flags;
+    const auto control = ReadModelMaterialControl(1000, 0, controls);
+    Require(control && control->applies && control->disable_diffuse == bool((present & 1) && (flags & 1)) &&
+        control->disable_specular == bool((present & 1) && (flags & 2)) &&
+        control->disable_shadow == bool((present & 1) && (flags & 8)), "independent present and feature bits");
+  }
+  words[1000] = 1;
   for (uint32_t flags = 0; flags < 16; ++flags) {
     words[1004] = flags;
     Require(ReadModelShadowPolicy(1000, 0, controls) ==

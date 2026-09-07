@@ -92,12 +92,15 @@ void TestNativeMaterialTextures() {
     return it == memory.end() ? std::nullopt : std::optional(it->second);
   };
   memory[visual + 3044] = 7;
+  memory[visual + 3052] = 3;
   for (uint32_t i = 0; i < 4; ++i) memory[visual + 3404 + i * 4] = std::bit_cast<uint32_t>(float(i) / 4);
   const auto object = ReadMaterialObjectInputs(visual, read);
-  Require(object && object->colour == std::array<float, 4>{0, .25f, .5f, .75f} && object->writes_shininess,
+  Require(object && object->colour == std::array<float, 4>{0, .25f, .5f, .75f} && object->writes_shininess && object->diffuse_enabled,
           "final object color and nonzero shininess flag imported once");
   memory[visual + 3044] = 0;
-  Require(!ReadMaterialObjectInputs(visual, read)->writes_shininess && object->writes_shininess,
+  memory[visual + 3052] = 0;
+  Require(!ReadMaterialObjectInputs(visual, read)->writes_shininess && object->writes_shininess &&
+          !ReadMaterialObjectInputs(visual, read)->diffuse_enabled && object->diffuse_enabled,
           "later publication cannot mutate an older object input");
   memory[visual + 3404] = 0x7fc00000;
   Require(!ReadMaterialObjectInputs(visual, read), "nonfinite object color refused");

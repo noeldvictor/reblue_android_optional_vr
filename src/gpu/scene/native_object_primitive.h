@@ -25,6 +25,7 @@ template <class Image> struct NativeObjectPrimitive {
   std::optional<NativeSelectedLights> lights;
   std::optional<NativeFogLayers> fog;
   std::optional<NativeLightingPass> lighting;
+  std::optional<NativeMaterialFeatures> features;
   NativeShadowPolicy receiver_shadow = NativeShadowPolicy::Unknown;
   std::array<float, 4> material_values[3]{};
   uint32_t material_mask = 0;
@@ -51,6 +52,9 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
   result.lights = std::move(lights);
   result.fog = std::move(fog);
   result.lighting = std::move(lighting);
+  if (result.lighting)
+    result.features = ComposeNativeMaterialFeatures(program->ranges[primitive].features,
+        object, result.lighting->inputs, program->ranges[primitive].reflection.enabled);
   result.receiver_shadow = program->shadow_policies[primitive];
   result.material_mask = ComposeNativeMaterialAsset(result.material->asset, object.colour,
       object.writes_shininess, result.material_values);

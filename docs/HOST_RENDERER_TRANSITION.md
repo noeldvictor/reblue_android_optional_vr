@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after owned lighting pass consumption and field run929. The first
+Updated 2026-09-07 after ordered material feature consumption and field run930. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -80,11 +80,15 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    bone count are now load-owned and retained in that same packet. Ordinary
    scene replay consumes the first two with matching field comparisons. The
    selected object's exact shader pair/UV formula are identified; remaining
-   lighting switches, samplers and pass inputs precede direct submission.
+   samplers and remaining pass inputs precede direct submission.
    Its packet now retains a fresh, view-scoped lighting pass. Ordinary scene
    replay consumes ambient/camera/color grading without captured pixel-pass
    history; wrong-view, stale-frame and reset publications are unavailable.
-   Vertex pass history, ordered switches, samplers and shadow inputs remain.
+   Ordered ordinary material switches now fold into load-owned feature recipes,
+   including null/default controls and repeated shininess-command elision.
+   Live object/pass gates compose diffuse/specular/normal-map/reflection/fog;
+   packets retain them and exact-pair replay consumes them with matching checks.
+   Vertex pass history, samplers and remaining shadow inputs still need ownership.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -167,10 +171,20 @@ also observes its owned light kinds `(directional, disabled, disabled)` after
 the per-node callback. Run923's object-wide-only snapshot missed these updates;
 the consumer gate failed instead of accepting startup publisher checks.
 Reuse this selected asset, not a library-wide recook. Its packet now retains
-lighting pass values as well. Connect ordered material switches, sampler recipes,
-shadow inputs, complete native pass bindings and
+lighting pass values and composed ordinary material features as well. Connect
+sampler recipes, remaining shadow/vertex-pass inputs, complete native pass bindings and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
+
+[Material feature evidence](../research/20260907_0625_owned-material-features.md):
+material27/CPU25,261 Python checks and host88 pass. Run930 adds1,326 matching
+feature comparisons and41,061 owned-input draws in post-event windows2009/2309;
+all previous field/light/fog/shadow and observed-movement gates pass. Actual pixels
+retain known cliff marks/blur. The five ordinary switches use named native
+recipes and fresh object/pass gates, not captured boolean history. No new raw
+or cache files; replacement verification retires the prior equivalent small set.
+Template/interpreter use, direct native shaders, cold-load/reload and both-eye
+qualification remain open; no speedup claim.
 
 [Lighting pass evidence](../research/20260907_0602_owned-lighting-pass.md):
 lighting1/CPU1, material26/CPU24, 259 Python checks and host87 pass. Run929 adds
@@ -190,9 +204,9 @@ ordinary-pair comparisons and42,166 owned-input draws in fresh field windows,
 with existing light/fog/movement gates passing. Actual pixels remain coherent
 with known cliff marks/blur. This removes captured texture-enable/vertex-color
 values as the source for these supported draws, not template/interpreter use.
-Remaining diffuse/specular/normal-map/reflection/shadow switches must come from
-their object/pass/control producers; the two observed target PS words are not
-permission to freeze pass flags. The native UV packer can now use the exact
+The later material-feature checkpoint above owns diffuse/specular/normal-map/
+reflection/fog switches; shadow receiving has its separate owned policy. Remaining
+shadow pass values are not permission to freeze observed flags. The native UV packer can now use the exact
 family formula. No full direct object, reload, both-eye or speedup claim.
 
 [Fog evidence](../research/20260907_0510_owned-fog.md): material24/CPU22,

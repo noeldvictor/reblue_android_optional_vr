@@ -20,6 +20,14 @@ inline void ApplyPrimitiveShaderBits(const PrimitiveShaderBits &bits, uint32_t &
   pixel = (pixel & ~7u) | bits.pixel;
 }
 using LightingStagingImage = std::array<uint32_t, 103>;
+constexpr uint32_t kNativeMaterialFeatureMask = (1u << 3) | (1u << 4) | (1u << 6) | (1u << 7) | (1u << 8);
+inline uint32_t PackNativeMaterialFeatures(const NativeMaterialFeatures &features) {
+  return (uint32_t(features.normal_mapping) << 3) | (uint32_t(features.reflection) << 4) |
+      (uint32_t(features.fog) << 6) | (uint32_t(features.diffuse) << 7) | (uint32_t(features.specular) << 8);
+}
+inline void ApplyNativeMaterialFeatures(const NativeMaterialFeatures &features, uint32_t &pixel_bools) {
+  pixel_bools = (pixel_bools & ~kNativeMaterialFeatureMask) | PackNativeMaterialFeatures(features);
+}
 inline std::array<LightingVector, 3> LightingPixelInputs(const NativeLightingPass &pass) {
   return {pass.inputs.ambient, pass.inputs.camera_position, pass.inputs.color_scale};
 }

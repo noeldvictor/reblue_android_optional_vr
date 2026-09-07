@@ -38,7 +38,8 @@ int MeshCommandOperands(uint16_t command) {
 bool DecodeMeshMaterials(std::span<const uint16_t> commands,
                          std::vector<NativeMaterialRange> &out,
                          std::vector<MaterialImageAssignment> *textures,
-                         std::vector<PrimitivePolicyStep> *policies) {
+                         std::vector<PrimitivePolicyStep> *policies,
+                         const std::function<std::optional<NativeMaterialControl>(uint16_t)> &control) {
   if (commands.size() > 65536)
     return false;
   std::vector<NativeMaterialRange> ranges;
@@ -77,6 +78,16 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       current.index_record = command & 0x0fff;
     } else if (kind == 0xe000) {
       current.control_record = command & 0x0fff;
+      const auto value = control ? control(current.control_record) : std::nullopt;
+      if (!value) {
+        current.features.diffuse = MaterialDiffuseMode::Unknown;
+        current.features.specular_requested.reset();
+      } else if (value->applies) {
+        current.features.diffuse = value->disable_diffuse ? MaterialDiffuseMode::Disabled : MaterialDiffuseMode::Object;
+        // The node-entry specular value is zero. Both disabling it and restoring
+        // that entry value reset it; a later repeated power command stays elided.
+        current.features.specular_requested = false;
+      }
     } else if (kind == 0x6000) {
       const auto channel = uint8_t((command >> 8) & 15);
       assignments.push_back({MaterialImageSource::Table, channel, uint8_t(command & 0xff)});
@@ -115,11 +126,17 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       // Higher values change its serial/mode but preserve the previous enables.
       if ((command & 0xff) <= 3)
         current.shader.texture_layers = uint8_t(command & 0xff);
+    } else if ((command & 0xff00) == 0x0300) {
+      current.features.diffuse = (command & 0xff) ? MaterialDiffuseMode::Enabled : MaterialDiffuseMode::Disabled;
+    } else if ((command & 0xff00) == 0x0500) {
+      // Repeats cannot change this folded value; the pass gate is live.
+      current.features.normal_mapping_requested = (command & 0xff) != 255;
     } else if ((command & 0xff00) == 0x0400) {
       const uint8_t shininess = command & 0xff;
       // The interpreter skips a repeated power command, even if an RGB
       // command has changed the specular colour in between.
       if (!m.has_shininess || m.shininess != shininess) {
+        current.features.specular_requested = shininess != 0;
         m.shininess = shininess;
         m.has_shininess = true;
         if (!m.shininess) {

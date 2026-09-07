@@ -14,25 +14,34 @@ namespace bd::gpu::scene {
 // unknown; an explicitly null table is the original command's no-op. No source
 // address, packed control word or reader survives in the resulting policy.
 template <typename Reader>
-NativeShadowPolicy ReadModelShadowPolicy(std::optional<uint32_t> table,
-                                         uint16_t control_record, Reader &&read) {
+std::optional<NativeMaterialControl> ReadModelMaterialControl(std::optional<uint32_t> table,
+                                                            uint16_t control_record, Reader &&read) {
   if (!table)
-    return NativeShadowPolicy::Unknown;
+    return {};
   if (!*table || control_record == 0xffff)
-    return NativeShadowPolicy::Receive;
+    return NativeMaterialControl{};
   if (control_record > 0x0fff)
-    return NativeShadowPolicy::Unknown;
+    return {};
   // E000 selects a 16-byte asset record. sub_8228AB40 dispatches
   // sub_8228AAB0 for present bit 0; payload bit 3 disables shadow receiving.
   const uint64_t address = uint64_t(*table) + uint64_t(control_record) * 16;
   if (address > UINT32_MAX - 7)
-    return NativeShadowPolicy::Unknown;
+    return {};
   const auto present = read(uint32_t(address));
   const auto flags = read(uint32_t(address + 4));
   if (!present || !flags)
-    return NativeShadowPolicy::Unknown;
-  return MaterialControlDisablesShadow(*present, *flags)
-      ? NativeShadowPolicy::Disabled : NativeShadowPolicy::Receive;
+    return {};
+  const uint32_t enabled = (*present & 1) ? *flags : 0;
+  // Even absent bit0 restores defaults. A null table is the distinct no-op.
+  // The second handler writes only output+4, not these four switch bytes.
+  return NativeMaterialControl{true, bool(enabled & 1), bool(enabled & 2), bool(enabled & 8)};
+}
+template <typename Reader>
+NativeShadowPolicy ReadModelShadowPolicy(std::optional<uint32_t> table,
+                                         uint16_t control_record, Reader &&read) {
+  const auto control = ReadModelMaterialControl(table, control_record, std::forward<Reader>(read));
+  if (!control) return NativeShadowPolicy::Unknown;
+  return control->disable_shadow ? NativeShadowPolicy::Disabled : NativeShadowPolicy::Receive;
 }
 
 } // namespace bd::gpu::scene
