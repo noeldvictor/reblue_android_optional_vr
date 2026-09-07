@@ -144,8 +144,10 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::DEPTH_WRITE));
   commands->setFramebuffer(shadow_fb.get()); commands->clearDepthStencil(true,false,1,0);
   GraphicsBindings bindings;
-  bindings.layout = programs.shadow->Layout(); bindings.set_count = 3;
-  for (uint32_t n=0;n<3;++n) bindings.sets[n] = sets[n].get();
+  // Production casters bind only their two matrix blocks. The depth-only VS
+  // does not require otherwise declared image/sampler sets to be populated.
+  bindings.layout = programs.shadow->Layout(); bindings.set_count = 1;
+  bindings.sets[0] = sets[0].get();
   bindings.dynamic_counts[0] = 2; bindings.offsets = {2*stride,3*stride};
   GraphicsBindingState binding_state;
   Need(ApplyGraphicsBindings(*commands,bindings,binding_state), "Rigid shadow bind");
@@ -161,6 +163,8 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->setFramebuffer(scene_fb.get()); commands->clearColor(0,RenderColor(0,0,0,0));
   commands->clearDepthStencil(true,false,1,0);
   bindings.layout = programs.scene->Layout(); bindings.offsets[0] = stride;
+  bindings.set_count = 3;
+  for (uint32_t n=1;n<3;++n) bindings.sets[n] = sets[n].get();
   Need(ApplyGraphicsBindings(*commands,bindings,binding_state), "Rigid scene bind");
   commands->setPipeline(scene_pipeline.get()); commands->drawIndexedInstanced(3,1,0,0,0);
   commands->setFramebuffer(nullptr);

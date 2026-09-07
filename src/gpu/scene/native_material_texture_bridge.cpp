@@ -9,6 +9,7 @@
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_sampler_bridge.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_model_materials.h"
@@ -264,7 +265,8 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
       *scope->object, mesh->values[primitive], mesh->policies[primitive],
       SelectNativeObjectLights(scope->lights, scope->node_lights, node),
       NativeFogIsCurrent(scope->fog_revision) ? scope->fog : std::nullopt,
-      FindNativeLightingPass(scope->render_view), FindNativeSamplerFilters(scope->render_view));
+      FindNativeLightingPass(scope->render_view), FindNativeSamplerFilters(scope->render_view),
+      FindNativePassCamera(scope->render_view));
   object_stats.packets += result.has_value();
   return result;
 }

@@ -2551,3 +2551,44 @@ Git deltas unknown. Cleanup-end58.57 GiB free;1,474,560 B (1.41 MiB) used from
 output preflight. Drive-wide free rose149,254,144 B (142.34 MiB) from the first
 source-only measure, mainly unrelated/unattributed activity, not cleanup credit.
 Original budgets/floor unchanged; next review replaces equivalent evidence.
+
+### Direct rigid-shadow continuation, 2026-09-07
+
+Parent b9d3076. Same original3 GiB exception,62,509,998,080 B operational
+floor/raw0 gate; no reset. Output preflight62,877,323,264 B, unchanged116 B
+owner profile and no active producers. Existing build256 MiB/runtime192 MiB
+free-drop stops,75 s/400 KiB log/160 KiB JPEG, aggregate logs/images10 MiB.
+Reuse existing CPU/GPU/host trees and selected cooked asset; no new raw or cook.
+
+Output16/PID27088 failed on a Windows max macro in the new overflow assertion;
+fixed before output17/PID29516 and CPU2/PID24408 passed (0.34/0.36 s).
+GPU build24/PID19644 and rigid03/PID31484 passed four8x8 two-eye cases with
+zero validation errors/warnings,1.07/1.08 s. Host93/PID29384 passed host-only
+dependent recompilation/link; codegen0 written/up to date, no guest/shader
+objects rebuilt.275 all-boundary Python checks pass.
+
+Run935/PID24424,08:43:40–08:44:42: first direct native rigid caster at frame787;
+fresh post-event reports1987/2287 add300 submissions/300 fence retirements.
+Prior field, movement and native shadow-image gates pass. Sixteen settings
+audited, exact profile restored, no producer survives.242,052 B runtime text
+and inspected148,199 B JPEG; no new raw/perf/cache/dump/cooked outputs.
+Normal profile keeps the acceptance switch off. Scene/receiver drawing,
+source-free cold-load/reload, native batching and full-game/both-eye gates remain.
+Evidence/hashes:20260907_0846_direct-rigid-shadow.md.
+
+After validation removed14 exact obsolete agent files: host92,output15/CPU1,
+failed output16,GPU build23,rigid02 stdout/stderr,934 text and shadow-image JPEG.
+386,909 logical B;62,832,992,256 ->62,833,393,664 B free: **401,408 B reclaimed**,
+credited once. Exact old runtime image/text gone; hashes/findings remain.
+Keep current935/image,output17/CPU2,GPU24/rigid03,host93,other distinct fixtures
+and all required baseline/flat/VR/movement/failure/raw evidence and game data.
+
+CPU texture fixture tree65,095,361 B; GPU fixture tree10,420,169 B (its growth
+not separately measured); logs212,792 B; images10,254,599 B. Known component
+growth2,443,146 B: CPU fixture+2,183,259,logs+25,279,image+12,332,
+runtime+2,628,exe+23,040/PDB+196,608. New admission/camera fixtures and native
+consumer code justify the retained growth; runtime evidence replaces its
+predecessor, not a new archive. Other object/source/Git and drive activity
+unattributed. Cleanup-end58.52 GiB free,41.89 MiB drive-wide use from output
+preflight, not all task-owned bytes. Next checkpoint retains the same budget
+and replaces equivalent evidence after qualification.

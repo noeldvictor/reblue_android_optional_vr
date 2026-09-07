@@ -7,6 +7,7 @@
 #include "gpu/scene/native_scene_framebuffer.h"
 #include "gpu/scene/native_scene_commands.h"
 #include "gpu/scene/native_scene_snapshot.h"
+#include "gpu/scene/native_rigid_shadow.h"
 #include <array>
 #include <limits>
 #ifdef NDEBUG
@@ -561,6 +562,81 @@ void DepthOnlyCommands() {
     assert(weak.expired());
   }
 }
+void CameraAndRigidCaster() {
+  using namespace bd::gpu::scene;
+  const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+  RenderTransformInputs inputs{identity, identity, identity};
+  inputs.view[12] = 7; inputs.projection[0] = 2;
+  RenderCameraState state;
+  state.Publish(inputs, false, false, false); assert(!state.Read());
+  state.Publish(inputs, true, false, false); assert(!state.Read());
+  state.Publish(inputs, false, true, false);
+  assert(state.Read() && state.Read()->world_to_clip[12] == 14);
+  const auto retained_camera = *state.Read();
+  inputs.world[0] = std::numeric_limits<float>::quiet_NaN();
+  state.Publish(inputs, false, false, false); assert(state.Read()); // world isn't a camera input
+  inputs.view[12] = 9;
+  state.Publish(inputs, false, false, false); assert(!state.Read()); // unseen late writer
+  state.Publish(inputs, true, false, false); assert(state.Read());
+  state.Publish(inputs, true, true, true); assert(!state.Read());
+  state.Publish(inputs, true, false, false); assert(!state.Read());
+  state.Publish(inputs, false, true, false); assert(state.Read());
+  inputs.projection[0] = std::numeric_limits<float>::infinity();
+  state.Publish(inputs, false, true, false); assert(!state.Read());
+  inputs.projection = identity;
+  state.Publish(inputs, false, true, false); assert(!state.Read()); // invalidation lost both
+  state.Publish(inputs, true, false, false); assert(state.Read());
+  inputs.view[0] = inputs.projection[0] = (std::numeric_limits<float>::max)();
+  state.Publish(inputs, true, true, false); assert(!state.Read()); // derived overflow
+  inputs = {identity, identity, identity};
+  NativeSceneCommands pass;
+  pass.PublishCamera(inputs, true, true, false, 10, 1);
+  assert(pass.Camera(10, 1) && !pass.Camera(11, 1) && !pass.Camera(10, 3));
+  pass.PublishCamera(inputs, false, false, false, 11, 1); assert(!pass.Camera(11, 1));
+  pass.PublishCamera(inputs, true, true, false, 11, 1);
+  pass.PublishCamera(inputs, true, false, false, 11, 3); assert(!pass.Camera(11, 3));
+  pass.PublishCamera(inputs, false, true, false, 11, 3); assert(pass.Camera(11, 3));
+  NativeSceneCommands nested;
+  nested.PublishCamera(inputs, false, false, false, 11, 3); assert(!nested.Camera(11, 3));
+  assert(pass.Camera(11, 3));
+  pass.InvalidateCamera(); assert(!pass.Camera(11, 3));
+
+  auto geometry = std::make_shared<NativeGeometry>();
+  geometry->id = 0x258694267A8DBAEEull; geometry->canonical_vertices = true;
+  geometry->stream_mask = 1; geometry->count = 474; geometry->strides[0] = 96;
+  int buffer_token = 0;
+  geometry->streams[0].buffer.ref = reinterpret_cast<RenderBuffer *>(&buffer_token);
+  geometry->index.buffer.ref = geometry->streams[0].buffer.ref;
+  NativeVertexInputLibrary library;
+  RenderInputElement element{}; element.semanticName = "POSITION";
+  element.format = RenderFormat::R32G32B32A32_FLOAT;
+  geometry->rigid_vertex_input = library.Resolve(std::span(&element, 1), 1, {});
+  auto material = std::make_shared<NativeMaterial>(); material->id = 0x63B8D67932573E51ull;
+  NativeModelMaterialProgram program;
+  program.valid = true; program.geometries = {geometry}; program.materials = {material};
+  program.ranges.resize(1); program.ranges[0].shader.vertex_bones = 0;
+  PrimitivePolicyInputs policy; policy.phase = 1; policy.pass_cull = PrimitiveCull::Back;
+  assert(SelectedNativeRigidShadow(program));
+  const auto build = [&] { return PrepareNativeRigidShadow(program, identity, policy, retained_camera); };
+  auto caster = build();
+  assert(caster && caster->draw && caster->cull == PrimitiveCull::Back);
+  assert(caster->pass.world_to_shadow.rows[3].x == 14 && caster->object.flags.x == 0);
+  program.ranges.push_back(program.ranges[0]); assert(!build()); program.ranges.pop_back();
+  program.ranges[0].shader.vertex_bones.reset(); assert(!build());
+  program.ranges[0].shader.vertex_bones = 2; assert(!build()); program.ranges[0].shader.vertex_bones = 0;
+  program.ranges[0].skin = NativeSkinBinding{}; assert(!build()); program.ranges[0].skin.reset();
+  program.policy_steps = {{PrimitivePolicyOperation::Alpha, 1, 0}};
+  program.ranges[0].policy_step_end = 1; assert(!build()); // sorted/alpha isn't a solid caster
+  program.policy_steps = {{PrimitivePolicyOperation::Texture, 1, 0}};
+  policy.texture_effects = true; assert(!build()); // no invented texture routing
+  policy.texture_effects = false; assert(build());
+  auto bad_world = identity; bad_world[15] = 0;
+  assert(!PrepareNativeRigidShadow(program, bad_world, policy, retained_camera));
+  auto bad_camera = retained_camera; bad_camera.world_to_clip[0] = std::numeric_limits<float>::quiet_NaN();
+  assert(!PrepareNativeRigidShadow(program, identity, policy, bad_camera));
+  program = {}; material.reset(); geometry.reset();
+  assert(caster->geometry && caster->geometry->count == 474); // source/model lifetime independent
+}
 void SceneCommands() {
   using namespace bd::gpu::scene;
   const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
@@ -690,6 +766,7 @@ int main() {
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   SceneFramebufferOwnership();
   DepthOnlyCommands();
+  CameraAndRigidCaster();
   SceneCommands();
   refraction_material_tests::Run();
   water_update_tests::Run();

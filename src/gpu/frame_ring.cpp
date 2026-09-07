@@ -34,6 +34,7 @@
 #include "gpu/scene/native_texture_gpu.h"
 #include "gpu/scene/native_scene_resolves.h"
 #include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/scene/native_rigid_draw.h"
 #include "gpu/native_post_images.h"
 #include "gpu/native_target_images.h"
 #include "gpu/physical_buffers.h"
@@ -203,6 +204,7 @@ void DrainSlot(VideoState &s, u32 slot) {
   {
     std::lock_guard lock(s.mutex);
     s.framebuffer_graveyard[slot].clear();
+    scene::DrainNativeRigidDrawsLocked(s, slot);
     DrainNativePostImagesLocked(s, slot);
     scene::DrainNativeTextureGpuLocked(s, slot);
     scene::DrainNativeSceneResolvesLocked(s, slot);

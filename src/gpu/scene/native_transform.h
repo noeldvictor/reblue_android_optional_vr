@@ -8,6 +8,7 @@
 #pragma once
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 
 namespace bd::gpu::scene {
@@ -66,4 +67,37 @@ ComposeRenderTransforms(const RenderTransformInputs &inputs) {
       return {};
   return result;
 }
+
+struct RenderCamera {
+  RenderMatrix view{}, projection{}, world_to_clip{};
+};
+
+// One pass owns this state. Seeing an object's world matrix cannot bootstrap a
+// camera from inherited engine cache values. Both camera inputs must have been
+// explicitly produced in this scope; late unknown writes invalidate ownership.
+class RenderCameraState {
+  RenderCamera camera_;
+  std::array<bool, 2> known_{};
+public:
+  void Reset() { known_ = {}; }
+  void Publish(const RenderTransformInputs &inputs, bool view_changed, bool projection_changed,
+               bool suppressed) {
+    if (suppressed) { Reset(); return; }
+    const std::array<const RenderMatrix *, 2> values{&inputs.view, &inputs.projection};
+    const std::array<RenderMatrix *, 2> owned{&camera_.view, &camera_.projection};
+    const std::array<bool, 2> changed{view_changed, projection_changed};
+    for (uint32_t n = 0; n < 2; ++n) {
+      for (float value : *values[n]) if (!std::isfinite(value)) { Reset(); return; }
+      if (changed[n]) { *owned[n] = *values[n]; known_[n] = true; }
+      else if (known_[n] && *owned[n] != *values[n]) known_[n] = false;
+    }
+    if (known_[0] && known_[1]) {
+      camera_.world_to_clip = MultiplyRenderMatrices(camera_.view, camera_.projection);
+      for (float value : camera_.world_to_clip) if (!std::isfinite(value)) { Reset(); return; }
+    }
+  }
+  std::optional<RenderCamera> Read() const {
+    return known_[0] && known_[1] ? std::optional(camera_) : std::nullopt;
+  }
+};
 } // namespace bd::gpu::scene

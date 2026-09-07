@@ -33,6 +33,7 @@ set(reblue_backend_only
     gpu/scene/native_scene_framebuffer.cpp
     gpu/scene/native_texture_gpu.cpp
     gpu/scene/native_rigid_program.cpp
+    gpu/scene/native_rigid_draw.cpp
     gpu/shaders/guest_shaders.cpp
     gpu/texture_upload.cpp
     gpu/vertex_declaration.cpp

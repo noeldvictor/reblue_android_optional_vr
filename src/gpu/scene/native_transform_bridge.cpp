@@ -15,6 +15,7 @@
 #include "gpu/scene/deferred_shader_bridge.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/native_transform.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 #include <algorithm>
 #include <bit>
 #include <rex/cvar.h>
@@ -208,6 +209,8 @@ void Compare(const Publication &publication) {
 }
 void Publish(const Publication &publication) {
   native_transforms = publication.transforms;
+  PublishNativePassCamera(publication.transforms.inputs, publication.update[1],
+      publication.update[2], publication.suppressed);
   if (publication.nonfinite_mask && ++stats.nonfinite <= 8)
     BD_WARN("[native-transforms] preserving nonfinite engine values on host; "
             "mask {} (world=1 view=2 projection=4 derived=8)",
@@ -260,6 +263,7 @@ void UpdateRenderTransforms(PPCContext &ctx, uint8_t *base,
   }
   ++stats.compatibility;
   native_transforms.reset();
+  InvalidateNativePassCamera();
   Original(ctx, base, view_override);
   Report();
 }

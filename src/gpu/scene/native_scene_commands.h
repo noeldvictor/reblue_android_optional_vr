@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/native_target_images.h"
+#include "gpu/scene/native_transform.h"
 #include <array>
 #include <cmath>
 #include <optional>
@@ -74,6 +75,16 @@ public:
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
   bool ClearPending() const { return clear_.has_value(); }
+  void PublishCamera(const RenderTransformInputs &inputs, bool view_changed, bool projection_changed,
+                     bool suppressed, uint32_t frame, uint32_t view) {
+    if (frame != camera_frame_ || view != camera_view_) camera_.Reset();
+    camera_frame_ = frame; camera_view_ = view;
+    camera_.Publish(inputs, view_changed, projection_changed, suppressed);
+  }
+  void InvalidateCamera() { camera_.Reset(); }
+  std::optional<RenderCamera> Camera(uint32_t frame, uint32_t view) const {
+    return frame == camera_frame_ && view == camera_view_ ? camera_.Read() : std::nullopt;
+  }
   // Read only after ending this scope's active render pass. For MSAA this is
   // the ordinary attachment-resolve destination, never the multisample source.
   SampledImage ColorReadImage() const {
@@ -115,5 +126,7 @@ private:
   plume::RenderFramebuffer *framebuffer_ = nullptr;
   std::array<SampledImage, 2> resolved_;
   std::optional<NativeSceneClear> clear_;
+  RenderCameraState camera_;
+  uint32_t camera_frame_ = 0, camera_view_ = ~uint32_t{0};
 };
 } // namespace bd::gpu::scene

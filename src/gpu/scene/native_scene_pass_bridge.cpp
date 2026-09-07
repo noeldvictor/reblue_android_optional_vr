@@ -11,6 +11,7 @@
 #include "gpu/scene_image.h"
 #include "gpu/scene/native_pass_bridge.h"
 #include "gpu/scene/native_view_bridge.h"
+#include "gpu/scene/guest_scene.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
 #include "gpu/device.h"
@@ -480,6 +481,31 @@ void BindNativeSceneCommands(VideoState &s, NativeSceneCommands &commands) {
   const auto barriers = commands.Bind(*s.command_list);
   if (barriers) NoteBarrierCall(barriers, BarrierSite::DrawFb);
   ++stats.command_binds;
+}
+void PublishNativePassCamera(const RenderTransformInputs &inputs, bool view_changed,
+                            bool projection_changed, bool suppressed) {
+  const auto *view = bd::mem::try_at<const be_u32>(kRenderViewIdVa);
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,
+      s.depth_stencil ? s.depth_stencil->texture : nullptr);
+  if (!commands) return;
+  if (!view || uint32_t(*view) >= 16) { commands->InvalidateCamera(); return; }
+  commands->PublishCamera(inputs, view_changed, projection_changed, suppressed,
+      FrameStatFrameCount(), uint32_t(*view));
+}
+void InvalidateNativePassCamera() {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  if (auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,
+      s.depth_stencil ? s.depth_stencil->texture : nullptr)) commands->InvalidateCamera();
+}
+std::optional<RenderCamera> FindNativePassCamera(uint32_t render_view) {
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  const auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,
+      s.depth_stencil ? s.depth_stencil->texture : nullptr);
+  return commands ? commands->Camera(FrameStatFrameCount(), render_view) : std::nullopt;
 }
 void ApplyNativeSceneClear(VideoState &s, NativeSceneCommands &commands) {
   stats.native_clears += commands.ApplyClear(*s.command_list);

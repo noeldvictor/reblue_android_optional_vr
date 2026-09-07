@@ -37,6 +37,7 @@ namespace bd::gpu {
 namespace scene { struct NativeTextureGpuStore; struct NativeTextureBinding; }
 namespace scene { struct NativeSceneResolveStore; }
 namespace scene { class NativeSceneFramebufferStore; }
+namespace scene { struct NativeRigidDrawStore; }
 namespace scene { struct AlphaState; }
 struct SceneImage;
 class NativePostImagePool;
@@ -711,6 +712,7 @@ struct VideoState {
   std::shared_ptr<scene::NativeTextureGpuStore> native_texture_gpu;
   std::shared_ptr<scene::NativeSceneResolveStore> native_scene_resolves;
   std::shared_ptr<scene::NativeSceneFramebufferStore> native_scene_framebuffers;
+  std::shared_ptr<scene::NativeRigidDrawStore> native_rigid_draws;
   std::shared_ptr<NativePostImagePool> native_post_images;
   std::shared_ptr<NativeTargetImageStore> native_target_images;
 

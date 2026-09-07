@@ -52,6 +52,8 @@
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
+#include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/host_frustum_bridge.h"
 #include "gpu/scene/node_tag.h"
@@ -165,6 +167,14 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
   // triangles into the shadow map and 49k into the reflection against 79k
   // in the scene (research/20260904_0400, before this).
   const u32 view_id = bd::mem::try_load<u32>(kRenderViewIdVa);
+  // Transitional object producer boundary, before visiting any primitive. The
+  // direct consumer receives values and owned pose/model handles, never VAs.
+  const auto shadow_policy = view_id == 1 && NativeRigidShadowEnabled()
+      ? ReadPrimitivePolicyInputs(ctx_va, bd::mem::try_load<u32>(ctx_va), [](uint64_t address) -> std::optional<uint32_t> {
+          if (!address || address > UINT32_MAX - 3 || (address & 3)) return {};
+          const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
+          return word ? std::optional(uint32_t(*word)) : std::nullopt;
+        }) : std::nullopt;
   float eye[3] = {0, 0, 0};
   const f64 extra_cull =
       view_id == 1 ? REXCVAR_GET(bd_shadow_cull_distance)
@@ -380,7 +390,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             ctx.r4.u64 = index;
             ctx.r5.u64 = matrix;
             ctx.r6.u64 = ctx_va;
-            bdSceneNodeDrawSingle(ctx, base);
+            if (!(view_id == 1 && instance_pose &&
+                  SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)))
+              bdSceneNodeDrawSingle(ctx, base);
             // Diagnostic only: per-node light callbacks publish during the draw.
             if (instance_pose && REXCVAR_GET(bd_native_materials_verify))
               NoteNativeModelNodeCandidate(*instance_pose, index, view_id,

@@ -58,29 +58,34 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **the main sun-shadow pass now owns its
-native depth image, framebuffer, clear and sampled-image handoff.** It no longer
-allocates through the console surface pool or publishes a legacy resolve link.
-Run934 verifies 300 fresh shadow image handoffs with no ownership mismatch or
-fallback. The depth-only/lifetime fixture, 271 source/scenario checks, host92
-and existing field/movement gates pass. The inspected image shows coherent
-character/scenery shadows, with known cliff marks/blur still present. No new raw
-captures or cache files; six superseded small verification files were removed.
+Latest desktop checkpoint (2026-09-07): **a real field object's shadow now uses
+the native rigid shader**, through the existing queue and pipeline cache. The
+opt-in `bd_native_rigid_shadow` acceptance mode bypasses that selected caster's
+interpreter, template capture and replay; a recognized but unsupported node
+fails visibly. Run935 verifies 300 fresh submissions and fence retirements,
+alongside the existing field/movement and native shadow-image gates. Camera
+matrices are owned by the active pass and checked for frame/view freshness.
+The CPU fixture, 275 source/scenario checks, host93 and four tiny two-eye Vulkan
+pixel cases pass. The inspected field image retains coherent shadows and known
+cliff marks/blur. No new raw captures or cooked assets; 14 superseded small
+verification files were removed. This path is not enabled in the normal profile.
 
 Next: connect the packet for the already-persisted 162-vertex rigid field asset to
-remaining live pass inputs and direct scene/shadow submission, then prove
+remaining live pass inputs and direct **scene/receiver** submission, then prove
 interpreter/template-free cold-load and reload. Its exact shader pair and UV
 formula are now identified; one layer, enabled vertex color and zero declaration
 bones are confirmed. The packet now retains lighting pass values, composed
 material features and ordinary 2D sampler recipes. The shadow image now has a
-native owner; fresh camera/projection and shadow receiver values still need to
-feed complete native pass/draw routing. Host light selection is
+native owner and the caster consumes fresh camera/projection values. Shadow
+receiver values and the production uploader's array-view texture contract still
+need to feed complete native scene routing. Host light selection is
 available, but its caller still sits inside the old shader callback; direct
 submission must invoke the producer before that path. Observed flags must not
 become frozen defaults.
-**No live game object uses the new native rigid shaders yet.** Source-free GPU
-loading, full-game/both-eye qualification and any speedup remain unproven.
-[Evidence and next integration](research/20260907_0757_native-shadow-images.md).
+**No live game scene draw uses the new native rigid scene shader yet.** The
+caster still receives source-published pose/pass inputs; native batching,
+source-free cold-load/reload, full-game/both-eye qualification and any speedup
+remain unproven. [Evidence and next integration](research/20260907_0846_direct-rigid-shadow.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no
@@ -170,7 +175,8 @@ dependencies. The source-index tool now exposes indirect and hook boundaries;
 this tooling checkpoint does not itself convert additional rendering.
 
 1. Complete one real native static-object path from cooked geometry/materials
-   and instance updates through direct scene/shadow submission. Establish
+   and instance updates through direct scene/shadow submission. The first opt-in
+   caster now reaches the backend; finish scene/receiver inputs and native batching. Establish
    live producers for the GPU-tested native shader/texture/pass contracts; remove its
    guest-renderer warm-up, source lookup and captured templates. Verify movement
    and reload behavior, then expand material families.

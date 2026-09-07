@@ -59,6 +59,10 @@ NativeSceneCommands *ActiveNativeSceneCommands(plume::RenderTexture *color, plum
 // Depth-only sun scopes reuse the same native framebuffer/command owners.
 plume::RenderFramebuffer *ActiveNativeShadowFramebuffer(plume::RenderTexture *color, plume::RenderTexture *depth);
 NativeSceneCommands *ActiveNativeShadowCommands(plume::RenderTexture *color, plume::RenderTexture *depth);
+void PublishNativePassCamera(const RenderTransformInputs &inputs, bool view_changed,
+                            bool projection_changed, bool suppressed);
+void InvalidateNativePassCamera();
+std::optional<RenderCamera> FindNativePassCamera(uint32_t render_view);
 void BindNativeSceneCommands(VideoState &s, NativeSceneCommands &commands);
 void ApplyNativeSceneClear(VideoState &s, NativeSceneCommands &commands);
 } // namespace bd::gpu::scene

@@ -8,7 +8,9 @@
 
 namespace bd::gpu {
 // Host resource staging, deliberately not a shader-register allocation.
-// No uniform dynamic offset, guest address, or emulated resource is involved.
+// Native vertex/index/storage/uniform bytes share the bounded frame arena.
+// The consumer supplies its alignment and interprets the returned byte offset;
+// no guest address or emulated resource is involved.
 struct HostUploadAllocation {
   uint8_t *memory = nullptr;
   plume::RenderBufferReference ref{};

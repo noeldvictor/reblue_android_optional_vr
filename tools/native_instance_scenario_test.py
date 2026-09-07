@@ -3,6 +3,7 @@ import re
 from native_instance_scenario import verify_model_nodes, verify_object_inputs, verify_selected_lights
 from native_instance_scenario import verify_fog, verify_primitive_shader, verify_lighting_pass, verify_material_features
 from native_instance_scenario import verify_material_samplers, verify_light_selection, verify_shadow_images
+from native_instance_scenario import verify_rigid_shadow
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -704,6 +705,35 @@ class MaterialSamplerScenarioTest(unittest.TestCase):
                     "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_material_samplers(bad)
+
+
+class RigidShadowScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-rigid-shadow] frame 100 submitted 100 suppressed 0 fence-retired 99; node 64 instance 144 generation 93 phase 1;"
+        rows[4] = "[native-rigid-shadow] frame 150 submitted 150 suppressed 0 fence-retired 149; node 64 instance 144 generation 93 phase 1;"
+        return rows
+
+    def test_fresh_native_draws_and_fences(self):
+        self.assertEqual(verify_rigid_shadow("\n".join(self.rows())), dict(submitted_delta=50, retired_delta=50))
+
+    def test_stale_missing_generation_change_and_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150 submitted 150", "150 submitted 100"),
+                    text.replace("retired 149", "retired 99"),
+                    text.replace("bg41_01", "bg42_01"),
+                    text + "\n[native-material-context] mode Loading",
+                    text.replace("generation 93 phase 1;", "generation 94 phase 1;", 1),
+                    "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2])):
+            with self.assertRaises(Pending):
+                verify_rigid_shadow(bad)
+
+    def test_refusal_and_input_bounds(self):
+        text = "\n".join(self.rows())
+        for bad in ("[native-rigid-shadow] selected node refused: camera\n" + text,
+                    text.replace("node 64", "node 63"), "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_rigid_shadow(bad)
 
 
 class FogScenarioTest(unittest.TestCase):

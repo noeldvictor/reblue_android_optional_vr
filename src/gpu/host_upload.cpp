@@ -41,6 +41,7 @@ HostUploadAllocation AllocateHostUpload(uint32_t size, uint32_t alignment) {
                            plume::RenderBufferDesc::UploadBuffer(
                                capacity, plume::RenderBufferFlag::VERTEX |
                                              plume::RenderBufferFlag::INDEX |
+                                             plume::RenderBufferFlag::CONSTANT |
                                              plume::RenderBufferFlag::STORAGE),
                            "host-upload-page");
                        if (!page->buffer)
