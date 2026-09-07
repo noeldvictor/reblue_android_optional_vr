@@ -23,6 +23,7 @@
 #include "gpu/constant_buffers.h"
 #include "gpu/vertex_pull.h"
 #include "gpu/scene/host_draw.h"
+#include "gpu/scene/native_vertex_input.h"
 #include "gpu/scene/native_alpha_bridge.h"
 #include "gpu/scene/native_blend_bridge.h"
 #include "gpu/scene/native_raster_bridge.h"
@@ -179,7 +180,8 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
   }
 
   // Anything missing here means the engine has not wired the pipeline up yet.
-  if (!s.pipelineState.vertexShader || !s.pipelineState.vertexDeclaration) {
+  if (!s.pipelineState.vertexShader ||
+      (!s.pipelineState.native_vertex_input && !s.pipelineState.vertexDeclaration)) {
     u32 n;
     if (DiagShouldLog(3, s.render_target, &n)) {
       BD_WARN("[draw-diag] #{} draw dropped: vs={} decl={} ps={} rt={}x{}", n,
@@ -313,8 +315,12 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
         PipelineState pulled = inst;
         pulled.specConstants |= kSpecConstantPulled;
         pulled.vertexDeclaration = VertexPullDummyDeclaration();
+        if (lookup.native_vertex_input) {
+          pulled.native_vertex_input = VertexPullDummyInput();
+          pulled.vertexDeclaration = nullptr;
+        }
         std::memset(pulled.vertexStrides, 0, sizeof(pulled.vertexStrides));
-        if (pulled.vertexDeclaration) {
+        if (pulled.native_vertex_input || pulled.vertexDeclaration) {
           SanitizePipelineState(pulled);
           s.current_pulled_pso = FindPipeline(pulled);
           if (!s.current_pulled_pso) {
@@ -330,6 +336,7 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
     return false;
   }
 
+  if (s.pipelineState.native_vertex_input) ++scene::NativeVertexInputUses().pipelines;
   // The Set*ShaderConstant wrappers dirty-track these, so clean means the bound
   // constants are still live and the 4 KiB byte swap upload can be skipped.
   // Vulkan push offsets 0/8/16 follow the guest PushConstants member order

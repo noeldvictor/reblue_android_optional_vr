@@ -1365,3 +1365,34 @@ draft's preflight, not all attributable to the smaller retained diagnostic growt
 Scoped producer/output checks leave the intervening drive-wide difference
 unattributed; do not call it cleanup. Final source/docs/Git writes remain charged.
 No new raw allowance, budget reset, Quest run or full native-frame claim.
+
+### Native vertex-input ownership, same checkpoint
+
+Preflight 2026-09-06 20:18 EDT: **64,168,857,600 B** free, no renderer/build
+producer. Original checkpoint ceilings/floor and zero new raw allowance remain.
+Plan <=256 MiB build/link overlap, <=4 MiB fixture/log growth, reuse existing
+host/mesh/texture trees. No guest/shader rebuild or cache/cooked-asset writes.
+One <=1 MiB normal-field JPEG replacement may overlap the current table image
+until validated; existing total-image cap remains 10 MiB. Keep one latest
+passing image by purpose and retire only superseded agent logs after validation.
+The runtime input owner removes declaration dereferences in pipeline creation,
+shared decoding and pulling; packed vertex bytes, shader ABI and templates remain.
+Host60 (44.663 s, no guest/shader rebuild), mesh CPU04, draw-intent fixture,
+152 guards and 23 scenario cases pass. PSO-off run907 and precache-on run908
+pass fresh field checks; 908 adds 170,020 native pulled records, with instancing/
+indirect calls active and inspected 1920x1080 pixels. Every producer is terminal
+and the exact owner profile restored. This is not direct static drawing or full
+desktop/both-eye/movement qualification. Details: `20260906_2040_native-vertex-inputs.md`.
+
+No new raw/perf/cache/dump files; mesh cache unchanged at 3,510 /36,510,144 B.
+Mesh exe+five objects now 865,196 B. Known exe/main/new-input-object growth
+83,458 B; other modified fixture/build metadata lacks a complete before baseline.
+Comparable runtime-log/build-log/image set grows 233,145 B for new input and
+precache-off/on coverage. Aggregate build logs 175,358 B, below 10 MiB.
+After validated replacements, removed nine exact superseded logs/JPEGs,
+992,997 logical B; measured reclaim 614,400 +393,216 = **1,007,616 B**, once.
+Keep logs907/908, current pulled-input JPEG and final host60/mesh04/intent01
+logs. Older texture comparison905 and protected flat/XR/broad failures remain.
+Post-cleanup free **64,135,020,544 B**: 33,837,056 B drive-wide use from this
+preflight, not all attributable to retained outputs. Source/docs/Git writes
+follow. Original checkpoint ceilings, zero new raw allowance and full goal remain.

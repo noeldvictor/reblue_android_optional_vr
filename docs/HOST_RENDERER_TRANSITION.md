@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after load-owned native texture tables. These milestones organize the
+Updated 2026-09-06 after native runtime vertex-input ownership. These milestones organize the
 unchanged completion requirements above; none is a substitute for the full gate.
 
 1. **Scene/material dependency map and targeted verification.** Start from
@@ -46,7 +46,7 @@ unchanged completion requirements above; none is a substitute for the full gate.
    four consumers independently of PSO precaching, with full graph retirement.
    Geometry/buffer associations now resolve during load, and converted base
    geometry replays consume load-owned GPU handles. Control/texture/pass inputs,
-   independent layouts, source-key adapter and draw templates remain. Next are
+   independent cooked layouts, source-key adapter and draw templates remain. Next are
    complete native object/update contracts and direct draws, not another first-draw cache.
    Native IDs and final render-pose snapshots now feed traversal/replay, including
    the actual dirty-state-gated handoff and late pose writers. Pose calculation,
@@ -56,6 +56,11 @@ unchanged completion requirements above; none is a substitute for the full gate.
    replacement. Native image leases and normal host lookup are active, but the
    source-selected return ABI and downstream resource/dynamic overrides remain.
    Connect these owners to complete native object/material/pass records next.
+   Geometry-owned runtime vertex inputs now feed pipeline creation, shader decode
+   parameters and pulling with the dispatch's guest declaration cleared. Two
+   shared input records cover this field. Packed bytes, synthetic shader inputs,
+   register ABI, source associations and retained templates remain; do not call
+   this a canonical cooked layout or a direct static-object draw.
    Scenario checks must establish feature execution; empty queues are untested.
    The loader visibility/slot readers and idle-state contract are corrected:
    two post-event state-0 samples now pass with positive material/lookup deltas.
@@ -71,7 +76,8 @@ unchanged completion requirements above; none is a substitute for the full gate.
    Native mesh disk retention is now independently bounded (256 MiB /16,384
    files, free-space reserve and writer lease). The existing GPU arena remains
    separate. Load-time base geometry and render-pose snapshots are now active;
-   complete native update production, independent layouts and direct submission
+   runtime input ownership also removes the terminal declaration dependency.
+   Complete native update production, persistent layouts/native shader inputs and direct submission
    are still required.
 3. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
@@ -93,6 +99,22 @@ work over introducing a new build system. No overall development-speed
 multiplier is established.
 
 ## Latest qualified checkpoint
+
+Native vertex inputs (2026-09-06): immutable, bounded, content-shared owners
+carry IA elements (including owned semantic names), pulling entries and the
+temporary old-shader decoding contract. Geometry pins them; native dispatch
+clears the guest declaration, uses owned strides, and gives all three consumers
+the explicit input. The legacy PSO CSV excludes runtime-native rows rather than
+serializing resource pointers. Host 60, mesh CPU 04, draw-intent test, 152 source
+guards and 23 scenario cases pass. PSO-off run 907 adds 170,037 native pipeline/
+decode uses, no pulling; normal precache-on run 908 adds 170,020 native pulled
+records with instancing and indirect dispatch active. Both retain fresh matching
+material/geometry/pose and normal texture-table checks. Two inputs /3,824 B;
+normal 1920x1080 pixels inspected. No new raw/perf/cache files. Packed formats,
+shader-register ABI, template/source lookup, full native object/pass contracts
+and direct scene/shadow submission remain. Movement/reloads/sequences/both eyes
+and full desktop qualification remain open. Evidence:
+`research/20260906_2040_native-vertex-inputs.md`.
 
 Texture tables (2026-09-06): immutable image leases and native runtime IDs now
 publish after actual load completion; replacement/eviction preserves immutable

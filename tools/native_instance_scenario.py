@@ -13,6 +13,8 @@ TABLE_METRIC = re.compile(
     r"\[native-texture-tables\] (\d+) published (\d+) retired (\d+) indexed / (\d+) bytes; "
     r"(\d+) replacements (\d+) refused; (\d+) lookups (\d+) fallback; (\d+) checks wrong (\d+); "
     r"(\d+) image checks wrong (\d+); (\d+) native image reads (\d+) unavailable;")
+VERTEX_METRIC = re.compile(
+    r"\[native-vertex-input-use\] (\d+) pipeline binds, (\d+) decode blocks, (\d+) pulled records")
 
 
 class Pending(ValueError):
@@ -104,12 +106,33 @@ def verify_texture_tables(text, comparison=True):
             "native_image_reads_delta": b[12] - a[12]}
 
 
+def verify_vertex_inputs(text, require_pulling=False):
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("vertex-input diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = VERTEX_METRIC.search(line)
+        if match:
+            metrics.append((index, tuple(map(int, match.groups()))))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] - a[0] < 32 or b[1] - a[1] < 32 or b[2] < a[2]:
+        raise Pending("native pipeline and shader-input consumers must advance in the ready field")
+    if require_pulling and b[2] - a[2] < 32:
+        raise Pending("native vertex pulling must advance in the ready field")
+    return {"pipeline_binds_delta": b[0] - a[0], "decode_blocks_delta": b[1] - a[1],
+            "pulled_records_delta": b[2] - a[2]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--texture-tables", action="store_true")
     mode.add_argument("--texture-tables-normal", action="store_true")
+    parser.add_argument("--vertex-inputs", action="store_true")
+    parser.add_argument("--vertex-pulling", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -120,6 +143,8 @@ def main():
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
+        vertex_inputs = verify_vertex_inputs(text, args.vertex_pulling) if (
+            args.vertex_inputs or args.vertex_pulling) else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -129,6 +154,8 @@ def main():
     print("PASS: post-event native instances " + ", ".join(f"{k}={v}" for k, v in result.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
+    if vertex_inputs is not None:
+        print("PASS: post-event native vertex inputs " + ", ".join(f"{k}={v}" for k, v in vertex_inputs.items()))
     return 0
 
 

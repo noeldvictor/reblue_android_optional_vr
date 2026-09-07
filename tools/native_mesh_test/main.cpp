@@ -12,6 +12,7 @@ static void Check(bool ok, const char *name) {
   }
 }
 void TestMeshStorage();
+void TestVertexInput();
 int VerifyMeshCache(const char *path);
 static int RunTests(int argc, char **argv) {
   if (argc == 3 && std::string_view(argv[1]) == "--verify-cache")
@@ -70,6 +71,7 @@ static int RunTests(int argc, char **argv) {
   Check(!ValidateNativeMesh(mesh), "negative effective index rejected");
   std::cout << "native mesh: topology, bounds, round trip, truncation and corruption passed\n";
   TestMeshStorage();
+  TestVertexInput();
   return 0;
 }
 

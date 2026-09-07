@@ -1,6 +1,6 @@
 import unittest
 import re
-from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables
+from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables, verify_vertex_inputs
 
 
 def metric(reads=100, checks=100, wrong=0, refused=0):
@@ -138,6 +138,44 @@ class TextureTableScenarioTest(unittest.TestCase):
                 verify_texture_tables(bad, comparison=False)
         with self.assertRaises(Pending):
             verify_texture_tables("\n".join(rows).replace("150 lookups", "100 lookups"), comparison=False)
+
+class VertexInputScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-vertex-input-use] 100 pipeline binds, 100 decode blocks, 0 pulled records"
+        rows[4] = "[native-vertex-input-use] 150 pipeline binds, 140 decode blocks, 0 pulled records"
+        return rows
+
+    def test_fresh_consumers_do_not_claim_pulling_coverage(self):
+        result = verify_vertex_inputs("\n".join(self.rows()))
+        self.assertEqual(result, dict(pipeline_binds_delta=50, decode_blocks_delta=40, pulled_records_delta=0))
+
+    def test_stale_or_missing_consumer(self):
+        for old, new in (("140 decode", "100 decode"), ("150 pipeline", "0 pipeline")):
+            with self.assertRaises(Pending):
+                verify_vertex_inputs("\n".join(self.rows()).replace(old, new))
+
+    def test_pulling_requires_positive_fresh_coverage(self):
+        with self.assertRaises(Pending):
+            verify_vertex_inputs("\n".join(self.rows()), require_pulling=True)
+        rows = self.rows()
+        rows[-1] = rows[-1].replace("0 pulled records", "50 pulled records")
+        self.assertEqual(verify_vertex_inputs("\n".join(rows), require_pulling=True)["pulled_records_delta"], 50)
+
+    def test_startup_wrong_scene_and_nonconsecutive_samples(self):
+        rows = self.rows()
+        for text in ("\n".join(rows).replace("field-state 0", "field-state 4"),
+                     "\n".join([rows[2], rows[4]] + [r for r in rows if "context" in r]),
+                     "\n".join(rows[:-1] + ["[native-material-context] " + READY, rows[-1]])):
+            with self.assertRaises(Pending):
+                verify_vertex_inputs(text)
+
+    def test_bounded_and_interleaved(self):
+        with self.assertRaises(ValueError):
+            verify_vertex_inputs("x" * (MAX_LOG_BYTES + 1))
+        self.assertEqual(verify_vertex_inputs("\n".join(self.rows() + [
+            "[native-material-context] " + READY]))["pipeline_binds_delta"], 50)
+
 
 if __name__ == "__main__":
     unittest.main()

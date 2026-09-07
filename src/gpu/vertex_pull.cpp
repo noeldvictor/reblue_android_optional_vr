@@ -23,6 +23,7 @@
 #include "gpu/host_resource_heap.h"
 #include "gpu/resources.h"
 #include "gpu/vertex_declaration.h"
+#include "gpu/scene/native_vertex_input.h"
 
 namespace bd::gpu {
 namespace {
@@ -46,6 +47,9 @@ struct PullState {
   std::unique_ptr<plume::RenderBuffer> decls;
   u8 *decls_mapped = nullptr;
   u32 next_decl = 1; // 0 stays the "no declaration" id
+  std::unordered_map<const scene::NativeVertexInput *, u32> native_inputs;
+  scene::NativeVertexInputHandle native_dummy;
+  std::once_flag native_dummy_once;
   std::vector<VertexPullInfo> staged;
   std::unique_ptr<plume::RenderBuffer> dummy;
   plume::RenderVertexBufferView dummy_view{};
@@ -198,31 +202,7 @@ bool VertexPullInit(plume::RenderDevice *device) {
 bool VertexPullReady() { return pull().ready; }
 
 u32 VertexPullEntry(plume::RenderFormat format, u32 slot, u32 offset) {
-  using F = plume::RenderFormat;
-  // The codes of shader_common.h's BD_PULL_* table.
-  u32 code = 0;
-  switch (format) {
-  case F::R32_FLOAT: code = 1; break;
-  case F::R32G32_FLOAT: code = 2; break;
-  case F::R32G32B32_FLOAT: code = 3; break;
-  case F::R32G32B32A32_FLOAT: code = 4; break;
-  case F::B8G8R8A8_UNORM: code = 5; break;
-  case F::R8G8B8A8_UINT: code = 6; break;
-  case F::R8G8B8A8_UNORM: code = 7; break;
-  case F::R16G16_SINT: code = 8; break;
-  case F::R16G16_SNORM: code = 9; break;
-  case F::R16G16B16A16_SNORM: code = 10; break;
-  case F::R16G16_UNORM: code = 11; break;
-  case F::R16G16B16A16_UNORM: code = 12; break;
-  case F::R16G16_FLOAT: code = 13; break;
-  case F::R16G16B16A16_FLOAT: code = 14; break;
-  case F::R32_UINT: code = 15; break;
-  case F::R16G16B16A16_SINT: code = 16; break;
-  default: return 0;
-  }
-  if (slot >= 16 || offset >= 0x10000)
-    return 0;
-  return (code << 24) | (slot << 16) | offset;
+  return scene::VertexInputPullEntry(format, slot, offset);
 }
 
 u32 VertexPullDeclId(GuestVertexDeclaration *decl) {
@@ -249,6 +229,18 @@ u32 VertexPullDeclId(GuestVertexDeclaration *decl) {
   return id;
 }
 
+u32 VertexPullInputId(const scene::NativeVertexInput *input) {
+  auto &p = pull();
+  if (!input || !p.ready || !input->Pullable()) return 0;
+  if (const auto found = p.native_inputs.find(input); found != p.native_inputs.end()) return found->second;
+  if (p.next_decl >= kPullDeclCount) return 0;
+  const u32 id = p.next_decl++;
+  std::memcpy(p.decls_mapped + u64(id) * kPullTableEntries * sizeof(u32),
+              input->PullTable().data(), kPullTableEntries * sizeof(u32));
+  p.native_inputs.emplace(input, id);
+  return id;
+}
+
 bool VertexPullStage(u32 record_index, const VideoState &s) {
   auto &p = pull();
   if (!p.ready || record_index == ~0u)
@@ -258,14 +250,15 @@ bool VertexPullStage(u32 record_index, const VideoState &s) {
   VertexPullInfo &info = p.staged[record_index];
   std::memset(&info, 0, sizeof(info));
   ++p.n_staged;
-  info.decl = VertexPullDeclId(s.pipelineState.vertexDeclaration);
+  const auto *native = s.pipelineState.native_vertex_input;
+  info.decl = native ? VertexPullInputId(native) : VertexPullDeclId(s.pipelineState.vertexDeclaration);
   if (!info.decl) {
     ++p.n_no_decl;
     return false;
   }
   const GuestVertexDeclaration *decl = s.pipelineState.vertexDeclaration;
   for (u32 i = 0; i < 16; ++i) {
-    if (!decl->vertexStreams[i])
+    if (!(native ? (native->Streams() & (1u << i)) : decl->vertexStreams[i]))
       continue;
     const auto &view = s.vertex_views[i];
     if (!view.buffer.ref) {
@@ -284,7 +277,21 @@ bool VertexPullStage(u32 record_index, const VideoState &s) {
     info.streams[i][2] = s.input_slots[i].stride;
   }
   ++p.n_ok;
+  if (native) ++scene::NativeVertexInputUses().pulled_records;
   return true;
+}
+
+const scene::NativeVertexInput *VertexPullDummyInput() {
+  auto &p = pull();
+  std::call_once(p.native_dummy_once, [&p] {
+    // Reuse the shader ABI's zero-attribute description, but never retain its
+    // resource wrapper in a native PSO. Native shaders can omit these fillers.
+    if (const auto *decl = VertexPullDummyDeclaration()) {
+      scene::NativeVertexInputLibrary library(scene::NativeVertexInputLibrary::kOwnerBytes, 1);
+      p.native_dummy = library.Resolve({decl->inputElements.get(), decl->inputElementCount}, 0, {});
+    }
+  });
+  return p.native_dummy.get();
 }
 
 void VertexPullNoteTwinMissing() { ++pull().n_twin_missing; }

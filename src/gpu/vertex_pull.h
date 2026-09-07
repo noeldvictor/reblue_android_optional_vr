@@ -19,6 +19,7 @@ namespace bd::gpu {
 
 struct VideoState;
 struct GuestVertexDeclaration;
+namespace scene { class NativeVertexInput; }
 
 // Mirrors BDPullInfo in shader_common.h: per instance record, each stream's
 // slot in the block buffer heap, its base byte offset and its stride, and
@@ -48,6 +49,7 @@ u32 VertexPullEntry(plume::RenderFormat format, u32 slot, u32 offset);
 
 // The declaration's id in the table, written on first use.
 u32 VertexPullDeclId(GuestVertexDeclaration *decl);
+u32 VertexPullInputId(const scene::NativeVertexInput *input);
 
 // Stages the pull info for the instance record just staged at record_index,
 // from the bound streams and declaration. Streams bound from a buffer the
@@ -64,6 +66,7 @@ void VertexPullNoteTwinMissing();
 // then reads the same in-bounds bytes for every vertex and the shader never
 // looks at them. One declaration for the process.
 GuestVertexDeclaration *VertexPullDummyDeclaration();
+const scene::NativeVertexInput *VertexPullDummyInput();
 const plume::RenderVertexBufferView *VertexPullDummyView();
 const plume::RenderInputSlot *VertexPullDummySlot();
 

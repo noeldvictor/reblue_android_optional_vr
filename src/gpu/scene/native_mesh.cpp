@@ -41,6 +41,7 @@ struct Store {
   std::mutex mutex;
   std::vector<Chunk> chunks;
   std::unordered_map<u64, std::shared_ptr<const NativeGeometry>> meshes;
+  NativeVertexInputLibrary vertex_inputs;
   u64 allocated = 0;
   u32 built = 0, loaded = 0, refused = 0, budget_refused = 0;
   u32 native_draws = 0, legacy_draws = 0, last_frame = 0;
@@ -66,7 +67,8 @@ NativeMeshDiskCache &DiskCache() {
 
 u32 Align(u32 n) { return (n + 15u) & ~15u; }
 
-std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &data, u64 key) {
+std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &data, u64 key,
+                                          NativeVertexInputHandle vertex_input) {
   u32 bytes = Align(u32(data.indices.size() * 4));
   for (const auto &stream : data.streams)
     bytes += Align(u32(stream.bytes.size()));
@@ -95,6 +97,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   auto result = std::make_shared<NativeGeometry>();
   result->id = key;
   result->layout = data.layout;
+  result->vertex_input = std::move(vertex_input);
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
   result->start_index = chunk.used / 4;
@@ -213,7 +216,17 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
     if (!ValidateNativeMesh(data))
       return {};
   }
-  auto result = Upload(s, data, key);
+  const auto &decl = *r.declaration;
+  uint32_t stream_mask = 0;
+  for (uint32_t slot = 0; slot < 16; ++slot)
+    if (decl.vertexStreams[slot]) stream_mask |= 1u << slot;
+  auto vertex_input = s.vertex_inputs.Resolve(
+      {decl.inputElements.get(), decl.inputElementCount}, stream_mask,
+      {decl.swappedTexcoords, decl.swappedNormals, decl.swappedBinormals,
+       decl.swappedTangents, decl.swappedBlendWeights, decl.swappedPositions,
+       decl.sintTexcoords});
+  if (!vertex_input) return {};
+  auto result = Upload(s, data, key, std::move(vertex_input));
   if (!result)
     return {};
   if (loaded)
@@ -254,6 +267,11 @@ void NativeMeshNoteDraw(bool native) {
           double(s.native_draws) / frames, double(s.legacy_draws) / frames,
           s.refused, s.budget_refused);
   const auto disk = DiskCache().Stats();
+  BD_INFO("[native-vertex-input] {} owned inputs / {} bytes; no declaration needed by native dispatch",
+          s.vertex_inputs.Size(), s.vertex_inputs.Bytes());
+  const auto &uses = NativeVertexInputUses();
+  BD_INFO("[native-vertex-input-use] {} pipeline binds, {} decode blocks, {} pulled records",
+          uses.pipelines, uses.decode_blocks, uses.pulled_records);
   BD_INFO("[native-mesh-disk] {} writes, {} reused, {} failures / {} budget refusals, "
           "{} conflicts; last inventory {} files / {} bytes, complete {}; "
           "disk-full retains native geometry, never evicts files",

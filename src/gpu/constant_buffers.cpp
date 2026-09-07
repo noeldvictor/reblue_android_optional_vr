@@ -41,6 +41,7 @@
 #include "gpu/native_parameter_buffer.h"
 #include "gpu/device.h"
 #include "gpu/draw_intent.h"
+#include "gpu/scene/native_vertex_input.h"
 #include "gpu/vertex_pull.h"
 #include "gpu/shadow_fit.h"
 #include "gpu/frame_stats.h"
@@ -1381,14 +1382,23 @@ ConstantAllocation UploadSharedConstants(u32 device_guest) {
   s.shared.alphaThreshold = bd::gpu::Video::AlphaThreshold();
   s.shared.halfPixelOffsetX = 0.0f;
   s.shared.halfPixelOffsetY = 0.0f;
-  const auto *declaration = DrawVertexDeclaration(vs);
-  s.shared.swappedTexcoords = declaration ? declaration->swappedTexcoords : 0u;
-  s.shared.swappedNormals = declaration ? declaration->swappedNormals : 0u;
-  s.shared.swappedBinormals = declaration ? declaration->swappedBinormals : 0u;
-  s.shared.swappedTangents = declaration ? declaration->swappedTangents : 0u;
-  s.shared.swappedBlendWeights = declaration ? declaration->swappedBlendWeights : 0u;
-  s.shared.swappedPositions = declaration ? declaration->swappedPositions : 0u;
-  s.shared.sintTexcoords = declaration ? declaration->sintTexcoords : 0u;
+  const auto decode = scene::VertexInputDecode(
+      vs.native_draw_pipeline ? vs.native_draw_pipeline->native_vertex_input : nullptr, [&] {
+    const auto *declaration = DrawVertexDeclaration(vs);
+    return declaration ? scene::VertexShaderDecode{
+        declaration->swappedTexcoords, declaration->swappedNormals, declaration->swappedBinormals,
+        declaration->swappedTangents, declaration->swappedBlendWeights,
+        declaration->swappedPositions, declaration->sintTexcoords} : scene::VertexShaderDecode{};
+  });
+  s.shared.swappedTexcoords = decode.texcoords;
+  s.shared.swappedNormals = decode.normals;
+  s.shared.swappedBinormals = decode.binormals;
+  s.shared.swappedTangents = decode.tangents;
+  s.shared.swappedBlendWeights = decode.blend_weights;
+  s.shared.swappedPositions = decode.positions;
+  s.shared.sintTexcoords = decode.integer_texcoords;
+  if (vs.native_draw_pipeline && vs.native_draw_pipeline->native_vertex_input)
+    ++scene::NativeVertexInputUses().decode_blocks;
 
   s.shared.shadowPcfScale = s.shadowPcfScale;
   s.shared.materialTier =

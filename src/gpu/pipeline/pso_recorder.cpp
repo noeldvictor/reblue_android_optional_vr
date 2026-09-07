@@ -376,6 +376,9 @@ void CaptureMiss(const PipelineState &state, u32 renderPassId, u64 vsHash,
 
 void RecordPipelineState(const PipelineState &state, u32 renderPassId,
                          bool builtOnRenderThread) {
+  // The residual CSV encodes console shader/declaration identities. A native
+  // geometry input has no such declaration; never emit an unreplayable row.
+  if (state.native_vertex_input) return;
   const u64 vsHash = ShaderHash(state.vertexShader);
   const u64 psHash = ShaderHash(state.pixelShader);
 

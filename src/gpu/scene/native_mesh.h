@@ -10,6 +10,7 @@
 #include <span>
 #include <rex/types.h>
 #include "plume_render_interface.h"
+#include "gpu/scene/native_vertex_input.h"
 
 namespace bd::gpu {
 struct GuestBuffer;
@@ -37,6 +38,7 @@ struct NativeGeometry {
   // Content identity and explicit native stream strides travel with the data,
   // independently of the temporary source-buffer/declaration lookup.
   u64 id = 0, layout = 0;
+  NativeVertexInputHandle vertex_input;
   u32 strides[16]{};
   plume::RenderVertexBufferView streams[16]{};
   u32 stream_mask = 0;

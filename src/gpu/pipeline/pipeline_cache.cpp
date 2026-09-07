@@ -22,6 +22,7 @@
 #include "gpu/device.h"
 #include "gpu/occlusion.h"
 #include "gpu/shaders/shader_cache.h"
+#include "gpu/scene/native_vertex_input.h"
 
 REXCVAR_DECLARE(bool, bd_debug_depth_always);
 REXCVAR_DECLARE(bool, bd_debug_no_stencil_bias);
@@ -33,13 +34,16 @@ namespace bd::gpu {
 
 // Size tripwire next to the raw-byte hash: forces a deliberate review on any
 // PipelineState field add/remove/reorder. Replace the literal if the struct
-// legitimately changes (and update the CSV schema + regenerate the PSO cache).
-static_assert(sizeof(PipelineState) == 158,
+// legitimately changes. The appended native input is runtime-only; legacy
+// CSV/header rows remain unchanged and default it to null. RecordPipelineState
+// explicitly excludes native inputs, which have no console declaration hash.
+static_assert(sizeof(PipelineState) == 166,
               "PipelineState size changed: update kCSVHeader/CsvRow + "
               "tools/shader_cache/pso_cache_to_header.py and regenerate "
               "cache/pipeline_state_cache.h.");
 
 void SanitizePipelineState(PipelineState &state) {
+  if (state.native_vertex_input) state.vertexDeclaration = nullptr;
   // Probe: no stencil and no depth bias in any pipeline. Renders wrongly
   // where the guest relied on either; exists to ask Adreno's render-stage
   // trace whether one of them is what keeps the scene pass out of tiled
@@ -168,7 +172,7 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
   auto *layout = Video::MainPipelineLayout();
   if (!layout)
     return nullptr;
-  if (!state.vertexShader || !state.vertexDeclaration)
+  if (!state.vertexShader || (!state.native_vertex_input && !state.vertexDeclaration))
     return nullptr;
 
   auto *vs = GetOrLinkShader(state.vertexShader, state.specConstants);
@@ -285,8 +289,12 @@ std::unique_ptr<plume::RenderPipeline> Build(const PipelineState &state) {
   desc.multisampling.sampleCount = state.sampleCount;
   desc.alphaToCoverageEnabled = state.enableAlphaToCoverage;
 
-  desc.inputElements = state.vertexDeclaration->inputElements.get();
-  desc.inputElementsCount = state.vertexDeclaration->inputElementCount;
+  const auto inputs = scene::VertexInputElements(state.native_vertex_input, [&] {
+    return std::span<const plume::RenderInputElement>(
+        state.vertexDeclaration->inputElements.get(), state.vertexDeclaration->inputElementCount);
+  });
+  desc.inputElements = inputs.data();
+  desc.inputElementsCount = uint32_t(inputs.size());
 
   // One input slot per unique slotIndex. Under instancing, slots 0 and 15 stay
   // PER_VERTEX.

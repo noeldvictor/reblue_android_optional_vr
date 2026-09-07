@@ -2995,9 +2995,14 @@ bool HostDrawReplay(const NodeTag &tag) {
       }
       if (const auto &mesh = d.native_geometry) {
         std::lock_guard lock(s.mutex);
+        s.pipelineState.native_vertex_input = mesh->vertex_input.get();
+        s.pipelineState.vertexDeclaration = nullptr;
+        s.native_draw_pipeline = &s.pipelineState;
         for (u32 slot = 0; slot < 16; ++slot)
-          if (mesh->stream_mask & (1u << slot))
+          if (mesh->stream_mask & (1u << slot)) {
             s.vertex_views[slot] = mesh->streams[slot];
+            s.input_slots[slot].stride = mesh->strides[slot];
+          }
         s.index_view = mesh->index;
         lod_count = mesh->count;
         lod_start = mesh->start_index;

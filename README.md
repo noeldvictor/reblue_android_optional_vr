@@ -58,27 +58,36 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest ownership checkpoint (2026-09-06): texture tables now publish native image
+Latest ownership checkpoint (2026-09-06): native geometry now owns immutable
+vertex inputs used by pipeline creation, shader-decoding parameters and vertex
+pulling. Converted dispatch clears the guest declaration pointer. The field
+shares two input records /3,824 bytes; the pulling-enabled check adds 170,020
+fresh native pulled records, with instancing/indirect calls active and a normal
+1920x1080 image inspected. Host/CPU checks, 152 source guards and 23 scenario
+cases pass. **Packed vertex formats, shader-register ABI, retained draw templates
+and self-describing cooked layouts remain; this is not direct static drawing.**
+[Implementation and evidence](research/20260906_2040_native-vertex-inputs.md).
+
+The preceding texture-table checkpoint publishes native image
 leases after completed synchronous/asynchronous loading, with atomic image/table
 publication and generation-safe replacement/retirement. The field has 5,736
 tables /2.07 MiB. Comparison adds 22,326 matching lookups and 22,006 matching image
-checks; normal texture lookup adds 21,745 reads with zero original comparison or
-fallback calls. Host/CPU checks, 146 source guards and 18 scenario cases pass.
-A normal 1920x1080 field image was inspected. Source selection/return ABI, dynamic
+checks; the new pulling-enabled field check adds 22,333 normal lookups with zero
+original comparison or fallback calls. Source selection/return ABI, dynamic
 overrides and remaining resource consumers are still adapters; the direct native
 reflection consumer was not exercised. **Movement, sequences, both eyes and
 full-game qualification remain open.**
 [Texture-table implementation and evidence](research/20260906_1955_native-texture-tables.md).
 
 Native instance IDs and immutable render poses feed host traversal/replay after
-the final handoff, including late edits. The new normal-table check adds 118,941
+the final handoff, including late edits. The pulling-enabled field check adds 118,987
 matching pose reads with no misses/refusals. Original pose calculation/copy,
 secondary palettes, source lookup and retained draw templates remain.
 [Instance implementation and evidence](research/20260906_1850_native-instance-render-poses.md).
 
 The preceding load-owned geometry path supplies 2,973 primitive geometries and
-their material associations. The new field check adds 51,863 native-handle draws
-and 2,700 matching geometry checks. Independent layouts, complete native object/
+their material associations. The new field check adds 51,785 native-handle draws
+and 2,700 matching geometry checks. Persistent independent layouts, complete native object/
 texture/pass records and direct scene/shadow submission are next.
 [Geometry implementation](research/20260906_1743_load-owned-model-geometry.md).
 The [corrected loader/field observations](research/20260906_1638_field-state-observations.md)
@@ -97,7 +106,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
-| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; load-owned primitive geometry/material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and object texture/pass associations, independent layouts, dynamic geometry and streaming/backpressure |
+| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; geometry-owned runtime vertex inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and object texture/pass associations, self-describing independent cooked layouts, dynamic geometry and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
 | Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
@@ -124,7 +133,8 @@ dependencies. The source-index tool now exposes indirect and hook boundaries;
 this tooling checkpoint does not itself convert additional rendering.
 
 1. Extend the load-owned primitive records into native instance/update and
-   texture/pass contracts, with independent layouts and stable native handles.
+   texture/pass contracts, with self-describing cooked layouts, native shader
+   inputs and stable native handles. Runtime vertex-input ownership is now active.
 2. Complete one native static-object path through direct scene/shadow submission,
    removing its retained draw templates; qualify movement and reload behavior.
 3. Complete character asset, pose, joint-palette and GPU skinning ownership.
@@ -151,7 +161,7 @@ block from about 13.00 to 0.757 (94% less import work), **not a 94% FPS gain**.
 Its desktop field median was 16.667 ms (~60 FPS), with 6.610 ms `other_ms` and
 5.677 ms GPU time. No controlled overall speedup or Quest performance result
 is established. [Measurements and limitations](research/20260906_1323_native-visual-schedule.md).
-The latest Toon check is correctness evidence, not a performance benchmark.
+The latest vertex-input checks are correctness evidence, not performance benchmarks.
 
 ## Project documentation
 

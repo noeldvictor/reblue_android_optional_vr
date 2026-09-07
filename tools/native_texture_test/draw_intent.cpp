@@ -14,6 +14,7 @@
 struct Pipeline {
   int vertexShader = 0, pixelShader = 0, vertexDeclaration = 0;
   int blend = 0, depth = 0, alpha = 0, topology = 0, target = 0;
+  const void *native_vertex_input = nullptr;
   bool operator==(const Pipeline &) const = default;
 };
 struct State {
@@ -58,6 +59,7 @@ int main() {
   // Returning to the engine restores its own history, not the native packet.
   state.native_draw_pipeline = nullptr;
   state.pipelineState = engine;
+  state.pipelineState.native_vertex_input = &packet;
   ApplyEngineDrawIntent(state, publish);
   assert(imports == 2 && state.pipelineState == engine);
   assert(DrawPixelShader(state) == 2 && DrawVertexDeclaration(state) == 3);
