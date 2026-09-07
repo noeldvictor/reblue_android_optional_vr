@@ -30,7 +30,16 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07: host103/run940 passes one selected-object mono title reload.
+Updated 2026-09-07: latest receiver source replaces original sub_82176708 and
+publishes one retained image/camera/late-colour packet;299 Python checks,
+output27/CPU11 and material31/CPU29 pass. Host104/run941 **failed** a second-field
+light-selection dirty-bit comparison. Zero reported receiver original/refused/
+missing calls does not qualify that run. Host105 adds bounded failure context
+and is build-only. Investigate the actual ordering/dirty writer and fix it before
+another full reload/receiver/pixel gate; do not relax comparison or chase a pass.
+[Current evidence](../research/20260907_1224_native-receiver-setup.md).
+
+Last accepted live checkpoint: host103/run940 passes one selected-object mono title reload.
 Generation93 retires all1676 native scene/shadow submissions before title;
 generation207/instance389 renders afterward. Each field epoch adds901 actual
 native emissions per consumer after readiness and independently passes the
@@ -67,8 +76,12 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
      owned model geometry and the immutable pose. Completed depth/camera and
      receiver colour now reach the scene packet with frame/view/object freshness;
      colour is published after the actual receiver callback's late flush, not
-     from an early projection snapshot. That original callback still executes
-     for compatibility consumers and must be replaced. The uploader's actual 2D-array views now match
+     from an early projection snapshot. Latest source replaces that original
+     callback with host setup and one retained image/camera/colour packet;
+     compatibility texture/parameter/colour publication for other draws remains
+     explicit. Run941's light-selection mismatch leaves
+     this replacement's reload/pixel acceptance pending; its cause is unproven.
+     The uploader's actual 2D-array views now match
      the native scene shader in the focused GPU fixture (19c9da6); bind those
      retained explicit views, not a texture's default plain-2D view.
      Native per-node selection/publication preflight now runs before the selected
@@ -109,7 +122,8 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
      emission and fence-retirement evidence. The old source was destroyed while
      two draws per consumer were still retained; all retired before title.
      Both epochs pass the complete existing consumer/movement checks separately.
-     **Next: remove the remaining direct-object receiver/pass source adapters
+     **Next: resolve941's light-selection dirty-output failure and qualify the
+     receiver replacement, then remove the remaining receiver/pass source adapters
      and publish explicit per-eye inputs**, then qualify repeated-object batches,
      visual sequences and both eyes before expanding families. Mono reload is
      not source-free scene loading or full lifecycle qualification.
@@ -175,7 +189,7 @@ that same path before expanding families; one image does not establish stability
 | 2. Native batching and lifecycle acceptance | Existing queue/culling/instancing/indirect backend, native model/instance owners and `native_instance_scenario.py`; extend the existing runner rather than creating another harness | Selected-family legacy rendering disabled before its first draw; cold load, movement, teardown and reload with fresh generations and no retained templates/warm-up. Batches preserve per-object transforms/materials and fence lifetimes. Both scene and shadow consumers must be exercised. |
 | 3. Expand rigid material families | Existing policy/material/shader programs, native image/sampler owners and the accepted direct route | Alpha-test, wind and translucent families added as complete producer-to-consumer paths, with authored changes, sibling/deferred participation and matching lifecycle/pixel checks. Delete temporary adapters at last use; no library-wide recook unless a measured format requirement needs it. |
 
-Reload checkpoint: host103/run940 passes both independently checked field
+Last accepted reload checkpoint: host103/run940 passes both independently checked field
 epochs and actual selected-source/GPU retirement, with901 post-readiness
 emissions per consumer per epoch. Generation93/instance144 becomes207/389.
 Both epochs add300 fresh admission/emission/fence samples; no merged runtime
@@ -228,7 +242,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | The selected direct scene draw now consumes the owned packet, retaining geometry/images through the fence. Packet assembly selects owned programs without a `NodeTag`/source key. The producer still resolves object bindings and visibility at an explicit source boundary. Only `PrepareReplayMaterialMesh` keeps the bounded replay alias index; remove it when replay's last consumer migrates. Source-to-object publication still needs replacement. |
-| Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and native per-node light preflight. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. The original receiver callback, authored light snapshot/cache, fog and source camera/object producers remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
+| Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and native per-node light preflight. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. The host receiver replacement has CPU/live-use evidence but awaits accepted reload/pixels after941's strict light-selection failure. Authored projection/colour/light snapshot/cache, fog and source camera/object producers and compatibility publication remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Both programs now use native structured instance storage and indexed indirect commands through the shared cache/queue. CPU batch preflight and two-instance/two-eye GPU pixels pass; live field uses singleton batches. Complete repeated-object runtime/lifecycle coverage. Other families still use engine bindings and translated instance gathering. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission and exact native batch compatibility feed shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Cold-start hard-off and actual mono title reload pass in940. Source object/pass publication, unsupported families, repeated-object batches, sequences and both-eye acceptance remain. |
 

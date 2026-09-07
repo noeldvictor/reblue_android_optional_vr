@@ -58,7 +58,14 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-Latest **live-game** checkpoint (2026-09-07, host103/run940): one real rigid
+Latest source (`6de0c2f`) replaces the receiver callback with host setup and a retained
+image/camera/late-colour packet. CPU fixtures and 299 Python checks pass, but
+run941 failed a light-selection dirty-bit comparison in its second field load.
+That failure is preserved; the newer host105 adds bounded failure context and
+has not been run. Receiver reload/pixel acceptance remains pending.
+[Current evidence and next investigation](research/20260907_1224_native-receiver-setup.md).
+
+Last **accepted live-game** checkpoint (2026-09-07, host103/run940): one real rigid
 field object now uses native programs for **both scene and shadow draws**.
 Whole-node admission bypasses its interpreter, capture and replay; fresh field
 windows add 300 scene draw emissions and 300 fence retirements. Its retained
@@ -78,7 +85,7 @@ Latest **GPU-fixture** checkpoint: five 8x8 two-eye pixel cases pass in
 1.22 seconds with zero Vulkan validation errors/warnings. The new case draws
 two instances together with different transforms, colours, lights and fog;
 both scene and caster use native indexed indirect commands. Nonzero storage/
-command offsets and production-style array views are exercised. All 293 Python
+command offsets and production-style array views are exercised. All 299 Python
 source/scenario checks pass; the expanded C++ fixture also covers missing poses,
 missing geometry identities, stale generations and source-address reuse.
 
@@ -92,8 +99,9 @@ inspected. The earlier sampling failure has a focused regression test.
 **This is still one opt-in object, not a fully native scene.** Cold-start hard-off
 routing and one real mono reload pass. Representative multi-object batches,
 visual sequences and both-eye game checks remain for the already-cooked path.
-Object/pass source adapters and the original receiver callback remain explicitly
-tracked; no full-game lifecycle qualification or performance improvement is claimed.
+Object/pass source adapters and compatibility publication remain explicitly
+tracked. The receiver replacement is not yet accepted through reload/pixels;
+no full-game lifecycle qualification or performance improvement is claimed.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |

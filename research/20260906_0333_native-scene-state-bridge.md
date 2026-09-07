@@ -2931,3 +2931,32 @@ estimate<=64 MiB incremental overlap within the original160 MiB plan and
 existing supervisors. Preflight63,176,953,856 B. No second game run/capture is
 planned until the failed producer boundary is understood. These diagnostics
 improve the next investigation; they are not a fix or a live pass.
+
+Final checks: material31/PID31080 builds; material CPU29/PID28688 passes0.13 s
+including the16-view strict dirty-output/missing-output regression. Host105/
+PID17772 builds one host object/link, no guest objects. Binary48,564,736 B,
+SHA E535D6E8E7DE126A5457E2F829AA648A53C1C73F6A3488C907E1D253151FDD80;
+PDB108,843,008 B. Host105 not run; host104 remains941's failed live binary,
+host103/run940 the last accepted live/pixel evidence.299 Python checks pass.
+Source/tests/report committed and pushed6de0c2f, exact remote main verified.
+
+Removed four replaced material30/CPU28 stdout/stderr logs (2,203 logical B):
+63,175,114,752 ->63,175,118,848 B,4,096 measured B recovered. With prior8,192 B,
+this continuation reclaimed12,288 B from12 superseded reproducible logs;
+no historical raw, accepted live evidence, game data or build tree removed.
+Keep output27/CPU11,material31/CPU29,host105 diagnostic build,host104/941 failure,
+host103/940/image accepted baseline and unchangedGPU26/rigid05.941's unresolved
+430,499 B log is new coverage with cleanup trigger: reproduce/explain/fix its
+dirty-output mismatch and replace with accepted equivalent reload/pixel proof.
+
+Known retained net growth661,444 B: texture CPU tree+116,739 (69,128,990),
+material fixture+7,862 (7,976,013), exe+16,896/PDB+86,016, build logs+3,432
+(187,589 aggregate),941 failure log430,499. Images unchanged10,231,096;
+runtime audit confirms zero new raw/cache/HLSL dump/perf CSV. Other host
+objects/source/Git and unrelated volume changes are not fully attributed.
+Output-preflight63,202,775,040 ->cleanup-end63,175,118,848 B (58.836 GiB free):
+27,656,192 B (26.375 MiB) drive-wide use, distinct from known retained bytes.
+Actual peak not separately sampled; supervisors enforced the original floor,
+drop/time/log caps. All owned jobs terminal; exact116 B owner profile restored
+(SHA2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0).
+No next game run/capture queued. Live acceptance remains pending, not relabelled.

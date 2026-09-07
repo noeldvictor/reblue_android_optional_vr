@@ -126,4 +126,12 @@ Audit after941 finds zero new raw, cache, HLSL dump or perf-CSV files. Keep941's
 small log for the unresolved mismatch; retain940/image as last accepted live
 evidence. No existing live image/log may be retired on941's partial evidence.
 All historical raw/baseline/VR/movement/failure evidence stays protected.
-Final cleanup/accounting follows in the cumulative ledger.
+Final cleanup removed four superseded material30/CPU28 stdout/stderr logs,
+2,203 logical B:63,175,114,752 ->63,175,118,848 B,4,096 B recovered. Total this
+continuation:12 superseded reproducible logs,12,288 B measured recovery; no
+protected evidence/data removed. Ending58.836 GiB free,26.375 MiB drive-wide
+use versus output preflight. Known retained net growth661,444 B (0.631 MiB)
+is fixture/binary/debug-info growth and941's unresolved failure log, not all
+drive activity. The cumulative ledger records component sizes/retention.
+No producer remains; owner profile is exact. Source/fixtures/report published
+in6de0c2f; no live acceptance or performance claim accompanies that commit.
