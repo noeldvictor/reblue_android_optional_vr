@@ -71,12 +71,15 @@ import aliases. Direct native loads do not consult that alias map.
 
 ## Verification status
 
-The canonical data CPU fixture passed, including source-destroyed consumption
-and a small persistent v2 round trip. All 3,510 existing v1 files decoded
-read-only. The subsequent synthetic-pulling correction passes host/fixture syntax,
-compile-time encoding assertions and 156 source guards, but its updated runtime
-fixtures have not been rebuilt. **Updated C++ execution, full host linking and
-new runtime pixels are pending** at the cumulative storage gate. No new
-game-rendering or performance result is claimed. See the
+The rebuilt mesh fixture (build09/CPU08) passes canonical numeric/schema/storage
+checks, source-destroyed input consumption and the synthetic-pulling correction.
+All 3,510 existing v1 files were previously decoded read-only. Host64, 156 source
+guards and 34 scenario cases pass. Flat run912 observes 2,206 canonical meshes,
+104,787 fresh canonical draws and 117,515 fresh native pulled records, with
+matching geometry/material/pose checks and an inspected full-size sanity image.
+No new raw or asset-cache files. **Source-free GPU loads remain zero; direct
+object submission, expanded layout coverage, compact packing, reloads, sequences,
+both eyes and performance remain unqualified.** See the
+[desktop qualification](../research/20260906_2316_canonical-rigid-desktop.md),
 [canonical-data evidence](../research/20260906_2158_canonical-rigid-mesh.md) and
 [pull-default follow-up](../research/20260906_2211_native-pull-defaults.md).

@@ -1,6 +1,9 @@
 import unittest
 import re
-from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables, verify_vertex_inputs, verify_movement
+from native_instance_scenario import (
+    MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
+    verify_vertex_inputs, verify_movement, verify_canonical_geometry,
+)
 
 
 def metric(reads=100, checks=100, wrong=0, refused=0):
@@ -226,6 +229,55 @@ class VertexInputScenarioTest(unittest.TestCase):
             verify_vertex_inputs("x" * (MAX_LOG_BYTES + 1))
         self.assertEqual(verify_vertex_inputs("\n".join(self.rows() + [
             "[native-material-context] " + READY]))["pipeline_binds_delta"], 50)
+
+
+class CanonicalGeometryScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-mesh-canonical] 12 meshes, 100 draws, 0 source-free disk loads;"
+        rows[4] = "[native-mesh-canonical] 12 meshes, 150 draws, 0 source-free disk loads;"
+        return rows
+
+    def test_fresh_draws_do_not_claim_source_free_loading(self):
+        self.assertEqual(verify_canonical_geometry("\n".join(self.rows())),
+                         dict(meshes=12, draws_delta=50, source_free_loads_delta=0))
+
+    def test_missing_or_unused_canonical_owners(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("12 meshes", "0 meshes"),
+                    text.replace("150 draws", "100 draws"),
+                    text.replace("150 draws", "131 draws"),
+                    "\n".join(scenario())):
+            with self.assertRaises(Pending):
+                verify_canonical_geometry(bad)
+
+    def test_counter_reset_is_not_fresh_activity(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150 draws", "10 draws"),
+                    text.replace("12 meshes, 150", "11 meshes, 150"),
+                    text.replace("100 draws, 0", "100 draws, 2")):
+            with self.assertRaises(Pending):
+                verify_canonical_geometry(bad)
+
+    def test_startup_wrong_scene_missing_event_and_nonconsecutive_samples(self):
+        rows = self.rows()
+        for bad in ("\n".join(rows[1:]),
+                    "\n".join(rows).replace("field-state 0", "field-state 4"),
+                    "\n".join([rows[2], rows[4]] + [r for r in rows if "context" in r]),
+                    "\n".join(rows[:-1] + ["[native-material-context] " + READY, rows[-1]])):
+            with self.assertRaises(Pending):
+                verify_canonical_geometry(bad)
+
+    def test_interleaving_and_lost_readiness(self):
+        rows = self.rows() + ["[native-material-context] " + READY]
+        self.assertEqual(verify_canonical_geometry("\n".join(rows))["draws_delta"], 50)
+        for extra in ("[native-material-context] mode Loading", "[native-material-context] " + READY):
+            with self.assertRaises(Pending):
+                verify_canonical_geometry("\n".join(rows + [extra]))
+
+    def test_bounded_input(self):
+        with self.assertRaises(ValueError):
+            verify_canonical_geometry("x" * (MAX_LOG_BYTES + 1))
 
 
 if __name__ == "__main__":

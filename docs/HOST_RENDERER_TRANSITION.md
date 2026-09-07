@@ -30,8 +30,8 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after readiness-driven movement verification. The first two
-former milestones are one producer-to-consumer outcome; full scope is unchanged.
+Updated 2026-09-06 after canonical rigid geometry desktop verification. The first
+two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
    Work backward from a real rigid object's direct scene/shadow draw: canonical,
@@ -39,8 +39,9 @@ former milestones are one producer-to-consumer outcome; full scope is unchanged.
    named native shader inputs; native instance/update handles; direct submission.
    Reuse load-owned geometry/material programs, render-pose snapshots, image
    tables, runtime vertex inputs and the existing culling/instancing/indirect
-   backend. Current owners still feed replay; packed bytes, shader-register ABI,
-   `NodeTag`/source lookup and retained templates are not the finished contract.
+   backend. Canonical rigid values now draw on desktop; remaining packed layouts,
+   shader-register ABI, `NodeTag`/source lookup and retained templates are not
+   the finished contract.
    The [source map](../research/20260906_1531_static-model-ownership-frontier.md)
    and existing call graph locate producers and indirect/lifetime boundaries.
    Acceptance: the converted object loads, updates, draws in scene/shadow passes
@@ -73,27 +74,30 @@ No overall development-speed multiplier is established.
 
 ## Latest qualified checkpoint
 
-Source follow-up (2026-09-06, still unqualified on GPU): native pulling now
-preserves synthetic attribute formats using an owned zero STORAGE buffer and
-stride zero. Empty table entries otherwise reach a shader default with w=1,
-which disagrees with omitted secondary-position blend weights of zero. Host/
-fixture syntax, compile-time encoding assertions and156 source guards pass.
-Updated C++ fixtures, full linking and new pixels remain pending the storage
-gate; the earlier CPU pass below predates this correction. No shader regeneration,
-new artifact set or game run. Evidence: `research/20260906_2211_native-pull-defaults.md`.
+Canonical rigid geometry (2026-09-06): the owner-approved 3 GiB exception resumed
+verification under the original cumulative ledger; other storage caps and zero
+new raw allowance remain. Mesh build09/CPU08, host64, 156 guards and 34 scenario
+tests pass, including the synthetic-pulling default correction. No guest object
+or shader rebuild. Flat normal-MSAA/precache-on run912 /PID27288 passes fresh
+post-event movement, geometry/material/pose, normal texture-table and pulling
+gates. It observes 2,206 canonical meshes /104,787 fresh canonical draws and
+117,515 fresh native pulled records. Instancing and indirect calls are active.
+One inspected 1920x1080 JPEG adds component sanity coverage, not a new sequence.
+No raw/perf/cache/dump output; the exact owner profile is restored.
 
-Source/CPU progress (2026-09-06, runtime qualification pending): BDMESH v2 has
-named canonical rigid vertex values and content/layout identities independent
-of the source declaration. Import-time conversion replaces per-vertex unpacking
-for supported layouts; its input owner derives from the asset alone. A native
-content-ID loader needs no source wrappers. CPU/storage tests, 155 source guards,
-four host syntax checks and read-only decoding of all 3,510 existing v1 files
-pass. Full linking and new pixels are paused at the cumulative storage gate;
-run911/host63 remain the qualified executable, not this changed source. Expanded
-float4 bandwidth, source-free GPU loading and live canonical draws are unmeasured.
-The old shader signature, source-index producer and replay templates still need
-replacement within the complete native static-object path. Evidence:
-`research/20260906_2158_canonical-rigid-mesh.md`.
+The schema has named values and content/layout identities independent of the
+source declaration, and converted inputs clear shader unpack masks. Missing
+native pull attributes use format-aware entries and an owned zero STORAGE
+buffer. Source-free disk-to-GPU loads remain **zero**, so the implemented native
+content-ID entry point is not qualified by this game's importing producer.
+The field retains 980 noncanonical owners among 3,186 meshes; those are not a
+whole-game conversion percentage. The GPU arena reserves 64 MiB; compact storage,
+bandwidth/performance, reloads, longer sequences and both eyes are unqualified.
+Shader-register ABI, source lookup, replay templates and direct scene/shadow
+object submission remain the next ownership boundary. Prior cliff-edge/blur
+evidence stays protected. Evidence: `research/20260906_2316_canonical-rigid-desktop.md`;
+implementation history: `research/20260906_2158_canonical-rigid-mesh.md` and
+`research/20260906_2211_native-pull-defaults.md`.
 
 Desktop verification loop (2026-09-06): runtime-independent autoplay now waits
 for stable field/controller/player readiness, stops on interruptions, and

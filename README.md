@@ -58,23 +58,22 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Current source checkpoints implement self-describing BDMESH v2 rigid vertices,
-a source-free geometry loader and format-correct native pulling defaults.
-156 source guards and host/fixture syntax checks pass. The last executed mesh
-CPU/cache check passed before the pull-default correction. **Updated C++ fixture
-execution, full host linking and new pixels are pending the cumulative storage
-gate.** This is not direct static drawing or an FPS result.
-[Format and verification limits](docs/NATIVE_MESH_FORMAT.md).
+Latest desktop checkpoint (2026-09-06): self-describing BDMESH v2 rigid vertices
+and format-correct native pulling defaults now pass the rebuilt CPU fixture,
+host64, 156 source guards and 34 scenario tests. Field run912 observes
+**2,206 canonical meshes and 104,787 fresh canonical draws**, with native pulling,
+instancing/indirect submission and matching geometry/material/pose checks. One
+1920x1080 image was inspected after actual player movement; no new raw captures,
+performance logs or asset-cache files were produced.
+[Desktop evidence](research/20260906_2316_canonical-rigid-desktop.md).
 
-Latest ownership checkpoint (2026-09-06): native geometry now owns immutable
-vertex inputs used by pipeline creation, shader-decoding parameters and vertex
-pulling. Converted dispatch clears the guest declaration pointer. The field
-shares two input records /3,824 bytes; the pulling-enabled check adds 170,020
-fresh native pulled records, with instancing/indirect calls active and a normal
-1920x1080 image inspected. Host/CPU checks, 152 source guards and 23 scenario
-cases pass. **Packed vertex formats, shader-register ABI, retained draw templates
-and self-describing cooked layouts remain; this is not direct static drawing.**
-[Implementation and evidence](research/20260906_2040_native-vertex-inputs.md).
+Canonical geometry owns named values and immutable vertex inputs independently
+of the imported declaration. Unsupported layouts still use transitional packed
+data. **Source-free GPU loading was not exercised; shader-register ABI, source
+lookup and retained draw templates remain. This is not direct static drawing,
+complete sequence/both-eye qualification or a measured speedup.** Float4 storage
+is an initial checked representation, not the final compact headset format.
+[Format and remaining work](docs/NATIVE_MESH_FORMAT.md).
 
 The desktop test loop now starts walking after verified field readiness instead
 of waiting a fixed 150 seconds. A roughly 61-second run observes actual player
@@ -102,9 +101,10 @@ secondary palettes, source lookup and retained draw templates remain.
 [Instance implementation and evidence](research/20260906_1850_native-instance-render-poses.md).
 
 The preceding load-owned geometry path supplies 2,973 primitive geometries and
-their material associations. The new field check adds 51,785 native-handle draws
-and 2,700 matching geometry checks. Persistent independent layouts, complete native object/
-texture/pass records and direct scene/shadow submission are next.
+their material associations. Its earlier field check added 51,785 native-handle
+draws and 2,700 matching geometry checks. Canonical rigid layouts are now exercised
+above; complete native object/texture/pass records, source-free GPU loading and
+direct scene/shadow submission remain next.
 [Geometry implementation](research/20260906_1743_load-owned-model-geometry.md).
 The [corrected loader/field observations](research/20260906_1638_field-state-observations.md)
 remain the scenario gate; water activity alone is not a field identifier.
@@ -122,7 +122,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
-| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; geometry-owned runtime vertex inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and object texture/pass associations, self-describing independent cooked layouts, dynamic geometry and streaming/backpressure |
+| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
 | Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
@@ -150,7 +150,7 @@ this tooling checkpoint does not itself convert additional rendering.
 
 1. Complete one real native static-object path from cooked geometry/materials
    and instance updates through direct scene/shadow submission. Establish
-   self-describing layouts and native shader/texture/pass contracts; remove its
+   native shader/texture/pass contracts on the canonical rigid layouts; remove its
    guest-renderer warm-up, source lookup and captured templates. Verify movement
    and reload behavior, then expand material families.
 2. Complete character asset, pose, joint-palette and GPU skinning ownership.

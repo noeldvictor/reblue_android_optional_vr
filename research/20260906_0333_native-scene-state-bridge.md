@@ -1513,3 +1513,63 @@ build/test logs, binary, image, cache, dump or raw output. Source/docs/Git write
 are small but not fully baselined and remain charged. Existing fixture and game
 executables/profile are unchanged; protected evidence remains. No goal completion
 or new resource allowance is claimed.
+
+### Owner-approved verification resumption, same checkpoint
+
+On 2026-09-06 the owner approved increasing **this existing cumulative peak cap
+to3 GiB**, retaining the20 GiB free-space reserve and raw-capture ban. This is
+not a change to AGENTS' default or a new checkpoint. Original starting free
+**65,462,788,096 B** remains the ledger anchor. The three active producer
+wrappers now stop at **62,509,998,080 B**, allowing2.75 GiB growth with256 MiB
+headroom before3 GiB; their21 GiB reserve is stronger than the20 GiB minimum.
+Diagnostics100 MiB, build/test logs10 MiB, window images10 MiB aggregate and
+**zero new raw allowance** are unchanged. No prior cleanup is credited again.
+
+Resumption preflight free **63,222,808,576 B**; no renderer/compiler/test process
+observed. Reuse the mesh fixture and configured host tree. Plan <=192 MiB host
+compile/link overlap and <=4 MiB fixture/log growth. Rebuild changed CPU tests
+first, then host64, with no guest/shader rebuild or asset-library recook.
+One new canonical-mesh sanity JPEG may use <=300 KiB within the existing image
+cap (10,106,400 B retained,379,360 B available). Preserve the standing and
+three-motion-image baselines; a single new image cannot qualify a sequence.
+Runtime diagnostics must require fresh canonical draw activity, keep raw/perf/
+cache writes disabled and restore the exact owner profile on every exit.
+Validate replacements before retiring only superseded agent logs. Account for
+actual results/free space below before another producer or publication.
+
+Resumption results: mesh09 /PID31092, CPU08 /PID30632 and host64 /PID27696
+all pass; no guest object/shader rebuild.156 boundary checks and34 scenario
+cases pass. Flat run912 /PID27288 (23:12:47..23:13:58) adds fresh canonical
+draw/pulling, matching geometry/material/pose and actual movement observations.
+One210,325-byte1920x1080 JPEG was inspected; not a new sequence or full native
+object qualification. Source-free GPU loads remain zero. All producers terminal,
+owner profile restored exactly. See `20260906_2316_canonical-rigid-desktop.md`.
+
+No new raw/perf/cache/dump files. The existing mesh cache is unchanged at3,510
+files /36,510,144 B. Current window images total **10,316,725 B**, leaving
+169,035 B under the unchanged10 MiB aggregate cap. Retain the new JPEG and
+run912 log202,300 B for canonical-component coverage; prior standing/failure
+and three-image movement baseline are not superseded by this single image.
+Replace only after equivalent coverage is validated; no new raw allowance.
+
+Cleanup after validation: removed mesh08/CPU07 stdout/stderr (1,931 logical B),
+immediate free63,183,777,792 ->63,183,781,888 B, reclaim **4,096 B**. Removed
+host63 stdout/stderr (744 logical B), immediate free63,246,290,944 ->
+**63,246,295,040 B**, reclaim **4,096 B**. Total this resumption **8,192 B**,
+counted once; six exact obsolete logs, reproducible from source. Final logs
+mesh09/CPU08/host64 and cache04 remain; no protected images/data/builds removed.
+
+Reusable mesh fixture now **1,419,621 B**, growth7,253 B from resumption baseline.
+Aggregate build logs112 files /148,356 B, growth2,484 B. Comparable retained
+fixture/log/image set including run912 grows **422,362 B** for new canonical
+runtime/default-lane coverage. Game exe/PDB grow **176,128 B** combined; changed
+objects, build metadata, helper/source/docs/Git bytes lack complete before
+baselines and are not falsely reported as zero. No duplicate build tree.
+
+Post-cleanup free **63,246,295,040 B** (~58.90 GiB), a drive-wide gain of
+**23,486,464 B** from resumption preflight. This gain exceeds our8,192 B cleanup
+and is not attributed to task reclamation; other processes continue changing
+the volume. The lowest explicitly returned sample was63,110,840,320 B after
+run912; producer supervision kept the operational floor enforced. Source/docs/
+Git publication writes still count; preserve the original ledger and approved
+3 GiB cap without resetting allowances at the next continuation.

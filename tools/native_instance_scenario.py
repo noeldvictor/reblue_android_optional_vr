@@ -16,6 +16,8 @@ TABLE_METRIC = re.compile(
     r"(\d+) image checks wrong (\d+); (\d+) native image reads (\d+) unavailable;")
 VERTEX_METRIC = re.compile(
     r"\[native-vertex-input-use\] (\d+) pipeline binds, (\d+) decode blocks, (\d+) pulled records")
+CANONICAL_METRIC = re.compile(
+    r"\[native-mesh-canonical\] (\d+) meshes, (\d+) draws, (\d+) source-free disk loads;")
 MOVEMENT_METRIC = re.compile(
     r"\[autoplay\] t ([\d.]+) stage (\S+) ready ([01]) walking ([01]) episode (\d+) "
     r"walk-s ([\d.]+) moved (\d+) distance ([\d.]+) position (\S+)")
@@ -129,6 +131,24 @@ def verify_vertex_inputs(text, require_pulling=False):
             "pulled_records_delta": b[2] - a[2]}
 
 
+def verify_canonical_geometry(text):
+    """Observe live converted draws without implying source-free loading occurred."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("canonical-geometry diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = CANONICAL_METRIC.search(line)
+        if match:
+            metrics.append((index, tuple(map(int, match.groups()))))
+    a, b = recent_field_samples(contexts, metrics)
+    if not a[0] or not b[0] or b[1] - a[1] < 32 or any(b[i] < a[i] for i in (0, 2)):
+        raise Pending("canonical mesh draws must advance in the ready field")
+    return {"meshes": b[0], "draws_delta": b[1] - a[1],
+            "source_free_loads_delta": b[2] - a[2]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -166,6 +186,8 @@ def main():
     mode.add_argument("--texture-tables-normal", action="store_true")
     parser.add_argument("--vertex-inputs", action="store_true")
     parser.add_argument("--vertex-pulling", action="store_true")
+    parser.add_argument("--canonical-geometry", action="store_true",
+                        help="require fresh canonical draws and native vertex pulling")
     parser.add_argument("--movement", action="store_true")
     args = parser.parse_args()
     try:
@@ -177,8 +199,9 @@ def main():
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
-        vertex_inputs = verify_vertex_inputs(text, args.vertex_pulling) if (
-            args.vertex_inputs or args.vertex_pulling) else None
+        vertex_inputs = verify_vertex_inputs(text, args.vertex_pulling or args.canonical_geometry) if (
+            args.vertex_inputs or args.vertex_pulling or args.canonical_geometry) else None
+        canonical = verify_canonical_geometry(text) if args.canonical_geometry else None
         movement = verify_movement(text) if args.movement else None
     except Pending as error:
         print(f"Pending: {error}")
@@ -191,6 +214,8 @@ def main():
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:
         print("PASS: post-event native vertex inputs " + ", ".join(f"{k}={v}" for k, v in vertex_inputs.items()))
+    if canonical is not None:
+        print("PASS: post-event canonical geometry " + ", ".join(f"{k}={v}" for k, v in canonical.items()))
     if movement is not None:
         print("PASS: post-event observed player movement " + ", ".join(f"{k}={v}" for k, v in movement.items()))
     return 0
