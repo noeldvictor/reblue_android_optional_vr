@@ -704,7 +704,33 @@ def verify_receiver_setup(text):
     return dict(native_delta=b[1]-a[1], packets_delta=b[7]-a[7], reads_delta=b[8]-a[8], original=b[3])
 
 
-def verify_rigid_epoch(text, receiver_setup=False):
+def verify_scene_lights(text):
+    """Fresh handoff-to-native selection with exact pass/instance identities."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("scene lighting diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-scene-lights\] frame (\d+) update (\d+) pass update (\d+) light view (\d+); (\d+) publications (\d+) refused; (\d+) bindings (\d+) unavailable imports; (\d+) native reads (\d+) missing; instance (\d+) generation (\d+) node (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if "[native-scene-lights]" in line and not match:
+            raise ValueError("invalid or failed scene lighting handoff")
+        if match:
+            v = tuple(map(int, match.groups()))
+            if not v[1] or v[1] != v[2] or v[3] >= 16 or not 0 < v[6] <= 65536 or v[9] or not v[10] or not v[11]:
+                raise ValueError("scene light update/view/instance identity or native read failure")
+            metrics.append((index, v))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[5] != a[5]:
+        raise ValueError("scene light publication refused in the field window")
+    if b[0] <= a[0] or b[1] <= a[1] or b[4]-a[4] < 32 or b[8]-a[8] < 32 or b[10:13] != a[10:13]:
+        raise Pending("need fresh scene light handoffs and native reads for the same field instance")
+    return dict(updates_delta=b[4]-a[4], reads_delta=b[8]-a[8], bindings=b[6],
+                unavailable_imports=b[7], generation=b[11], light_view=b[3])
+
+
+def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -717,6 +743,8 @@ def verify_rigid_epoch(text, receiver_setup=False):
         check(text)
     if receiver_setup:
         verify_receiver_setup(text)
+    if scene_lights:
+        verify_scene_lights(text)
 
 
 def main():
@@ -746,6 +774,7 @@ def main():
     parser.add_argument("--rigid-hard-off", action="store_true")
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
     parser.add_argument("--receiver-setup", action="store_true", help="host receiver callback and fresh retained packet reads in each requested epoch")
+    parser.add_argument("--scene-lights", action="store_true", help="owned scene/object handoffs and fresh native reads in each requested epoch")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -762,8 +791,8 @@ def main():
         text = data.decode("utf-8")
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup)
-            verify_rigid_epoch(text, args.receiver_setup)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -786,6 +815,7 @@ def main():
         rigid_batches = verify_rigid_batches(text) if args.rigid_batches else None
         rigid_hard_off = verify_rigid_hard_off(text) if args.rigid_hard_off else None
         receiver_setup = verify_receiver_setup(text) if args.receiver_setup else None
+        scene_lights = verify_scene_lights(text) if args.scene_lights else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -802,6 +832,8 @@ def main():
         print("PASS: same-process native rigid reload (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in reload.items()))
     if receiver_setup is not None:
         print("PASS: host receiver setup and owned reads " + ", ".join(f"{k}={v}" for k,v in receiver_setup.items()))
+    if scene_lights is not None:
+        print("PASS: owned scene/object lighting and native reads " + ", ".join(f"{k}={v}" for k,v in scene_lights.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:

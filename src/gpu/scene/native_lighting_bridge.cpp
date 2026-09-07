@@ -116,6 +116,8 @@ std::optional<NativeLightingPass> Prepare(uint32_t source, bool enabled) {
   // sub_82182180/1D0 then query level-zero dimensions twice apiece. Read the
   // host resource metadata directly, without SDK descriptor or guest calls.
   const uint32_t slot = bd::mem::load<uint32_t>(kSlot);
+  inputs.light_view = slot;
+  inputs.light_update = NativeSceneLightUpdate(FrameStatFrameCount());
   uint32_t entry = bd::mem::load<uint32_t>(kTextureList);
   std::unordered_set<uint32_t> visited;
   while (entry) {

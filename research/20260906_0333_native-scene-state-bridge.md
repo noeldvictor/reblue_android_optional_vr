@@ -3035,3 +3035,53 @@ measurement belongs in the checkpoint handoff, not a new restamp build.
 Owner's newest request is status/README/commit/push. No further renderer build,
 game run, capture or debugger job is authorized by that documentation update;
 leave941's cause and full receiver pixel acceptance explicitly pending.
+
+### 2026-09-07 owned scene-lighting bundle
+
+Goal continuation resumes implementation after the committed workflow revision.
+Starting measured free62,937,022,464 B; pre-build62,932,135,936 B. Reuse the
+original65,462,788,096 B baseline,3 GiB exception,62,509,998,080 B operational
+floor,100 MiB diagnostics,10 MiB aggregate build logs/images and incoming raw0.
+No live producer remains. Existing host105 and fixtures are reused incrementally;
+planned material32/CPU30 and host106 need <=192 MiB peak overlap (host objects,
+linker/PDB and fixture replacement), enforced by the existing300 s/256 MiB-drop
+supervisor and original floor. No guest/shader rebuild, cook or new build tree.
+Retain only current build/test logs until replacement passes, then retire their
+exact superseded agent logs. Keep940/image,941 failure and943 text until proper
+equivalent integration replacement. A targeted reload/window-image gate follows
+CPU/build acceptance, with its existing limits/profile restoration; no raw output.
+
+Material32/PID25736 and CPU30/PID29820 pass; CPU0.15 s,305 artifact-free Python
+checks pass. Host106/PID28988/session18083 terminal:48,609,792 B exe,
+SHA084A9883CC71C5E639F140B55D1779223B28B13438D64F6A46964C9025E857BC;
+PDB108,961,792 B. No guest/shader rebuild; codegen0 written. After accepted
+fixture replacement removed four material31/CPU29 logs (2,035 logical B):
+62,930,989,056 ->62,930,993,152 B free,4,096 B recovered once.
+
+Run944/PID28276/session30334 terminal13:46:36-13:48:56, host106 reused, all21
+settings applied, exact owner-profile hash unchanged. Enforced180 s/800 KiB
+text/192 MiB free-drop and original floor,160 KiB JPEG/10 MiB images,raw0.
+Pre-run free62,926,897,152 B; immediate close62,920,568,832 B. Both independent
+field epochs pass complete reload/receiver plus new scene-lighting checks. New
+generation207/instance384 consumes fresh owned lights without source caches;
+old93/144 fully fence-retired before title. No941 mismatch; its cause remains open.
+944 log490,886 B SHA7630E837C613AE116611D4A38FD25DBD2FAB861648FD2786499B531E2710F8A1.
+Inspected135,993 B JPEG SHA6424763E163BC784035E7BD21860B9B86D1A023C002B54C084C11713E3B6D2C0:
+coherent terrain/trees/shadows, player partly obscured, known cliff marks. One
+mono image only. Scoped post-run audit finds zero new raw/perf/cache/dump files.
+
+After independent944 parser/pixel acceptance, removed exact943 text and two
+host105 build logs (487,408 logical B):62,916,591,616 ->62,917,083,136 B free,
+491,520 B recovered. Total495,616 B reclaimed once from seven superseded agent
+outputs; no protected raw/baseline941/940/image, game/profile/build data removed.
+943's exact text is gone; findings/hash remain in earlier reports, stronger944
+text/pixels replace its receiver purpose. Keep940/image for the open941 failure.
+
+Known retained net growth462,603 B: material fixture+153,473 (8,129,486 B/41files),
+exe+45,056/PDB+118,784, build logs+5,052 (192,641 B), runtime replacement+4,245,
+new JPEG135,993 (aggregate images10,367,089 B). Other objects/source/Git/volume
+activity unallocated. First measured free62,937,022,464 ->cleanup-end62,917,083,136 B:
+19,939,328 B drive-wide use,58.596 GiB free. This is not all renderer growth.
+Same original floor/exception/retention obligations; no duplicate jobs or reset
+budget. Details in20260907_1342_owned-scene-lighting.md. Final post-push read-only
+measurement belongs in handoff; no rebuild merely to stamp the commit hash.

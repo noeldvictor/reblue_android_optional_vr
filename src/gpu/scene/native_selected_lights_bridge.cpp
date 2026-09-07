@@ -5,6 +5,8 @@
  */
 #include "gpu/scene/native_selected_lights_source.h"
 #include "gpu/scene/native_light_selection_source.h"
+#include "gpu/scene/native_scene_lights_source.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/frame_stats.h"
@@ -42,6 +44,13 @@ struct SelectionStats {
   uint64_t updates = 0, rebuilt = 0, candidates = 0, compatibility = 0, checked = 0, wrong = 0;
 };
 thread_local SelectionStats selection_stats;
+struct SceneLights {
+  std::mutex mutex;
+  NativeSceneLightingPublication current;
+  uint64_t published = 0, refused = 0, unavailable = 0, reads = 0, missing = 0;
+  uint32_t reported = 0;
+};
+SceneLights &Scene() { static SceneLights result; return result; }
 std::optional<uint32_t> Word(uint64_t address) {
   if (!address || (address & 3) || address > UINT32_MAX-3) return {};
   const auto *value = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -175,17 +184,61 @@ bool Publish(PPCContext &ctx, uint8_t *base) {
 }
 } // namespace
 
-std::optional<NativeSelectedLights> PrepareNativeSelectedLightValues(uint32_t selection) {
+void PublishNativeSceneLights(uint32_t manager) {
+  auto &scene = Scene();
+  std::optional<NativeSceneLightSet> lights;
+  std::vector<NativeNodeLightBinding> bindings;
+  size_t unavailable = 0;
+  try {
+    // bdMainGameStep waited for DrawEnd, completed scene preparation and the
+    // transfer callbacks; bdFrameSubmitAndDebugHUD has not signalled DrawStart.
+    // The original snapshot and interpolation changed-list restoration are done.
+    constexpr uint32_t kPrimary = (uint32_t(-32035)<<16)-26664;
+    constexpr uint32_t kSpecial = (uint32_t(-32035)<<16)-26232;
+    const auto primary = Word(kPrimary), special = Word(kSpecial), strength = Word(kStrength);
+    const auto scale = Word((uint32_t(-32247)<<16)-3992), angle = Word((uint32_t(-32250)<<16)+11844);
+    const auto low = Word((uint32_t(-32247)<<16)-5560), high = Word((uint32_t(-32250)<<16)+8116);
+    const auto mode = special && *special ? Word(uint64_t(*special)+1032) : std::optional(0u);
+    if (REXCVAR_GET(bd_native_lighting) && manager == kManager && primary && special && mode &&
+        strength && scale && angle && low && high && rex::system::XThread::GetCurrentThread() &&
+        rex::system::XThread::GetCurrentThreadId() == *primary) {
+      lights = ReadNativeSceneLightSet(manager, *mode == 1,
+          {std::bit_cast<float>(*scale),std::bit_cast<float>(*angle),std::bit_cast<float>(*low),std::bit_cast<float>(*high)},
+          std::bit_cast<float>(*strength), Word);
+      if (lights && !CollectNativeInstanceLightInputs(bindings, unavailable)) lights.reset();
+    }
+  } catch (const std::exception &error) {
+    lights.reset();
+    BD_WARN("[native-scene-lights] handoff failed: {}", error.what());
+  }
+  std::lock_guard lock(scene.mutex);
+  const auto frame = FrameStatFrameCount();
+  const bool published = lights && scene.current.Publish(frame, std::move(*lights), std::move(bindings));
+  if (!published) scene.current.Reset();
+  ++(published ? scene.published : scene.refused);
+  scene.unavailable += unavailable;
+}
+uint64_t NativeSceneLightUpdate(uint32_t frame) {
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  return scene.current.Update(frame);
+}
+std::optional<NativeSelectedLights> FindNativeSceneLights(uint64_t instance,
+    uint64_t model_generation, uint32_t node, const NativeLightingInputs &pass) {
   if (!REXCVAR_GET(bd_native_lighting)) return {};
-  const auto plan = PrepareSelection(selection, 0);
-  const auto view = Word(kView), count = Word(kManager+46816), numerator = Word(kStrength);
-  if (!plan || !view || !count || !numerator) return {};
-  // Evaluate the publisher against the proposed selection without writing any
-  // compatibility state. A refused scene packet has no observable side effects.
-  // In particular, do not call comparison/original bodies in this direct path.
-  return PreviewSelectedLightValues(*plan, kPublisher, selection, *view, kManager+24016,
-      *count, std::bit_cast<float>(*numerator), current, Word,
-      [](double angle) { return std::cos(angle); });
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  const auto frame = FrameStatFrameCount();
+  const auto result = scene.current.Select(frame, pass.light_update, instance, model_generation, node, pass.light_view);
+  ++(result ? scene.reads : scene.missing);
+  if (frame-scene.reported >= 300 || (!result && scene.missing <= 3)) {
+    BD_INFO("[native-scene-lights] frame {} update {} pass update {} light view {}; {} publications {} refused; "
+            "{} bindings {} unavailable imports; {} native reads {} missing; instance {} generation {} node {}; no legacy selection/cache reads",
+        frame, scene.current.Update(frame), pass.light_update, pass.light_view, scene.published, scene.refused,
+        scene.current.Bindings(), scene.unavailable, scene.reads, scene.missing, instance, model_generation, node);
+    scene.reported = frame;
+  }
+  return result ? std::optional(result->lights) : std::nullopt;
 }
 std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection) {
   if (!REXCVAR_GET(bd_native_lighting) || current.known != 7 || current_selection != selection ||

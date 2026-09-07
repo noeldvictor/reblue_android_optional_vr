@@ -8,6 +8,10 @@
 
 namespace bd::gpu::scene {
 struct NodeTag;
+struct NativeNodeLightBinding;
+// Called only at the synchronized game/render handoff, after completed poses.
+// Reuses the existing source index; returned bindings contain native IDs only.
+bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out, size_t &unavailable);
 std::shared_ptr<const NativeInstancePose> FindNativeInstancePose(
     uint32_t visual, uint32_t graph, uint32_t palette);
 bool CopyNativeInstanceWorld(const NodeTag &tag, float out[16]);

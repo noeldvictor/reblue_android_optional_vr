@@ -36,37 +36,35 @@ a longer list of counters. Reuse the native owners, assets and backend already
 built. The selected rigid object remains a regression target, not a permanent
 ceiling on scene-level implementation.
 
-Latest renderer source remains `6de0c2f`; this workflow revision changes no
-renderer binary. Host105/run943 passes the existing text gates and receiver
-checks in both reload epochs, but does not explain run941's light-selection
-dirty-bit mismatch. No new pixels were captured. Host103/run940 remains the last
-accepted selected-object mono reload/pixel checkpoint. There is no qualified
-complete host frame, broad scene, full-game stereo or Quest result.
-[Receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md),
-[last accepted reload](../research/20260907_1140_native-rigid-reload.md).
+Host106/run944 connects owned scene/object lighting to the native rigid consumer,
+passes the complete existing reload/receiver text gates plus a new owned-lighting
+gate in both epochs, and has an inspected mono image.305 Python checks and the
+extended C++ fixture pass. Run941's legacy dirty-bit mismatch remains unexplained;
+keep its strict comparison and failure evidence. There is no qualified complete
+host frame, broad scene, full-game stereo or Quest result.
+[Current lighting/reload evidence](../research/20260907_1342_owned-scene-lighting.md),
+[preserved receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md).
 
-### Next deliverable: owned scene lighting consumed by native rigid draws
+### Delivered connection: owned scene lighting consumed by native rigid draws
 
-The current direct consumer already bypasses the original shader callback, but
-`PrepareNativeSelectedLightValues` still imports mutable per-object selection
-state and previews the legacy publisher/cache. That is the dependency to remove,
-not another helper to translate. Implement the producer, lifetime and consumer
-connection as one coherent bundle:
+The direct consumer now uses `NativeSceneLightingPublication`: semantic lights
+and native instance/model/node bindings published after DrawEnd, scene preparation
+and pose/light transfer, before DrawStart. `PrepareNativeSelectedLightValues`
+and `PreviewSelectedLightValues` were removed. Native consumption no longer reads
+dirty masks, selected source slots, cached shader IDs or legacy descriptors.
 
-| Boundary | Reuse | Required result |
+| Boundary | Existing owner | Current result / remaining work |
 | --- | --- | --- |
-| Authored updates -> owned scene-light data | Existing `bdLightListUpdateSnapshot` boundary in `src/engine/frame_interp.cpp`; `native_light_selection.h`, `native_selected_lights.h` and current lighting bridges | Publish bounded semantic light definitions, scoring/priority/view/exclusion inputs and scene/update identities at a proven coherent handoff. Preserve animated/late changes. Audit synchronization; copying mutable fields or stamping them with a frame number alone is not an immutable snapshot. |
-| Object updates -> selection inputs | Existing native model/instance/object owners and per-node binding import | Retain the correct object/node light binding, class and spatial inputs with owned lifetime. Guest addresses may identify the temporary import boundary, not the native lighting API or persistent asset. Do not substitute guessed bounds or freeze observed light values. |
-| Native light/object inputs -> actual scene packet | Existing `native_selected_lights_bridge.cpp`, `native_material_texture_bridge.cpp`, `PrepareNativeRigidSceneForObject` and `native_rigid_draw.cpp` | Select/compose from owned data without reading guest dirty masks, cached shader IDs or legacy parameter descriptors at native consumption. Preserve the existing native scene/shadow programs, image leases, queue, instancing/indirect and fence retirement. |
+| Authored updates -> owned scene-light data | `bdLightListUpdateSnapshot` in `frame_interp.cpp`; existing selection/composition math and lighting bridges | Bounded300 semantic records, scoring/priority/exclusion data and update identity. Pass-owned lighting view remains distinct from render view. Original authored updates/snapshot helper still execute at the producer. |
+| Object updates -> selection inputs | Existing native instance source index and model/pose owners | Copies class/centre/radius and per-node binding at the handoff, keyed only by native instance/model/node.2,898 field bindings available; missing poses and null/inherited/invalid bindings remain explicitly unconverted. No guessed bounds or draw-time light reimport. |
+| Native light/object inputs -> actual scene packet | Existing `PrepareNativeRigidSceneForObject` and native scene/shadow queue/programs | Pure owned selection/composition, copied packet values survive replacement/retirement. Existing instancing/indirect/image/fence path unchanged. Current live acceptance remains the selected rigid consumer, not all imported bindings or a whole scene. |
 
-The exit test is a connected producer-to-consumer proof: existing CPU fixtures
-consume after source mutation/destruction, reject stale scene/update identities,
-and cover changed light values even when old shader slots were unchanged.
-Exercise supported directional/point/spot, priority/exclusion, per-node binding
-and late-update semantics. Then use the existing targeted runtime/receiver
-reload and pixel gates to show fresh consumption and no return to the replaced
-interface. Keep unsupported families explicit. Unchanged shader-fixture evidence
-can be reused; changed bindings/program behavior needs the affected GPU tests.
+CPU fixtures consume after source destruction, reject stale frame/update/native
+identities, and exercise changed colours with unchanged IDs, directional/point/
+spot, priority/exclusion, per-node overrides, limits and copied-value lifetime.
+Run944 proves fresh native consumption in both reload epochs; one inspected image
+is sanity evidence, not a sequence, animated-light matrix or both-eye acceptance.
+Unchanged shader-fixture evidence is reused. Keep unsupported families explicit.
 
 Keep run941's exact failure and strict comparison. Establish its affected
 boundary with a targeted observation when needed; do not assume it is unrelated
@@ -76,14 +74,19 @@ behavior remains unqualified until the cause is resolved or the replaced
 dependency's removal and equivalent native behavior are proved. No disabling
 checks, counter resets, weaker thresholds or relabelled passing evidence.
 
-### Following delivery bundles
+### Next delivery bundles
 
 1. **Scene-level rigid ownership and representative batches.** Complete remaining
-   object/receiver/camera/pass producers and explicit per-eye inputs using the
+   object/receiver/camera/pass producers, inherited node-light inputs and explicit per-eye inputs using the
    existing owners. Grow beyond the single asset to representative supported
    objects, culling/occlusion and real multi-instance groups. Preserve sibling,
    deferred and volume participation; no silent omission or warm-up fallback.
    The selected asset's cold-start hard-off/reload proof stays a regression case.
+   Reuse `NativeObjectTextureScope`, owned instance/model/primitive data, existing
+   receiver/camera/pass publications and native programs. Exit with representative
+   multi-object native emissions using those owners, no legacy warm-up, plus
+   culling/participation/lifetime and targeted pixel checks. Do not stop at another
+   source-reader helper or claim all2,898 light bindings are native draws.
 2. **Material families and characters.** Extend the same path to alpha-tested,
    wind and translucent materials; deliver native skeleton/skin assets, animation/
    pose production and GPU skinning as connected character paths. Test authored
@@ -135,7 +138,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | The selected direct scene draw now consumes the owned packet, retaining geometry/images through the fence. Packet assembly selects owned programs without a `NodeTag`/source key. The producer still resolves object bindings and visibility at an explicit source boundary. Only `PrepareReplayMaterialMesh` keeps the bounded replay alias index; remove it when replay's last consumer migrates. Source-to-object publication still needs replacement. |
-| Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and native per-node light preflight. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. The host receiver replacement has CPU/live-use evidence but awaits accepted reload/pixels after941's strict light-selection failure. Authored projection/colour/light snapshot/cache, fog and source camera/object producers and compatibility publication remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
+| Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and owned scene/node light selection. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. Host106/run944 adds accepted receiver/owned-light reload text and mono sanity pixels;941's legacy comparison failure stays open. Authored light updates, inherited node inputs, projection/colour, fog and source camera/object producers and compatibility publication remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Both programs now use native structured instance storage and indexed indirect commands through the shared cache/queue. CPU batch preflight and two-instance/two-eye GPU pixels pass; live field uses singleton batches. Complete repeated-object runtime/lifecycle coverage. Other families still use engine bindings and translated instance gathering. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission and exact native batch compatibility feed shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Cold-start hard-off and actual mono title reload pass in940. Source object/pass publication, unsupported families, repeated-object batches, sequences and both-eye acceptance remain. |
 

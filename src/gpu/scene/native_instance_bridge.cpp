@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_instance_source.h"
+#include "gpu/scene/native_scene_lights_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_rigid_route.h"
 #include "gpu/scene/native_rigid_route_bridge.h"
@@ -140,6 +141,30 @@ void Handoff(uint32_t container) {
   Report(store);
 }
 } // namespace
+
+bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out, size_t &unavailable) {
+  out.clear(); unavailable = 0;
+  if (!REXCVAR_GET(bd_native_instances)) return false;
+  auto &store = Instances();
+  std::lock_guard lock(store.mutex);
+  for (const auto &[visual, binding] : store.sources) {
+    const auto pose = store.instances.Read(binding.instance, 1);
+    if (!pose || !pose->model || pose->model_generation != binding.model_generation) {
+      ++unavailable; continue;
+    }
+    for (uint32_t node = 0; node < pose->transforms.size(); ++node) {
+      if (!FindNativeInstanceNode(*pose, node)) continue;
+      const auto inputs = ReadNativeObjectLightInputs(visual, node, Word);
+      if (!inputs) { ++unavailable; continue; }
+      if (out.size() == NativeSceneLightingPublication::kMaxBindings) { out.clear(); return false; }
+      if (out.size() == out.capacity())
+        out.reserve(std::min(NativeSceneLightingPublication::kMaxBindings,
+            std::max(size_t(64), out.size()*2)));
+      out.push_back({binding.instance, binding.model_generation, node, *inputs});
+    }
+  }
+  return true;
+}
 
 std::shared_ptr<const NativeInstancePose> FindNativeInstancePose(
     uint32_t visual, uint32_t graph, uint32_t palette) {

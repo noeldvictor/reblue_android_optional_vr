@@ -9,6 +9,7 @@ from native_instance_scenario import verify_rigid_batches
 from native_instance_scenario import verify_rigid_hard_off
 from native_instance_scenario import split_rigid_reload
 from native_instance_scenario import verify_receiver_setup
+from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -886,6 +887,51 @@ class ReceiverSetupScenarioTest(unittest.TestCase):
                     module.verify_rigid_epoch(old_text, receiver_setup=True)
                     module.verify_rigid_epoch(new_text, receiver_setup=True)
             module.verify_rigid_epoch(self.text(), receiver_setup=True)
+
+
+class SceneLightsScenarioTest(unittest.TestCase):
+    def text(self):
+        rows = scenario()
+        for index, frame in ((2, 100), (4, 150)):
+            rows[index] = (f"[native-scene-lights] frame {frame} update {frame} pass update {frame} light view 0; "
+                           f"{frame} publications 0 refused; 500 bindings 2 unavailable imports; "
+                           f"{frame} native reads 0 missing; instance 11 generation 93 node 64;")
+        return "\n".join(rows)
+
+    def test_owned_scene_lights_have_fresh_handoffs_and_consumers(self):
+        self.assertEqual(verify_scene_lights(self.text()), dict(updates_delta=50, reads_delta=50,
+                         bindings=500, unavailable_imports=2, generation=93, light_view=0))
+
+    def test_stale_publication_wrong_scene_and_missing_consumption_cannot_pass(self):
+        text = self.text()
+        for bad in ("", text.replace("150 native reads", "100 native reads"),
+                    text.replace("150 publications", "100 publications"), text.replace("frame 150", "frame 100"),
+                    text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading"):
+            with self.assertRaises(Pending): verify_scene_lights(bad)
+
+    def test_stale_pass_fault_and_bounds_are_errors(self):
+        text = self.text()
+        for bad in (text.replace("pass update 150", "pass update 100"), text.replace("0 missing", "1 missing"),
+                    text.replace("light view 0", "light view 16"), text.replace("500 bindings", "65537 bindings"),
+                    text.replace("instance 11", "instance 0"), text.replace("150 publications 0 refused", "150 publications 1 refused"),
+                    "[native-scene-lights] handoff failed: source\n" + text, "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_scene_lights(bad)
+
+    def test_reload_checks_each_epoch_not_only_the_final_field(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in (
+                        "verify_rigid_epoch", "verify_scene_lights"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for old_text, new_text in ((cold, self.text()), (self.text(), new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(old_text, scene_lights=True)
+                    module.verify_rigid_epoch(new_text, scene_lights=True)
+            module.verify_rigid_epoch(self.text(), scene_lights=True)
 
 
 class FogScenarioTest(unittest.TestCase):

@@ -28,6 +28,10 @@ struct NativeLightingInputs {
   std::optional<LightingExtent> sample_extent;
   std::array<float, 3> scene_origin{};
   float scene_range = 1;
+  // Light-selection view is NOT the render-view identity. The update pins the
+  // coherent scene/object publication used by this pass, not a shader cache.
+  uint32_t light_view = 0;
+  uint64_t light_update = 0;
 };
 struct NativeLightingPass {
   NativeLightingInputs inputs;

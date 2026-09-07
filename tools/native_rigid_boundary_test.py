@@ -73,11 +73,27 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,", emitter)
         self.assertIn("d.native_rigid ? d.native_rigid->model_generation : 0", emitter)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
-        preview = lights.split("PrepareNativeSelectedLightValues(uint32_t selection)", 1)[1].split(
+        preview = lights.split("std::optional<NativeSelectedLights> FindNativeSceneLights(", 1)[1].split(
             "std::optional<NativeSelectedLights> FindNativeSelectedLights", 1)[0]
-        self.assertIn("PreviewSelectedLightValues(", preview)
-        for forbidden in ("__imp__", "bd::mem::store", "REXCVAR_GET(bd_native_materials_verify)"):
+        self.assertIn("scene.current.Select(frame, pass.light_update, instance, model_generation, node, pass.light_view)", preview)
+        for forbidden in ("__imp__", "bd::mem::", "Word(", "PrepareSelection(", "PrepareSelectedLights("):
             self.assertNotIn(forbidden, preview)
+
+    def test_scene_lights_publish_at_handoff_without_dirty_or_shader_cache_inputs(self):
+        producer = (ROOT / "src/engine/frame_interp.cpp").read_text().split(
+            "REX_HOOK_RAW(bdLightListUpdateSnapshot) {", 1)[1].split("\n}", 1)[0]
+        self.assertLess(producer.index("__imp__bdLightListUpdateSnapshot(ctx, base)"),
+                        producer.index("PublishNativeSceneLights(manager)"))
+        self.assertNotIn("return;", producer)
+        source = (ROOT / "src/gpu/scene/native_scene_lights_source.h").read_text()
+        for forbidden in ("selection+4)", "selection+8", "selection+216", "+276", "PrepareSelectedLights"):
+            self.assertNotIn(forbidden, source)
+        consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text().split(
+            "std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject", 1)[1].split("\n}", 1)[0]
+        self.assertIn("FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs)", consumer)
+        for forbidden in ("Word(", "+3132", "+3376", "+3380", "PrepareNativeSelectedLightValues"):
+            self.assertNotIn(forbidden, consumer)
+        self.assertNotIn("PreviewSelectedLightValues", (ROOT / "src/gpu/scene/native_light_selection_source.h").read_text())
 
     def test_native_batches_use_owned_storage_and_shared_queue_without_translated_gather(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()

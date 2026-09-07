@@ -178,19 +178,11 @@ std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
       scope->policy_inputs->technique != 0) return {};
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
-  refusal = "per-node light source binding unavailable";
-  const auto per_node = Word(uint64_t(scope->visual)+3380);
-  if (!per_node) return {};
-  uint64_t selection = uint64_t(scope->visual)+3132;
-  if (*per_node) {
-    const auto table = Word(uint64_t(scope->visual)+3376);
-    const auto entry = table && *table ? Word(uint64_t(*table)+uint64_t(node)*4) : std::nullopt;
-    if (!entry || !*entry) return {}; // inherited state is not a native light owner
-    selection = *entry;
-  }
-  if (selection > UINT32_MAX) return {};
-  refusal = "native per-node light preflight unavailable";
-  const auto lights = PrepareNativeSelectedLightValues(uint32_t(selection));
+  refusal = "owned ordinary scene packet or lighting pass unavailable";
+  auto packet = FindNativeObjectPrimitive(pose, node, 0);
+  if (!packet || !packet->lighting) return {};
+  refusal = "owned scene/object lighting publication unavailable";
+  const auto lights = FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
   if (!lights) return {};
   refusal = "fresh completed primary shadow or receiver colour unavailable";
   const auto receiver = FindNativePrimaryReceiver(scope->visual,scope->render_view);
@@ -201,10 +193,7 @@ std::optional<NativeRigidScenePlan> PrepareNativeRigidSceneForObject(
   refusal = "live receiver visibility unavailable";
   const auto visibility = ImportNodeShadowInputs(tag);
   if (!visibility) return {};
-  refusal = "owned ordinary scene packet unavailable";
-  auto packet = FindNativeObjectPrimitive(pose, node, 0);
-  if (!packet) return {};
-  packet->lights = lights; // computed for this node BEFORE its old shader callback
+  packet->lights = lights; // copied values remain valid through update/reload/GPU retirement
   refusal = "whole-node scene shader contract unsupported";
   return PrepareNativeRigidScene(*program, *packet,
       {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility});

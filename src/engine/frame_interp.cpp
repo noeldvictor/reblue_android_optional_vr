@@ -33,6 +33,7 @@
 #include "engine/virtual_buttons.h"
 #include "gpu/gpu.h"
 #include "gpu/scene/native_transform_bridge.h"
+#include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_view_schedule_bridge.h"
 #include "xr/xr_game_camera.h"
@@ -455,6 +456,7 @@ void ClearLightChangedList() {
 
 REX_EXTERN(__imp__bdLightListUpdateSnapshot);
 REX_HOOK_RAW(bdLightListUpdateSnapshot) {
+  const u32 manager = ctx.r3.u32;
   u32 held = bd::engine::InterpolationActive()
                  ? bd::mem::load<u32>(kLightChangedCountEA)
                  : 0;
@@ -463,10 +465,11 @@ REX_HOOK_RAW(bdLightListUpdateSnapshot) {
 
   __imp__bdLightListUpdateSnapshot(ctx, base);
 
-  if (held == 0)
-    return;
-  SetChangedFlags(held, true);
-  bd::mem::store<u32>(kLightChangedCountEA, held);
+  if (held != 0) {
+    SetChangedFlags(held, true);
+    bd::mem::store<u32>(kLightChangedCountEA, held);
+  }
+  bd::gpu::scene::PublishNativeSceneLights(manager);
 }
 
 namespace bd::engine {

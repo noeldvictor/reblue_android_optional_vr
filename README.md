@@ -68,28 +68,32 @@ families, characters/skinning, effects/UI, frame/pass ownership, asset streaming
 and full desktop stereo coverage. Quest 2 optimization has not resumed. There
 is no defensible completion percentage or delivery estimate yet.
 
-Last **accepted live/pixel checkpoint** (2026-09-07, host103/run940): one opt-in
+Last **accepted live/pixel checkpoint** (2026-09-07, host106/run944): one opt-in
 rigid field object uses native scene and shadow programs, native instance storage
 and indexed indirect submission. Its old interpreter/capture/replay path is
 disabled before first draw. Cold load and a real title teardown/reload pass,
 including old-source and GPU-fence retirement. The inspected mono image is
-coherent, with known cliff marks/distant blur. Runtime batches are singletons;
+coherent (terrain, trees and shadows; Shu partly hidden by foliage), with known
+cliff marks. Runtime batches are singletons;
 no draw-call reduction or speedup is established. This object still has source
 adapters; it is not independently host-owned scene loading.
-[Reload evidence](research/20260907_1140_native-rigid-reload.md).
+[Current lighting/reload evidence](research/20260907_1342_owned-scene-lighting.md).
 
-**Latest work and known regression:** renderer source `6de0c2f` replaces the
-receiver callback with host setup and a retained image/camera/late-colour packet.
-Host105/run943 passes its text gates in both reload epochs, but does not reproduce
-or explain run941's light-selection dirty-bit failure. That failure is preserved;
-no new pixels were captured. The next implementation removes mutable guest
-light-selection/cache inputs from the direct native consumer using owned scene
-and object lighting. The mismatch stays open and the affected runtime behavior
-unqualified; independent ownership work need not wait on repeated diagnostic
-boots. Representative batches, visual sequences and both-eye game checks remain.
-[Current evidence and next investigation](research/20260907_1224_native-receiver-setup.md).
+**Latest connected change:** scene lights and object/node lighting inputs are
+now published at the synchronized game/render handoff. Native rigid draws select
+from owned values, without reading guest dirty masks, selected slots, cached
+shader IDs or parameter descriptors. The field publication contains 2,898 node
+bindings; the selected native consumer passes fresh-update and reload gates with
+no missing reads. Other unsupported imports remain explicit. The host receiver
+also passes its two-epoch text gate and the new mono-image sanity check.
 
-Verification: 300 Python source/scenario checks and the current C++ fixtures
+Run941's separate legacy light-selection dirty-bit failure remains unresolved;
+this passing run does not explain it. Its strict comparison and failure evidence
+are preserved. Authored update producers, inherited node bindings, broader
+material/object families, visual sequences and both-eye game checks remain.
+[Preserved regression](research/20260907_1224_native-receiver-setup.md).
+
+Verification: 305 Python source/scenario checks and the current C++ fixtures
 pass. Existing GPU evidence covers five 8x8 two-eye pixel cases in 1.22 seconds
 with zero Vulkan validation errors/warnings, including two instanced scene/shadow
 draws with different per-instance values. These fixtures are not full-game stereo
@@ -98,7 +102,7 @@ or lifecycle acceptance. All acceptance switches remain off in the normal profil
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive packets, native scene/caster instanced-indirect route, selected-object mono reload proof | Representative multi-object batches, remaining source producers/material families and broader lifecycle coverage |
+| Scene and materials | Owned instance/primitive/light packets, native scene/caster instanced-indirect route, selected-object mono reload proof | Representative multi-object batches, remaining source producers/material families and broader lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |
@@ -114,8 +118,9 @@ not a second chronological worklog here.
 ### How we finish faster
 
 Work in **connected subsystem bundles**: producer, owned data, native consumers
-and removal of the replaced interface. Next is scene lighting; then broader
-rigid scene ownership, material/character paths and the remaining frame producers.
+and removal of the replaced interface. The owned-lighting connection is in place;
+next are broader rigid scene ownership, material/character paths and remaining
+frame producers.
 Reuse the existing assets, owners, math, shaders and backend. The first object is
 a regression case, not a permanent limit on scene-level development. Delete
 compatibility at last use and complete the full desktop gate before Quest work.
