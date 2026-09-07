@@ -5,10 +5,31 @@
  */
 #pragma once
 #include "gpu/scene/native_material_textures.h"
+#include "gpu/scene/native_material_data.h"
 #include <bit>
 #include <cmath>
 
 namespace bd::gpu::scene {
+// bdSceneTreeDraw publishes colour at +3404 before its setup callbacks and
+// traversal. Read the final value at traversal entry, not the earlier +3004
+// source or a sibling draw's shader constants. Mode-11/special-route exclusions
+// are established by ReadMaterialTextureInputs before this publication is used.
+template <class Read>
+std::optional<NativeMaterialObjectInputs> ReadMaterialObjectInputs(uint32_t visual, Read read) {
+  if (!visual || (visual & 3) || visual > UINT32_MAX - 3419) return {};
+  const auto shininess = read(uint64_t(visual) + 3044);
+  if (!shininess) return {};
+  NativeMaterialObjectInputs result;
+  result.writes_shininess = *shininess != 0;
+  for (uint32_t n = 0; n < 4; ++n) {
+    const auto value = read(uint64_t(visual) + 3404 + n * 4);
+    if (!value) return {};
+    result.colour[n] = std::bit_cast<float>(*value);
+    if (!std::isfinite(result.colour[n])) return {};
+  }
+  return result;
+}
+
 // Reader accepts checked 64-bit addresses and returns host-endian words.
 // Image conversion runs at object setup, outside the Video lock. Its result is
 // an owned lease, a known no-op, or explicitly unavailable, never a source key.

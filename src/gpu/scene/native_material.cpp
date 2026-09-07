@@ -10,6 +10,7 @@
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
 #include "gpu/scene/native_material_texture_bridge.h"
+#include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/reflection_texture_import.h"
@@ -281,6 +282,14 @@ void NoteNativeModelNodeCandidate(const NativeInstancePose &pose, uint32_t index
           game.Stage().Name(), pose.instance, pose.model_generation, index, program->ranges.size(), geometry->id, material->id,
           technique, view, range.skin.has_value(), range.skin ? range.skin->count : 0, range.material.has_diffuse_multiplier, range.material.has_specular_colour,
           range.material.has_shininess, bounds[0], bounds[1], bounds[2], bounds[3]);
+  if (const auto packet = FindNativeObjectPrimitive(pose, index, 0)) {
+    BD_INFO("[native-rigid-packet] geometry {:016X} material {:016X} mask {} images {:04X} UV known {} values {:.6g} {:.6g} {:.6g} {:.6g}; "
+            "diffuse {:.6g} {:.6g} {:.6g} {:.6g}; policy known {} direct {} deferred {} alpha {}; owned packet, shader/pass eligibility pending",
+            packet->geometry->id, packet->material->id, packet->material_mask, packet->textures.image_mask,
+            packet->textures.owns_uv, packet->textures.uv[0], packet->textures.uv[1], packet->textures.uv[2], packet->textures.uv[3],
+            packet->material_values[0][0], packet->material_values[0][1], packet->material_values[0][2], packet->material_values[0][3],
+            packet->policy.routing_known, packet->policy.direct, packet->policy.deferred, packet->policy.alpha_test);
+  }
 }
 
 std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelMaterials(
@@ -421,9 +430,19 @@ std::optional<bool> ImportMaterialDisablesShadow(
 uint32_t EvaluateNativeMaterial(const NodeTag &tag,
                                const NativeMaterialAsset &material,
                                std::array<float, 4> values[3]) {
-  if (!tag.visual_va || tag.from_list || !tag.ctx_va || tag.tech == 11 ||
-      bd::mem::try_load<uint32_t>(tag.ctx_va + 16, uint32_t(-1)) != 0)
+  if (!tag.visual_va || tag.from_list || !tag.ctx_va || tag.tech == 11)
     return 0;
+  if (const auto object = FindNativeMaterialObjectInputs(tag)) {
+    if (REXCVAR_GET(bd_native_materials_verify)) {
+      const auto original = ReadMaterialObjectInputs(tag.visual_va, [](uint64_t address) -> std::optional<uint32_t> {
+        const auto *value = bd::mem::try_at<const be_u32>(uint32_t(address));
+        return value ? std::optional(uint32_t(*value)) : std::nullopt;
+      });
+      NativeMaterialObjectInputCheck(original && *original == *object);
+    }
+    return ComposeNativeMaterialAsset(material, object->colour, object->writes_shininess, values);
+  }
+  if (bd::mem::try_load<uint32_t>(tag.ctx_va + 16, uint32_t(-1)) != 0) return 0;
   std::array<float, 4> object_colour;
   for (uint32_t i = 0; i < 4; ++i) {
     const auto *component = bd::mem::try_at<const be_f32>(

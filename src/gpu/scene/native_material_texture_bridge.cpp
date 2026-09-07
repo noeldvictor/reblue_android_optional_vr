@@ -25,17 +25,24 @@ namespace bd::gpu::scene {
 struct NativeObjectTextureState {
   uint32_t context = 0, visual = 0, graph = 0, table_offset = 0;
   uint64_t generation = 0;
+  NativeModelRenderHandle model;
+  std::shared_ptr<const NativeInstancePose> pose;
+  std::optional<NativeMaterialObjectInputs> object;
   NativeTextureTableHandle table;
   MaterialImageSelection<NativeTextureBinding> fallback;
   MaterialTextureInputs<NativeTextureBinding> inputs;
   std::optional<PrimitivePolicyInputs> policy_inputs;
   struct Mesh {
     std::shared_ptr<const ModelMaterialImport> owner;
+    const NativeModelMaterialProgram *program = nullptr;
     std::vector<NativeMaterialTextureValues> values;
     std::vector<NativePrimitivePolicy> policies;
     std::optional<NativePrimitivePlan> plan;
   };
-  std::unordered_map<uint32_t, Mesh> meshes;
+  std::unordered_map<const NativeModelMaterialProgram *, Mesh> meshes;
+  // Only legacy replay ordinal matching needs this bounded source-key index.
+  // Both routes share the same prepared values, never two material caches.
+  std::unordered_map<uint32_t, Mesh *> source_meshes;
   size_t bytes = sizeof(NativeObjectTextureState);
 };
 namespace {
@@ -55,6 +62,8 @@ struct PolicyStats {
   uint64_t reads = 0, missing = 0, checked = 0, wrong = 0, draws = 0, changed = 0, refreshes = 0;
 };
 thread_local PolicyStats policy_stats;
+struct ObjectStats { uint64_t publications = 0, reads = 0, missing = 0, checked = 0, wrong = 0, packets = 0; };
+thread_local ObjectStats object_stats;
 std::optional<uint32_t> Word(uint64_t address) {
   if (!address || (address & 3) || address > UINT32_MAX - 3) return {};
   const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -68,7 +77,8 @@ MaterialImageSelection<NativeTextureBinding> Capture(uint32_t source) {
 }
 }
 
-NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context) : previous_(current) {
+NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
+    std::shared_ptr<const NativeInstancePose> pose) : previous_(current) {
   current = nullptr;
   ++depth;
   if (!REXCVAR_GET(bd_native_material_textures)) return;
@@ -82,7 +92,10 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context) : previous_
     auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture);
     if (!inputs) { ++stats.unsupported; return; }
     auto publication = std::make_unique<NativeObjectTextureState>();
-    publication->generation = LoadedNativeModelGeneration(*graph);
+    publication->model = FindLoadedNativeModel(*graph);
+    publication->generation = publication->model ? publication->model->Generation() : 0;
+    if (pose && pose->model == publication->model) publication->pose = std::move(pose);
+    publication->object = ReadMaterialObjectInputs(*visual, Word);
     publication->table = *table ? FindLoadedNativeTextureTable(*table) : nullptr;
     if (!publication->generation || (*table && !publication->table)) { ++stats.unsupported; return; }
     publication->context = context; publication->visual = *visual; publication->graph = *graph;
@@ -95,6 +108,7 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context) : previous_
     if (publication->bytes > kScopeBytes) { ++stats.refused; return; }
     stats.override_scopes += !publication->inputs.overrides.empty() || !publication->inputs.late_images.empty();
     owned_ = std::move(publication); current = owned_.get();
+    object_stats.publications += current->object.has_value();
     ++stats.scopes;
   } catch (const std::exception &error) {
     ++stats.refused;
@@ -104,16 +118,13 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context) : previous_
 NativeObjectTextureScope::~NativeObjectTextureScope() { current = previous_; --depth; }
 
 namespace {
-NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NodeTag &tag) {
+NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialProgram &program) {
   auto *scope = current;
-  if (!scope || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual ||
-      scope->generation != LoadedNativeModelGeneration(scope->graph)) return nullptr;
-  auto it = scope->meshes.find(tag.mesh_va);
+  if (!scope) return nullptr;
+  auto it = scope->meshes.find(&program);
   if (it == scope->meshes.end()) {
     NativeObjectTextureState::Mesh mesh;
-    mesh.owner = FindLoadedNativeModelMaterials(scope->graph, tag.mesh_va);
-    if (!mesh.owner) return nullptr;
-    const auto &program = mesh.owner->program;
+    mesh.program = &program; // the scope's immutable model lease pins it
     constexpr size_t overhead = 256;
     if (scope->bytes > kScopeBytes - overhead || program.ranges.size() >
         (kScopeBytes - scope->bytes - overhead) /
@@ -159,19 +170,69 @@ NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NodeTag &tag) {
       policy_stats.direct += mesh.plan->direct; policy_stats.deferred += mesh.plan->deferred;
       policy_stats.suppressed += mesh.plan->suppressed;
     }
-    scope->bytes += overhead + mesh.values.capacity() * sizeof(NativeMaterialTextureValues) +
+    const size_t retained = overhead + mesh.values.capacity() * sizeof(NativeMaterialTextureValues) +
         mesh.policies.capacity() * sizeof(NativePrimitivePolicy);
+    if (retained > kScopeBytes - scope->bytes) { ++stats.refused; return nullptr; }
+    scope->bytes += retained;
     stats.peak_bytes = std::max(stats.peak_bytes, scope->bytes);
-    it = scope->meshes.emplace(tag.mesh_va, std::move(mesh)).first;
+    it = scope->meshes.emplace(&program, std::move(mesh)).first;
     ++stats.meshes;
   }
   return &it->second;
 }
+
+NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
+  auto *scope = current;
+  if (!scope || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual ||
+      scope->generation != LoadedNativeModelGeneration(scope->graph)) return nullptr;
+  if (auto it = scope->source_meshes.find(tag.mesh_va); it != scope->source_meshes.end()) return it->second;
+  constexpr size_t alias_bytes = 128;
+  if (scope->source_meshes.size() >= 4096 || scope->bytes > kScopeBytes - alias_bytes) {
+    ++stats.refused; return nullptr;
+  }
+  const auto owner = FindLoadedNativeModelMaterials(scope->graph, tag.mesh_va);
+  if (!owner || owner.owner_before(scope->model) || scope->model.owner_before(owner)) return nullptr;
+  auto *mesh = PrepareMaterialMesh(owner->program);
+  if (!mesh || scope->bytes > kScopeBytes - alias_bytes) { ++stats.refused; return nullptr; }
+  mesh->owner = owner;
+  scope->source_meshes.emplace(tag.mesh_va, mesh);
+  scope->bytes += alias_bytes;
+  stats.peak_bytes = std::max(stats.peak_bytes, scope->bytes);
+  return mesh;
+}
 } // namespace
+
+std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
+    const NativeInstancePose &pose, uint32_t node, uint32_t primitive) {
+  auto *scope = current;
+  // Exact publication identity prevents another instance of the same model, or
+  // a different lane/update, from borrowing this object's color and textures.
+  if (!scope || scope->pose.get() != &pose || !scope->object || scope->model != pose.model) return {};
+  const auto *program = FindNativeInstanceNode(pose, node);
+  const auto *mesh = program ? PrepareMaterialMesh(*program) : nullptr;
+  if (!mesh || primitive >= mesh->values.size() || primitive >= mesh->policies.size()) return {};
+  auto result = BuildNativeObjectPrimitive(scope->pose, node, primitive,
+      *scope->object, mesh->values[primitive], mesh->policies[primitive]);
+  object_stats.packets += result.has_value();
+  return result;
+}
+
+std::optional<NativeMaterialObjectInputs> FindNativeMaterialObjectInputs(const NodeTag &tag) {
+  const auto *scope = current;
+  if (!scope || tag.from_list || tag.tech == 11 || tag.ctx_va != scope->context || tag.visual_va != scope->visual || !scope->object) {
+    ++object_stats.missing; return {};
+  }
+  ++object_stats.reads;
+  return scope->object;
+}
+void NativeMaterialObjectInputCheck(bool same) {
+  ++object_stats.checked;
+  if (!same && ++object_stats.wrong <= 4) BD_WARN("[native-object-input-mismatch] object colour/shininess publication");
+}
 
 const NativeMaterialTextureValues *FindNativeMaterialTextures(
     const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count) {
-  const auto *prepared = PrepareMaterialMesh(tag);
+  const auto *prepared = PrepareReplayMaterialMesh(tag);
   if (!prepared) { ++stats.missing; return nullptr; }
   const auto &mesh = *prepared;
   const NativeMaterialTextureValues *found = nullptr;
@@ -188,7 +249,7 @@ const NativeMaterialTextureValues *FindNativeMaterialTextures(
 std::optional<NativePrimitivePolicy> FindNativePrimitivePolicy(
     const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count) {
   if (!REXCVAR_GET(bd_native_primitive_policies)) return {};
-  const auto *mesh = PrepareMaterialMesh(tag);
+  const auto *mesh = PrepareReplayMaterialMesh(tag);
   if (!mesh || !mesh->plan) { ++policy_stats.missing; return {}; }
   std::optional<NativePrimitivePolicy> found;
   for (size_t i = 0; i < mesh->owner->program.ranges.size(); ++i) {
@@ -203,7 +264,7 @@ std::optional<NativePrimitivePolicy> FindNativePrimitivePolicy(
 }
 std::optional<NativePrimitivePlan> FindNativePrimitivePlan(const NodeTag &tag) {
   if (!REXCVAR_GET(bd_native_primitive_policies)) return {};
-  const auto *mesh = PrepareMaterialMesh(tag);
+  const auto *mesh = PrepareReplayMaterialMesh(tag);
   return mesh ? mesh->plan : std::nullopt;
 }
 void NativePrimitivePolicyCheck(bool same) {
@@ -221,6 +282,9 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  BD_INFO("[native-object-inputs] {} publications {} owned colour reads {} unavailable; {} checks wrong {}; {} owned primitive packets; no direct draw claimed",
+          object_stats.publications, object_stats.reads, object_stats.missing,
+          object_stats.checked, object_stats.wrong, object_stats.packets);
   BD_INFO("[native-material-textures] {} object publications {} with overrides; {} unsupported {} refused; "
           "{} meshes prepared, peak {} bytes; {} reads {} unavailable; {} checks wrong {}; "
           "{} draws {} image slots {} UV blocks; source object/pass setup and shader ABI remain",

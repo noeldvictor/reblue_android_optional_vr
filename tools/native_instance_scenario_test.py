@@ -1,6 +1,6 @@
 import unittest
 import re
-from native_instance_scenario import verify_model_nodes
+from native_instance_scenario import verify_model_nodes, verify_object_inputs
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -512,6 +512,35 @@ class ModelNodeScenarioTest(unittest.TestCase):
                 verify_model_nodes(bad)
         with self.assertRaises(Pending):
             verify_model_nodes(text + "\n[native-material-context] mode Loading")
+
+
+class ObjectInputScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-object-inputs] 10 publications 100 owned colour reads 4 unavailable; 100 checks wrong 0; 1 owned primitive packets;"
+        rows[4] = "[native-object-inputs] 20 publications 150 owned colour reads 8 unavailable; 150 checks wrong 0; 1 owned primitive packets;"
+        return rows
+
+    def test_fresh_complete_comparison_not_a_draw_claim(self):
+        self.assertEqual(verify_object_inputs("\n".join(self.rows())),
+                         dict(publications_delta=10, reads_delta=50, checks_delta=50, unavailable=8, packets_observed=1))
+
+    def test_stale_reset_missing_checks_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150 owned", "100 owned"), text.replace("150 checks", "149 checks"),
+                    text.replace("20 publications", "10 publications"), text.replace("150", "1"),
+                    text.replace("bg41_01", "bg42_01"), "\n".join(self.rows()[1:])):
+            with self.assertRaises(Pending):
+                verify_object_inputs(bad)
+
+    def test_mismatch_and_limits(self):
+        text = "\n".join(self.rows())
+        for bad in ("[native-object-input-mismatch]\n" + text, text.replace("wrong 0", "wrong 1", 1),
+                    "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_object_inputs(bad)
+        with self.assertRaises(Pending):
+            verify_object_inputs(text + "\n[native-material-context] mode Loading")
 
 
 if __name__ == "__main__":

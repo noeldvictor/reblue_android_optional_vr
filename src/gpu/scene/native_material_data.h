@@ -17,6 +17,12 @@
 
 namespace bd::gpu::scene {
 
+struct NativeMaterialObjectInputs {
+  std::array<float, 4> colour{};
+  bool writes_shininess = false;
+  bool operator==(const NativeMaterialObjectInputs &) const = default;
+};
+
 // Named asset properties, not a captured shader register file. Unknown fields
 // stay unknown: an omitted command inherits state and is not a white default.
 struct NativeMaterialProperties {

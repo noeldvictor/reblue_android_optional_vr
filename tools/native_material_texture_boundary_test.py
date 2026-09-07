@@ -13,11 +13,41 @@ class MaterialTextureBoundaryTest(unittest.TestCase):
 
     def test_object_publication_precedes_traversal_and_restores_nested_scope(self):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertLess(walk.index("NativeObjectTextureScope textures(ctx.r4.u32)"),
-                        walk.index("Walk(ctx, base, ctx.r3.u32, ctx.r4.u32)"))
+        self.assertLess(walk.index("const auto instance_pose = FindNativeInstancePose("),
+                        walk.index("NativeObjectTextureScope textures(ctx_va, instance_pose)"))
+        self.assertLess(walk.index("NativeObjectTextureScope textures(ctx_va, instance_pose)"),
+                        walk.index("const u32 saved_r1"))
         self.assertIn("previous_(current)", self.bridge)
         self.assertIn("current = previous_; --depth;", self.bridge)
         self.assertIn("depth > kScopeDepth", self.bridge)
+
+    def test_native_packet_uses_exact_pose_and_shared_preparation_without_source_keys(self):
+        prepare = self.bridge.split("NativeObjectTextureState::Mesh *PrepareMaterialMesh(", 1)[1].split(
+            "NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(", 1)[0]
+        packet = self.bridge.split("std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(", 1)[1].split(
+            "std::optional<NativeMaterialObjectInputs>", 1)[0]
+        for part in (prepare, packet):
+            for forbidden in ("NodeTag", "LoadedNativeModelGeneration", "FindLoadedNativeModelMaterials",
+                              "source_meshes", "ModelPrimitiveMatches", "bd::mem", "Word(", "Video::"):
+                self.assertNotIn(forbidden, part)
+        self.assertIn("scope->pose.get() != &pose", packet)
+        self.assertIn("scope->model != pose.model", packet)
+        self.assertIn("BuildNativeObjectPrimitive(scope->pose, node, primitive", packet)
+        self.assertIn("PrepareMaterialMesh(owner->program)", self.bridge)
+        self.assertIn("owner.owner_before(scope->model)", self.bridge)
+        self.assertIn("alias_bytes = 128", self.bridge)
+
+    def test_colour_consumer_reads_source_only_for_comparison_or_missing_publication(self):
+        material = (ROOT / "src/gpu/scene/native_material.cpp").read_text()
+        begin = material.split("uint32_t EvaluateNativeMaterial(", 1)[1]
+        owned = begin.split("if (const auto object = FindNativeMaterialObjectInputs(tag))", 1)[1].split(
+            "if (bd::mem::try_load<uint32_t>(tag.ctx_va + 16", 1)[0]
+        self.assertIn("if (REXCVAR_GET(bd_native_materials_verify))", owned)
+        self.assertIn("NativeMaterialObjectInputCheck(original && *original == *object)", owned)
+        self.assertIn("ComposeNativeMaterialAsset(material, object->colour, object->writes_shininess", owned)
+        core = (ROOT / "src/gpu/scene/native_object_primitive.h").read_text()
+        for forbidden in ("NodeTag", "bd::mem", "PPCContext", "Video::", "REX_", "source_bindings"):
+            self.assertNotIn(forbidden, core)
 
     def test_consumer_only_uses_owned_program_table_and_override_values(self):
         consumer = self.bridge.split("NativeObjectTextureState::Mesh *PrepareMaterialMesh(")[1]

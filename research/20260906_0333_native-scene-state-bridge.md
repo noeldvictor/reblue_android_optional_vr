@@ -2142,3 +2142,54 @@ Cleanup-end free58.968 GiB, drive-wide gain18,165,760 B from this turn's first;
 independent volume gains are not credited as cleanup. Same original cap/floor/
 raw0 gate; retain the selected native asset for direct consumption and replace
 the field/build logs by purpose, not by every revision.
+
+### Owned object primitive packets, same checkpoint (2026-09-07)
+
+Parent91d86ce, prior turn verified progress and pushed. First current storage
+preflight free63,286,571,008 B; material tree7,461,125 B, logs181,150 B, images
+10,235,034 B. One transient cmake/PID31364 appeared during inspection, but its
+handle/process was authoritatively missing on recheck; never restarted/stopped
+it. No owned producer active. Same original3 GiB exception/floor62,509,998,080 B,
+per-build256 MiB/per-run192 MiB stops, raw0. Plan <=4 MiB fixture/log growth,
+<=256 MiB build overlap. Reuse material/desktop trees and selected17,572 B mesh;
+no guest/shader rebuild, new asset/capture/cache tree or bulk conversion. Runtime
+and one replacement <=160 KiB image preflight follow CPU/build checks; keep
+run921 text/run919 image until replacements qualify under the same10 MiB cap.
+
+Material20/PID31720 passes (14 build edges,6.010 s); CPU18/PID27944 passes
+0.10 s behavior/0.11 s CTest.245 Python checks pass. Host78/PID31256 passes:
+codegen up-to-date,21 host edges/link, no guest/shader rebuild. All terminal.
+Runtime preflight free63,269,978,112 B; no renderer/build producer. Material tree
+7,532,110 B (+70,985), build logs187,675 B (+6,525), images10,235,034 B unchanged.
+Host exe48,359,936/PDB107,626,496 B; owner116 B profile hash unchanged. One
+<=75 s complete post-event field check with owned-color comparisons, <=400 KiB
+log and one <=160 KiB JPEG; no selected cook, raw, perf or shader/cache output.
+Image overlap fits10 MiB. Keep previous evidence until comparisons and actual
+new pixels pass; retain only the replacement passing flat image/text afterward.
+
+Run922/PID29112 terminal04:06:01; all14 settings effective, original profile
+restored exactly. Complete post-event field gates pass:79,716 new owned color
+reads/comparisons, zero mismatch/unavailable;33,600 publications and4 bounded
+owned packet observations. Bounds+1,761,600/poses+113,514 matching; movement31
+samples/+37.499395 units. Selected packet owns image mask0001, UV offsets0,
+diffuse1, material mask3, direct opaque policy. Shader/UV family interpretation
+and live light/fog remain unresolved; no native rigid game shader route yet.
+Run922223,889 B and inspected137,491 B1920x1080 JPEG replace prior flat evidence.
+Known cliff marks/blur remain; one image is not sequence/both-eye qualification.
+No new raw/perf/cache/dump. Binary/evidence hashes and source audit are in
+`20260907_0406_owned-object-primitive-inputs.md`.
+
+After replacement validation, removed8 exact superseded files: material19/
+CPU17/host77 stdout/stderr, run921 text and run919's model-node sanity image.
+Historical reports/hashes and selected mesh preserved, along with distinct
+baseline/GPU/failure/motion/raw evidence.370,066 logical B; immediate free
+63,265,992,704 ->63,266,369,536 B, **376,832 B (368 KiB) actually reclaimed**.
+Credited once; earlier cleanup is not part of these savings. Build logs are
+reproducible; exact retired runtime files are no longer retained. No producer.
+
+Known retained growth270,552 B: material tree+70,985, logs+1,404, flat image
+replacement+8,857, field text replacement−12,422, host exe/PDB+201,728. This adds
+owned-packet lifetime/color-consumer coverage; replace equivalent outputs next
+checkpoint. Other objects/metadata/source/Git deltas unknown. Cleanup-end free
+58.92 GiB, drive-wide use+20,201,472 B (19.27 MiB) from current first preflight;
+not all attributed to task outputs. Original exception/floor/raw0 gate unchanged.

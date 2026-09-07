@@ -122,6 +122,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
       LoadF32(ctx_va + offsetof(GuestTraverseCtx, radiusScale));
   const auto instance_pose = FindNativeInstancePose(
       bd::mem::try_load<u32>(ctx_va), bd::mem::try_load<u32>(ctx_va + 4), palette);
+  NativeObjectTextureScope textures(ctx_va, instance_pose);
 
   const u32 saved_r1 = ctx.r1.u32;
   const u32 frame = saved_r1 - kFrameBytes;
@@ -437,6 +438,5 @@ REX_HOOK_RAW(bdSceneNodeCullTraverse) {
   const u32 view = bd::mem::try_load<u32>(kRenderViewIdVa);
   if (view == 0 && REXCVAR_GET(bd_walk_skip_stubs) && !REXCVAR_GET(bd_reflections))
     return;
-  bd::gpu::scene::NativeObjectTextureScope textures(ctx.r4.u32);
   Walk(ctx, base, ctx.r3.u32, ctx.r4.u32);
 }

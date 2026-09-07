@@ -58,21 +58,21 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **the selected rigid field asset is now
-persisted and independently readable**, and uploaded geometry retains the native
-scene/shadow vertex layout. Geometry `258694267A8DBAEE`, material
-`63B8D67932573E51`, has 162 vertices /158 triangles in a 17,572-byte file. All four
-required attributes exist. Mesh behavior tests, host77 and 240 source/scenario
-checks pass; run921 repeats the field/movement/shadow text gates with exactly
-one cache write and no captures. Run919 remains the latest inspected game image,
-tied to its earlier binary; known cliff artifacts/blur remain.
+Latest desktop checkpoint (2026-09-07): **owned object packets now select native
+geometry, materials, transforms, textures and policy without replay/source keys.**
+Normal material composition also consumes the object-level color snapshot instead
+of rereading it per draw. Material behavior tests, host78 and 245 source/scenario
+checks pass; run922 adds 79,716 fresh matching color comparisons, movement and the
+existing field/shadow gates. Its inspected 1920x1080 sanity image retains the known
+cliff artifacts/blur. No raw captures or cache files were added.
 
-Next: connect this object's owned color/UV/images and live light/fog inputs to
-direct scene/shadow submission, then prove interpreter/template-free cold-load
-and reload. Its UVs still need the material-family conversion; attribute presence
-alone is not shader eligibility. **No live game object uses the new native rigid
-shaders yet.** Source-free GPU loading, full-game/both-eye qualification and any
-speedup remain unproven. [Evidence and next integration](research/20260907_0340_selected-native-rigid-asset.md).
+Next: connect the packet for the already-persisted 162-vertex rigid field asset to
+live light/fog producers and direct scene/shadow submission, then prove
+interpreter/template-free cold-load and reload. UV conversion and exact shader
+flags remain unresolved; an owned packet alone is not shader eligibility.
+**No live game object uses the new native rigid shaders yet.** Source-free GPU
+loading, full-game/both-eye qualification and any speedup remain unproven.
+[Evidence and next integration](research/20260907_0406_owned-object-primitive-inputs.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no
@@ -137,7 +137,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render poses retaining load-owned node/primitive associations and bounds, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production and direct consumers; replace source-tree discovery, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, object-published image/UV values, GPU-tested native rigid shaders with explicit bindings, lighting/state producers, pass binders, water and Toon callbacks | Connect live native rigid consumers and light/fog owners; volume/deferred and remaining override families; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, owned object color/image/UV packets, GPU-tested native rigid shaders with explicit bindings, lighting/state producers, pass binders, water and Toon callbacks | Connect live native rigid consumers and light/fog owners; volume/deferred and remaining override families; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |

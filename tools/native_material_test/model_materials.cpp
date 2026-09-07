@@ -2,6 +2,7 @@
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
 #include "gpu/scene/native_instance.h"
+#include "gpu/scene/native_object_primitive.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -36,6 +37,54 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
 }
 
 void TestNativeModelMaterials() {
+  {
+    ModelMaterialRegistry models;
+    NativeInstanceRegistry instances;
+    auto source = Mesh(10);
+    // Opaque GPU-handle lifetime only: this core must never inspect backend
+    // geometry bytes. Production geometry/layout pixels have separate fixtures.
+    auto gpu_owner = std::make_shared<const uint32_t>(91);
+    std::weak_ptr<const uint32_t> gpu_lifetime = gpu_owner;
+    source.program.geometries[0] = std::shared_ptr<const NativeGeometry>(gpu_owner,
+        static_cast<const NativeGeometry *>(static_cast<const void *>(gpu_owner.get())));
+    const ModelNodeSourceBinding node{0, 10};
+    Require(models.Publish(100, {source}, {&node, 1}), "packet model publication");
+    auto model = models.FindModel(100);
+    const auto id = instances.Create(model->Generation(), model);
+    RenderMatrix world{};
+    world[0] = world[5] = world[10] = world[15] = 1; world[12] = 7;
+    Require(instances.Publish(id, 0, {&world, 1}), "packet pose publication");
+    auto pose = instances.Read(id, 0);
+    using Image = std::shared_ptr<const uint32_t>;
+    MaterialTextureValues<Image> textures;
+    textures.images[0] = std::make_shared<const uint32_t>(73);
+    std::weak_ptr<const uint32_t> image_lifetime = textures.images[0];
+    textures.image_mask = 1; textures.owns_uv = true; textures.uv = {1, 2, 3, 4};
+    NativePrimitivePolicy policy;
+    policy.routing_known = policy.direct = true;
+    NativeMaterialObjectInputs object{{.5f, .25f, .75f, 1}, true};
+    auto packet = BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy);
+    Require(packet && packet->geometry && packet->world[12] == 7 && packet->policy.direct &&
+            packet->receiver_shadow == NativeShadowPolicy::Receive && (packet->material_mask & kNativeDiffuse) &&
+            packet->material_values[0] == object.colour, "owned pose/material/geometry/texture/policy packet");
+    Require(!BuildNativeObjectPrimitive(pose, 1, 0, object, textures, policy) &&
+            !BuildNativeObjectPrimitive(pose, 0, 1, object, textures, policy) &&
+            !BuildNativeObjectPrimitive({}, 0, 0, object, textures, policy), "unknown node/primitive/pose refused");
+    NativeInstancePose stale = *pose; ++stale.model_generation;
+    Require(!BuildNativeObjectPrimitive(std::make_shared<const NativeInstancePose>(stale), 0, 0, object, textures, policy),
+            "mismatched model generation cannot assemble a packet");
+    object.colour[0] = std::numeric_limits<float>::infinity();
+    Require(!BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy), "nonfinite object input refused");
+    textures = {}; object = {}; source = {}; gpu_owner.reset();
+    models.Retire(100); instances.Retire(id); pose.reset(); model.reset(); stale = {};
+    Require(!gpu_lifetime.expired() && !image_lifetime.expired() && *packet->textures.images[0] == 73 &&
+            packet->textures.uv[3] == 4 && packet->world[12] == 7 && packet->material_values[0][0] == .5f,
+            "queued packet survives object scope, source and model/instance retirement");
+    Require(models.Publish(100, {Mesh(20, 42)}), "same source key may be reused");
+    Require(packet->material->asset.properties.shininess != 42, "replacement model cannot repoint packet");
+    packet.reset();
+    Require(gpu_lifetime.expired() && image_lifetime.expired(), "last packet releases owned resources");
+  }
   {
     ModelMaterialRegistry models;
     auto a = Mesh(100), b = Mesh(200, 24);

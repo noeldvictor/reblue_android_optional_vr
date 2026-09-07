@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after selected native geometry persistence and field run921. The first
+Updated 2026-09-07 after owned object packets/color consumption and field run922. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -60,13 +60,16 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    cache selection has CPU coverage; the production rigid shader factory,
    pipeline-description and binding cores now have real GPU fixture coverage.
    No game producer uses the native programs yet, and instance-record gathering
-   remains translated. Connect the owned object packet and live pass producers next,
+   remains translated. Connect the now-owned object packet to live pass producers next,
    not another broad compatibility layer.
    Model-node associations and local bounds are now load-owned and pinned by
    native instance poses; `FindNativeInstanceNode` selects primitives without a
    source graph/mesh/buffer lookup. The host walk consumes these bounds with
-   matching field checks. Object texture/color/pass assembly and direct draw
-   submission must now consume the same association, not discover it from replay.
+   matching field checks. `FindNativeObjectPrimitive` now assembles owned
+   geometry/material/transform/color/image/UV/policy packets from that association;
+   normal material composition uses the published object color. Exact pose identity
+   prevents another instance/lane from borrowing the publication. Direct submission
+   must use this packet, not rediscover its data from replay; live pass inputs remain.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -116,14 +119,14 @@ drop participants from the initial acceptance scene.
 
 ### Direct rigid-object dependency map
 
-Source audit at `11f5d94`, updated for native model-node associations (2026-09-07).
+Source audit at `11f5d94`, updated for owned object primitive inputs (2026-09-07).
 This records why the latest component
 checks are not an end-to-end object conversion, and where the next implementation
 must connect. It is not a second roadmap or a new renderer framework.
 
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
-| An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeInstanceNode`, owned geometry/materials/bounds and object image/UV/policy publications | Model-to-primitive association is published at load and retained by instances; native bounds are live consumers. Assemble direct object color/UV/image/policy packets from this association. `PrepareMaterialMesh` and replay still select by `NodeTag`/source graph and match source IB/VB/range keys; remove that discovery from the new direct consumer. |
+| An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | Packet assembly and shared material preparation now select owned programs, with no `NodeTag`/source lookup. Packets retain resources after scope retirement; ordinary color composition is a live consumer. Feed these packets into direct submission. Only `PrepareReplayMaterialMesh` keeps the bounded source alias index; remove it when replay's last consumer migrates. Source-to-object publication itself still needs replacement. |
 | Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass` and explicit GPU layout | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The live normal shader still imports these from registers. Publish owned lights/fog and associate native material/UV inputs with actual model primitives; do not repack translated registers per draw as the finished producer. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Actual native shaders now work in the Vulkan fixture, using the production factory/description/binding cores. Connect the game object producer and shared cache selection; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
@@ -138,8 +141,12 @@ v2 file is persisted and independently inspected;162 vertices/158 triangles.
 Upload/load retains `rigid_vertex_input`, independent of translated locations.
 UV0 values16383..16895 still require the actual material-family conversion; the
 related cached CS-normal shader uses `(uv+1)/512+offset`, not yet proven as this
-object's exact live variant. Reuse this selected asset, not a library-wide recook.
-Complete color/UV/image/light/fog ownership and
+object's exact live variant. Run922 observes its owned packet: material mask3,
+image mask0001, known UV offsets `(0,0,0,0)`, diffuse `(1,1,1,1)`, known direct
+non-deferred/non-alpha participation. These are that object's live values, not
+defaults to freeze into its asset or proof of exact shader eligibility.
+Reuse this selected asset, not a library-wide recook. Connect its owned packet,
+complete light/fog production, resolve material-family interpretation and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
 
@@ -178,6 +185,19 @@ separate C++ and runtime evidence follows below.
 
 ## Latest qualified checkpoint
 
+Owned object primitive inputs (2026-09-07): object-entry color/shininess snapshots
+now feed ordinary material composition; source reads remain only for verification
+or unsupported scopes. Owned pose/node/primitive selection shares the same prepared
+image/UV/policy data as replay without using its source-key index. Material20/CPU18,
+host78 and245 Python checks pass. Run922 has79,716 fresh matching color reads,
+33,600 new publications, four bounded owned packet observations and all existing
+post-event field/movement gates. Its137,491 B1920x1080 sanity image was inspected:
+Shu/terrain/vegetation/shadows coherent, known cliff marks/distant blur remain.
+No raw/perf/cache output; profile restored. This is packet/lifetime and ordinary
+color-consumer progress, not a native rigid game draw, sequence/both-eye gate,
+interpreter-free cold-load/reload or performance result. Evidence:
+`research/20260907_0406_owned-object-primitive-inputs.md`.
+
 Selected native rigid asset (2026-09-07): geometry upload/load now resolves and
 retains the production native shader vertex input. An opt-in exact content ID
 allows one<=2 MiB asset during otherwise persistence-disabled verification, using
@@ -187,7 +207,7 @@ one17,572 B file and no raw/image/perf/dump. Independent read validates identity
 actual attributes and input lifetime after CPU data destruction. The schema has
 Position/Normal/UV0/Color, but UV units and live material flags still need exact
 family resolution. No game draw reroute, source-free GPU load or new game pixel
-qualification; run919 remains the inspected image tied to host74. Evidence:
+qualification; its inspected image was still run919 tied to host74. Evidence:
 `research/20260907_0340_selected-native-rigid-asset.md`.
 
 Native model-node associations (2026-09-07): load traversal preserves every

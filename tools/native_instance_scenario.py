@@ -40,6 +40,7 @@ PRIMITIVE_POLICY_METRIC = re.compile(
 LIT_SHADING_METRIC = re.compile(r"\[native-lit-shading\] (\d+) normal-lit queued draws;")
 DRAW_BINDING_METRIC = re.compile(r"\[draw-bindings\] (\d+) emitted draws (\d+) descriptor binds (\d+) layout binds;")
 MODEL_NODE_METRIC = re.compile(r"\[native-model-nodes\] (\d+) owned bounds/primitive associations (\d+) unavailable; (\d+) bounds checks wrong (\d+);")
+OBJECT_INPUT_METRIC = re.compile(r"\[native-object-inputs\] (\d+) publications (\d+) owned colour reads (\d+) unavailable; (\d+) checks wrong (\d+); (\d+) owned primitive packets;")
 
 
 class Pending(ValueError):
@@ -311,6 +312,29 @@ def verify_model_nodes(text):
     return {"reads_delta": b[0] - a[0], "checks_delta": b[2] - a[2], "unavailable": b[1]}
 
 
+def verify_object_inputs(text):
+    """Fresh owned color consumption/comparison; packet counts are not draws."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("object-input diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-object-input-mismatch]" in line:
+            raise ValueError("native object input mismatch")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = OBJECT_INPUT_METRIC.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[4]:
+                raise ValueError("native object input differs from source")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or b[1] - a[1] < 32 or b[3] - a[3] != b[1] - a[1]:
+        raise Pending("need fresh object publications and completely checked owned color reads")
+    return {"publications_delta": b[0] - a[0], "reads_delta": b[1] - a[1],
+            "checks_delta": b[3] - a[3], "unavailable": b[2], "packets_observed": b[5]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -357,6 +381,7 @@ def main():
     parser.add_argument("--lit-shading", action="store_true")
     parser.add_argument("--draw-bindings", action="store_true")
     parser.add_argument("--model-nodes", action="store_true")
+    parser.add_argument("--object-inputs", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -377,6 +402,7 @@ def main():
         lit = verify_lit_shading(text) if args.lit_shading else None
         bindings = verify_draw_bindings(text) if args.draw_bindings else None
         nodes = verify_model_nodes(text) if args.model_nodes else None
+        objects = verify_object_inputs(text) if args.object_inputs else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -404,6 +430,8 @@ def main():
         print("PASS: post-event explicit draw bindings " + ", ".join(f"{k}={v}" for k, v in bindings.items()))
     if nodes is not None:
         print("PASS: post-event owned model nodes " + ", ".join(f"{k}={v}" for k, v in nodes.items()))
+    if objects is not None:
+        print("PASS: post-event owned object inputs " + ", ".join(f"{k}={v}" for k, v in objects.items()))
     return 0
 
 

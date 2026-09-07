@@ -91,6 +91,19 @@ void TestNativeMaterialTextures() {
     const auto it = memory.find(address);
     return it == memory.end() ? std::nullopt : std::optional(it->second);
   };
+  memory[visual + 3044] = 7;
+  for (uint32_t i = 0; i < 4; ++i) memory[visual + 3404 + i * 4] = std::bit_cast<uint32_t>(float(i) / 4);
+  const auto object = ReadMaterialObjectInputs(visual, read);
+  Require(object && object->colour == std::array<float, 4>{0, .25f, .5f, .75f} && object->writes_shininess,
+          "final object color and nonzero shininess flag imported once");
+  memory[visual + 3044] = 0;
+  Require(!ReadMaterialObjectInputs(visual, read)->writes_shininess && object->writes_shininess,
+          "later publication cannot mutate an older object input");
+  memory[visual + 3404] = 0x7fc00000;
+  Require(!ReadMaterialObjectInputs(visual, read), "nonfinite object color refused");
+  memory.erase(visual + 3404);
+  Require(!ReadMaterialObjectInputs(visual, read) && !ReadMaterialObjectInputs(0, read) &&
+          !ReadMaterialObjectInputs(UINT32_MAX - 3, read), "missing/null/overflow object input refused");
   const auto imported = ReadMaterialTextureInputs<Image>(visual, read, Bind);
   Require(imported && imported->owns_uv && imported->overrides[0].image.image == 77 &&
           imported->late_images[0].image.image == 88, "live object import owns named UV/image values");
@@ -104,6 +117,7 @@ void TestNativeMaterialTextures() {
   Require(!ReadMaterialTextureInputs<Image>(visual, read, Bind), "special callback route not guessed");
   Require(!ReadMaterialTextureInputs<Image>(UINT32_MAX - 3, read, Bind), "object extent overflow");
   memory.clear();
+  Require(object->colour[3] == .75f && object->writes_shininess, "object input survives source destruction");
   Require(imported->overrides[0].uv == std::array<float, 2>{9, 10} &&
           imported->late_images[0].image.image == 88, "owned publication survives all source storage destruction");
   std::cout << "native material texture order, null inheritance, live overrides, source-free ownership and bounds passed\n";

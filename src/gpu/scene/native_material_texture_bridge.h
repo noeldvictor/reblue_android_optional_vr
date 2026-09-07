@@ -7,6 +7,7 @@
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_texture_binding.h"
 #include "gpu/scene/native_primitive_policy.h"
+#include "gpu/scene/native_object_primitive.h"
 #include <memory>
 namespace bd::gpu::scene {
 struct NodeTag;
@@ -18,11 +19,18 @@ class NativeObjectTextureScope {
   std::unique_ptr<NativeObjectTextureState> owned_;
   NativeObjectTextureState *previous_;
 public:
-  explicit NativeObjectTextureScope(uint32_t traverse_context);
+  NativeObjectTextureScope(uint32_t traverse_context, std::shared_ptr<const NativeInstancePose> pose);
   ~NativeObjectTextureScope();
   NativeObjectTextureScope(const NativeObjectTextureScope &) = delete;
   NativeObjectTextureScope &operator=(const NativeObjectTextureScope &) = delete;
 };
+using NativeObjectPrimitiveInputs = NativeObjectPrimitive<NativeTextureBinding>;
+// Exact pose publication and native ordinals, not a source graph/mesh/buffer key.
+// Returned packets own their leases and remain valid after this scope retires.
+std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
+    const NativeInstancePose &pose, uint32_t node, uint32_t primitive);
+std::optional<NativeMaterialObjectInputs> FindNativeMaterialObjectInputs(const NodeTag &tag);
+void NativeMaterialObjectInputCheck(bool same);
 // Returned values live only through the current object scope. No source memory,
 // image-resource lookup or table-registry lock is required by this consumer.
 const NativeMaterialTextureValues *FindNativeMaterialTextures(
