@@ -59,6 +59,10 @@ void NativePrimitivePolicyCheck(bool same);
 void NativePrimitivePolicyNoteDraw(bool changed);
 void NativePrimitivePolicyRefresh();
 void NativeMaterialTextureCheck(bool same, uint32_t channel, uint32_t visual);
+// Failure-only provenance. Never imports values into a native packet or changes
+// the strict comparison; bounded to the first four reported mismatches.
+void ReportNativeMaterialUvMismatch(const NodeTag &tag,
+    const NativeMaterialTextureValues &values, const void *actual);
 void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv);
 void NativeMaterialTextureReport();
 } // namespace bd::gpu::scene

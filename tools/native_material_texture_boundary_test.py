@@ -86,6 +86,17 @@ class MaterialTextureBoundaryTest(unittest.TestCase):
         self.assertIn("channel == 5", self.draw)  # reflection owns its separate producer
         self.assertIn("p.scene_texture_recipe.UsesSlot(channel)", self.draw)
 
+    def test_uv_failure_provenance_is_bounded_and_does_not_replace_comparison(self):
+        diagnostic = self.bridge.split("void ReportNativeMaterialUvMismatch(", 1)[1].split(
+            "\nnamespace {", 1)[0]
+        self.assertIn("stats.wrong > 4", diagnostic)
+        self.assertIn("std::min<size_t>(8,current->inputs.overrides.size())", diagnostic)
+        self.assertIn("const auto &entry=current->inputs.overrides[n]", diagnostic)
+        for forbidden in ("Publish", "REX_STORE", "bd::mem::store", "current->inputs =", "values.uv ="):
+            self.assertNotIn(forbidden, diagnostic)
+        self.assertIn("std::memcmp(textures->uv.data(), t_vs_block + 2 * 16, 16) == 0", self.draw)
+        self.assertIn("if (!same) ReportNativeMaterialUvMismatch(tag, *textures, t_vs_block + 2 * 16)", self.draw)
+
     def test_native_samplers_have_owned_filter_and_address_producers(self):
         core = (ROOT / "src/gpu/scene/native_material_sampler.h").read_text()
         producer = (ROOT / "src/gpu/scene/native_sampler_bridge.cpp").read_text()

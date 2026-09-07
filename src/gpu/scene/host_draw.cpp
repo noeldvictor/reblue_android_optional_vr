@@ -1591,6 +1591,7 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
       if (textures->owns_uv) {
         const bool same = std::memcmp(textures->uv.data(), t_vs_block + 2 * 16, 16) == 0;
         NativeMaterialTextureCheck(same, 16, tag.visual_va);
+        if (!same) ReportNativeMaterialUvMismatch(tag, *textures, t_vs_block + 2 * 16);
         d.native_uv_recipe = same;
         if (!same) p.replayable = false;
       }

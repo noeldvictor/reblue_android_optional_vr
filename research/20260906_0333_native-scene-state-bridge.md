@@ -3308,3 +3308,65 @@ Firstfree62,592,278,528 ->cleanup-end64,831,401,984 B is a2,239,123,456 B
 drive-wide gain, not a cleanup claim. No owned producer remains; a reused PID
 was verified as an unrelated Android build and left untouched. No game/profile/
 protected baseline/build-tree deletion. Original allowance/floor unchanged.
+
+Continuation after28abb64: prior turn is progress (consumer fix and preserved
+new UV failure). First measured free62,920,818,688 B, no renderer/build process
+found. Source inspection confirms ordinary per-node UV initialization and ordered
+override/reset rules;948 lacks actual/expected values, so it cannot distinguish
+recipe import from a later staging/flush writer. One bounded failure-only
+provenance observation will make that decision. Host111 <=192 MiB peak, same
+300 s supervisor/original floor; no guest/shader rebuild. One subsequent <=180 s
+capture-disabled reload probe, <=800 KiB text and192 MiB free-drop, captures/perf
+off/profile restored. Preserve947/948 and945/940/941 until replacement evidence
+qualifies; no new raw/image/cache/tree. Source checks stay artifact-free.
+Host111/PID34264/session52412 passes, no guest/shader compilation (codegen0
+written); native UV diagnostics only, exe SHA
+295E4FB6B8265DCA01701D411BCCBB9EC4088B0D4DC7BEB143AF2C8F3EFDA655.
+A Python wiring guard initially found diagnostic reads placed in its broad
+consumer section. Relocated that failure-only routine to the source-boundary
+section without changing the guard or diagnostic behavior;312 checks pass.
+The build had already started before the orchestration surfaced the failed guard;
+future producer chaining must check exit codes before launch. No logic restamp.
+Run949/PID31872/session41826 terminal16:24:21 after16:21:21 start: cold teardown
+1998/1998/1998 completed, reload loaded16:24:00, but180 s expired during the
+reloaded opening event. No UV observation or acceptance. Exact profile restored.
+Change the observation window, not comparisons: existing supervisor now exposes
+180..300 s ReloadTimeoutSeconds, default180; the next diagnostic explicitly300 s
+to reach reloaded movement. Same800 KiB log/192 MiB drop and original floor, no
+new raw/image. Retain949 until its timing-purpose evidence is superseded.
+Run950/PID33028/session69692 terminal16:27:00 after16:25:55 start, stopped by
+the cumulative75 MiB small-output threshold before reload; profile restored.
+No UV observation. Actual retained scoped runtime logs7,516,376 B/26files plus
+historical perf8,954,976 B/20files, fixed49 MiB reservation, GPU fixture10,585,571 B
+and build logs191,113 B nearly consume the stop threshold. Reconcile before retry.
+Preserve the ten historical CSV+metadata pairs215905..150239 losslessly in one
+ZIP under logs/perf, verify every decompressed entry's length/SHA-256 before
+removing the redundant originals. Peak<=32 MiB including conservative overlap,
+same original floor; source set exactly20files/8,954,976 B, output<=10 MiB.
+No raw/game/profile/build/required-evidence deletion; archive remains retained
+for the original reports' purposes. No next runtime until this budget reconciles.
+Compression completed: all20 decompressed entries match original lengths/hashes.
+Archive retained-20260905-215905_to_20260906-150239.zip is1,519,695 B, SHA
+76100860DFBEB64D03986246F766A1903BE057AFB5D6B394CEA4194D753084AA.
+Removed20 redundant originals8,954,976 logical B, fully recoverable from archive;
+logical net reduction7,435,281 B. Free63,045,853,184 ->63,051,153,408 B,
+5,300,224 B observed recovery (concurrent volume activity not isolated).
+This restores over7 MiB of the diagnostics stop headroom. Resume the same pending
+UV observation with the revised300 s bound, unchanged800 KiB/192 MiB/raw0 caps.
+Run951/PID35436/session74854 terminal16:33:52 after16:31:07 start; free-space/
+drop threshold stopped the cold-field run. No UV observation, no new acceptance.
+All21settings applied; exact116 B profile restored. No fourth probe. Local
+supervisor now preflights complete diagnostic text/image overlap against75 MiB,
+plus192 MiB runtime peak above the original floor, before touching the profile.
+PowerShell parser passes; guard not runtime-exercised.313 Python checks pass.
+Host111 and unchanged C++/GPU behavior evidence retained; no new pixel/raw/cache.
+
+Removed950's recorded/reconciled budget-stop log253,784 B and host110 stdout/
+stderr1,034/0 B after111 passed;3files/254,818 logical B, free63,058,161,664 ->
+63,058,419,712 B (258,048 B observed). Exact old logs gone; results/hashes in
+20260907_1638_uv-boundary-provenance.md.949/951 retained664,637 B;945/940/941/
+947/948 unchanged. Build logs190,079 B/136files. Known retained net-6,732,917 B:
+compression-7,435,281,exe+7,168,PDB+28,672,logs+1,887,new949/951+664,637.
+Objects/CMake/source/Git unallocated. Firstfree62,920,818,688 ->cleanup-end
+63,058,419,712 B is137,601,024 B drive-wide gain, not cleanup attribution.
+No owned producer remains. All original budgets/protected raw sets unchanged.

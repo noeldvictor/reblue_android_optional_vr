@@ -110,6 +110,11 @@ pixel acceptance remain open. This run took no images and sampled zero layered
 or inherited-light draws; no speedup is claimed. The failure is preserved, not
 hidden by disabling its comparison.
 
+Host111 adds bounded UV-failure provenance, not a rendering fix. Follow-up
+diagnostics stopped at time/storage limits without reproducing that mismatch;
+the prior failure remains open. The local loop now checks full diagnostics
+headroom before booting. [Current UV investigation and evidence](research/20260907_1638_uv-boundary-provenance.md).
+
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, alpha/deferred,
 normal/reflection and texture-dependent effects remain unconverted here.
@@ -122,10 +127,11 @@ are preserved. Authored update producers, live inherited-binding acceptance, bro
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification: 312 Python source/scenario checks and current C++ fixtures pass.
+Verification: 313 Python source/scenario checks pass; existing C++ fixtures remain
+the behavior evidence for unchanged rendering code.
 The new GPU evidence covers twelve 8x8 two-eye pixel cases in 1.08 seconds with
 zero Vulkan validation errors/warnings, including three-layer instanced draws
-with different per-instance values. Host110 is built; host107/run945 remains
+with different per-instance values. Host111 is built; host107/run945 remains
 the last accepted live result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 

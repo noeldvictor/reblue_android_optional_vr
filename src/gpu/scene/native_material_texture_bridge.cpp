@@ -22,6 +22,7 @@
 #include "core/logging.h"
 #include "core/settings.h"
 #include <unordered_map>
+#include <cstring>
 #include <rex/cvar.h>
 
 REXCVAR_DEFINE_BOOL(bd_native_material_textures, true, kCvarGroup,
@@ -228,6 +229,34 @@ bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans) {
     draws |= plan.draw;
   }
   return !draws || CommitNativeSceneLights(ticket,current->stack);
+}
+
+void ReportNativeMaterialUvMismatch(const NodeTag &tag,
+    const NativeMaterialTextureValues &values, const void *actual) {
+  if (!current || !actual || stats.wrong > 4) return;
+  // These checked reads are diagnostic only. Distinguish an import/recipe
+  // disagreement from a later staging/flush writer without seeding ownership
+  // from whichever legacy value happened to survive.
+  constexpr uint32_t staging = (uint32_t(-32034) << 16) - 32552;
+  constexpr uint32_t scratch = (uint32_t(-32034) << 16) - 22068;
+  std::array<uint32_t,4> observed;
+  std::memcpy(observed.data(),actual,sizeof(observed));
+  BD_WARN("[native-uv-provenance] visual {:08X} node {} mesh {:08X} view {} tech {} generation {} overrides {}",
+      tag.visual_va,tag.node_index,tag.mesh_va,tag.render_view,tag.tech,current->generation,current->inputs.overrides.size());
+  for (uint32_t n=0;n<4;++n) {
+    const auto source=Word(uint64_t(tag.visual_va)+3444+n*4);
+    const auto staged=Word(staging+32+n*4), working=Word(scratch+n*4);
+    BD_WARN("[native-uv-lane] {} owned {:08X} actual {:08X} initial {:08X} reset {:08X} live {:08X} staged {:08X} scratch {:08X} readable {}{}{}",
+        n,std::bit_cast<uint32_t>(values.uv[n]),observed[n],
+        std::bit_cast<uint32_t>(current->inputs.initial_uv[n]),std::bit_cast<uint32_t>(current->inputs.reset_uv[n]),
+        source.value_or(0),staged.value_or(0),working.value_or(0),source.has_value(),staged.has_value(),working.has_value());
+  }
+  for (size_t n=0;n<std::min<size_t>(8,current->inputs.overrides.size());++n) {
+    const auto &entry=current->inputs.overrides[n];
+    BD_WARN("[native-uv-override] {} selector {} channel {} uv {} {:08X} {:08X} image {}",
+        n,entry.selector,entry.channel,entry.uv.has_value(),entry.uv ? std::bit_cast<uint32_t>((*entry.uv)[0]):0,
+        entry.uv ? std::bit_cast<uint32_t>((*entry.uv)[1]):0,entry.replaces_image);
+  }
 }
 
 namespace {

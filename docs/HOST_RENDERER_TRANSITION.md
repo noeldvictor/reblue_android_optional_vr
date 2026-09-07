@@ -62,6 +62,14 @@ host frame, broad scene, full-game stereo or Quest result.
 [New layered-scene connection and pending gates](../research/20260907_1501_layered-rigid-scene.md).
 [Ordered light ownership, host110 and preserved UV failure](../research/20260907_1544_ordered-scene-lighting.md).
 
+Host111 follow-up adds bounded failure provenance without changing UV semantics.
+Runs949..951 stopped at time/storage limits before the needed UV observation;
+no non-reproduction is a fix.313 Python checks pass, no new pixels or reload
+acceptance. The local supervisor now checks full diagnostic overlap before boot.
+Next observation needs the mismatching node/technique and exact owned/live/staging/
+shader values to identify the first divergence; no speculative outgoing mirror
+or guessed causal test. [Current investigation and retained evidence](../research/20260907_1638_uv-boundary-provenance.md).
+
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
 The direct consumer now uses `NativeSceneLightingPublication`: semantic lights
