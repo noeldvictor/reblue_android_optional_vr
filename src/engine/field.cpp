@@ -5,9 +5,11 @@
  * @license   BSD 3-Clause License
  */
 #include "engine/field.h"
+#include "engine/field_input.h"
 
 #include <cstdio>
 #include <cstring>
+#include <optional>
 
 #include <rex/hook.h>
 
@@ -220,6 +222,15 @@ engine::ScriptVars Field::Vars() const {
 u32 Field::NothingsCollected() const { return Vars().Global(kVarNothings); }
 
 bool Field::HasPlayer() const { return PlayerCharaEA() != 0; }
+
+bool Field::DirectionalInputAvailable(u32 *blockers) const {
+  return ReadFieldDirectionalInput(
+      bd::mem::try_load<u32>(addr::kFieldSceneCtl),
+      bd::mem::try_load<u32>(addr::kFieldPlayerEntity), [](u32 ea) -> std::optional<u32> {
+        const auto *word = bd::mem::try_at<const be_u32>(ea);
+        return word ? std::optional<u32>(static_cast<u32>(*word)) : std::nullopt;
+      }, blockers);
+}
 
 Vec3 Field::Position() const {
   const u32 chara = PlayerCharaEA();

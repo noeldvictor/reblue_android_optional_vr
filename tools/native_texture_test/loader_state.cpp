@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 using namespace bd::engine;
+void TestAutoplay();
 
 static void Require(bool value) {
   if (!value)
@@ -18,6 +19,7 @@ static void Require(bool value) {
 }
 
 int main() {
+  TestAutoplay();
   std::array<uint32_t, 128> states{};
   uint32_t reads = 0;
   const auto busy = [&] {
@@ -61,5 +63,5 @@ int main() {
   Require(!LoadingIconVisible(0.0f, true, 0, false, 10));
   Require(!LoadingIconVisible(0.5f, true, 0, false, 10));
   Require(LoadingIconVisible(0.5f, true, 1, false, 10));
-  std::cout << "128 loader slots and persistent icon/strip visibility passed\n";
+  std::cout << "readiness-driven autoplay, 128 loader slots and icon/strip visibility passed\n";
 }

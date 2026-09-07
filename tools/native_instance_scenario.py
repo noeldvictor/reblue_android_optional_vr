@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 import re
+import math
 
 MAX_LOG_BYTES = 400 * 1024
 READY = "mode FieldActive field-state 0 stage bg41_01 player 1 event 0 movie 0 loader-busy 0 icon-visible 0"
@@ -15,6 +16,9 @@ TABLE_METRIC = re.compile(
     r"(\d+) image checks wrong (\d+); (\d+) native image reads (\d+) unavailable;")
 VERTEX_METRIC = re.compile(
     r"\[native-vertex-input-use\] (\d+) pipeline binds, (\d+) decode blocks, (\d+) pulled records")
+MOVEMENT_METRIC = re.compile(
+    r"\[autoplay\] t ([\d.]+) stage (\S+) ready ([01]) walking ([01]) episode (\d+) "
+    r"walk-s ([\d.]+) moved (\d+) distance ([\d.]+) position (\S+)")
 
 
 class Pending(ValueError):
@@ -125,6 +129,35 @@ def verify_vertex_inputs(text, require_pulling=False):
             "pulled_records_delta": b[2] - a[2]}
 
 
+def verify_movement(text):
+    """Require observed displacement during one fresh, uninterrupted field walk."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("movement diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = MOVEMENT_METRIC.search(line)
+        if match:
+            t, stage, ready, walking, episode, duration, moved, distance, position = match.groups()
+            xyz = tuple(map(float, position.split(",")))
+            values = (float(t), stage, int(ready), int(walking), int(episode),
+                      float(duration), int(moved), float(distance))
+            if len(xyz) != 3 or not all(math.isfinite(v) for v in xyz + (values[0], values[5], values[7])):
+                raise ValueError("invalid movement observation")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if (a[1] != "bg41_01" or b[1] != a[1] or not all((a[2], a[3], b[2], b[3])) or
+            not a[4] or b[4] != a[4] or b[0] <= a[0] or b[5] - a[5] < 1 or
+            b[6] - a[6] < 4 or b[7] - a[7] < 0.1):
+        raise Pending("need fresh displacement during the same ready-field walking episode")
+    # A later loss of readiness must invalidate otherwise complete old windows.
+    if not metrics[-1][1][2] or not metrics[-1][1][3] or metrics[-1][1][4] != b[4]:
+        raise Pending("walking was interrupted after the qualifying windows")
+    return {"episode": b[4], "samples_delta": b[6] - a[6],
+            "distance_delta": round(b[7] - a[7], 6), "walk_seconds": b[5]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -133,6 +166,7 @@ def main():
     mode.add_argument("--texture-tables-normal", action="store_true")
     parser.add_argument("--vertex-inputs", action="store_true")
     parser.add_argument("--vertex-pulling", action="store_true")
+    parser.add_argument("--movement", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -145,6 +179,7 @@ def main():
             args.texture_tables or args.texture_tables_normal) else None
         vertex_inputs = verify_vertex_inputs(text, args.vertex_pulling) if (
             args.vertex_inputs or args.vertex_pulling) else None
+        movement = verify_movement(text) if args.movement else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -156,6 +191,8 @@ def main():
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:
         print("PASS: post-event native vertex inputs " + ", ".join(f"{k}={v}" for k, v in vertex_inputs.items()))
+    if movement is not None:
+        print("PASS: post-event observed player movement " + ", ".join(f"{k}={v}" for k, v in movement.items()))
     return 0
 
 

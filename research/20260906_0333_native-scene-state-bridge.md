@@ -1396,3 +1396,45 @@ logs. Older texture comparison905 and protected flat/XR/broad failures remain.
 Post-cleanup free **64,135,020,544 B**: 33,837,056 B drive-wide use from this
 preflight, not all attributable to retained outputs. Source/docs/Git writes
 follow. Original checkpoint ceilings, zero new raw allowance and full goal remain.
+
+### Readiness-driven desktop walking, same checkpoint
+
+Parent b24e545. Reused the loader CPU fixture and current host tree; no renderer
+ownership is claimed. Native policy replaces the fixed 150-second walk delay
+with stable field/input readiness, and verifies observed displacement separately
+from stick input. Host63, loader04/CPU03, 152 guards and 28 scenario cases pass.
+Runs909/910 diagnosed selected Mindows panel versus actual overlay visibility;
+run911 /PID3732 passes fresh motion/native-component checks and three inspected
+1920x1080 images. All sessions terminal and profiles restored. Full evidence and
+limits: `20260906_2120_readiness-driven-autoplay.md`.
+
+Preflight **64,093,036,544 B**; planned <=128 MiB host/link overlap, <=2 MiB
+fixture/log growth and <=1.5 MiB JPEG overlap, within original cumulative ceilings.
+Before the host build, drive free fell to63,789,682,688 B; scoped inventories
+found only18 recent files /1,841,248 B and no matching large producer. The larger
+drive-wide change remains unattributed, not a new allowance. Existing stop floor
+63,583,739,904 B was enforced by every producer. No new raw/perf/cache/dump files,
+no downloads/new tree, mesh cache unchanged at3,510 files /36,510,144 B.
+
+Reusable loader/autoplay fixture exe/PDB/two objects **1,483,285 B**, growth
+**765,043 B** over the recorded718,242 B predecessor. Three new motion JPEGs
+**1,255,213 B**; keep for actual movement/pixel coverage, replace when equivalent
+motion evidence passes. The standing vertex-input image remains the comparison
+reference for unqualified cliff-edge artifacts/blur; do not silently delete it.
+Aggregate window images **10,106,400 B**, close to the unchanged10 MiB cap.
+
+After validating replacements, deleted **16 exact superseded logs**: host60..62
+stdout/stderr, loader builds02/03 stdout/stderr, loader CPU01/02 stdout/stderr,
+and failed runs909/910. Their source diagnosis/hashes remain in research; exact
+old logs are gone, equivalent diagnostics can be regenerated. Logical removal
+**687,078 B**; immediate free63,739,285,504 ->**63,739,985,920 B** reclaims
+**700,416 B**, counted once. No game/build/cache/raw/protected image data removed.
+Final retained build logs146,016 B (29,342 B less than the175,358 B preflight).
+Run911 log229,708 B is retained. Comparable fixture/log/image set grows
+**2,220,622 B** for new movement/lifecycle evidence; small helper/build-metadata
+and source/Git changes are not fully baselined, so this is not total task growth.
+
+Post-cleanup drive-wide use **353,050,624 B** from preflight, mostly not explained
+by the scoped retained outputs; do not label the difference task artifact bytes.
+Source/docs/Git writes follow and remain charged. Broader normal flat/XR and
+unresolved failure evidence stays protected. No budget reset or Quest work.

@@ -30,75 +30,59 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after native runtime vertex-input ownership. These milestones organize the
-unchanged completion requirements above; none is a substitute for the full gate.
+Updated 2026-09-06 after readiness-driven movement verification. The first two
+former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
-1. **Scene/material dependency map and targeted verification.** Start from
-   `bdSceneTreeDraw`, `bdSceneNodeCullTraverse`, `bdSceneNodeDrawSingle`,
-   `host_walk.cpp`, `host_draw.cpp`, `native_mesh.*` and `native_material.*`.
-   Record actual data producers, current replacement hooks, indirect callbacks,
-   consumers and deletion conditions. The
-   [static-model source map](../research/20260906_1531_static-model-ownership-frontier.md)
-   traces request/build/registration/lifetime/draw boundaries. The existing call
-   graph now exposes direct/original/indirect/instruction-hook sites and
-   conservative host-hook declaration boundaries; linked activation and indirect
-   targets still need review. Load-owned primitive/material programs now feed
-   four consumers independently of PSO precaching, with full graph retirement.
-   Geometry/buffer associations now resolve during load, and converted base
-   geometry replays consume load-owned GPU handles. Control/texture/pass inputs,
-   independent cooked layouts, source-key adapter and draw templates remain. Next are
-   complete native object/update contracts and direct draws, not another first-draw cache.
-   Native IDs and final render-pose snapshots now feed traversal/replay, including
-   the actual dirty-state-gated handoff and late pose writers. Pose calculation,
-   original copy, secondary palettes and the source index remain temporary.
-   Texture tables now publish at completed sync/async load boundaries and retire
-   at both teardown paths. Atomic image/table publication handles concurrent
-   replacement. Native image leases and normal host lookup are active, but the
-   source-selected return ABI and downstream resource/dynamic overrides remain.
-   Connect these owners to complete native object/material/pass records next.
-   Geometry-owned runtime vertex inputs now feed pipeline creation, shader decode
-   parameters and pulling with the dispatch's guest declaration cleared. Two
-   shared input records cover this field. Packed bytes, synthetic shader inputs,
-   register ABI, source associations and retained templates remain; do not call
-   this a canonical cooked layout or a direct static-object draw.
-   Scenario checks must establish feature execution; empty queues are untested.
-   The loader visibility/slot readers and idle-state contract are corrected:
-   two post-event state-0 samples now pass with positive material/lookup deltas.
-   This is not input/movement or pixel qualification. Water updates also occur
-   in the opening cinematic, so they are not a field ID. Extend the existing
-   scenario checks when a feature needs movement, a battle or an authored effect.
-2. **Complete native static-object path.** Reuse the existing native asset
-   libraries and submission backend. Move asset/mesh/material association and
-   instance storage above draw submission, using stable native handles. Replace
-   guest `NodeTag` discovery and retained interpreter templates for that path;
-   scene/shadow draws must not re-import per-draw console state. Temporary load
-   adapters need explicit removal conditions, not permanent address identities.
-   Native mesh disk retention is now independently bounded (256 MiB /16,384
-   files, free-space reserve and writer lease). The existing GPU arena remains
-   separate. Load-time base geometry and render-pose snapshots are now active;
-   runtime input ownership also removes the terminal declaration dependency.
-   Complete native update production, persistent layouts/native shader inputs and direct submission
-   are still required.
-3. **Complete character path.** Native skeleton/skin assets, animation and pose
+1. **Complete a native static-object path, then expand its material families.**
+   Work backward from a real rigid object's direct scene/shadow draw: canonical,
+   self-describing cooked geometry; explicit material/texture/pass records and
+   named native shader inputs; native instance/update handles; direct submission.
+   Reuse load-owned geometry/material programs, render-pose snapshots, image
+   tables, runtime vertex inputs and the existing culling/instancing/indirect
+   backend. Current owners still feed replay; packed bytes, shader-register ABI,
+   `NodeTag`/source lookup and retained templates are not the finished contract.
+   The [source map](../research/20260906_1531_static-model-ownership-frontier.md)
+   and existing call graph locate producers and indirect/lifetime boundaries.
+   Acceptance: the converted object loads, updates, draws in scene/shadow passes
+   and reloads without guest rendering warm-up, captured templates or per-draw
+   console imports. Destroy import-source storage in fixtures before native
+   consumption. Verify generation reuse, async completion and late writers.
+   Expand opaque rigid objects to alpha-tested/wind/translucent families without
+   dropping deferred participants. Cook small batches under existing independent
+   disk/GPU budgets; do not recook the library before a real consumer works.
+2. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
    and verify characters in the relevant field/battle/cutscene/shadow paths.
-4. **Complete specialized producers.** Dynamic vertices, effects/particles, UI,
+3. **Complete specialized producers.** Dynamic vertices, effects/particles, UI,
    reflections and remaining pass/material callbacks, with authored event and
    lifecycle checks rather than field-only counter coverage.
-5. **Delete unused compatibility machinery and qualify desktop.** Remove guest
+4. **Delete unused compatibility machinery and qualify desktop.** Remove guest
    rendering execution, register/resource/getter adapters, EDRAM/tile inference,
    seed copies and emulated resolves as their consumers disappear. Complete all
    representative desktop/both-eye/animated-effect checks before Quest runs.
 
 Use focused fixtures and incremental builds for the inner loop, targeted
 GPU/pixel checks for coherent rendering changes, and the broad suite at meaningful
-milestones. Maintain frequent verified commits/pushes. Recent host builds take
-seconds; the mesh-storage CPU fixture takes 0.12 s and the corrected post-event
-field diagnostic about 51 s. Prioritize removing repeated investigation/boot
-work over introducing a new build system. No overall development-speed
-multiplier is established.
+milestones. Maintain frequent verified commits/pushes. The latest autoplay CPU
+fixture takes 0.03 s; a one-file host build 2.323 s. Readiness-driven autoplay
+starts walking at about 42 s from initial pad polling, replacing a fixed 150 s
+delay; a 61 s diagnostic now observes displacement and three motion images.
+Extend the existing scenario checker for reloads, battles and authored effects;
+empty queues, startup counters and water activity do not qualify those paths.
+No overall development-speed multiplier is established.
 
 ## Latest qualified checkpoint
+
+Desktop verification loop (2026-09-06): runtime-independent autoplay now waits
+for stable field/controller/player readiness, stops on interruptions, and
+reports observed horizontal displacement separately from stick input. Mindows'
+selected panel survives while hidden; the corrected policy uses its visibility
+flag. CPU fixture, host63, 152 guards and 28 scenario cases pass. Flat run911
+observes one uninterrupted walk with fresh geometry/pose/material/table/pulling
+checks, and three inspected full-size images. This adds short field movement
+coverage, not native rendering ownership or complete sequence/reload/both-eye
+qualification. Dark cliff-edge artifacts and distant blur remain unqualified.
+Evidence/failures: `research/20260906_2120_readiness-driven-autoplay.md`.
 
 Native vertex inputs (2026-09-06): immutable, bounded, content-shared owners
 carry IA elements (including owned semantic names), pulling entries and the

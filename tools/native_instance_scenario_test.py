@@ -1,6 +1,6 @@
 import unittest
 import re
-from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables, verify_vertex_inputs
+from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables, verify_vertex_inputs, verify_movement
 
 
 def metric(reads=100, checks=100, wrong=0, refused=0):
@@ -13,6 +13,57 @@ def scenario():
     return ["[native-material-context] stage bg41_01 player 1 event 1 movie 0",
             "[native-material-context] " + READY, metric(),
             "[native-material-context] " + READY, metric(150, 140)]
+
+
+def movement(t=40, episode=1, walking=1, duration=2, moved=30, distance=1.5):
+    return (f"[autoplay] t {t:.3f} stage bg41_01 ready 1 walking {walking} episode {episode} "
+            f"walk-s {duration:.3f} moved {moved} distance {distance:.6f} position 1.0,2.0,3.0")
+
+
+class MovementScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = movement()
+        rows[4] = movement(t=45, duration=7, moved=80, distance=4)
+        return rows
+
+    def test_fresh_displacement(self):
+        result = verify_movement("\n".join(self.rows()))
+        self.assertEqual(result["samples_delta"], 50)
+        self.assertEqual(result["distance_delta"], 2.5)
+
+    def test_stick_and_time_without_displacement_do_not_pass(self):
+        for moved, distance in ((30, 4), (80, 1.5), (80, 1.51)):
+            rows = self.rows()
+            rows[-1] = movement(t=45, duration=7, moved=moved, distance=distance)
+            with self.assertRaises(Pending):
+                verify_movement("\n".join(rows))
+
+    def test_reload_pause_and_new_episode_do_not_join(self):
+        for last in (movement(t=45, episode=2, duration=7, moved=80, distance=4),
+                     movement(t=45, walking=0, duration=7, moved=80, distance=4)):
+            rows = self.rows(); rows[-1] = last
+            with self.assertRaises(Pending):
+                verify_movement("\n".join(rows))
+            with self.assertRaises(Pending):
+                verify_movement("\n".join(self.rows() + [last]))
+
+    def test_ready_state_stage_and_observation_order(self):
+        good = "\n".join(self.rows())
+        for bad in (good.replace("ready 1", "ready 0"),
+                    good.replace("stage bg41_01", "stage bg42_01"),
+                    good.replace("t 45.000", "t 39.000"),
+                    good.replace("walk-s 7.000", "walk-s 2.500"),
+                    "\n".join(self.rows()[1:]),
+                    "\n".join([movement()] + [r for r in self.rows() if "context" in r])):
+            with self.assertRaises(Pending):
+                verify_movement(bad)
+
+    def test_invalid_and_bounded_observations(self):
+        for bad in ("x" * (MAX_LOG_BYTES + 1),
+                    "\n".join(self.rows()).replace("1.0,2.0,3.0", "nan,2.0,3.0")):
+            with self.assertRaises(ValueError):
+                verify_movement(bad)
 
 
 class InstanceScenarioTest(unittest.TestCase):

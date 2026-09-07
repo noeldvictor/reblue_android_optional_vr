@@ -104,6 +104,8 @@ public:
   u32 NothingsCollected() const; // lifetime total from save data, 0 off-field
 
   bool HasPlayer() const;
+  // Shared controller/script/leader input gates, not full per-character CanMove.
+  bool DirectionalInputAvailable(u32 *blockers = nullptr) const;
   Vec3 Position() const;
   Vec3 Rotation() const;
 };

@@ -8,16 +8,20 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <mutex>
 
 #include <rex/input/flags.h>
 
 #include "core/logging.h"
+#include "core/global_config.h"
 
 #include <chrono>
 
 #include <rex/cvar.h>
 
 #include "core/settings.h" // kCvarGroup
+#include "engine/game.h"
+#include "xr/autoplay.h"
 #include "xr/xr_pad.h"
 
 namespace bd::xr {
@@ -60,62 +64,62 @@ u8 ToTrigger(f32 v) {
   return static_cast<u8>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
 }
 
-// How long to keep mashing A before also walking.
-//
-// Generous, and it has to be: a stick deflection while the file menu is up
-// moves the selection, and the run then sits in a menu for ever - measured as
-// 18 draws/frame with the camera pinned, which reads as a hang rather than as
-// a wrong button. Launch to a field scene is about 130s on a Quest 2 with a
-// cold cache, so this waits past it rather than racing it. Autoplay is for
-// unattended runs that already take minutes; buying certainty with 20 seconds
-// is the right trade.
-constexpr double kWalkStart = 150.0;
-
-// Radians per second around the circle. Slow enough that the character is
-// genuinely traversing rather than spinning on the spot - a fast turn rate
-// looks like movement to the pad and like standing still to the streamer.
-constexpr double kWalkTurnRate = 0.35;
-
-// START once the game has had time to reach its title, then A on a slow
-// repeat. Blue Dragon's opening is START, then a confirm on the file menu,
-// then dialogue - all of which A advances. Held for a few frames because the
-// guest samples its pad at 30Hz and edge-detects.
-void ApplyAutoplay(PadState &pad) {
+// Observe semantic gameplay state at the pad boundary. The policy never reads
+// guest pointers or calls rendering, and works in a flat build without OpenXR.
+void ApplyAutoplay(PadState &pad, bool enabled) {
   using Clock = std::chrono::steady_clock;
+  static std::mutex mutex;
+  std::lock_guard lock(mutex);
+  static Autoplay policy;
   static Clock::time_point start{};
+  static double last_report = -1;
+  static uint32_t reports = 0;
+  if (!enabled) {
+    policy.Reset();
+    start = {};
+    last_report = -1;
+    reports = 0;
+    return; // Do not change the real controller's state.
+  }
   if (start.time_since_epoch().count() == 0)
     start = Clock::now();
   const double t = std::chrono::duration<double>(Clock::now() - start).count();
-
-  if (t < 6.0)
-    return; // let it finish booting
-  if (t < 6.4) {
-    pad.menu = true; // START
-    return;
-  }
-  // A for 200ms out of every 1.2s, for ever - and the "for ever" is
-  // deliberate. Stopping it once walking begins was tried, on the theory that
-  // it was opening menus mid-run, and it made things worse: the character walks
-  // into a transition about 35s after setting off, something opens, and with no
-  // A there is nothing to dismiss it. The run then sits at 20 draws a frame for
-  // the rest of its life. Pressing A for ever is what lets a run recover.
-  const double phase = std::fmod(t - 6.4, 1.2);
-  pad.a = phase < 0.2;
-
-  // Then walk. Pressing A alone gets the game into the field and leaves the
-  // character standing on the spot, which is not a representative measurement
-  // and, worse, is invisible: the guest only calls bdPlayerFieldMovementUpdate
-  // when the character is actually moving, so every hook on the player object
-  // silently never fires and the position probe below it stays empty. That
-  // read for a long time as "the anchored camera modes do not work".
-  //
-  // A slow circle rather than a straight line, so the character stays in one
-  // region of the map - a straight walk leaves the playable area or hits
-  // geometry and stops, which puts the measurement back where it started.
-  if (t >= kWalkStart) {
-    const double a = (t - kWalkStart) * kWalkTurnRate;
-    pad.leftStickX = static_cast<f32>(std::sin(a));
-    pad.leftStickY = static_cast<f32>(std::cos(a));
+  const auto &game = bd::engine::Game::Get();
+  const auto field = game.Field();
+  const auto stage = field.Stage();
+  AutoplayObservation observation;
+  observation.field_active = game.Mode() == bd::engine::EngineMode::FieldActive;
+  observation.idle = game.FieldState() == 0;
+  observation.player = field.HasPlayer();
+  observation.event = bd::engine::EventScenePlaying();
+  observation.movie = bd::engine::SofdecMoviePlaying();
+  const auto *hidden = bd::GetMindowsHiddenFlag();
+  observation.panel = AutoplayOverlayBlocksInput(
+      hidden ? std::optional<uint32_t>(static_cast<uint32_t>(*hidden)) : std::nullopt);
+  uint32_t input_blockers = 0;
+  observation.directional_input = field.DirectionalInputAvailable(&input_blockers);
+  if (stage && stage.Category() <= 8)
+    observation.stage = (uint64_t(stage.Category() + 1) << 32) | stage.CombinedNum();
+  observation.position = field.Position();
+  const auto input = policy.Step(t, observation);
+  // Explicit diagnostic mode owns the whole pad; neutralize stale real sticks.
+  pad = {};
+  pad.menu = input.start;
+  pad.a = input.confirm;
+  pad.leftStickX = input.x;
+  pad.leftStickY = input.y;
+  // Bounded text evidence, not a capture producer. Never log at polling rate.
+  if (reports < 120 && t - last_report >= 1.0) {
+    last_report = t;
+    ++reports;
+    BD_INFO("[autoplay] t {:.3f} stage {} ready {} walking {} episode {} "
+            "walk-s {:.3f} moved {} distance {:.6f} position {:.6f},{:.6f},{:.6f} "
+            "blockers {} input-blockers {}",
+            t, stage ? stage.Name() : "none", observation.Ready() ? 1 : 0,
+            input.walking ? 1 : 0, policy.Episode(), policy.WalkSeconds(),
+            policy.MovedSamples(), policy.Distance(), observation.position[0],
+            observation.position[1], observation.position[2], observation.Blockers(),
+            input_blockers);
   }
 }
 
@@ -202,7 +206,9 @@ X_RESULT PadDriver::GetDeviceState(rex::input::DeviceId id,
 
   PadState pad;
   const bool autoplay = REXCVAR_GET(bd_xr_autoplay);
-  if (!CurrentPad(pad) && !autoplay)
+  const bool connected = CurrentPad(pad);
+  ApplyAutoplay(pad, autoplay);
+  if (!connected && !autoplay)
     return X_ERROR_DEVICE_NOT_CONNECTED;
 
   // One line, the first time the guest actually asks. Everything upstream of
@@ -214,9 +220,6 @@ X_RESULT PadDriver::GetDeviceState(rex::input::DeviceId id,
     announced = true;
     BD_INFO("[xr] guest is polling the OpenXR pad");
   }
-
-  if (autoplay)
-    ApplyAutoplay(pad);
 
   if (out_state) {
     std::memset(out_state, 0, sizeof(*out_state));

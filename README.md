@@ -68,6 +68,14 @@ cases pass. **Packed vertex formats, shader-register ABI, retained draw template
 and self-describing cooked layouts remain; this is not direct static drawing.**
 [Implementation and evidence](research/20260906_2040_native-vertex-inputs.md).
 
+The desktop test loop now starts walking after verified field readiness instead
+of waiting a fixed 150 seconds. A roughly 61-second run observes actual player
+displacement, fresh native-component checks and three inspected motion images;
+walking starts about 42 seconds after pad polling begins. This improves short
+field coverage, not renderer ownership. Reloads, longer sequences, cliff-edge
+artifacts, distant blur and both-eye qualification remain open.
+[Test-loop evidence](research/20260906_2120_readiness-driven-autoplay.md).
+
 The preceding texture-table checkpoint publishes native image
 leases after completed synchronous/asynchronous loading, with atomic image/table
 publication and generation-safe replacement/retirement. The field has 5,736
@@ -75,7 +83,7 @@ tables /2.07 MiB. Comparison adds 22,326 matching lookups and 22,006 matching im
 checks; the new pulling-enabled field check adds 22,333 normal lookups with zero
 original comparison or fallback calls. Source selection/return ABI, dynamic
 overrides and remaining resource consumers are still adapters; the direct native
-reflection consumer was not exercised. **Movement, sequences, both eyes and
+reflection consumer was not exercised. **Broader movement/reload sequences, both eyes and
 full-game qualification remain open.**
 [Texture-table implementation and evidence](research/20260906_1955_native-texture-tables.md).
 
@@ -132,14 +140,14 @@ identifies the existing load-time integration points and remaining template/data
 dependencies. The source-index tool now exposes indirect and hook boundaries;
 this tooling checkpoint does not itself convert additional rendering.
 
-1. Extend the load-owned primitive records into native instance/update and
-   texture/pass contracts, with self-describing cooked layouts, native shader
-   inputs and stable native handles. Runtime vertex-input ownership is now active.
-2. Complete one native static-object path through direct scene/shadow submission,
-   removing its retained draw templates; qualify movement and reload behavior.
-3. Complete character asset, pose, joint-palette and GPU skinning ownership.
-4. Finish dynamic geometry, effects, UI and remaining reflection/pass producers.
-5. Remove unused compatibility machinery and complete the representative desktop
+1. Complete one real native static-object path from cooked geometry/materials
+   and instance updates through direct scene/shadow submission. Establish
+   self-describing layouts and native shader/texture/pass contracts; remove its
+   guest-renderer warm-up, source lookup and captured templates. Verify movement
+   and reload behavior, then expand material families.
+2. Complete character asset, pose, joint-palette and GPU skinning ownership.
+3. Finish dynamic geometry, effects, UI and remaining reflection/pass producers.
+4. Remove unused compatibility machinery and complete the representative desktop
    gate before Quest 2 work.
 
 Small, coherent, verified commits and pushes remain the default. Focused CPU
@@ -186,9 +194,15 @@ It exercises the VR path without a headset; it cannot prove Quest performance,
 device-only foveation or comfort.
 
 Desktop settings go in `profiles/default/reblue.toml` under the install root.
-Use `bd_xr_autoplay` for field-scene bring-up and `bd_capture_after_s`,
+Use `bd_xr_autoplay` for readiness-driven field walking and `bd_capture_after_s`,
 `bd_capture_min_draws` and `bd_capture_frames` for capture sequences. Verify the
 live settings in the log and inspect the actual images.
+
+Autoplay's bounded `[autoplay]` records distinguish readiness, stick activity
+and observed displacement. `tools/native_instance_scenario.py --movement`
+requires movement during fresh post-event native-instance verification windows;
+an enabled setting or a stationary character does not pass. Keep raw captures
+off for text diagnostics and enforce the storage limits before image sequences.
 
 - `tools/capture_seq.py` flags neighbouring-frame changes.
 - `tools/capture_cyan.py` checks a known visual artifact.
