@@ -60,32 +60,36 @@ and replace complete rendering paths; it does not make ownership automatic.
 
 ### How much is left?
 
-**Substantial implementation and qualification remain.** We are qualifying the
-first native static-object path, not polishing a completed renderer. No complete
+**Substantial implementation and qualification remain.** Native rigid rendering
+covers one scene object and a wider shadow-caster family, not a finished renderer. No complete
 host-only frame or whole native game scene has passed the full acceptance gate.
 The foundations below are reusable, but remaining work spans scenery/material
 families, characters/skinning, effects/UI, frame/pass ownership, asset streaming
 and full desktop stereo coverage. Quest 2 optimization has not resumed. There
 is no defensible completion percentage or delivery estimate yet.
 
-Last **accepted live/pixel checkpoint** (2026-09-07, host106/run944): one opt-in
-rigid field object uses native scene and shadow programs, native instance storage
-and indexed indirect submission. Its old interpreter/capture/replay path is
-disabled before first draw. Cold load and a real title teardown/reload pass,
-including old-source and GPU-fence retirement. The inspected mono image is
-coherent (terrain, trees and shadows; Shu partly hidden by foliage), with known
-cliff marks. Runtime batches are singletons;
-no draw-call reduction or speedup is established. This object still has source
-adapters; it is not independently host-owned scene loading.
-[Current lighting/reload evidence](research/20260907_1342_owned-scene-lighting.md).
+Last **accepted live/pixel checkpoint** (2026-09-07, host107/run945): native
+opaque rigid **shadow casting now covers a material family and multi-primitive
+nodes**, not one hard-coded asset. Every sibling is preflighted before submission;
+supported nodes bypass the old interpreter/capture/replay path. In a fresh
+300-frame reloaded-field window, the wider family emitted and fence-retired
+12,532 additional native primitives, including 2,096 multi-primitive node visits.
+These are repeated runtime visits, not a count of unique converted assets.
 
-**Latest connected change:** scene lights and object/node lighting inputs are
-now published at the synchronized game/render handoff. Native rigid draws select
-from owned values, without reading guest dirty masks, selected slots, cached
-shader IDs or parameter descriptors. The field publication contains 2,898 node
-bindings; the selected native consumer passes fresh-update and reload gates with
-no missing reads. Other unsupported imports remain explicit. The host receiver
-also passes its two-epoch text gate and the new mono-image sanity check.
+The original object's native scene/shadow path remains a separate regression:
+cold load and real title teardown/reload pass, including old-source/GPU retirement.
+Both epochs also pass the receiver and owned-lighting gates. The inspected mono
+image shows coherent terrain, trees, fences, Shu and shadows; known cliff marks
+remain. Batches are still singletons: no draw-call reduction or speedup is claimed.
+[Caster-family implementation and evidence](research/20260907_1420_native-caster-families.md).
+
+**Scene shading remains narrower than shadow casting.** One selected rigid scene
+consumer uses native programs and handoff-owned scene/object lights without guest
+dirty masks, selected slots, shader IDs or parameter descriptors. Its publication
+contains 2,898 node bindings; these are not all native scene draws. Broader scene
+materials, skin/deformation, alpha/deferred and texture-dependent effects remain
+unconverted. Source tree, object/pass and other producer adapters also remain.
+[Owned-lighting contract](research/20260907_1342_owned-scene-lighting.md).
 
 Run941's separate legacy light-selection dirty-bit failure remains unresolved;
 this passing run does not explain it. Its strict comparison and failure evidence
@@ -93,7 +97,7 @@ are preserved. Authored update producers, inherited node bindings, broader
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification: 305 Python source/scenario checks and the current C++ fixtures
+Verification: 310 Python source/scenario checks and the current C++ fixtures
 pass. Existing GPU evidence covers five 8x8 two-eye pixel cases in 1.22 seconds
 with zero Vulkan validation errors/warnings, including two instanced scene/shadow
 draws with different per-instance values. These fixtures are not full-game stereo
@@ -102,7 +106,7 @@ or lifecycle acceptance. All acceptance switches remain off in the normal profil
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive/light packets, native scene/caster instanced-indirect route, selected-object mono reload proof | Representative multi-object batches, remaining source producers/material families and broader lifecycle coverage |
+| Scene and materials | Owned instance/primitive/light packets, multi-primitive opaque native casters, native scene/caster indirect route and selected-object reload proof | Broader native scene shading, real multi-instance groups, remaining source producers/material families and lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |
@@ -155,7 +159,7 @@ booting the game; build its `native_scene_snapshot_test` target only when its
 code or shaders change. See the [dev-loop guide](.claude/skills/devloop/SKILL.md)
 for the configured trees and storage-supervised build/run rules.
 
-The current 300-check source/scenario suite takes 0.123 seconds. Automated menu
+The current 310-check source/scenario suite takes 0.146 seconds. Automated menu
 tests temporarily disable mouse hover as well as owning the pad, and title-menu
 Exit fails immediately instead of being treated as a pending field. Reuse the
 existing binary and logs when they answer the question; an intermittent failure

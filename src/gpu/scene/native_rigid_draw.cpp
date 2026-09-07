@@ -25,7 +25,7 @@
 #endif
 
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
-    "Fail-closed direct native shadow acceptance for the selected rigid field asset; no template warm-up.");
+    "Fail-closed native opaque rigid caster families, including multi-primitive nodes; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
     "Fail-closed direct native mono scene acceptance for the selected rigid field asset; no node interpreter/template warm-up.");
 namespace bd::gpu::scene {
@@ -48,11 +48,13 @@ struct NativeRigidDrawStore {
   uint32_t scene_reported_frame = 0;
   uint64_t scene_batches = 0, shadow_batches = 0, merged_instances = 0;
   uint64_t reported_generation = 0, scene_reported_generation = 0;
+  uint64_t family_nodes = 0, family_multi_nodes = 0, family_primitives = 0;
+  uint64_t family_emitted = 0, family_retired = 0;
 };
 namespace {
 void Require(bool valid, const char *reason) {
   if (valid) return;
-  BD_ERROR("[native-rigid-shadow] selected node refused: {}; interpreter/capture/replay remain disabled", reason);
+  BD_ERROR("[native-rigid-shadow] admitted node refused: {}; interpreter/capture/replay remain disabled", reason);
   throw std::runtime_error(reason);
 }
 void BatchRequire(bool valid, const char *reason) {
@@ -66,7 +68,7 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
   item->frame = FrameStatFrameCount(); item->slot = Video::CurrentFrameSlot();
   BatchRequire(item->Ready(item->frame,item->slot), "incomplete native instance");
   state().native_rigid_draws->records[item->slot].push_back(item);
-  NoteNativeRigidSubmitted(item->model_generation,item->instance,item->view);
+  if (item->regression) NoteNativeRigidSubmitted(item->model_generation,item->instance,item->view);
   draw.native_rigid = std::move(item);
 }
 }
@@ -76,12 +78,15 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
                              const std::optional<PrimitivePolicyInputs> &inputs) {
   if (!NativeRigidShadowEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
-  if (!model || !SelectedNativeRigidShadow(*model)) return false;
-  Require(inputs.has_value(), "object pass policy unavailable");
+  if (!model) return false;
+  const auto admission = PrepareNativeRigidCasterAdmission(*model, inputs);
+  if (admission.route == NativeRigidCasterRoute::Legacy) return false;
+  Require(admission.route == NativeRigidCasterRoute::Native, "caster family or object pass policy unavailable");
   const auto camera = FindNativePassCamera(1);
   Require(camera.has_value(), "fresh shadow pass camera unavailable");
-  const auto plan = PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera);
-  Require(plan.has_value(), "whole-node caster contract unsupported");
+  Require(node < pose.transforms.size(), "native caster transform unavailable");
+  const auto plans = PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera);
+  Require(plans.has_value(), "whole-node caster resources or matrices unavailable");
   auto &s = state();
   std::lock_guard lock(s.mutex);
   auto *commands = ActiveNativeShadowCommands(s.render_target ? s.render_target->texture : nullptr,
@@ -91,61 +96,81 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   Require(current_camera && current_camera->world_to_clip == camera->world_to_clip, "shadow scope changed before submission");
   if (!s.native_rigid_draws) s.native_rigid_draws = std::make_shared<NativeRigidDrawStore>();
   auto &store = *s.native_rigid_draws;
-  if (!plan->draw) { ++store.suppressed; return true; }
-  const auto &geometry = plan->geometry;
   auto &records = store.records[Video::CurrentFrameSlot()];
-  Require(records.size() < 4096, "native draw retention capacity reached");
-  auto program = std::find_if(store.programs.begin(), store.programs.end(), [&](const auto &p) {
-    return p.input == geometry->rigid_vertex_input;
-  });
-  if (program == store.programs.end()) {
-    Require(store.programs.size() < 8, "native program capacity reached");
-    auto shaders = CreateNativeRigidPrograms(*s.device, geometry->rigid_vertex_input);
-    Require(shaders.shadow && shaders.scene, "native shader creation failed");
-    store.programs.push_back({geometry->rigid_vertex_input, std::move(shaders)});
-    program = store.programs.end() - 1;
+  Require(records.size() <= 4096 && plans->size() <= 4096-records.size(), "native draw retention capacity reached");
+  struct Pending { QueuedDraw draw; std::shared_ptr<NativeRigidBatchItem> item; };
+  std::vector<Pending> pending;
+  pending.reserve(plans->size());
+  // All CPU inputs, pipelines and bindings must pass before the first sibling
+  // reaches the shared queue. Failure cannot leave a partially replaced node.
+  for (const auto &plan : *plans) {
+    if (!plan.draw) continue;
+    const auto &geometry = plan.geometry;
+    auto program = std::find_if(store.programs.begin(), store.programs.end(), [&](const auto &p) {
+      return p.input == geometry->rigid_vertex_input;
+    });
+    if (program == store.programs.end()) {
+      Require(store.programs.size() < 8, "native program capacity reached");
+      auto shaders = CreateNativeRigidPrograms(*s.device, geometry->rigid_vertex_input);
+      Require(shaders.shadow && shaders.scene, "native shader creation failed");
+      store.programs.push_back({geometry->rigid_vertex_input, std::move(shaders)});
+      program = store.programs.end() - 1;
+    }
+    PipelineState pipeline_state;
+    pipeline_state.native_program = program->shaders.shadow.get();
+    pipeline_state.vertexStrides[0] = uint8_t(geometry->strides[0]);
+    pipeline_state.renderTargetFormat = plume::RenderFormat::UNKNOWN;
+    pipeline_state.depthStencilFormat = plume::RenderFormat::D32_FLOAT_S8_UINT;
+    pipeline_state.colorWriteEnable = 0;
+    pipeline_state.cullMode = plan.cull == PrimitiveCull::Back ? plume::RenderCullMode::BACK :
+        plan.cull == PrimitiveCull::Front ? plume::RenderCullMode::FRONT : plume::RenderCullMode::NONE;
+    SanitizePipelineState(pipeline_state);
+    auto *pipeline = GetOrCreatePipeline(pipeline_state);
+    Require(pipeline != nullptr, "native shadow pipeline unavailable");
+    QueuedDraw draw;
+    draw.pipeline = pipeline;
+    draw.bindings.layout = program->shaders.shadow->Layout();
+    draw.vertex_views[0] = geometry->streams[0];
+    draw.input_slots[0] = plume::RenderInputSlot(0, geometry->strides[0]);
+    draw.vertex_count = 1; draw.index_view = geometry->index;
+    draw.has_index_buffer = draw.indexed = true;
+    draw.count = geometry->count; draw.start_index = geometry->start_index; draw.base_vertex = geometry->base_vertex;
+    draw.framebuffer = commands->Framebuffer();
+    const auto width = draw.framebuffer->getWidth(), height = draw.framebuffer->getHeight();
+    draw.viewport = plume::RenderViewport(0, 0, float(width), float(height));
+    draw.scissor = plume::RenderRect(0, 0, width, height); draw.has_viewport = true;
+    draw.render_view = 1; draw.zwrite = true; draw.reorderable = true;
+    Require(draw.bindings.Valid(), "invalid native descriptor contract");
+    auto item = std::make_shared<NativeRigidBatchItem>();
+    item->geometry = geometry; item->input = {plan.object,plan.pass};
+    item->model_generation = pose.model_generation; item->instance = pose.instance;
+    item->regression = geometry->id == 0x258694267A8DBAEEull;
+    pending.push_back({std::move(draw), std::move(item)});
   }
-  PipelineState pipeline_state;
-  pipeline_state.native_program = program->shaders.shadow.get();
-  pipeline_state.vertexStrides[0] = uint8_t(geometry->strides[0]);
-  pipeline_state.renderTargetFormat = plume::RenderFormat::UNKNOWN;
-  pipeline_state.depthStencilFormat = plume::RenderFormat::D32_FLOAT_S8_UINT;
-  pipeline_state.colorWriteEnable = 0;
-  pipeline_state.cullMode = plan->cull == PrimitiveCull::Back ? plume::RenderCullMode::BACK :
-      plan->cull == PrimitiveCull::Front ? plume::RenderCullMode::FRONT : plume::RenderCullMode::NONE;
-  SanitizePipelineState(pipeline_state);
-  auto *pipeline = GetOrCreatePipeline(pipeline_state);
-  Require(pipeline != nullptr, "native shadow pipeline unavailable");
-  QueuedDraw draw;
-  draw.pipeline = pipeline;
-  draw.bindings.layout = program->shaders.shadow->Layout();
-  draw.vertex_views[0] = geometry->streams[0];
-  draw.input_slots[0] = plume::RenderInputSlot(0, geometry->strides[0]);
-  draw.vertex_count = 1; draw.index_view = geometry->index;
-  draw.has_index_buffer = draw.indexed = true;
-  draw.count = geometry->count; draw.start_index = geometry->start_index; draw.base_vertex = geometry->base_vertex;
-  draw.framebuffer = commands->Framebuffer();
-  const auto width = draw.framebuffer->getWidth(), height = draw.framebuffer->getHeight();
-  draw.viewport = plume::RenderViewport(0, 0, float(width), float(height));
-  draw.scissor = plume::RenderRect(0, 0, width, height); draw.has_viewport = true;
-  draw.render_view = 1; draw.zwrite = true; draw.reorderable = true;
-  Require(draw.bindings.Valid(), "invalid native descriptor contract");
-  auto item = std::make_shared<NativeRigidBatchItem>();
-  item->geometry = geometry; item->input = {plan->object,plan->pass};
-  item->model_generation = pose.model_generation; item->instance = pose.instance;
-  StageNativeItem(draw,std::move(item));
-  if (!s.draw_framebuffer_bound) {
+  store.suppressed += plans->size()-pending.size();
+  if (!pending.empty() && !s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands);
     s.draw_framebuffer_bound = true;
   }
-  DrawQueuePush(draw);
+  for (auto &entry : pending) {
+    store.family_primitives += !entry.item->regression;
+    StageNativeItem(entry.draw, std::move(entry.item));
+    DrawQueuePush(entry.draw);
+  }
   if (!DrawQueueEnabled()) DrawQueueFlush(s.command_list);
-  ++store.submitted;
+  store.submitted += pending.size();
+  if (!SelectedNativeRigidShadow(*model)) {
+    ++store.family_nodes;
+    store.family_multi_nodes += plans->size() > 1;
+  }
   const auto frame = FrameStatFrameCount();
-  if (store.reported_generation != pose.model_generation || frame - store.reported_frame >= 300) {
+  if (SelectedNativeRigidShadow(*model) &&
+      (store.reported_generation != pose.model_generation || frame - store.reported_frame >= 300)) {
     BD_INFO("[native-rigid-shadow] frame {} submitted {} suppressed {} fence-retired {}; node {} instance {} generation {} phase {}; native program and owned matrices, no interpreter/template/replay",
         frame, store.submitted, store.suppressed, store.retired, node, pose.instance, pose.model_generation, inputs->phase);
+    BD_INFO("[native-caster-family] frame {} nodes {} multi-primitive nodes {} submitted {} emitted {} fence-retired {}; excludes selected regression; whole-node opaque rigid admission",
+        frame, store.family_nodes, store.family_multi_nodes, store.family_primitives, store.family_emitted, store.family_retired);
     store.reported_frame = frame;
     store.reported_generation = pose.model_generation;
   }
@@ -232,6 +257,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node) {
   auto item = std::make_shared<NativeRigidBatchItem>();
   item->geometry = geometry; item->input = {plan->object,plan->pass};
   item->model_generation = pose.model_generation; item->instance = pose.instance;
+  item->regression = true;
   item->albedo = plan->albedo; item->shadow = plan->shadow;
   item->albedo_sampler = albedo_sampler; item->shadow_sampler = shadow_sampler;
   StageNativeItem(draw,std::move(item));
@@ -306,7 +332,8 @@ void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_v
   if (!s.native_rigid_draws) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &program : store.programs) if (bindings.layout == program.shaders.scene->Layout()) {
-    NoteNativeRigidEmitted(generation,render_view,instances);
+    if (generation) NoteNativeRigidEmitted(generation,render_view,instances);
+    else if (render_view == 1) store.family_emitted += instances;
     if (render_view == 3 && bindings.set_count == 3) { store.scene_emitted += instances; ++store.scene_batches; }
     else if (render_view == 1 && bindings.set_count == 1) { store.emitted += instances; ++store.shadow_batches; }
     if (instances > 1) store.merged_instances += instances;
@@ -317,7 +344,8 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   if (!s.native_rigid_draws || slot >= kNumFrames) return;
   auto &store = *s.native_rigid_draws;
   for (const auto &record : store.records[slot]) {
-    NoteNativeRigidFenceRetired(record->model_generation,record->view);
+    if (record->regression) NoteNativeRigidFenceRetired(record->model_generation,record->view);
+    else if (record->view == 1) ++store.family_retired;
     if (record->view == 3) ++store.scene_retired;
     else ++store.retired;
   }

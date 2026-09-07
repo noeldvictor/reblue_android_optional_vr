@@ -22,36 +22,63 @@ struct NativeRigidShadowPlan {
   PrimitiveCull cull = PrimitiveCull::None;
   bool draw = false;
 };
-inline std::optional<NativeRigidShadowPlan> PrepareNativeRigidShadow(
+enum class NativeRigidCasterRoute { Legacy, Native, Refused };
+struct NativeRigidCasterAdmission {
+  NativeRigidCasterRoute route = NativeRigidCasterRoute::Refused;
+  std::vector<NativePrimitivePolicy> policies;
+};
+// Classify the authored family before consulting a pose or GPU allocation.
+// Depth-only opaque casting does not consume material colour, texture layers,
+// samplers or lights. Skin/deformation, alpha and volume/effect routing do.
+// The original selected asset stays fail-closed even if its contract regresses.
+inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
+    const NativeModelMaterialProgram &program,
+    const std::optional<PrimitivePolicyInputs> &inputs) {
+  if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
+      program.ranges.size() != program.geometries.size()) return {};
+  const auto unsupported = SelectedNativeRigidShadow(program)
+      ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
+  for (const auto &range : program.ranges)
+    if (!range.shader.vertex_bones || *range.shader.vertex_bones || range.skin)
+      return {unsupported};
+  if (!inputs) return {};
+  if (inputs->technique != 0 || inputs->phase > 1) return {unsupported};
+  // This family deliberately excludes texture-dependent effect participation.
+  // Do not classify a missing image as an ordinary volume-free material.
+  if (inputs->texture_effects)
+    for (const auto &step : program.policy_steps)
+      if (step.operation == PrimitivePolicyOperation::Texture) return {unsupported};
+  std::vector<NativePrimitivePolicy> policies;
+  if (!ComposePrimitivePolicies(std::span(program.policy_steps), std::span(program.ranges), *inputs,
+      [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Unknown; }, policies)) return {};
+  for (const auto &policy : policies)
+    if (!policy.routing_known || policy.deferred || policy.alpha_test) return {unsupported};
+  return {NativeRigidCasterRoute::Native, std::move(policies)};
+}
+inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadow(
     const NativeModelMaterialProgram &program, const RenderMatrix &world,
     const PrimitivePolicyInputs &inputs, const RenderCamera &camera) {
-  // Whole-node admission. Expanding this family must preflight every sibling
-  // before enqueue, including deferred and intentionally suppressed participants.
-  if (!program.valid || program.ranges.size() != 1 || program.geometries.size() != 1 ||
-      program.materials.size() != 1 || !program.geometries[0] || !program.materials[0] ||
-      program.materials[0]->id != 0x63B8D67932573E51ull || inputs.technique != 0 || inputs.phase > 1)
-    return {};
-  const auto &range = program.ranges[0];
-  const auto &geometry = program.geometries[0];
-  if (!range.shader.vertex_bones || *range.shader.vertex_bones || range.skin ||
-      !geometry->canonical_vertices || !geometry->rigid_vertex_input || geometry->stream_mask != 1 ||
-      !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref ||
-      !geometry->count || geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255)
-    return {};
-  std::vector<NativePrimitivePolicy> policies;
-  // An unowned volume/texture routing decision is not assumed to be ordinary.
-  if (!ComposePrimitivePolicies(std::span(program.policy_steps), std::span(program.ranges), inputs,
-      [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Unknown; }, policies) ||
-      policies.size() != 1 || !policies[0].routing_known || policies[0].deferred || policies[0].alpha_test)
-    return {};
-  NativeRigidShadowPlan result;
-  result.geometry = geometry; result.cull = policies[0].cull; result.draw = policies[0].direct;
+  const auto admission = PrepareNativeRigidCasterAdmission(program, inputs);
+  if (admission.route != NativeRigidCasterRoute::Native) return {};
+  NativeRigidObjectGPU object{};
+  NativeRigidPassGPU pass{};
   // The depth-only VS consumes exactly these two matrices. Zeroed unused fields
   // are padding for the shared layout, not claims of known scene light/material data.
-  result.object.world = PackRigidMatrix(world);
-  result.pass.world_to_shadow = PackRigidMatrix(camera.world_to_clip);
-  if (!RigidFinite(result.object.world) || !RigidFinite(result.pass.world_to_shadow) ||
+  object.world = PackRigidMatrix(world);
+  pass.world_to_shadow = PackRigidMatrix(camera.world_to_clip);
+  if (!RigidFinite(object.world) || !RigidFinite(pass.world_to_shadow) ||
       world[3] != 0 || world[7] != 0 || world[11] != 0 || world[15] != 1) return {};
+  std::vector<NativeRigidShadowPlan> result;
+  result.reserve(program.ranges.size());
+  // Preflight every sibling. No partial plan can escape on a late failure.
+  for (size_t n = 0; n < program.ranges.size(); ++n) {
+    const auto &geometry = program.geometries[n];
+    if (!geometry || !geometry->id || !geometry->canonical_vertices || !geometry->rigid_vertex_input ||
+        geometry->stream_mask != 1 || !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref ||
+        !geometry->count || geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255) return {};
+    const auto &policy = admission.policies[n];
+    result.push_back({geometry, object, pass, policy.cull, policy.direct});
+  }
   return result;
 }
 } // namespace bd::gpu::scene

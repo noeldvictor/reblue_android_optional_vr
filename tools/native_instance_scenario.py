@@ -399,7 +399,7 @@ def verify_rigid_shadow(text):
     metric = re.compile(r"\[native-rigid-shadow\] frame (\d+) submitted (\d+) suppressed (\d+) fence-retired (\d+); node (\d+) instance (\d+) generation (\d+) phase (\d+);")
     contexts, metrics = [], []
     for index, line in enumerate(text.splitlines()):
-        if "[native-rigid-shadow] selected node refused:" in line:
+        if "[native-rigid-shadow]" in line and "node refused:" in line:
             raise ValueError("direct rigid caster refused; no fallback qualification")
         if "[native-material-context]" in line:
             contexts.append((index, line))
@@ -730,7 +730,33 @@ def verify_scene_lights(text):
                 unavailable_imports=b[7], generation=b[11], light_view=b[3])
 
 
-def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False):
+def verify_caster_family(text):
+    """Fresh multi-primitive caster work, excluding the selected reload asset."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("caster family diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-caster-family\] frame (\d+) nodes (\d+) multi-primitive nodes (\d+) submitted (\d+) emitted (\d+) fence-retired (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-rigid-shadow]" in line and "node refused:" in line:
+            raise ValueError("native caster refused; family not qualified")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if "[native-caster-family]" in line and not match:
+            raise ValueError("malformed native caster family evidence")
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[2] > values[1] or values[5] > values[4] or values[4] > values[3]:
+                raise ValueError("impossible caster participation/emission/lifetime counts")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1, 2, 3, 4, 5)):
+        raise Pending("need fresh non-regression multi-primitive casters, emissions and fence retirement")
+    return dict(nodes_delta=b[1]-a[1], multi_nodes_delta=b[2]-a[2],
+                submitted_delta=b[3]-a[3], emitted_delta=b[4]-a[4], retired_delta=b[5]-a[5])
+
+
+def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -745,6 +771,8 @@ def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False):
         verify_receiver_setup(text)
     if scene_lights:
         verify_scene_lights(text)
+    if caster_family:
+        verify_caster_family(text)
 
 
 def main():
@@ -775,6 +803,7 @@ def main():
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
     parser.add_argument("--receiver-setup", action="store_true", help="host receiver callback and fresh retained packet reads in each requested epoch")
     parser.add_argument("--scene-lights", action="store_true", help="owned scene/object handoffs and fresh native reads in each requested epoch")
+    parser.add_argument("--caster-family", action="store_true", help="non-regression multi-primitive native caster emissions and fence retirement")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -791,8 +820,8 @@ def main():
         text = data.decode("utf-8")
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights)
-            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -816,6 +845,7 @@ def main():
         rigid_hard_off = verify_rigid_hard_off(text) if args.rigid_hard_off else None
         receiver_setup = verify_receiver_setup(text) if args.receiver_setup else None
         scene_lights = verify_scene_lights(text) if args.scene_lights else None
+        caster_family = verify_caster_family(text) if args.caster_family else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -834,6 +864,8 @@ def main():
         print("PASS: host receiver setup and owned reads " + ", ".join(f"{k}={v}" for k,v in receiver_setup.items()))
     if scene_lights is not None:
         print("PASS: owned scene/object lighting and native reads " + ", ".join(f"{k}={v}" for k,v in scene_lights.items()))
+    if caster_family is not None:
+        print("PASS: multi-primitive native caster family " + ", ".join(f"{k}={v}" for k,v in caster_family.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:

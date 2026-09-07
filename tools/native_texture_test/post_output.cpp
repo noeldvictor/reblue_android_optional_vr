@@ -624,8 +624,8 @@ void CameraAndRigidCaster() {
   assert(SelectedNativeRigidShadow(program));
   const auto build = [&] { return PrepareNativeRigidShadow(program, identity, policy, retained_camera); };
   auto caster = build();
-  assert(caster && caster->draw && caster->cull == PrimitiveCull::Back);
-  assert(caster->pass.world_to_shadow.rows[3].x == 14 && caster->object.flags.x == 0);
+  assert(caster && caster->size() == 1 && caster->at(0).draw && caster->at(0).cull == PrimitiveCull::Back);
+  assert(caster->at(0).pass.world_to_shadow.rows[3].x == 14 && caster->at(0).object.flags.x == 0);
   program.ranges.push_back(program.ranges[0]); assert(!build()); program.ranges.pop_back();
   program.ranges[0].shader.vertex_bones.reset(); assert(!build());
   program.ranges[0].shader.vertex_bones = 2; assert(!build()); program.ranges[0].shader.vertex_bones = 0;
@@ -639,15 +639,69 @@ void CameraAndRigidCaster() {
   assert(!PrepareNativeRigidShadow(program, bad_world, policy, retained_camera));
   auto bad_camera = retained_camera; bad_camera.world_to_clip[0] = std::numeric_limits<float>::quiet_NaN();
   assert(!PrepareNativeRigidShadow(program, identity, policy, bad_camera));
+  // A representative three-range node needs no scene material or texture-layer
+  // restriction for depth-only casting. All siblings retain exact GPU ranges.
+  geometry->id = 42;
+  program.materials.clear();
+  program.ranges.resize(3, program.ranges[0]);
+  program.ranges[0].shader.texture_layers = 3;
+  program.ranges[1].winding = PrimitiveWinding::Reverse;
+  program.ranges[2].winding = PrimitiveWinding::TwoSided;
+  auto sibling = std::make_shared<NativeGeometry>(*geometry);
+  sibling->id = 43; sibling->count = 12; sibling->start_index = 9; sibling->base_vertex = -3;
+  program.geometries = {geometry, sibling, geometry};
+  const auto classify = [&] { return PrepareNativeRigidCasterAdmission(program, policy).route; };
+  assert(classify() == NativeRigidCasterRoute::Native);
+  auto family = build();
+  assert(family && family->size() == 3 && family->at(1).geometry == sibling);
+  assert(family->at(1).geometry->start_index == 9 && family->at(1).geometry->base_vertex == -3);
+  assert(family->at(0).cull == PrimitiveCull::Back && family->at(1).cull == PrimitiveCull::Front &&
+      family->at(2).cull == PrimitiveCull::None);
+  assert(PrepareNativeRigidCasterAdmission(program, {}).route == NativeRigidCasterRoute::Refused);
+  for (uint32_t technique : {3u, 8u, 9u, 11u, 14u}) {
+    policy.technique = technique; assert(classify() == NativeRigidCasterRoute::Legacy && !build());
+  }
+  policy.technique = 0;
+  policy.texture_effects = true; assert(classify() == NativeRigidCasterRoute::Legacy);
+  policy.texture_effects = false;
+  policy.pass_mode = 2; assert(classify() == NativeRigidCasterRoute::Legacy);
+  policy.pass_mode = 0;
+  program.ranges[2].shader.vertex_bones = 1; assert(classify() == NativeRigidCasterRoute::Legacy && !build());
+  program.ranges[2].shader.vertex_bones = 0;
+  program.ranges[2].skin = NativeSkinBinding{}; assert(classify() == NativeRigidCasterRoute::Legacy);
+  program.ranges[2].skin.reset();
+  program.policy_steps.push_back({PrimitivePolicyOperation::Alpha, 17, 0});
+  program.ranges[2].policy_step_end = 2;
+  assert(classify() == NativeRigidCasterRoute::Legacy && !build()); // Do not omit an alpha sibling.
+  program.policy_steps.pop_back(); program.ranges[2].policy_step_end = 1;
+  sibling->canonical_vertices = false;
+  assert(classify() == NativeRigidCasterRoute::Native && !build()); // Missing GPU data cannot select legacy.
+  sibling->canonical_vertices = true;
+  program.geometries[2].reset(); assert(classify() == NativeRigidCasterRoute::Native && !build());
+  program.geometries[2] = geometry;
+  program.ranges[2].policy_step_end = 2; assert(classify() == NativeRigidCasterRoute::Refused);
+  program.ranges[2].policy_step_end = 1;
+  assert(build());
+  program.policy_steps = {{PrimitivePolicyOperation::Alpha,17,0}, {PrimitivePolicyOperation::Alpha,0,0}};
+  for (auto &range : program.ranges) range.policy_step_end = 2;
+  policy.special_shadow_block = true;
+  const auto suppressed_family = build();
+  assert(suppressed_family && suppressed_family->size() == 3);
+  for (const auto &plan : *suppressed_family) assert(!plan.draw); // A later opaque command does not restore casting.
+  program.ranges.resize(4097, program.ranges[0]);
+  program.geometries.resize(4097, geometry);
+  assert(classify() == NativeRigidCasterRoute::Refused && !build());
   program = {}; material.reset(); geometry.reset();
-  assert(caster->geometry && caster->geometry->count == 474); // source/model lifetime independent
+  assert(caster->at(0).geometry && caster->at(0).geometry->count == 474);
+  sibling.reset();
+  assert(family->at(1).geometry->count == 12); // Whole-node leases survive source/model retirement.
 }
 void RigidHardOffRouting() {
   using namespace bd::gpu::scene;
   const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
   const auto mesh = [](uint32_t key, bool selected, bool bounds = true) {
     ModelMaterialImport result; result.source_mesh = key;
-    auto &p = result.program; p.valid = true; p.ranges.resize(1);
+    auto &p = result.program; p.valid = true; p.ranges.resize(1); p.ranges[0].shader.vertex_bones = 0;
     p.materials.resize(1); p.shadow_policies.resize(1); result.source_bindings.resize(1);
     auto geometry = std::make_shared<NativeGeometry>();
     geometry->id = selected ? 0x258694267A8DBAEEull : 42;
@@ -665,6 +719,14 @@ void RigidHardOffRouting() {
   };
   assert(route(0,1) == NativeRigidRoute::Shadow && route(0,3) == NativeRigidRoute::Scene);
   assert(route(1,3) == NativeRigidRoute::Legacy);
+  PrimitivePolicyInputs caster_policy; caster_policy.phase = 1;
+  assert(PrepareNativeRigidRoute(model,&pose,1,1,caster_policy).route == NativeRigidRoute::Shadow);
+  assert(PrepareNativeRigidRoute(model,nullptr,1,1,caster_policy).route == NativeRigidRoute::Refused);
+  assert(!NativeRigidLegacyAllowed(models.Find(10,200).get(),1,caster_policy));
+  assert(PrepareNativeRigidRoute(model,&pose,1,1).route == NativeRigidRoute::Refused);
+  caster_policy.technique = 3;
+  assert(PrepareNativeRigidRoute(model,nullptr,1,1,caster_policy).route == NativeRigidRoute::Legacy);
+  assert(NativeRigidLegacyAllowed(models.Find(10,200).get(),1,caster_policy));
   // Selection exists before the first pose handoff, not after an old draw.
   assert(PrepareNativeRigidRoute(model,nullptr,0,3).route == NativeRigidRoute::Refused);
   assert(PrepareNativeRigidRoute(model,nullptr,1,3).route == NativeRigidRoute::Legacy);
@@ -943,7 +1005,7 @@ void RigidBatches() {
   assert(packed[1].object_data.diffuse.z == .6f && packed[1].pass_data.lights[0].colour_strength.x == .7f);
   assert(packed[1].pass_data.fog[0].colour_opacity.w == .4f);
   const auto good = b;
-  for (uint32_t fault=0;fault<16;++fault) {
+  for (uint32_t fault=0;fault<17;++fault) {
     b = good;
     if (fault == 0) ++b.frame;
     if (fault == 1) ++b.slot;
@@ -961,6 +1023,7 @@ void RigidBatches() {
     if (fault == 13) b.albedo_sampler = reinterpret_cast<RenderSampler *>(&token);
     if (fault == 14) ++b.model_generation;
     if (fault == 15) b.instance = 0;
+    if (fault == 16) b.regression = true;
     const auto before = packed;
     assert(NativeRigidBatchLength(pair,8,1) == 1 && !PackNativeRigidBatch(pair,packed,8,1));
     assert(std::memcmp(before.data(),packed.data(),sizeof(packed)) == 0);

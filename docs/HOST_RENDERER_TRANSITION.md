@@ -36,13 +36,16 @@ a longer list of counters. Reuse the native owners, assets and backend already
 built. The selected rigid object remains a regression target, not a permanent
 ceiling on scene-level implementation.
 
-Host106/run944 connects owned scene/object lighting to the native rigid consumer,
-passes the complete existing reload/receiver text gates plus a new owned-lighting
-gate in both epochs, and has an inspected mono image.305 Python checks and the
-extended C++ fixture pass. Run941's legacy dirty-bit mismatch remains unexplained;
+Host107/run945 extends native opaque rigid casting to multi-primitive nodes,
+with 12,532 additional native shadow emissions/retirements in a fresh300-frame
+reloaded-field window. Both epochs pass the new non-regression family gate and
+all existing reload/receiver/owned-lighting checks; mono pixels were inspected.
+310 Python checks and the expanded C++ fixture pass. Scene shading remains the
+selected object's route. Run941's legacy dirty-bit mismatch remains unexplained;
 keep its strict comparison and failure evidence. There is no qualified complete
 host frame, broad scene, full-game stereo or Quest result.
-[Current lighting/reload evidence](../research/20260907_1342_owned-scene-lighting.md),
+[Current caster-family evidence](../research/20260907_1420_native-caster-families.md),
+[owned-lighting contract](../research/20260907_1342_owned-scene-lighting.md),
 [preserved receiver/failure evidence](../research/20260907_1224_native-receiver-setup.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
@@ -79,7 +82,13 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
 1. **Scene-level rigid ownership and representative batches.** Complete remaining
    object/receiver/camera/pass producers, inherited node-light inputs and explicit per-eye inputs using the
    existing owners. Grow beyond the single asset to representative supported
-   objects, culling/occlusion and real multi-instance groups. Preserve sibling,
+   scene-shaded objects, culling/occlusion and real multi-instance groups. The
+   opaque caster family now handles whole multi-primitive nodes without material
+   ID or scene texture-layer restrictions; its submission, actual emission and
+   fence gates pass in both reload epochs. Skin/wind, alpha/deferred and
+   texture-dependent effect participation remain explicit unsupported families.
+   Extend scene shading through its real material contract, not by applying the
+   selected one-texture program to the observed three-layer materials. Preserve sibling,
    deferred and volume participation; no silent omission or warm-up fallback.
    The selected asset's cold-start hard-off/reload proof stays a regression case.
    Reuse `NativeObjectTextureScope`, owned instance/model/primitive data, existing
@@ -140,7 +149,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | The selected direct scene draw now consumes the owned packet, retaining geometry/images through the fence. Packet assembly selects owned programs without a `NodeTag`/source key. The producer still resolves object bindings and visibility at an explicit source boundary. Only `PrepareReplayMaterialMesh` keeps the bounded replay alias index; remove it when replay's last consumer migrates. Source-to-object publication still needs replacement. |
 | Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and owned scene/node light selection. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. Host106/run944 adds accepted receiver/owned-light reload text and mono sanity pixels;941's legacy comparison failure stays open. Authored light updates, inherited node inputs, projection/colour, fog and source camera/object producers and compatibility publication remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Both programs now use native structured instance storage and indexed indirect commands through the shared cache/queue. CPU batch preflight and two-instance/two-eye GPU pixels pass; live field uses singleton batches. Complete repeated-object runtime/lifecycle coverage. Other families still use engine bindings and translated instance gathering. |
-| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission and exact native batch compatibility feed shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Cold-start hard-off and actual mono title reload pass in940. Source object/pass publication, unsupported families, repeated-object batches, sequences and both-eye acceptance remain. |
+| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Host107/run945 replaces the caster asset-ID ceiling with whole-node opaque rigid admission, transactional sibling preparation and native submissions across the wider family. The selected scene/caster reload window stays isolated from those counts. Native batches still emit singletons. Source object/pass publication, unsupported families, repeated-instance groups, sequences and both-eye acceptance remain. |
 
 Selected investigation target from field run920: geometry `258694267A8DBAEE`,
 material `63B8D67932573E51`, model-local node64, sole primitive, technique0/view3

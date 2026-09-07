@@ -26,13 +26,19 @@ inline bool NativeRigidFamilyKnown(const NativeModelMaterialProgram &program) {
 // that would allow a missing/stale pose to select the legacy path itself.
 inline NativeRigidRouteDecision PrepareNativeRigidRoute(
     const NativeModelRenderHandle &model, const NativeInstancePose *pose,
-    uint32_t node, uint32_t view) {
+    uint32_t node, uint32_t view, const std::optional<PrimitivePolicyInputs> &inputs = {}) {
   if (!model) return {NativeRigidRoute::Refused, "load-owned model unavailable"};
   const auto *program = model->FindNode(node);
   if (!program) return {NativeRigidRoute::Refused, "load-owned node unavailable or ambiguous"};
   if (!NativeRigidFamilyKnown(*program))
     return {NativeRigidRoute::Refused, "load-owned geometry identity unavailable"};
-  if (!SelectedNativeRigidShadow(*program)) return {NativeRigidRoute::Legacy};
+  if (!SelectedNativeRigidShadow(*program)) {
+    if (view != 1) return {NativeRigidRoute::Legacy};
+    const auto caster = PrepareNativeRigidCasterAdmission(*program, inputs);
+    if (caster.route == NativeRigidCasterRoute::Legacy) return {NativeRigidRoute::Legacy};
+    if (caster.route == NativeRigidCasterRoute::Refused)
+      return {NativeRigidRoute::Refused, "native caster family or object policy unavailable"};
+  }
   if (!pose) return {NativeRigidRoute::Refused, "selected native pose unavailable"};
   if (!pose->instance || pose->model != model || pose->model_generation != model->Generation())
     return {NativeRigidRoute::Refused, "selected native pose belongs to another model generation"};
@@ -44,7 +50,9 @@ inline NativeRigidRouteDecision PrepareNativeRigidRoute(
   return {NativeRigidRoute::Refused, "selected render view has no native route"};
 }
 
-inline bool NativeRigidLegacyAllowed(const ModelMaterialImport *mesh) {
-  return mesh && NativeRigidFamilyKnown(mesh->program) && !SelectedNativeRigidShadow(mesh->program);
+inline bool NativeRigidLegacyAllowed(const ModelMaterialImport *mesh, uint32_t view = ~0u,
+                                    const std::optional<PrimitivePolicyInputs> &inputs = {}) {
+  if (!mesh || !NativeRigidFamilyKnown(mesh->program) || SelectedNativeRigidShadow(mesh->program)) return false;
+  return view != 1 || PrepareNativeRigidCasterAdmission(mesh->program, inputs).route == NativeRigidCasterRoute::Legacy;
 }
 } // namespace bd::gpu::scene

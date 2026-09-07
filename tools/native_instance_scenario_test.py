@@ -10,6 +10,7 @@ from native_instance_scenario import verify_rigid_hard_off
 from native_instance_scenario import split_rigid_reload
 from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
+from native_instance_scenario import verify_caster_family
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -746,6 +747,54 @@ class RigidShadowScenarioTest(unittest.TestCase):
                     text.replace("node 64", "node 63"), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_rigid_shadow(bad)
+
+
+class CasterFamilyScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-caster-family] frame 100 nodes 100 multi-primitive nodes 50 submitted 300 emitted 290 fence-retired 280;"
+        rows[4] = "[native-caster-family] frame 150 nodes 150 multi-primitive nodes 100 submitted 450 emitted 440 fence-retired 430;"
+        return rows
+
+    def test_fresh_non_regression_family(self):
+        self.assertEqual(verify_caster_family("\n".join(self.rows())), dict(
+            nodes_delta=50, multi_nodes_delta=50, submitted_delta=150, emitted_delta=150, retired_delta=150))
+
+    def test_missing_multi_primitive_stale_reset_and_wrong_scene(self):
+        rows = self.rows(); text = "\n".join(rows)
+        for bad in (text.replace("nodes 150", "nodes 100"), text.replace("primitive nodes 100", "primitive nodes 50"),
+                    text.replace("submitted 450", "submitted 300").replace("emitted 440", "emitted 290").replace("retired 430", "retired 280"),
+                    text.replace("frame 150", "frame 100"), text.replace("bg41_01", "bg42_01"),
+                    text + "\n[native-material-context] mode Loading",
+                    "\n".join([rows[2],rows[4]] + scenario()[::2])):
+            with self.assertRaises(Pending): verify_caster_family(bad)
+
+    def test_refusal_invalid_counts_and_bounds(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("emitted 440", "emitted 451"), text.replace("retired 430", "retired 441"),
+                    text.replace("primitive nodes 100", "primitive nodes 151"),
+                    "[native-rigid-shadow] admitted node refused: owner\n" + text,
+                    "[native-caster-family] invalid\n" + text, "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_caster_family(bad)
+        with self.assertRaises(ValueError):
+            verify_rigid_shadow("[native-rigid-shadow] admitted node refused: owner\n" +
+                                "\n".join(RigidShadowScenarioTest().rows()))
+
+    def test_both_reload_epochs_require_the_new_family(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in (
+                        "verify_rigid_epoch", "verify_caster_family"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for first, second in ((cold, "\n".join(self.rows())), ("\n".join(self.rows()), new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(first, caster_family=True)
+                    module.verify_rigid_epoch(second, caster_family=True)
+            module.verify_rigid_epoch("\n".join(self.rows()), caster_family=True)
 
 
 class RigidSceneScenarioTest(unittest.TestCase):

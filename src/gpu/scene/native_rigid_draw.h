@@ -11,8 +11,8 @@ struct NativeRigidBatchItem;
 bool NativeRigidShadowEnabled();
 bool NativeRigidSceneEnabled();
 // Called before the per-node interpreter/replay/capture, after host culling.
-// Once the selected asset is recognized, refusal is fatal in this acceptance
-// mode; it cannot silently warm a template. Other families remain untouched.
+// Once a supported family is recognized, missing owners/resources are fatal;
+// it cannot silently warm a template. Unsupported participation stays legacy.
 bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
                              const std::optional<PrimitivePolicyInputs> &inputs);
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node);

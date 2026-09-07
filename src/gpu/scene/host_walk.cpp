@@ -248,7 +248,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             (flags & kNodeHasGeometry) ? static_cast<u32>(n->mesh) : 0;
         if (mesh) {
           const u32 index = static_cast<u32>(n->matrixIndex);
-          RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id);
+          RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id, shadow_policy);
           const u32 matrix = palette + (index << 6);
           // One translation per object, not one per float: the walk visits
           // every node of every visual, and the per-read validation showed

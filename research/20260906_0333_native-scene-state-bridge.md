@@ -3085,3 +3085,69 @@ activity unallocated. First measured free62,937,022,464 ->cleanup-end62,917,083,
 Same original floor/exception/retention obligations; no duplicate jobs or reset
 budget. Details in20260907_1342_owned-scene-lighting.md. Final post-push read-only
 measurement belongs in handoff; no rebuild merely to stamp the commit hash.
+
+### 2026-09-07 opaque caster-family bundle
+
+Same original65,462,788,096 B baseline,3 GiB exception,62,509,998,080 B floor,
+100 MiB diagnostics,10 MiB aggregate build logs/images and incoming raw0.
+First measured free63,162,793,984 B; pre-build63,157,366,784 B. Existing texture
+fixture and host tree reused with <=192 MiB planned peak overlap,300 s/256 MiB
+free-drop supervisor. No guest/shader rebuild, new build tree or asset conversion.
+
+Output28/PID25096 stalled before compilation in sandbox. Read-only process
+inspection confirmed its CMake/Ninja30156 tree; stopped the owned tree and
+observed terminal session90984/exit1 before output29/PID29648. Output29/CPU12
+passed. Final added suppression/capacity fixtures pass output30/PID31364 and
+CPU13/PID31052 (0.38 s assertions/0.40 s CTest).310 artifact-free Python checks
+pass. Host107/PID30172/session19411 terminal, codegen0 written/module current,
+exe48,622,080 B SHA663715CBFD7E69C378A7F50C8F219149CAAE2899CAD128D9001ECA48A5F6757A;
+PDB109,068,288 B. No new GPU fixture/shader claim; unchanged GPU26/rigid05 reused.
+
+After fixture29/CPU12 acceptance, removed exact output27/CPU11/stopped-output28
+stdout/stderr: six files1,239 logical B;63,136,337,920 ->63,136,342,016 B free,
+4,096 B recovered once. Their build/test behavior is replaced and reproducible.
+
+Run945/PID28908/session67557 terminal14:20:22-14:22:20,180 s/800 KiB text/
+192 MiB free-drop and original floor. Raw/perf/dumps/cook off; all21 temporary
+settings audited, exact owner profile restored. Both independent epochs pass
+the complete prior gate plus new non-regression multi-primitive caster evidence.
+The newer300-frame window adds12,532 native family emissions and retirements;
+selected scene/caster reload counters remain isolated.941's failure stays open.
+105,191 B renderer-owned1920x1080 JPEG was encoded in memory under110 KiB,
+fitting replacement overlap without deleting protected images or lowering
+resolution. Inspected coherent scene/shadows, known cliff marks; mono sanity
+only. Aggregate scope/sequence/stereo and full-game requirements remain open.
+
+945 log505,192 B SHABBBB860A54C78D6E802C66D0C2B08C254BA9337BC30B1E1C73370C13DAE1CD8E;
+native_caster_family_window.jpg SHADB5B45846632841877805FC646165E9CEF207417E431BF204DD72BF92E0C408C.
+Immediate run-end free63,028,518,912 B. Scoped audit: no new raw/perf/cache/HLSL/
+dump files or >1 MiB install-tree file during the run; drive-wide use is not all
+attributable to renderer outputs. No renderer/build/test process remains.
+
+After independent945 parser/pixel and final fixture acceptance, removed eight
+exact superseded outputs:944 runtime text/receiver JPEG, host106 logs and
+output29/CPU12 logs.632,465 logical B;62,969,610,240 ->62,970,253,312 B free,
+643,072 B actually recovered. Total this bundle647,168 B from fourteen files,
+not prior cleanup credited again. Exact944 text/image gone; report/hashes kept,
+945 replaces that current acceptance purpose. Keep940/image,941 and all other
+protected raw/VR/movement/baseline/failure/game/profile/build data unchanged.
+An already absent935 image was inspected as a possible replacement candidate;
+it was not deleted and earns no new recovery credit.
+
+Known retained net growth568,300 B: texture fixture+467,033 to69,596,023 B/129files;
+exe+12,288/PDB+106,496; build logs-1,021 to191,620 B/136files;
+runtime replacement+14,306; image replacement-30,802 to10,336,287 B aggregate.
+Material fixture8,129,486 B/41files and GPU fixture10,487,791 B/10files unchanged.
+First free63,162,793,984 ->cleanup-end62,970,253,312 B:192,540,672 B (183.62 MiB)
+drive-wide use,58.646 GiB free. Other host objects/source/Git/volume activity is
+unallocated, not claimed as renderer growth or cleanup savings. Revalidate this
+ledger before the next producer. Details:20260907_1420_native-caster-families.md.
+
+Pre-commit read-only recheck fell further to62,695,747,584 B free with no owned
+producer running. A scoped all-out recent-large-file audit finds only the
+existing fixture object/PDB just rebuilt above; their net growth is already
+included. This additional drive-wide use remains unallocated, not cleanup credit
+or attributed renderer growth. Only185,749,504 B (177.14 MiB) remains above the
+original operational floor: the planned192 MiB next integration overlap does
+not fit. Do not launch that producer without rechecking free space and resolving
+the existing cumulative budget. Source work/Git handoff need no build or capture.

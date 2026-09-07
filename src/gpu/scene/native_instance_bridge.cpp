@@ -9,6 +9,7 @@
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_rigid_route.h"
 #include "gpu/scene/native_rigid_route_bridge.h"
+#include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/guest_scene.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
@@ -242,11 +243,14 @@ std::shared_ptr<const NativeModelRenderData> LoadNativeRigidRouteModel(uint32_t 
 }
 
 void RequireNativeRigidWalkNode(const std::shared_ptr<const NativeModelRenderData> &model,
-    const NativeInstancePose *pose, uint32_t node, uint32_t view) {
+    const NativeInstancePose *pose, uint32_t node, uint32_t view,
+    const std::optional<PrimitivePolicyInputs> &inputs) {
   if (!HardOffEnabled()) return;
-  const auto decision = PrepareNativeRigidRoute(model, pose, node, view);
+  const auto decision = PrepareNativeRigidRoute(model, pose, node, view, inputs);
   RouteRequire(decision.route != NativeRigidRoute::Refused, decision.refusal);
   if (decision.route == NativeRigidRoute::Legacy) return;
+  // Keep the selected-object regression window independent of family growth.
+  if (!SelectedNativeRigidShadow(*model->FindNode(node))) return;
   // Fixed-size counters, no lifetime index or retained templates. This proves
   // admission ran before culling; actual GPU emissions remain a separate gate.
   thread_local uint64_t scene = 0, shadow = 0;
@@ -268,7 +272,11 @@ void RequireNativeRigidLegacyNode(uint32_t context, uint32_t mesh) {
   const auto graph = Word(uint64_t(context) + offsetof(GuestTraverseCtx, sceneGraph));
   const auto owned = graph ? FindLoadedNativeModelMaterials(*graph, mesh) : nullptr;
   RouteRequire(bool(owned), "legacy node cannot be classified from its loaded model");
-  RouteRequire(NativeRigidLegacyAllowed(owned.get()), "selected family reached legacy node entry");
+  const auto view = Word(kRenderViewIdVa);
+  RouteRequire(view.has_value(), "legacy render view unavailable");
+  const auto visual = Word(context);
+  const auto inputs = *view == 1 && visual ? ReadPrimitivePolicyInputs(context, *visual, Word) : std::nullopt;
+  RouteRequire(NativeRigidLegacyAllowed(owned.get(), *view, inputs), "native family reached legacy node entry");
 }
 } // namespace bd::gpu::scene
 

@@ -42,7 +42,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
 
     def test_hard_off_selection_precedes_pose_fallback_and_every_legacy_path(self):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        guard = walk.index("RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id)")
+        guard = walk.index("RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id, shadow_policy)")
         self.assertLess(guard, walk.index("const bool native_pose ="))
         self.assertLess(guard, walk.index("if ((!native_pose && !mp)"))
         node = (ROOT / "src/gpu/hooks/scene_node.cpp").read_text().split(
@@ -52,8 +52,8 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         bridge = (ROOT / "src/gpu/scene/native_instance_bridge.cpp").read_text()
         self.assertIn("REXCVAR_DEFINE_BOOL(bd_native_rigid_hard_off, false", bridge)
         for required in ("FindLoadedNativeModel(*graph)", "FindLoadedNativeModelMaterials(*graph, mesh)",
-                         "PrepareNativeRigidRoute(model, pose, node, view)",
-                         "NativeRigidLegacyAllowed(owned.get())", "throw std::runtime_error(reason)"):
+                         "PrepareNativeRigidRoute(model, pose, node, view, inputs)",
+                         "NativeRigidLegacyAllowed(owned.get(), *view, inputs)", "throw std::runtime_error(reason)"):
             self.assertIn(required, bridge)
         policy = (ROOT / "src/gpu/scene/native_rigid_route.h").read_text()
         self.assertLess(policy.index("SelectedNativeRigidShadow(*program)"), policy.index("if (!pose)"))
@@ -71,7 +71,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
             self.assertIn(required, direct)
         emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
         self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,", emitter)
-        self.assertIn("d.native_rigid ? d.native_rigid->model_generation : 0", emitter)
+        self.assertIn("d.native_rigid && d.native_rigid->regression ? d.native_rigid->model_generation : 0", emitter)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
         preview = lights.split("std::optional<NativeSelectedLights> FindNativeSceneLights(", 1)[1].split(
             "std::optional<NativeSelectedLights> FindNativeSelectedLights", 1)[0]
@@ -137,13 +137,28 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         for required in ("PrepareNativeRigidShadow(", "FindNativePassCamera(1)",
                          "CreateNativeRigidPrograms(", "GetOrCreatePipeline(", "DrawQueuePush(draw)",
-                         "records.size() < 4096", "store.programs.size() < 8", "store.records[slot].clear()",
+                         "plans->size() <= 4096-records.size()", "store.programs.size() < 8", "store.records[slot].clear()",
                          "draw.bindings.set_count = 1", "throw std::runtime_error(reason)"):
             self.assertIn(required, direct)
         for forbidden in ("__imp__", "HostDrawReplay(", "HostDrawCommit(", "bd::mem::", "ConstantBlockBytes("):
             self.assertNotIn(forbidden, direct)
         ring = (ROOT / "src/gpu/frame_ring.cpp").read_text()
         self.assertIn("scene::DrainNativeRigidDrawsLocked(s, slot)", ring)
+
+    def test_caster_family_preflights_all_siblings_without_expanding_reload_counts(self):
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        shadow = direct.split("bool SubmitNativeRigidShadow(", 1)[1].split("bool SubmitNativeRigidScene(", 1)[0]
+        self.assertIn("PrepareNativeRigidCasterAdmission(*model, inputs)", shadow)
+        self.assertLess(shadow.index("pending.push_back("), shadow.index("StageNativeItem("))
+        self.assertLess(shadow.index("for (const auto &plan : *plans)"), shadow.index("DrawQueuePush(entry.draw)"))
+        self.assertIn("if (item->regression) NoteNativeRigidSubmitted", direct)
+        self.assertIn("if (record->regression) NoteNativeRigidFenceRetired", direct)
+        self.assertIn("if (generation) NoteNativeRigidEmitted", direct)
+        self.assertIn("[native-caster-family]", direct)
+        policy = (ROOT / "src/gpu/scene/native_rigid_shadow.h").read_text()
+        self.assertNotIn("0x63B8D67932573E51", policy)
+        self.assertIn("program.ranges.size() > 4096", policy)
+        self.assertIn("if (!inputs) return {}", policy)
 
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
