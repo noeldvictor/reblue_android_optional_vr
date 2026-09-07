@@ -2960,3 +2960,78 @@ Actual peak not separately sampled; supervisors enforced the original floor,
 drop/time/log caps. All owned jobs terminal; exact116 B owner profile restored
 (SHA2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0).
 No next game run/capture queued. Live acceptance remains pending, not relabelled.
+
+### 2026-09-07 light-selection producer continuation — diagnostic preflight
+
+Previous turn made source/fixture progress (6de0c2f,bb0e73c), not live acceptance.
+Worktree clean; reuse host105's already-built failure-only context, no restamp
+build. Current free63,182,209,024 B; same original65,462,788,096 B baseline,
+3 GiB exception,62,509,998,080 B operational floor and zero incoming raw gate.
+One text-only180 s/800 KiB existing reload diagnostic is needed to distinguish
+the dirty-mask mismatch using the added before/after context. No new image,
+raw/perf CSV/dump/cook planned; <=1 MiB named output, existing192 MiB runtime
+free-drop/aggregate diagnostics limits enforced. This is a bounded investigation,
+not a retry campaign to obtain a pass. Keep941's failure and940/image's accepted
+baseline; retain942 only for new diagnostic information or equivalent qualified
+replacement after the cause is resolved. A successful isolated rerun cannot by
+itself explain941. Exact owner-profile restoration remains guaranteed.
+
+942/PID31128/session31599 ran12:40:55–12:41:05 and exited0 through the title-menu
+Exit route before field loading; wrapper correctly failed missing acceptance.
+Final log21,237 B; all20 settings applied, profile restored. No light-selection
+observation or image. Actual immediate preflight63,179,436,032 B, closing
+63,178,510,336 B; no duplicate/live producer. A terminal-diagnostic regression
+now distinguishes this from merely pending field evidence (300 Python checks).
+
+Source shows autoplay owns the pad but HoverTitleRows independently changes the
+title cursor from host mouse position before the original title update. The
+source path can combine hover of Exit with an autoplay confirm;942 does not log
+pointer events, so exact user-vs-hover attribution is unknown. The existing
+bd_mouse_menu=false setting now isolates menu hover in the temporary automated
+diagnostic profile (21 settings); manual defaults/persistent profile unchanged.
+One replacement text probe943 is justified to reach the original failed boundary
+with this uncontrolled input path disabled, not to weaken any render test. Same
+180 s/800 KiB/192 MiB-drop caps, original floor/aggregate budgets, no new raw or
+image/cook. Reuse host105, no build. Reconcile942 before retry; keep its small
+log until startup succeeds and its findings are recorded.
+
+943/PID30948/session61243 is terminal,12:45:40-12:47:42. Host105 was reused,
+all21 settings applied, owner116 B profile SHA unchanged. Text gates pass in
+both independent epochs, including receiver original/refused/missing zero and
+300 fresh consumer reads in the newer window. Old93/144 closes all1656 draws
+per consumer before title; new207/385 then emits fresh native work. Each epoch
+adds900 scene/shadow emissions after readiness. No941 mismatch occurred: this
+does not identify its writer or fix it. No new pixels/sequence/both-eye claim.
+943 log486,641 B SHA
+E4807B454BDB1BCAAF3D811F131F35DC533EE4C411AF541F46A64477A37D3A08.
+Preflight63,175,229,440 B; immediate closing63,174,180,864 B.
+
+300 artifact-free Python checks pass in0.123 s; existing943 log independently
+passes --rigid-reload --receiver-setup. No C++ changes/builds in this follow-up.
+Scoped audit since12:40:55 finds zero new cache/HLSL/raw/perf-CSV/dump files.
+No renderer/debugger producer remains and no next run is queued. Retain943 for
+new two-epoch receiver text coverage, replaced on equivalent full acceptance;
+keep941 for its unresolved failure and940/image for last accepted pixels. All
+protected historical raw/baseline/VR/other failure evidence remains untouched.
+
+942's startup-only failure is now superseded by the regression, documented
+input isolation and943 reaching both fields. Its21,237 B log, SHA
+F5E2A8B27DD4C7D280224C5392D8CF63AAC6E7CF815B1C6A084990F8470F950E,
+is eligible for exact-path cleanup; original pointer events were never logged.
+Remove only that agent diagnostic, not941/940 or any source/game/build data;
+record actual recovery below after deletion. No repeated cleanup credit.
+
+Completed exact-path942 cleanup after size/hash/reparse/process checks:
+63,170,146,304 ->63,170,170,880 B free,24,576 B recovered once. One obsolete
+agent log removed; exact diagnostic unavailable, findings/hash/regression kept.
+No game data/profile/source/build tree/protected raw or failure evidence removed.
+Current retained diagnostic growth is943's486,641 B; no new build/image/cache/raw
+outputs. Other source/Git/volume activity is not fully attributed. From this
+follow-up's63,182,209,024 B starting free to cleanup-end63,170,170,880 B:
+12,038,144 B drive-wide use, ending58.832 GiB. These are not all renderer bytes.
+Original cumulative floor/budgets remain unchanged; final post-push free-space
+measurement belongs in the checkpoint handoff, not a new restamp build.
+
+Owner's newest request is status/README/commit/push. No further renderer build,
+game run, capture or debugger job is authorized by that documentation update;
+leave941's cause and full receiver pixel acceptance explicitly pending.

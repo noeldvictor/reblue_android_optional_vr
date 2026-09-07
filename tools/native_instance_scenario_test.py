@@ -978,6 +978,12 @@ class RigidReloadScenarioTest(unittest.TestCase):
         rows += [guard(2245,1500), "[native-material-context] frame 2245 " + READY]
         self.assertEqual(verify_rigid_hard_off("\n".join(rows))["scene_checks_delta"],300)
 
+    def test_942_title_exit_is_terminal_not_a_pending_field(self):
+        shutdown = "[warning] [shutdown] requested (guest-exit)\n[shutdown] complete, exiting 0"
+        for text in (shutdown, self.sample()+"\n"+shutdown):
+            with self.assertRaisesRegex(ValueError, "title-menu Exit"):
+                split_rigid_reload(text)
+
 
 if __name__ == "__main__":
     unittest.main()

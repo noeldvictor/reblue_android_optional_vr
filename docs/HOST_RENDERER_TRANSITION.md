@@ -31,12 +31,14 @@ All of these remain required; shipping an intermediate component is not completi
 ## Active work queue
 
 Updated 2026-09-07: latest receiver source replaces original sub_82176708 and
-publishes one retained image/camera/late-colour packet;299 Python checks,
+publishes one retained image/camera/late-colour packet;300 Python checks,
 output27/CPU11 and material31/CPU29 pass. Host104/run941 **failed** a second-field
 light-selection dirty-bit comparison. Zero reported receiver original/refused/
-missing calls does not qualify that run. Host105 adds bounded failure context
-and is build-only. Investigate the actual ordering/dirty writer and fix it before
-another full reload/receiver/pixel gate; do not relax comparison or chase a pass.
+missing calls does not qualify that run. Host105/run943 passes the receiver and
+all existing text gates independently in both reload epochs, after temporary
+mouse-menu isolation. It did not reproduce941 and has no new pixels: the dirty
+writer/cause remains unknown. Investigate that ordering before another full
+reload/receiver/pixel gate; do not relax comparison or chase a pass.
 [Current evidence](../research/20260907_1224_native-receiver-setup.md).
 
 Last accepted live checkpoint: host103/run940 passes one selected-object mono title reload.

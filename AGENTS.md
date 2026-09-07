@@ -192,6 +192,10 @@ interpreter mentioned in research is distinct from CPU emulation.
   TOML). Preserve/restore temporary overrides. Check `[config]` audit output:
   malformed TOML can discard the whole file; command-line flags are not the
   verified desktop settings route.
+- Automated pad input does not own mouse-menu hover. For unattended menu/reload
+  diagnostics, temporarily set `bd_mouse_menu = false`, verify it took effect
+  and restore the owner's profile afterward. Treat title-menu Exit as terminal
+  failure, not pending field readiness. Keep normal manual-input defaults intact.
 - The Windows install registry record must name the directory holding the exe:
   `HKCU\Software\Zolaware\reblue\Install`, `InstallRoot`, `SchemaVersion=3`.
   A full tested install mounts 1673 archives / 119346 record names.

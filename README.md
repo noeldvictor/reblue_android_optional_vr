@@ -58,50 +58,40 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-Latest source (`6de0c2f`) replaces the receiver callback with host setup and a retained
-image/camera/late-colour packet. CPU fixtures and 299 Python checks pass, but
-run941 failed a light-selection dirty-bit comparison in its second field load.
-That failure is preserved; the newer host105 adds bounded failure context and
-has not been run. Receiver reload/pixel acceptance remains pending.
-[Current evidence and next investigation](research/20260907_1224_native-receiver-setup.md).
+### How much is left?
 
-Last **accepted live-game** checkpoint (2026-09-07, host103/run940): one real rigid
-field object now uses native programs for **both scene and shadow draws**.
-Whole-node admission bypasses its interpreter, capture and replay; fresh field
-windows add 300 scene draw emissions and 300 fence retirements. Its retained
-packet binds current per-node lights, receiver values and explicit image views.
-Both paths now use native instance storage and indexed indirect submission in
-the shared queue. The field target produced single-instance batches, not a
-measured draw-call reduction.
-Hard-off mode now selects from the loaded model before pose fallback/culling
-and rejects entry to the selected family's old renderer in every view. The
-cold and reloaded field epochs pass with 300 fresh scene/shadow admission checks;
-missing ownership cannot silently warm an old draw template.
-The inspected field image is coherent, with known cliff marks/distant blur.
-All acceptance switches remain off in the normal profile.
+**Substantial implementation and qualification remain.** We are qualifying the
+first native static-object path, not polishing a completed renderer. No complete
+host-only frame or whole native game scene has passed the full acceptance gate.
+The foundations below are reusable, but remaining work spans scenery/material
+families, characters/skinning, effects/UI, frame/pass ownership, asset streaming
+and full desktop stereo coverage. Quest 2 optimization has not resumed. There
+is no defensible completion percentage or delivery estimate yet.
+
+Last **accepted live/pixel checkpoint** (2026-09-07, host103/run940): one opt-in
+rigid field object uses native scene and shadow programs, native instance storage
+and indexed indirect submission. Its old interpreter/capture/replay path is
+disabled before first draw. Cold load and a real title teardown/reload pass,
+including old-source and GPU-fence retirement. The inspected mono image is
+coherent, with known cliff marks/distant blur. Runtime batches are singletons;
+no draw-call reduction or speedup is established. This object still has source
+adapters; it is not independently host-owned scene loading.
 [Reload evidence](research/20260907_1140_native-rigid-reload.md).
 
-Latest **GPU-fixture** checkpoint: five 8x8 two-eye pixel cases pass in
-1.22 seconds with zero Vulkan validation errors/warnings. The new case draws
-two instances together with different transforms, colours, lights and fog;
-both scene and caster use native indexed indirect commands. Nonzero storage/
-command offsets and production-style array views are exercised. All 299 Python
-source/scenario checks pass; the expanded C++ fixture also covers missing poses,
-missing geometry identities, stale generations and source-address reuse.
+**Latest work and immediate blocker:** renderer source `6de0c2f` replaces the
+receiver callback with host setup and a retained image/camera/late-colour packet.
+Host105/run943 passes its text gates in both reload epochs, but does not reproduce
+or explain run941's light-selection dirty-bit failure. That failure is preserved;
+no new pixels were captured. Resolve the writer/ordering issue and qualify the
+receiver replacement before advancing this path. Representative multi-object
+batches, visual sequences and both-eye game checks remain afterward.
+[Current evidence and next investigation](research/20260907_1224_native-receiver-setup.md).
 
-The existing harness now passes a real same-process title teardown/reentry:
-generation 93 and all 1,676 native submissions per consumer retire before title;
-generation 207 and instance 389 then produce fresh native output. Each field
-epoch adds 901 scene and shadow emissions after readiness, and independently
-passes the existing consumer and movement checks. The final mono image was
-inspected. The earlier sampling failure has a focused regression test.
-
-**This is still one opt-in object, not a fully native scene.** Cold-start hard-off
-routing and one real mono reload pass. Representative multi-object batches,
-visual sequences and both-eye game checks remain for the already-cooked path.
-Object/pass source adapters and compatibility publication remain explicitly
-tracked. The receiver replacement is not yet accepted through reload/pixels;
-no full-game lifecycle qualification or performance improvement is claimed.
+Verification: 300 Python source/scenario checks and the current C++ fixtures
+pass. Existing GPU evidence covers five 8x8 two-eye pixel cases in 1.22 seconds
+with zero Vulkan validation errors/warnings, including two instanced scene/shadow
+draws with different per-instance values. These fixtures are not full-game stereo
+or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
@@ -156,6 +146,12 @@ These Python checks do not replace C++ fixtures or GPU pixels. The existing
 booting the game; build its `native_scene_snapshot_test` target only when its
 code or shaders change. See the [dev-loop guide](.claude/skills/devloop/SKILL.md)
 for the configured trees and storage-supervised build/run rules.
+
+The current 300-check source/scenario suite takes 0.123 seconds. Automated menu
+tests temporarily disable mouse hover as well as owning the pad, and title-menu
+Exit fails immediately instead of being treated as a pending field. Reuse the
+existing binary and logs when they answer the question; an intermittent failure
+needs a targeted writer/ordering observation, not repeated boots until one passes.
 
 ### Evidence limits and performance
 

@@ -626,6 +626,8 @@ def split_rigid_reload(text):
         raise ValueError("reload diagnostic exceeds 800 KiB")
     if re.search(r"\[(?:error|critical)\]|\[native-rigid-reload\] refused:", text):
         raise ValueError("runtime reload refused or reported an error")
+    if "[shutdown] requested (guest-exit)" in text:
+        raise ValueError("title-menu Exit ended the diagnostic; no continuing reload observation")
     complete = list(re.finditer(r"\[native-rigid-reload\] complete old-generation (\d+) new-generation (\d+) old-instance (\d+) new-instance (\d+);", text))
     if not complete:
         raise Pending("need completed same-process selected-asset reload")
