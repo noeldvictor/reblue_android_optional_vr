@@ -58,7 +58,7 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-Latest **live-game** checkpoint (2026-09-07, host98/run938): one real rigid
+Latest **live-game** checkpoint (2026-09-07, host103/run940): one real rigid
 field object now uses native programs for **both scene and shadow draws**.
 Whole-node admission bypasses its interpreter, capture and replay; fresh field
 windows add 300 scene draw emissions and 300 fence retirements. Its retained
@@ -68,11 +68,11 @@ the shared queue. The field target produced single-instance batches, not a
 measured draw-call reduction.
 Hard-off mode now selects from the loaded model before pose fallback/culling
 and rejects entry to the selected family's old renderer in every view. The
-cold-start field run passes with 300 fresh scene and shadow admission checks;
+cold and reloaded field epochs pass with 300 fresh scene/shadow admission checks;
 missing ownership cannot silently warm an old draw template.
 The inspected field image is coherent, with known cliff marks/distant blur.
-All three acceptance switches remain off in the normal profile.
-[Hard-off evidence](research/20260907_1045_native-rigid-hard-off.md).
+All acceptance switches remain off in the normal profile.
+[Reload evidence](research/20260907_1140_native-rigid-reload.md).
 
 Latest **GPU-fixture** checkpoint: five 8x8 two-eye pixel cases pass in
 1.22 seconds with zero Vulkan validation errors/warnings. The new case draws
@@ -82,23 +82,23 @@ command offsets and production-style array views are exercised. All 293 Python
 source/scenario checks pass; the expanded C++ fixture also covers missing poses,
 missing geometry identities, stale generations and source-address reuse.
 
-The reload driver now exercises the game's actual title teardown/reentry.
-Run939 destroyed the selected model, retired its native GPU work, and created
-a fresh model/instance. Its sampling gate failed, so reload pixels are not yet
-accepted. Host103 adds a regression-tested longer fresh-output window; the
-corrected runtime check is pending.
-[Reload evidence and limits](research/20260907_1140_native-rigid-reload.md).
+The existing harness now passes a real same-process title teardown/reentry:
+generation 93 and all 1,676 native submissions per consumer retire before title;
+generation 207 and instance 389 then produce fresh native output. Each field
+epoch adds 901 scene and shadow emissions after readiness, and independently
+passes the existing consumer and movement checks. The final mono image was
+inspected. The earlier sampling failure has a focused regression test.
 
 **This is still one opt-in object, not a fully native scene.** Cold-start hard-off
-routing passes; actual teardown/reload and runtime multi-object batch coverage
-remain for the already-cooked asset path. Object/pass source adapters and the original
-receiver callback remain explicitly tracked; no complete lifecycle, both-eye
-qualification or performance improvement is claimed.
+routing and one real mono reload pass. Representative multi-object batches,
+visual sequences and both-eye game checks remain for the already-cooked path.
+Object/pass source adapters and the original receiver callback remain explicitly
+tracked; no full-game lifecycle qualification or performance improvement is claimed.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive packets, native scene/caster instanced-indirect route, shared culling/batching infrastructure | Lifetime/reload proof, representative multi-object batches, remaining source producers and material families |
+| Scene and materials | Owned instance/primitive packets, native scene/caster instanced-indirect route, selected-object mono reload proof | Representative multi-object batches, remaining source producers/material families and broader lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |
@@ -196,6 +196,10 @@ and observed displacement. `tools/native_instance_scenario.py --movement`
 requires movement during fresh post-event native-instance verification windows;
 an enabled setting or a stationary character does not pass. Keep raw captures
 off for text diagnostics and enforce the storage limits before image sequences.
+The opt-in `bd_native_rigid_reload` extends that same runner with a real title
+round trip. `tools/native_instance_scenario.py LOG --rigid-reload` checks both
+field epochs independently and requires fresh model/instance identities plus
+actual old source and GPU-fence retirement. Pixels remain a separate check.
 
 - `tools/capture_seq.py` flags neighbouring-frame changes.
 - `tools/capture_cyan.py` checks a known visual artifact.

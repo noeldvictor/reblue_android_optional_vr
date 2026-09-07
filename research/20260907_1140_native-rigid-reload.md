@@ -80,3 +80,54 @@ Fixed max-macro/include/cvar-link failures remain described in the ledger.
 Cleanup-end63,330,783,232 B free,44,118,016 B drive-wide use since output
 preflight, not all task-attributable. Keep current builds and failed939 until
 corrected runtime validation. No new raw allowance.
+
+## Corrected runtime: run940 passes the mono round trip
+
+Published implementation86f00d4; same host103 binary/hash above (compiled before
+the source commit, no restamping build). PID28128,11:44:43-11:46:46, all19
+settings audited. Exact profile restored and no owned producer remains.
+
+Generation93/instance144: readiness window774->1675 emissions in **each**
+consumer,901 fresh emissions. The game destroys its source with1676 submitted/
+emitted and1674 fence-retired per consumer. At title all1676 are retired.
+Generation207/instance389: its independent readiness window764->1665 adds901
+scene and901 shadow emissions. Native commands reach fresh images after reload.
+
+The cold260,704 B and reloaded221,447 B parser epochs independently pass every
+existing field/consumer gate. Each has300 fresh native scene/shadow emissions,
+retirements and hard-off admission checks; merged runtime instances0. Movement
+samples advance83/92, distances79.102978/116.885012 in the source coordinate
+units. There is no across-load counter subtraction or inherited autoplay clock.
+The new source loads and instance identities differ from939; IDs are observations,
+not persistent asset names or hardcoded expectations.
+
+Final log483,446 B, SHA256
+2785A5001BC6DD0EF935269CB322A8E0A266439CB5A7163B4DA850DF574B536B.
+Final `native_rigid_reload_window.jpg`:1920x1080,124,696 B, SHA256
+6BA8E4AD2BC2F806134D1914B9F0637739AA8677A81D42E66DB58AE3C834277C.
+Actually inspected: Shu running by rocks, fence and trees, with coherent terrain
+and character/tree shadows. Known black cliff marks and distant blur remain.
+This is a whole-scene sanity image, not isolated selected-object shadow pixels,
+sequence stability, a full-game lifecycle claim, both eyes or a speedup result.
+
+940 produced no new raw/perf/shader-dump/cache files. Audit of both runs did
+find one **unexpected68 B native material cache entry** created at939's late
+transition:cache/native_materials/v1/561cb848b5104e0c.bdmat. This contradicts the
+earlier zero-cook observation; retain the single versioned reusable entry under
+the existing cache policy, no duplicate/archive. Include its68 B in storage.
+
+After940/pixels passed, removed superseded938/939 logs,938 hard-off JPEG and
+host98 stdout/stderr:five files900,296 logical B,913,408 measured B reclaimed
+(62,970,437,632 ->62,971,351,040 B free). Those old diagnostics are no longer
+available; failure findings/hashes and regression remain above. Keep940/image,
+host103/output25/CPU9, unchanged GPU26/rigid05 and all distinct protected baseline,
+movement, VR, unresolved visual-failure and historical raw evidence.
+
+Across this continuation, measured cleanup/compression recovery278,122,496 B,
+counted once. Output-preflight63,374,901,248 ->cleanup-end62,971,351,040 B:
+403,550,208 B drive-wide use, not all attributable. Known retained component
+growth471,903 B: CPU fixture115,818, exe20,480, PDB106,496, build logs7,
+replacement JPEG5,474, longer two-epoch runtime log223,560, cache68. Other host
+objects/source/Git and unrelated volume activity remain unattributed. Retained
+growth enables the new lifecycle coverage; replace this set at the next
+equivalent qualification, not one set per commit. Original floor/caps unchanged.

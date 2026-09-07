@@ -2833,3 +2833,38 @@ Retain host103/output25/CPU9,938 passing pixels/log and failed939 until its
 corrected runtime passes. No game/source/profile/build tree or raw deleted.
 The next retry uses the same180 s/800 KiB/160 KiB JPEG/192 MiB drop/original
 floor, not another budget. See20260907_1140_native-rigid-reload.md for evidence.
+
+Corrected run940/PID28128,11:44:43-11:46:46, on unchanged host103 binary now
+published as86f00d4: **PASS**, all19 settings audited, no owned producer remains,
+exact profile restored. Generation93/instance144 ->207/389 through real title
+shutdown.901 fresh scene/shadow emissions per ready-field epoch; all1676 old
+submissions retire before title. Each independently checked epoch also adds300
+fresh native admission/emission/retirement samples and observed movement. Final
+1920x1080/124,696 B JPEG inspected; coherent scene, known cliff marks/blur remain.
+Log483,446 B; no raw/perf/dump or940 cache output. No shader/GPU rerun, full-game,
+both-eye, sequence stability, repeated-instance batching or speedup claim.
+
+940 preflight63,172,657,152 B free ->runtime-end63,098,085,376 B. Later audit
+found one68 B native material entry created in939 at11:34:51, not940:
+cache/native_materials/v1/561cb848b5104e0c.bdmat. Unexpected relative to the
+zero-cook plan; retain its single versioned reusable cache representation and
+include the bytes, rather than claiming zero. No new raw in either run.
+
+Once940/pixels passed, deleted five replaced agent files:938/939 runtime logs,
+938 hard-off JPEG,host98 stdout/stderr.900,296 logical B; actual free
+62,970,437,632 ->62,971,351,040 B,913,408 B recovered once. Old exact diagnostics
+are gone; their findings/hashes remain, including939's regression-covered
+sampling failure. Keep940/image,host103/output25/CPU9,unchangedGPU26/rigid05 and
+all distinct protected baseline/flat/VR/movement/failure/raw evidence.
+
+Totals for this continuation:277,176,320 compression +32,768 build-log cleanup
++913,408 replacement cleanup =278,122,496 measured B reclaimed, no double credit.
+Known retained growth471,903 B: CPU fixture115,818 (tree69,012,251),
+exe20,480/PDB106,496,build logs7 (aggregate184,157),JPEG5,474 (aggregate10,231,096),
+runtime223,560,cache68; GPU tree unchanged10,487,791. The longer two-epoch log
+and lifecycle fixture are new coverage; replace on equivalent qualification.
+Other objects/source/Git and unrelated volume activity are not fully attributed.
+Output-preflight63,374,901,248 ->cleanup-end62,971,351,040 B (58.647 GiB):
+403,550,208 B drive-wide use. Actual peak not separately sampled; existing
+supervisors enforced the floor/drop/log/image limits. No new raw allowance,
+no active producer or next run queued; remeasure this same budget next time.

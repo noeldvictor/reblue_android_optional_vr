@@ -804,7 +804,7 @@ def main():
     if rigid_batches is not None:
         print("PASS: post-event native rigid batches " + ", ".join(f"{k}={v}" for k, v in rigid_batches.items()))
     if rigid_hard_off is not None:
-        print("PASS: pre-cull hard-off rigid routing (reload unqualified) " + ", ".join(f"{k}={v}" for k, v in rigid_hard_off.items()))
+        print("PASS: pre-cull hard-off rigid routing (admission-only check) " + ", ".join(f"{k}={v}" for k, v in rigid_hard_off.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     if primitive_shader is not None:

@@ -30,15 +30,14 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after load-owned hard-off routing; the latest
-live-game-tested executable is host98/field run938. This is a mono sanity
-checkpoint, not complete lifecycle or desktop qualification.
-Latest implementation is host103: generation-specific source/submission/GPU/
-fence evidence and a game-owned title round trip. Run939 actually retired the
-selected model and reloaded fresh identities, but its cold reporting window
-failed the unchanged freshness gate. A focused regression now requires900
-actual scene/shadow emissions per ready-field epoch.293 Python checks and
-output25/CPU9 pass; the corrected runtime/pixel retry remains pending.
+Updated 2026-09-07: host103/run940 passes one selected-object mono title reload.
+Generation93 retires all1676 native scene/shadow submissions before title;
+generation207/instance389 renders afterward. Each field epoch adds901 actual
+native emissions per consumer after readiness and independently passes the
+existing field/movement checks; final mono pixels inspected.293 Python checks
+and output25/CPU9 pass. Run939's insufficient reporting window is regression
+covered, not relabelled a pass. Remaining source adapters, repeated-object
+batches, sequences and both-eye game acceptance prevent full qualification.
 [Evidence](../research/20260907_1140_native-rigid-reload.md).
 The dependency map below owns the detail; keep this queue outcome-oriented.
 
@@ -55,6 +54,8 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
    batches. Run938 additionally passes cold-start hard-off routing: selection
    comes from the loaded model before pose fallback/culling, and the old node
    entry refuses the selected family before diagnostics, capture or replay.
+   Run940 additionally passes actual game-owned teardown/reload with separate
+   source generations and old native GPU-fence retirement, not registry simulation.
    Source-free lifecycle and both-eye game acceptance remain open.
 
    Connect this existing packet to the existing backend in dependency order:
@@ -103,10 +104,15 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
      Selected nodes require the exact current model lease/generation, transform,
      bounds and a supported view. Existing owner registries are reused, with no
      new selection cache. Run938 enables this before startup and passes fresh
-     scene/shadow admission and emission gates. **Next: accept the real in-game
-     teardown/reload of this selected asset**, with generation-specific lifecycle
-     evidence. The one aggregate model retirement in938 does not prove that
-     selected-object lifecycle; CPU address-reuse tests are not a game reload.
+     scene/shadow admission and emission gates. Run940 now accepts a real
+     game-owned title teardown/reload with generation-specific native submission,
+     emission and fence-retirement evidence. The old source was destroyed while
+     two draws per consumer were still retained; all retired before title.
+     Both epochs pass the complete existing consumer/movement checks separately.
+     **Next: remove the remaining direct-object receiver/pass source adapters
+     and publish explicit per-eye inputs**, then qualify repeated-object batches,
+     visual sequences and both eyes before expanding families. Mono reload is
+     not source-free scene loading or full lifecycle qualification.
 
    Test these connections with the producer's actual view types, UV units,
    frame/view/object identities and lifetime behavior in existing fixtures first.
@@ -159,8 +165,8 @@ These are dependency gates, not three parallel workstreams or a new percentage
 complete. Checkpoint1 now has a live mono scene/caster consumer (run936), with
 remaining source adapters explicit. Checkpoint2 now has native batching/indirect
 code and two-instance GPU coverage, plus live singleton indirect draws (run937).
-Cold-start hard-off routing now passes in run938; actual teardown/reload and
-repeated-object runtime gates remain. Stay on
+Cold-start hard-off routing passes in938 and actual mono teardown/reload in940;
+repeated-object runtime and remaining source-free/both-eye gates remain. Stay on
 that same path before expanding families; one image does not establish stability.
 
 | Checkpoint | Existing implementation to extend | Exit evidence |
@@ -168,6 +174,13 @@ that same path before expanding families; one image does not establish stability
 | 1. Direct rigid scene and receiver | `native_shadow_pass_bridge.cpp` / `native_scene_result_bridge.h` for completed shadow ownership and fresh receiver inputs; `native_selected_lights_bridge.cpp` for native per-node preparation; `native_material_texture_bridge.cpp` / `native_rigid_draw.cpp` / `host_walk.cpp` for retained packets and routing | Whole-node preflight before side effects; source-free packet consumption in fixtures; positive native scene GPU draw emissions after field readiness, not only queued submissions; selected-node interpreter/capture/replay absent after admission; actual scene and shadow pixels inspected. Unsupported selected inputs fail visibly. |
 | 2. Native batching and lifecycle acceptance | Existing queue/culling/instancing/indirect backend, native model/instance owners and `native_instance_scenario.py`; extend the existing runner rather than creating another harness | Selected-family legacy rendering disabled before its first draw; cold load, movement, teardown and reload with fresh generations and no retained templates/warm-up. Batches preserve per-object transforms/materials and fence lifetimes. Both scene and shadow consumers must be exercised. |
 | 3. Expand rigid material families | Existing policy/material/shader programs, native image/sampler owners and the accepted direct route | Alpha-test, wind and translucent families added as complete producer-to-consumer paths, with authored changes, sibling/deferred participation and matching lifecycle/pixel checks. Delete temporary adapters at last use; no library-wide recook unless a measured format requirement needs it. |
+
+Reload checkpoint: host103/run940 passes both independently checked field
+epochs and actual selected-source/GPU retirement, with901 post-readiness
+emissions per consumer per epoch. Generation93/instance144 becomes207/389.
+Both epochs add300 fresh admission/emission/fence samples; no merged runtime
+instances. One final mono image inspected, not a visual sequence or both eyes.
+[Evidence and failed-sampling regression](../research/20260907_1140_native-rigid-reload.md).
 
 Hard-off checkpoint: host98/run938 has its first guarded scene/caster submission
 at frame764, then300 fresh admissions and300 real emissions/retirements per
@@ -217,7 +230,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | The selected direct scene draw now consumes the owned packet, retaining geometry/images through the fence. Packet assembly selects owned programs without a `NodeTag`/source key. The producer still resolves object bindings and visibility at an explicit source boundary. Only `PrepareReplayMaterialMesh` keeps the bounded replay alias index; remove it when replay's last consumer migrates. Source-to-object publication still needs replacement. |
 | Explicit vertex, material and pass inputs | Canonical attributes, pass-local `RenderCameraState`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | Direct scene/caster use fresh cameras, copy-free completed shadow images, late receiver colour and native per-node light preflight. Production-style array views and D32/S8 sampling pass the GPU fixture and are bound in the live route. The original receiver callback, authored light snapshot/cache, fog and source camera/object producers remain. Mono cameras are duplicated only for mono acceptance; layered scene targets refuse until explicit per-eye publication exists. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Both programs now use native structured instance storage and indexed indirect commands through the shared cache/queue. CPU batch preflight and two-instance/two-eye GPU pixels pass; live field uses singleton batches. Complete repeated-object runtime/lifecycle coverage. Other families still use engine bindings and translated instance gathering. |
-| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission and exact native batch compatibility feed shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Load-owned hard-off cold-start routing passes in938. Source object/pass publication, unsupported families, repeated-object batches and actual teardown/reload acceptance remain. |
+| Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | Both opt-in routes bypass `bdSceneNodeDrawSingle` before interpreter/replay/capture. Whole-node admission and exact native batch compatibility feed shaders, queue and pipeline cache; descriptors/geometry retire at the matching fence. Cold-start hard-off and actual mono title reload pass in940. Source object/pass publication, unsupported families, repeated-object batches, sequences and both-eye acceptance remain. |
 
 Selected investigation target from field run920: geometry `258694267A8DBAEE`,
 material `63B8D67932573E51`, model-local node64, sole primitive, technique0/view3
@@ -343,11 +356,12 @@ and bulk recooking are not substitutes for this path.
 
 The acceptance harness now disables the selected family's interpreter, template
 capture and replay before its first draw in hard-off mode. Cold-start field
-admission/output passes in938; prove actual teardown and reload with fresh
-generations next. A failure must stay visible rather than silently warm a
-fallback. The walking/admission checker still does not exercise that lifecycle.
-Extend it at the same consumer, then expand families and complete the unchanged
-desktop/both-eye gate.
+admission/output passes in938;940 adds actual teardown/reload with fresh model,
+instance and game-task identities. A failure stays visible rather than warming
+a fallback. The opt-in reload extension now validates both field epochs and
+old source/GPU retirement; ordinary walking alone still does not prove it.
+Complete the remaining receiver/pass producers and explicit per-eye inputs at
+this consumer, then expand families and complete the unchanged desktop gate.
 
 ### Reusable inner loop
 
