@@ -2592,3 +2592,26 @@ predecessor, not a new archive. Other object/source/Git and drive activity
 unattributed. Cleanup-end58.52 GiB free,41.89 MiB drive-wide use from output
 preflight, not all task-owned bytes. Next checkpoint retains the same budget
 and replaces equivalent evidence after qualification.
+
+### Rigid sampled-array contract continuation, 2026-09-07
+
+Parent ce56e24; same original3 GiB exception/62,509,998,080 B floor/raw0 gate.
+Preflight62,715,219,968 B free, no active producer, exact116 B profile unchanged.
+Existing GPU tree only; estimated overlap under16 MiB, wrapper256 MiB free-drop
+stop/300 s timeout,30 s CTest,10 MiB aggregate build logs. No host build, game
+run, captures, new tree or cook. Host93/run935 remains the live-game evidence.
+
+GPU build25/PID4756 and rigid04/PID23632 pass: production native shader with
+explicit single-layer array views and D32/S8 sun depth, four8x8 two-eye cases,
+max error0.0000404567, zero validation errors/warnings,1.16 s CTest.276 Python
+checks pass. Contracts/hashes:20260907_0906_rigid-array-view-contract.md.
+Live scene/receiver routing, batching and cold-load/reload remain open.
+
+Replaced and removed four superseded GPU build24/rigid03 stdout/stderr logs:
+3,997 logical B, free62,715,523,072 ->62,715,531,264 B, **8,192 B reclaimed**
+once. Old exact text is gone; findings remain and tests can be rerun. Keep
+build25/rigid04 and all current host/runtime, distinct GPU and protected evidence.
+GPU fixture tree10,433,599 B (+13,430); aggregate logs212,743 B (-49), known
+component growth13,381 B. Source/generated PS/CMake/Git and unrelated volume
+changes not fully attributed. Cleanup-end58.41 GiB free;311,296 B drive-wide
+free gain from preflight, not all cleanup credit. Budget unchanged.

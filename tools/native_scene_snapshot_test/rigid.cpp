@@ -18,6 +18,17 @@ using namespace bd::gpu::scene;
 constexpr uint32_t size = 8, colour_bytes = size*size*16, depth_bytes = size*size*4;
 void Need(bool ok, const char *message) { if (!ok) throw std::runtime_error(message); }
 RenderMatrix Identity() { return {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; }
+std::unique_ptr<RenderTextureView> SampledArrayView(RenderTexture &image, RenderFormat format) {
+  // Match NativeTextureGpu and NativeTargetImage, not the default plain-2D
+  // view previously used by this fixture. The sun and ordinary albedo are mono.
+  RenderTextureViewDesc view;
+  view.format = format;
+  view.dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  view.mipLevels = view.arraySize = 1;
+  auto result = image.createTextureView(view);
+  Need(result && static_cast<VulkanTextureView *>(result.get())->vk, "Rigid sampled array view");
+  return result;
+}
 std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uint32_t bytes, RenderBufferFlags flags) {
   auto result = device.createBuffer(RenderBufferDesc::UploadBuffer(bytes, flags));
   Need(bool(result), "Rigid buffer allocation");
@@ -86,10 +97,13 @@ void Run(RenderDevice &device, uint32_t mode) {
   depth_desc.arraySize = 2;
   auto depth = device.createTexture(depth_desc);
   depth_desc.arraySize = 1;
+  depth_desc.format = RenderFormat::D32_FLOAT_S8_UINT;
   auto shadow = device.createTexture(depth_desc);
   colour_desc.arraySize = 1;
   auto albedo = device.createTexture(colour_desc);
   Need(colour && depth && shadow && albedo, "Rigid images");
+  auto albedo_view = SampledArrayView(*albedo, colour_desc.format);
+  auto shadow_view = SampledArrayView(*shadow, depth_desc.format);
   const RenderTexture *colour_ptr = colour.get(), *albedo_ptr = albedo.get();
   RenderFramebufferDesc fb;
   fb.colorAttachments = &colour_ptr; fb.colorAttachmentsCount = 1; fb.depthAttachment = depth.get(); fb.viewMask = 3;
@@ -103,8 +117,8 @@ void Run(RenderDevice &device, uint32_t mode) {
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]), "Rigid descriptors"); }
   sets[0]->setBuffer(0, uniforms.get(), sizeof(NativeRigidObjectGPU));
   sets[0]->setBuffer(1, uniforms.get(), sizeof(NativeRigidPassGPU));
-  sets[1]->setTexture(0, albedo.get(), RenderTextureLayout::SHADER_READ);
-  sets[1]->setTexture(1, shadow.get(), RenderTextureLayout::DEPTH_READ);
+  sets[1]->setTexture(0, albedo.get(), RenderTextureLayout::SHADER_READ, albedo_view.get());
+  sets[1]->setTexture(1, shadow.get(), RenderTextureLayout::SHADER_READ, shadow_view.get());
   RenderSamplerDesc sampler_desc;
   sampler_desc.minFilter = sampler_desc.magFilter = RenderFilter::NEAREST;
   sampler_desc.mipmapMode = RenderMipmapMode::NEAREST;
@@ -127,6 +141,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   auto scene_pipeline = device.createGraphicsPipeline(pipeline_desc);
   ApplyNativePipelineProgram(*programs.shadow, pipeline_desc);
   pipeline_desc.viewMask = 0; pipeline_desc.renderTargetCount = 0;
+  pipeline_desc.depthTargetFormat = depth_desc.format;
   auto shadow_pipeline = device.createGraphicsPipeline(pipeline_desc);
   Need(scene_pipeline && static_cast<VulkanGraphicsPipeline *>(scene_pipeline.get())->vk &&
        shadow_pipeline && static_cast<VulkanGraphicsPipeline *>(shadow_pipeline.get())->vk, "Rigid native pipelines");
@@ -142,7 +157,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->setFramebuffer(nullptr);
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(albedo.get(),RenderTextureLayout::SHADER_READ));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::DEPTH_WRITE));
-  commands->setFramebuffer(shadow_fb.get()); commands->clearDepthStencil(true,false,1,0);
+  commands->setFramebuffer(shadow_fb.get()); commands->clearDepthStencil(true,true,1,0);
   GraphicsBindings bindings;
   // Production casters bind only their two matrix blocks. The depth-only VS
   // does not require otherwise declared image/sampler sets to be populated.
@@ -157,7 +172,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->setVertexBuffers(0,&vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
   commands->drawIndexedInstanced(3,1,0,0,0);
   commands->setFramebuffer(nullptr);
-  commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::DEPTH_READ));
+  commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::SHADER_READ));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(colour.get(),RenderTextureLayout::COLOR_WRITE));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(depth.get(),RenderTextureLayout::DEPTH_WRITE));
   commands->setFramebuffer(scene_fb.get()); commands->clearColor(0,RenderColor(0,0,0,0));
@@ -178,7 +193,17 @@ void Run(RenderDevice &device, uint32_t mode) {
   };
   copy(colour.get(),colour_desc.format,2,0,colour_bytes);
   copy(depth.get(),RenderFormat::D32_FLOAT,2,2*colour_bytes,depth_bytes);
-  copy(shadow.get(),RenderFormat::D32_FLOAT,1,2*colour_bytes+2*depth_bytes,depth_bytes);
+  // Copy only D32 from the production D32/S8 shadow. The generic copy helper
+  // selects both aspects for this format, which is not a valid buffer copy.
+  commands->barriers(RenderBarrierStage::COPY, RenderTextureBarrier(shadow.get(),RenderTextureLayout::COPY_SOURCE));
+  VkBufferImageCopy shadow_copy{};
+  shadow_copy.bufferOffset = 2*colour_bytes+2*depth_bytes;
+  shadow_copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  shadow_copy.imageSubresource.layerCount = 1;
+  shadow_copy.imageExtent = {size,size,1};
+  vkCmdCopyImageToBuffer(static_cast<VulkanCommandList *>(commands.get())->vk,
+      static_cast<VulkanTexture *>(shadow.get())->vk, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      static_cast<VulkanBuffer *>(readback.get())->vk, 1, &shadow_copy);
   VkMemoryBarrier host{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
   host.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT; host.dstAccessMask=VK_ACCESS_HOST_READ_BIT;
   vkCmdPipelineBarrier(static_cast<VulkanCommandList *>(commands.get())->vk,VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -220,7 +245,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   }
   readback->unmap();
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" eyes=2 pixels=128 max_error="<<maximum_error
-           <<"; named object/pass/texture inputs, native caster/receiver; raw bytes=0\n";
+           <<"; sampled views=2D_ARRAY layer=0 shadow=D32_S8; native caster/receiver; raw bytes=0\n";
 }
 }
 void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<4;++mode) Run(device,mode); }

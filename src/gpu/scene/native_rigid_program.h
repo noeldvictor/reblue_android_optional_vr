@@ -16,6 +16,8 @@ struct NativeRigidDescriptorSchema {
     sets[0].addConstantBufferDynamic(0); // NativeRigidObjectGPU
     sets[0].addConstantBufferDynamic(1); // NativeRigidPassGPU
     sets[0].end();
+    // Explicit TEXTURE_2D_ARRAY sampled views: ordinary albedo and mono sun
+    // depth, both using layer zero. Do not bind a texture's default 2D view.
     sets[1].begin(); sets[1].addTexture(0); sets[1].addTexture(1); sets[1].end();
     sets[2].begin(); sets[2].addSampler(0); sets[2].addSampler(1); sets[2].end();
   }

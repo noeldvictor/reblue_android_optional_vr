@@ -1,8 +1,11 @@
 // Native single-albedo rigid family. Detail/normal maps, reflections, wind, skin
 // and alpha-tested/translucent recipes require their own explicit eligibility.
 #include "src/gpu/scene/native_rigid_shader.h"
-[[vk::binding(0, 1)]] Texture2D<float4> albedo_image : register(t0, space1);
-[[vk::binding(1, 1)]] Texture2D<float> shadow_image : register(t1, space1);
+// The native texture uploader and native target owner publish array views even
+// for mono images. Both eyes sample layer zero of this ordinary material and
+// the shared sun shadow; SV_ViewID selects cameras, not these image layers.
+[[vk::binding(0, 1)]] Texture2DArray<float4> albedo_image : register(t0, space1);
+[[vk::binding(1, 1)]] Texture2DArray<float> shadow_image : register(t1, space1);
 [[vk::binding(0, 2)]] SamplerState albedo_sampler : register(s0, space2);
 [[vk::binding(1, 2)]] SamplerComparisonState shadow_sampler : register(s1, space2);
 
@@ -18,7 +21,7 @@ float RigidShadow(float3 world, float3 normal) {
   float visibility = 0;
   [unroll] for (uint tap = 0; tap < 4; ++tap) {
     const float2 offset = float2((tap & 1) ? 1 : -1, (tap & 2) ? 1 : -1) * pass_data.shadow_filter.z;
-    visibility += .25 * shadow_image.SampleCmpLevelZero(shadow_sampler, uv + offset, reference);
+    visibility += .25 * shadow_image.SampleCmpLevelZero(shadow_sampler, float3(uv + offset, 0), reference);
   }
   return visibility;
 }
@@ -26,7 +29,7 @@ float RigidShadow(float3 world, float3 normal) {
 float4 main(RigidFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
   const uint flags = object_data.flags.x;
   float4 albedo = object_data.diffuse * fragment.colour;
-  if (flags & RigidAlbedo) albedo *= albedo_image.Sample(albedo_sampler, fragment.uv);
+  if (flags & RigidAlbedo) albedo *= albedo_image.Sample(albedo_sampler, float3(fragment.uv, 0));
   const float3 normal = normalize(fragment.normal);
   const LitVector position = RigidVector(fragment.world);
   const LitVector camera = RigidVector(pass_data.cameras[eye].xyz);

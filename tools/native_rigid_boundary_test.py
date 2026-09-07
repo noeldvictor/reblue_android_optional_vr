@@ -6,6 +6,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeRigidBoundaryTest(unittest.TestCase):
+    def test_scene_sampling_matches_production_array_views(self):
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
+        self.assertIn("Texture2DArray<float4> albedo_image", shader)
+        self.assertIn("Texture2DArray<float> shadow_image", shader)
+        self.assertIn("float3(fragment.uv, 0)", shader)
+        self.assertIn("float3(uv + offset, 0)", shader)
+        # Ordinary assets and the mono sun shadow share layer zero between eyes;
+        # framebuffer multiview does not make these sampled inputs stereo arrays.
+        fixture = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
+        for required in ("TEXTURE_2D_ARRAY", "view.mipLevels = view.arraySize = 1",
+                         "albedo_view.get()", "shadow_view.get()",
+                         "RenderFormat::D32_FLOAT_S8_UINT", "VK_IMAGE_ASPECT_DEPTH_BIT"):
+            self.assertIn(required, fixture)
+        for path in ("src/gpu/scene/native_texture_gpu.cpp", "src/gpu/native_target_images.cpp"):
+            self.assertIn("TEXTURE_2D_ARRAY", (ROOT / path).read_text())
+
     def test_direct_caster_precedes_interpreter_and_has_bounded_fence_owners(self):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
         self.assertIn("SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)", walk)
