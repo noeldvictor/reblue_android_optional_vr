@@ -88,6 +88,12 @@ int main() {
       auto actual = before;
       assert(PublishSamplerShadow(actual, slot, SamplerField(field), value));
       assert(actual == Original(before, slot, SamplerField(field), value));
+      if (field >= 4 && value <= 4) {
+        const auto filter = ImportMaterialFilter(SamplerField(field), value);
+        const uint32_t shift = field == 4 ? 19 : field == 5 ? 21 : 23;
+        const bool nearest = ((Original(before, slot, SamplerField(field), value).fetch[3] >> shift) & 3) == 0;
+        assert(filter && (*filter == MaterialSampleFilter::Nearest) == nearest);
+      }
       // The memory writer may touch only the original setter's bytes.
       std::array<uint8_t, 1800> memory{};
       for (auto &byte : memory) byte = uint8_t(random());
@@ -114,6 +120,11 @@ int main() {
   };
   for (auto min : settings) for (auto mag : settings) for (auto mip : settings) {
     const auto plan = SceneSamplerDefaults(min, mag, mip);
+    const auto filters = ImportMaterialFilterDefaults(min, mag, mip);
+    assert(filters[0]->min == (min == 1 ? MaterialSampleFilter::Nearest : MaterialSampleFilter::Linear));
+    assert(filters[0]->mag == (mag == 1 ? MaterialSampleFilter::Nearest : MaterialSampleFilter::Linear));
+    assert(filters[0]->mip == (mip == 1 || mip == 2 ? MaterialSampleFilter::Nearest : MaterialSampleFilter::Linear));
+    for (size_t slot = 1; slot < 5; ++slot) assert(filters[slot] == NativeSamplerFilters{});
     std::array<std::array<uint32_t, 20>, 32> cache;
     for (auto &slot : cache) for (auto &word : slot) word = random();
     const auto inherited = cache;
@@ -141,5 +152,6 @@ int main() {
         if (slot >= 5 || field == 2 || field == 3 || field > 6)
           assert(cache[slot][field] == inherited[slot][field]);
   }
-  std::cout << "Sampler publication: 112000 PPC comparisons, byte masks and scene defaults passed\n";
+  assert(!ImportMaterialFilter(SamplerField::MinFilter, 5) && !ImportMaterialFilter(SamplerField::AddressU, 0));
+  std::cout << "Sampler publication: 112000 PPC comparisons, byte masks, native filters and scene defaults passed\n";
 }

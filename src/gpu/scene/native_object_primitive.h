@@ -26,6 +26,7 @@ template <class Image> struct NativeObjectPrimitive {
   std::optional<NativeFogLayers> fog;
   std::optional<NativeLightingPass> lighting;
   std::optional<NativeMaterialFeatures> features;
+  NativeMaterialSamplers samplers;
   NativeShadowPolicy receiver_shadow = NativeShadowPolicy::Unknown;
   std::array<float, 4> material_values[3]{};
   uint32_t material_mask = 0;
@@ -36,7 +37,8 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
     std::shared_ptr<const NativeInstancePose> pose, uint32_t node, uint32_t primitive,
     const NativeMaterialObjectInputs &object, const MaterialTextureValues<Image> &textures,
     const NativePrimitivePolicy &policy, std::optional<NativeSelectedLights> lights = {},
-    std::optional<NativeFogLayers> fog = {}, std::optional<NativeLightingPass> lighting = {}) {
+    std::optional<NativeFogLayers> fog = {}, std::optional<NativeLightingPass> lighting = {},
+    std::optional<NativeSamplerFilterPass> filters = {}) {
   const auto *program = pose ? FindNativeInstanceNode(*pose, node) : nullptr;
   if (!program || !program->valid || primitive >= program->ranges.size() ||
       primitive >= program->geometries.size() || primitive >= program->materials.size() ||
@@ -52,6 +54,7 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
   result.lights = std::move(lights);
   result.fog = std::move(fog);
   result.lighting = std::move(lighting);
+  if (filters) result.samplers = ComposeMaterialSamplers(program->ranges[primitive].sampler_addresses, *filters);
   if (result.lighting)
     result.features = ComposeNativeMaterialFeatures(program->ranges[primitive].features,
         object, result.lighting->inputs, program->ranges[primitive].reflection.enabled);

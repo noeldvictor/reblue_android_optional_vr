@@ -50,6 +50,10 @@ std::optional<NativeMaterialFeatures> FindNativeMaterialFeatures(
     const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count);
 void NativeMaterialFeatureCheck(bool same);
 void NativeMaterialFeatureNoteDraw();
+std::optional<NativeMaterialSamplers> FindNativeMaterialSamplers(
+    const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count);
+void NativeMaterialSamplerCheck(bool same);
+void NativeMaterialSamplerNoteDraw();
 std::optional<NativePrimitivePlan> FindNativePrimitivePlan(const NodeTag &tag);
 void NativePrimitivePolicyCheck(bool same);
 void NativePrimitivePolicyNoteDraw(bool changed);

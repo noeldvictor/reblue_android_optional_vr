@@ -161,6 +161,12 @@ interpreter mentioned in research is distinct from CPU emulation.
   related changes into coherent, verified commits; keep required GPU/pixel
   checks proportional to risk. Target the actual feature with scene/event
   readiness checks, not a fixed boot delay or an unexercised queue.
+- Test producer-to-consumer boundaries with the representations the production
+  producer actually emits: view types, coordinate units, identities and lifetime
+  stamps. Isolated helper tests and source-string guards cannot establish that
+  the consumer is reachable. Turn a failed runtime eligibility check into a
+  focused boundary regression before repeating the game run; do not lower the
+  freshness/consumption gate to make an unused path pass.
 - For the rigid-object path, `python -B tools/host_checks.py` selects its existing
   Python guards/scenario tests without builds, caches or game runs. Narrow with
   repeatable `--area`; use `--list` to inspect or `--all-boundaries` at broader

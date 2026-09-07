@@ -58,25 +58,26 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **ordinary material switches now compose
-from load-owned command ordering and live object/pass values.** Diffuse,
-specular, normal mapping, reflection and fog no longer borrow captured switches
-for the supported shader pair. Run930 adds 1,326 matching comparisons and 41,061
-owned-input draws in post-event field windows. The material fixture, 261
-source/scenario checks and host88 pass, as do existing movement/light/fog/shadow
-gates. The inspected image retains known cliff marks/blur. No new raw captures
-or cache files; superseded small verification outputs were removed.
+Latest desktop checkpoint (2026-09-07): **ordinary 2D material samplers now use
+load-owned addressing and fresh host-published filtering.** Run932 adds 3,628
+matching sampler comparisons and 41,602 owned-input draws in post-event field
+windows. Material, sampler and texture-binding CPU fixtures, 263 source/scenario
+checks and host90 pass, alongside the existing movement/light/fog/shadow gates.
+The first attempt exposed a 2D-array eligibility bug; the corrected boundary has
+a regression fixture. The inspected image retains known cliff marks/blur.
+No new raw captures or cache files; superseded small outputs were removed.
 
 Next: connect the packet for the already-persisted 162-vertex rigid field asset to
 remaining live pass inputs and direct scene/shadow submission, then prove
 interpreter/template-free cold-load and reload. Its exact shader pair and UV
 formula are now identified; one layer, enabled vertex color and zero declaration
-bones are confirmed. The packet now retains lighting pass values and composed
-material features too. Sampler recipes, remaining shadow/vertex-pass inputs and
-complete native pass/draw routing remain; observed flags must not become frozen defaults.
+bones are confirmed. The packet now retains lighting pass values, composed
+material features and ordinary 2D sampler recipes. Remaining shadow/vertex-pass
+inputs, correctly timed per-node light production and complete native pass/draw
+routing remain; observed flags must not become frozen defaults.
 **No live game object uses the new native rigid shaders yet.** Source-free GPU
 loading, full-game/both-eye qualification and any speedup remain unproven.
-[Evidence and next integration](research/20260907_0625_owned-material-features.md).
+[Evidence and next integration](research/20260907_0655_owned-material-samplers.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no
@@ -188,6 +189,11 @@ only if it removes a named blocker for that path; defer broad recooking and
 material-family expansion until this end-to-end consumer works. The generated
 C++ is our exact behavior reference, not a reason to translate every console
 rendering helper one-for-one. This changes development order, not the full goal.
+
+Test each connection using the producer's real output shapes and lifetime rules
+before a game boot. Group the remaining pass-input work around direct submission,
+then spend the runtime check on that complete connection. A passing helper with
+zero eligible game consumers is unfinished work, not a conversion milestone.
 
 The capture-free inner loop is now one command:
 

@@ -2443,3 +2443,42 @@ code/tests and replacement evidence, not another verification set. Other objects
 source/Git/metadata deltas unknown. Cleanup-end58.62 GiB free; drive-wide use
 +26,255,360 B (25.04 MiB) from first measure, not wholly attributed to task files.
 Original floor/budgets and next-checkpoint replacement review remain unchanged.
+
+### Owned material-sampler continuation, 2026-09-07
+
+Parent35c0448 verified/pushed. First free62,765,817,856 B; no producer or scoped
+new output explained the preceding491,520 B difference. Later prebuild free
+63,015,092,224 B rose without task cleanup; no credit claimed. Same original
+3 GiB exception,62,509,998,080 B floor, raw0 allowance; <=192 MiB planned link
+overlap and existing build256 MiB/runtime192 MiB free-drop stops. Text400 KiB,
+JPEG160 KiB, aggregate build logs10 MiB/images10 MiB; retries share these caps.
+
+Sampler1/CPU1, material28/CPU26, binding20/21 and CPU18/19 pass. Host89/90 pass
+with host objects/link only; no guest or shader regeneration.263 Python checks
+pass. Run931/PID31668 terminal06:47:28 failed coverage with0 sampler checks/draws:
+plain2D eligibility rejected the uploader's array2D views. No image, exact profile
+restored. Added a boundary fixture for actual view types before the retry.
+Run932/PID17888,06:54:27-06:55:25, passes fresh post-event sampler and all prior
+field/movement/light/fog/shadow gates. All15 settings audited, exact profile
+restored; no owned producer remains. No new raw/perf/cache/dump/cooked files.
+Text234,233 B and inspectedJPEG135,574 B replace equivalent prior evidence.
+Known cliff marks/blur remain; direct native shader, cold-load/reload, both-eye
+and speedup unproven. Hashes and contracts:20260907_0655_owned-material-samplers.md.
+
+After validation, removed19 exact superseded agent files: host88/89,
+material27/CPU25, binding19/20 and CPU17/18 stdout/stderr;930/931 text and
+material-feature JPEG.738,922 logical B removed; immediate free62,879,055,872
+->62,879,813,632 B: **757,760 B actually reclaimed**, credited once. Reproducible
+build logs and retired exact runtime text/images are gone; hashes/observations
+remain in research. Preserve current fixture/host90/932 evidence, selected
+asset and all distinct protected GPU/flat/VR/motion/failure/raw evidence.
+
+Retained material tree7,761,059 B, texture fixture tree62,769,999 B, build
+logs182,380 B and window images10,241,974 B. Known retained growth221,693 B:
+material+28,341, texture fixture+148,023, logs-1,600, image-12,263, runtime
+text-712, exe+6,656/PDB+53,248. Growth supports ownership/boundary regression
+code and replacement evidence, not an extra retained verification set. Other
+objects/source/Git/metadata deltas unknown. Cleanup-end58.56 GiB free;
+drive-wide free increased113,995,776 B from first measure, mostly unattributed
+concurrent activity, not cleanup credit. Original limits/floor remain unchanged;
+review and replace equivalent evidence at the next checkpoint.

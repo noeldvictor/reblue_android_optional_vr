@@ -8,6 +8,7 @@
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/native_sampler_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_model_materials.h"
@@ -74,6 +75,7 @@ struct ObjectStats { uint64_t publications = 0, reads = 0, missing = 0, checked 
 thread_local ObjectStats object_stats;
 thread_local uint64_t shader_checked = 0, shader_wrong = 0, shader_draws = 0;
 thread_local uint64_t feature_checked = 0, feature_wrong = 0, feature_draws = 0;
+thread_local uint64_t sampler_checked = 0, sampler_wrong = 0, sampler_draws = 0;
 std::optional<uint32_t> Word(uint64_t address) {
   if (!address || (address & 3) || address > UINT32_MAX - 3) return {};
   const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -262,7 +264,7 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
       *scope->object, mesh->values[primitive], mesh->policies[primitive],
       SelectNativeObjectLights(scope->lights, scope->node_lights, node),
       NativeFogIsCurrent(scope->fog_revision) ? scope->fog : std::nullopt,
-      FindNativeLightingPass(scope->render_view));
+      FindNativeLightingPass(scope->render_view), FindNativeSamplerFilters(scope->render_view));
   object_stats.packets += result.has_value();
   return result;
 }
@@ -365,6 +367,27 @@ void NativeMaterialFeatureCheck(bool same) {
   if (!same && ++feature_wrong <= 4) BD_WARN("[native-material-feature-mismatch] ordered material/pass switches");
 }
 void NativeMaterialFeatureNoteDraw() { ++feature_draws; }
+std::optional<NativeMaterialSamplers> FindNativeMaterialSamplers(
+    const NodeTag &tag, uint32_t index, uint32_t vertex, uint32_t first, uint32_t count) {
+  if (tag.tech != 0) return {};
+  const auto *mesh = PrepareReplayMaterialMesh(tag);
+  const auto filters = FindNativeSamplerFilters(tag.render_view);
+  if (!mesh || !filters) return {};
+  std::optional<NativeMaterialSamplers> found;
+  for (size_t i = 0; i < mesh->program->ranges.size(); ++i) {
+    const auto &range = mesh->program->ranges[i];
+    if (!ModelPrimitiveMatches(range, mesh->owner->source_bindings[i], index, vertex, first, count)) continue;
+    const auto value = ComposeMaterialSamplers(range.sampler_addresses, *filters);
+    if (found && *found != value) return {};
+    found = value;
+  }
+  return found;
+}
+void NativeMaterialSamplerCheck(bool same) {
+  ++sampler_checked;
+  if (!same && ++sampler_wrong <= 4) BD_WARN("[native-material-sampler-mismatch] owned 2D filtering/addressing");
+}
+void NativeMaterialSamplerNoteDraw() { ++sampler_draws; }
 std::optional<NativePrimitivePlan> FindNativePrimitivePlan(const NodeTag &tag) {
   if (!REXCVAR_GET(bd_native_primitive_policies)) return {};
   const auto *mesh = PrepareReplayMaterialMesh(tag);
@@ -385,6 +408,8 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  BD_INFO("[native-material-sampler] {} checks wrong {}; {} owned-input draws; ordinary 2D recipes; cube/volume/inherited axes and direct submission pending",
+      sampler_checked, sampler_wrong, sampler_draws);
   BD_INFO("[native-material-feature] {} checks wrong {}; {} owned-input draws; ordinary material/pass switches; direct submission pending",
       feature_checked, feature_wrong, feature_draws);
   BD_INFO("[native-primitive-shader] {} checks wrong {}; {} owned-input draws; remaining material/pass inputs and direct submission pending",

@@ -114,6 +114,17 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
         }
         last_reflection_command = value;
       }
+    } else if ((command & 0xff00) == 0x0700 || (command & 0xff00) == 0x0800) {
+      const uint32_t channel = (command & 0xff00) == 0x0800 ? 4 : (command >> 4) & 15;
+      if (channel < current.sampler_addresses.size()) {
+        auto &address = current.sampler_addresses[channel];
+        constexpr MaterialSampleAddress modes[]{MaterialSampleAddress::Wrap, MaterialSampleAddress::Mirror, MaterialSampleAddress::Clamp};
+        const auto u = (command >> 2) & 3, v = command & 3;
+        // Encoding3 preserves each axis independently; repeated commands still
+        // apply. This is the ordinary phase0 recipe, not phase1's forced zero.
+        if (u < 3) address.u = modes[u];
+        if (v < 3) address.v = modes[v];
+      }
     } else if ((command & 0xff00) == 0x0900) {
       steps.push_back({PrimitivePolicyOperation::Alpha, uint8_t(command & 0xff)});
     } else if ((command & 0xff00) == 0x0200) {

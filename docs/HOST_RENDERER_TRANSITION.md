@@ -30,81 +30,50 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after ordered material feature consumption and field run930. The first
-two former milestones are one producer-to-consumer outcome; full scope is unchanged.
+Updated 2026-09-07 after ordinary 2D sampler consumption and field run932.
+The dependency map below owns the detail; keep this queue outcome-oriented.
 
-1. **Complete a native static-object path, then expand its material families.**
-   Work backward from a real rigid object's direct scene/shadow draw: canonical,
-   self-describing cooked geometry; explicit material/texture/pass records and
-   named native shader inputs; native instance/update handles; direct submission.
-   Reuse load-owned geometry/material programs, render-pose snapshots, image
-   tables, runtime vertex inputs and the existing culling/instancing/indirect
-   backend. Canonical rigid values now draw on desktop; remaining packed layouts,
-   shader-register ABI, `NodeTag`/source lookup and retained templates are not
-   the finished contract.
-   Shadow policy and ordered texture assignments are load-owned; object-level
-   image/UV publications now feed native material consumers. Ordinary alpha,
-   winding and direct/deferred policy now compose from owned programs/pass
-   inputs; live cull consumption passes the field check. Next, connect named
-   shader inputs and direct scene/shadow submission for one ordinary opaque
-   rigid field family (no skin or volume/special override dependency).
-   Production native rigid scene/shadow shaders now consume named attributes,
-   explicit 176-byte object/608-byte pass buffers, textures and samplers. Four
-   tiny two-eye Vulkan color/depth cases pass using the shared light/fog core;
-   packing is explicit, not a memcpy of its semantic structs. These shaders
-   are not connected to game draws yet; selected lights and both fog layers now
-   have owned publications, while remaining pass ownership is still required.
-   The shared queue accepts explicit layouts/descriptor sets/offsets, with
-   binding-aware batching and exact caller restoration. The shared pipeline cache
-   now accepts owned native shader/layout/input programs; background jobs and
-   cached pipelines pin their resources, with bounded native retention. Native
-   cache selection has CPU coverage; the production rigid shader factory,
-   pipeline-description and binding cores now have real GPU fixture coverage.
-   No game producer uses the native programs yet, and instance-record gathering
-   remains translated. Connect the now-owned object packet to live pass producers next,
-   not another broad compatibility layer.
-   Model-node associations and local bounds are now load-owned and pinned by
-   native instance poses; `FindNativeInstanceNode` selects primitives without a
-   source graph/mesh/buffer lookup. The host walk consumes these bounds with
-   matching field checks. `FindNativeObjectPrimitive` now assembles owned
-   geometry/material/transform/color/image/UV/policy packets from that association;
-   normal material composition uses the published object color. Exact pose identity
-   prevents another instance/lane from borrowing the publication. Direct submission
-   must use this packet, not rediscover its data from replay. The host three-light
-   publisher now supplies semantic values at the correctly timed per-node callback,
-   with exact object/node isolation and retained packet ownership. Authored selection
-   scoring, snapshot/animation updates and shader staging remain adapters. Both
-   fog layers now come from a checked host publisher, preserving inactive state
-   and signed endpoints; late/nested updates invalidate old active scopes.
-   Primitive texture-layer count, declaration vertex-color enable and declaration
-   bone count are now load-owned and retained in that same packet. Ordinary
-   scene replay consumes the first two with matching field comparisons. The
-   selected object's exact shader pair/UV formula are identified; remaining
-   samplers and remaining pass inputs precede direct submission.
-   Its packet now retains a fresh, view-scoped lighting pass. Ordinary scene
-   replay consumes ambient/camera/color grading without captured pixel-pass
-   history; wrong-view, stale-frame and reset publications are unavailable.
-   Ordered ordinary material switches now fold into load-owned feature recipes,
-   including null/default controls and repeated shininess-command elision.
-   Live object/pass gates compose diffuse/specular/normal-map/reflection/fog;
-   packets retain them and exact-pair replay consumes them with matching checks.
-   Vertex pass history, samplers and remaining shadow inputs still need ownership.
-   Preserve the ordered null/override semantics and extend unsupported families;
-   do not freeze animated overrides into mesh assets or assume every strip
-   range is opaque. Object/pass source setup and replay templates remain.
-   The [source map](../research/20260906_1531_static-model-ownership-frontier.md)
-   and existing call graph locate producers and indirect/lifetime boundaries.
-   Acceptance: the converted object loads, updates, draws in scene/shadow passes
-   and reloads without guest rendering warm-up, captured templates or per-draw
-   console imports. Run that family's cold-load/reload acceptance with its
-   interpreter and template capture disabled, not just declining to call them
-   when a warm cache happens to exist. Select and record the actual model,
-   material family and scene before claiming coverage. Destroy import-source
-   storage in fixtures before native
-   consumption. Verify generation reuse, async completion and late writers.
-   Expand opaque rigid objects to alpha-tested/wind/translucent families without
-   dropping deferred participants. Cook small batches under existing independent
-   disk/GPU budgets; do not recook the library before a real consumer works.
+1. **Finish one direct native static object, then expand material families.**
+   The selected `bg41_01` node64/162-vertex opaque rigid asset is already cooked.
+   Its owned packet retains geometry/material/node associations, pose, object
+   color/images/UVs, participation/shadow policy, shader-layer/color/bone metadata,
+   selected lights, fog, lighting pass, material features and ordinary 2D samplers.
+   Native scene/shadow shaders and shared pipeline/binding cores have focused
+   two-eye GPU coverage. **No game draw uses those native programs yet.**
+
+   Connect this existing packet to the existing backend in dependency order:
+
+   - Finish the live vertex/pass and remaining shadow inputs. Own the correctly
+     timed per-node light producer currently reached through the shader callback;
+     moving a draw earlier must not borrow lights from a previous object or pass.
+     Ordinary 2D filters/addressing are now owned; cube/volume/inherited-axis
+     samplers remain separate unsupported families, not frozen defaults.
+   - Route a completely supported node before `HostDrawReplay`/original capture
+     in `scene_node.cpp`, using native shader programs, layouts, image leases,
+     pass bindings and the shared culling/instancing/indirect submission backend.
+     Preflight every primitive before any draw or observable side effect, so
+     unsupported siblings are neither lost nor duplicated. Shadow casting and
+     receiving must each have a complete contract.
+   - Extend the existing scenario harness at that consumer boundary: disable the
+     selected family's interpreter, template capture and replay **before its first
+     draw**, then prove cold load, native instance updates, scene/shadow output,
+     teardown and reload with fresh generations. Refusal must remain a visible
+     failure, never silently warm the fallback. The walking gate is not this test.
+
+   Test these connections with the producer's actual view types, UV units,
+   frame/view/object identities and lifetime behavior in existing fixtures first.
+   Destroy source storage before native consumption; cover generation reuse,
+   asynchronous completion and late writers. Group the remaining pass contracts
+   around the direct consumer, not another series of unrelated adapter rewrites.
+   No new renderer framework, bulk recook or library-wide format churn is needed.
+
+   After that acceptance passes, expand opaque rigid objects to alpha-tested,
+   wind and translucent families, preserving ordered null/override semantics and
+   deferred/volume participants. Animated overrides must stay live. Native assets,
+   submission and pass systems are reused; temporary source aliases, shader-register
+   packing and retained templates are deleted as their last consumer migrates.
+   See the [dependency map](#direct-rigid-object-dependency-map) and
+   [loader/lifetime source map](../research/20260906_1531_static-model-ownership-frontier.md).
 2. **Complete character path.** Native skeleton/skin assets, animation and pose
    producers, joint palettes and GPU skinning; preserve gameplay synchronization
    and verify characters in the relevant field/battle/cutscene/shadow paths.
@@ -171,10 +140,21 @@ also observes its owned light kinds `(directional, disabled, disabled)` after
 the per-node callback. Run923's object-wide-only snapshot missed these updates;
 the consumer gate failed instead of accepting startup publisher checks.
 Reuse this selected asset, not a library-wide recook. Its packet now retains
-lighting pass values and composed ordinary material features as well. Connect
-sampler recipes, remaining shadow/vertex-pass inputs, complete native pass bindings and
+lighting pass values, composed ordinary material features and 2D samplers as well. Connect
+remaining shadow/vertex-pass inputs, correctly timed per-node lights, complete native pass bindings and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
+
+[Sampler evidence](../research/20260907_0655_owned-material-samplers.md): material28/CPU26,
+sampler1/CPU1, binding21/CPU19, 263 Python checks and host90 pass. Run932 adds
+3,628 matching sampler comparisons and 41,602 owned-input draws in fresh
+post-event windows2032/2332. Ordinary 2D addressing folds at load; filtering comes
+from a fresh frame/view publication with late setters. Unsupported slots refuse
+ownership. The first run931 correctly failed coverage because a plain-2D-only
+gate excluded the uploader's 2D-array views; both types now have boundary coverage.
+All prior field/movement/light/fog/shadow gates pass. The inspected image retains
+known cliff marks/blur; no new raw/cache outputs. Template/interpreter use, direct
+native shader submission, cold-load/reload, both-eye and speedup remain unproven.
 
 [Material feature evidence](../research/20260907_0625_owned-material-features.md):
 material27/CPU25,261 Python checks and host88 pass. Run930 adds1,326 matching
@@ -253,7 +233,7 @@ program guards brought these to 116 /231; rigid shader guards now bring them to
 119 /234 respectively; model-node guards/scenarios now bring these to123 /238. Their
 separate C++ and runtime evidence follows below.
 
-## Latest qualified checkpoint
+## Earlier checkpoint evidence by subsystem
 
 Owned object primitive inputs (2026-09-07): object-entry color/shininess snapshots
 now feed ordinary material composition; source reads remain only for verification

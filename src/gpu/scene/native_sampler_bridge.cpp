@@ -5,6 +5,8 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/sampler_import.h"
+#include "gpu/scene/native_sampler_bridge.h"
+#include "gpu/scene/guest_scene.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
 #include "gpu/device.h"
@@ -40,6 +42,16 @@ struct Stats {
   uint32_t frame = 0;
 };
 thread_local Stats stats;
+thread_local NativeSamplerFilterPublication filters;
+void TrackFilter(uint32_t slot, SamplerField field, uint32_t value) {
+  if (slot >= 5) return;
+  const auto native_field = field == SamplerField::MinFilter ? MaterialFilterField::Min :
+      field == SamplerField::MagFilter ? MaterialFilterField::Mag : MaterialFilterField::Mip;
+  if (field != SamplerField::MinFilter && field != SamplerField::MagFilter && field != SamplerField::MipFilter) return;
+  const auto *view = bd::mem::try_at<const be_u32>(kRenderViewIdVa);
+  if (!view) { filters.Reset(); return; }
+  filters.Set(FrameStatFrameCount(), uint32_t(*view), slot, native_field, ImportMaterialFilter(field, value));
+}
 void Report() {
   if ((++stats.calls & 1023) != 0)
     return;
@@ -155,6 +167,7 @@ struct Publication {
 };
 bool Set(PPCContext &ctx, uint8_t *base, Original original,
          uint32_t device, uint32_t slot, SamplerField field, bool engine) {
+  const auto requested = ctx.r5.u32;
   SamplerShadow shadow;
   const auto offset = SamplerOffset(field);
   if (!ReadShadow(device, slot, field == SamplerField::MinFilter ||
@@ -177,6 +190,7 @@ bool Set(PPCContext &ctx, uint8_t *base, Original original,
     publication.Add(kDirty, 1u);
   }
   publication.Execute(ctx, base, original);
+  TrackFilter(slot, field, requested);
   ++stats.setters[uint32_t(field)];
   stats.changes += engine;
   return true;
@@ -188,8 +202,9 @@ bool Defaults(PPCContext &ctx, uint8_t *base) {
   const auto settings = bd::mem::load<uint32_t>(kSettings);
   if (!settings || !Range(uint64_t(settings) + 7048, 12))
     return false;
-  const auto plan = SceneSamplerDefaults(bd::mem::load<uint32_t>(settings + 7052),
-      bd::mem::load<uint32_t>(settings + 7056), bd::mem::load<uint32_t>(settings + 7048));
+  const auto min = bd::mem::load<uint32_t>(settings + 7052), mag = bd::mem::load<uint32_t>(settings + 7056);
+  const auto mip = bd::mem::load<uint32_t>(settings + 7048);
+  const auto plan = SceneSamplerDefaults(min, mag, mip);
   std::array<SamplerShadow, 5> shadows;
   for (uint32_t slot = 0; slot < 5; ++slot)
     if (!ReadShadow(device, slot, true, shadows[slot]))
@@ -216,11 +231,15 @@ bool Defaults(PPCContext &ctx, uint8_t *base) {
     ++changes;
   }
   publication.Execute(ctx, base, __imp__sub_82184A88);
+  const auto *view = bd::mem::try_at<const be_u32>(kRenderViewIdVa);
+  if (view) filters.Publish(ImportMaterialFilterDefaults(min, mag, mip), FrameStatFrameCount(), uint32_t(*view));
+  else filters.Reset();
   ++stats.defaults;
   stats.default_changes += changes;
   return true;
 }
 void Fallback(PPCContext &ctx, uint8_t *base, Original original) {
+  filters.Reset(); // unowned production cannot leave a native publication eligible
   ++stats.compatibility;
   stats.refused += REXCVAR_GET(bd_host_sampler_state);
   original(ctx, base);
@@ -236,6 +255,9 @@ void Direct(PPCContext &ctx, uint8_t *base, Original original, SamplerField fiel
   Report();
 }
 } // namespace
+std::optional<NativeSamplerFilterPass> FindNativeSamplerFilters(uint32_t render_view) {
+  return filters.Read(FrameStatFrameCount(), render_view);
+}
 } // namespace bd::gpu::scene
 
 REX_HOOK_RAW(bdSetSamplerState) {

@@ -80,6 +80,7 @@
 #include "gpu/scene/native_texture_table_bridge.h"
 #include "gpu/scene/native_texture_table_source.h"
 #include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/native_sampler_bridge.h"
 #include "gpu/scene/lighting_shader_bridge.h"
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_shadow.h"
@@ -149,6 +150,7 @@ struct SubDraw {
   std::optional<NativePrimitiveShaderInputs> native_shader_inputs;
   bool native_lighting_pass = false;
   bool native_material_features = false;
+  uint8_t native_material_sampler_mask = 0;
   std::optional<NativeSkinBinding> skin;
   std::optional<bool> material_disables_shadow;
   std::optional<NativeReflectionRecipe> reflection;
@@ -528,6 +530,7 @@ struct VerifyDraw {
   std::array<NativeTextureBinding, 16> native_textures;
   std::array<plume::RenderSamplerDesc, 16> native_samplers;
   u32 native_sampler_mask = 0;
+  uint8_t native_material_sampler_mask = 0;
   PipelineState pipelineState;
   plume::RenderVertexBufferView vertex_views[16];
   plume::RenderInputSlot input_slots[16];
@@ -843,6 +846,7 @@ bool MergeDraws(std::vector<SubDraw> &have, const std::vector<SubDraw> &now) {
     x.native_shader_inputs = y.native_shader_inputs;
     x.native_lighting_pass = y.native_lighting_pass;
     x.native_material_features = y.native_material_features;
+    x.native_material_sampler_mask = y.native_material_sampler_mask;
     x.material_disables_shadow = y.material_disables_shadow;
     // Keep each binding with its original inherited-state snapshot. Replacing
     // only the native half here can pair an old dynamic surface with a newly
@@ -1209,7 +1213,9 @@ void VerifyAgainstReplay(const NodeTag &tag, const SubDraw &d) {
   }
   for (u32 k = 0; k < 32; ++k) {
     if (k < 16 && ((e.native_sampler_mask >> k) & 1u) &&
-        SamplerKey(DecodeSamplerRecipe(t_fetch[k])) != SamplerKey(e.native_samplers[k])) {
+        (((e.native_material_sampler_mask >> k) & 1u)
+          ? !MaterialSamplerMatches2D(e.native_samplers[k], DecodeSamplerRecipe(t_fetch[k]))
+          : SamplerKey(DecodeSamplerRecipe(t_fetch[k])) != SamplerKey(e.native_samplers[k]))) {
       ++n_fetch;
       why += fmt::format(" native sampler{} differs;", k);
     }
@@ -1623,6 +1629,15 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
   const uint64_t vs_hash = vertex_shader && vertex_shader->shaderCacheEntry ? vertex_shader->shaderCacheEntry->hash : 0;
   const uint64_t ps_hash = pixel_shader && pixel_shader->shaderCacheEntry ? pixel_shader->shaderCacheEntry->hash : 0;
   if (d.indexed && vs_hash == 0xB5C88BB6295138CCull && ps_hash == 0xFB83DD3F5E67CEB7ull) {
+    if (const auto samplers = FindNativeMaterialSamplers(tag, d.index_va, d.stream_va[0], d.start_index, d.count)) {
+      for (uint32_t slot = 0; slot < samplers->size(); ++slot) {
+        if (slot == 3 || !(*samplers)[slot] || !MaterialSamplerImage2D(d.native_textures[slot])) continue;
+        const bool same = MaterialSamplerMatches2D(MaterialSamplerDesc(*(*samplers)[slot]), DecodeSamplerRecipe(t_fetch[slot]));
+        NativeMaterialSamplerCheck(same);
+        if (same) d.native_material_sampler_mask |= 1u << slot;
+        else p.replayable = false;
+      }
+    }
     if (const auto features = FindNativeMaterialFeatures(tag, d.index_va, d.stream_va[0], d.start_index, d.count)) {
       const bool same = (d.bools[4] & kNativeMaterialFeatureMask) == PackNativeMaterialFeatures(*features);
       NativeMaterialFeatureCheck(same);
@@ -2317,6 +2332,7 @@ bool HostDrawReplay(const NodeTag &tag) {
     const NativeMaterialTextureValues *textures = nullptr;
     std::optional<NativePrimitivePolicy> policy;
     std::optional<NativeMaterialFeatures> features;
+    NativeMaterialSamplers samplers;
   };
   static thread_local std::vector<MaterialValues> native_values;
   const u32 frame = FrameStatFrameCount();
@@ -2380,6 +2396,7 @@ bool HostDrawReplay(const NodeTag &tag) {
       if (draw.native_lighting_pass && !lighting_pass) return false;
       values.policy.reset();
       values.features.reset();
+      values.samplers = {};
       if (draw.native_material_features) {
         values.features = FindNativeMaterialFeatures(tag, draw.index_va, draw.stream_va[0], draw.start_index, draw.count);
         if (!values.features) return false;
@@ -2398,6 +2415,17 @@ bool HostDrawReplay(const NodeTag &tag) {
       if (REXCVAR_GET(bd_native_materials) && t->draws[i].native_material)
         values.mask = EvaluateNativeMaterial(tag, t->draws[i].native_material->asset,
                                               values.values);
+      if (draw.native_material_sampler_mask) {
+        const auto samplers = FindNativeMaterialSamplers(tag, draw.index_va, draw.stream_va[0], draw.start_index, draw.count);
+        if (!samplers) return false;
+        for (uint32_t slot = 0; slot < samplers->size(); ++slot) {
+          if (!(draw.native_material_sampler_mask & (1u << slot))) continue;
+          const auto &binding = values.textures && (draw.native_texture_recipe_mask & (1u << slot)) ?
+              values.textures->images[slot] : draw.native_textures[slot];
+          if (!(*samplers)[slot] || !MaterialSamplerImage2D(binding)) return false;
+          values.samplers[slot] = (*samplers)[slot];
+        }
+      }
     }
     // Every moving value must have been written by an interpreted node of
     // this visual in this frame; otherwise this node is the one to interpret.
@@ -2560,7 +2588,8 @@ bool HostDrawReplay(const NodeTag &tag) {
         }
       }
       for (const FetchDelta &f : d.fetch_delta)
-        if (!f.stable && (!v || v->fetch_frame[f.slot] != frame)) {
+        if (!(d.native_material_sampler_mask & (1u << f.slot)) &&
+            !f.stable && (!v || v->fetch_frame[f.slot] != frame)) {
           ++st.stale_bail;
           return false;
         }
@@ -3020,11 +3049,18 @@ bool HostDrawReplay(const NodeTag &tag) {
     }
     ov.native_sampler_mask = 0;
     for (const FetchDelta &f : d.fetch_delta) {
-      if (f.slot < 16 && f.stable && native_textures[f.slot].primary) {
+      if (!(d.native_material_sampler_mask & (1u << f.slot)) &&
+          f.slot < 16 && f.stable && native_textures[f.slot].primary) {
         native_samplers[f.slot] = f.native_recipe;
         ov.native_sampler_mask |= 1u << f.slot;
       }
     }
+    for (uint32_t slot = 0; slot < native_values[di].samplers.size(); ++slot)
+      if (const auto &sampler = native_values[di].samplers[slot]) {
+        native_samplers[slot] = MaterialSamplerDesc(*sampler);
+        ov.native_sampler_mask |= 1u << slot;
+      }
+    if (d.native_material_sampler_mask) NativeMaterialSamplerNoteDraw();
     // Verification still composes all compatibility words for comparison.
     // Normal native sampler slots do not read the device fetch file at all.
     const bool inspect_fetch = verify || RecordingArmed();
@@ -3210,6 +3246,7 @@ bool HostDrawReplay(const NodeTag &tag) {
       std::copy(std::begin(native_samplers), std::end(native_samplers),
                 e.native_samplers.begin());
       e.native_sampler_mask = ov.native_sampler_mask;
+      e.native_material_sampler_mask = d.native_material_sampler_mask;
       std::memcpy(e.vs, t_vs_block, kBlockBytes);
       std::memcpy(e.ps, t_ps_block, kBlockBytes);
       std::memcpy(e.fetch, t_fetch, sizeof(e.fetch));

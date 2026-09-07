@@ -8,6 +8,7 @@
 #include "gpu/scene/fenced_asset_cache.h"
 #include "gpu/scene/scene_recipe_residency.h"
 #include "gpu/sampler_key.h"
+#include "gpu/scene/native_sampler_bridge.h"
 #include <cstdlib>
 #include <iostream>
 #include <latch>
@@ -164,6 +165,17 @@ void TestNativePipelineProgram();
 int main() {
   TestNativePipelineProgram();
   TestTextureTables();
+  // Match the production uploader's array view, not only a synthetic plain 2D.
+  for (const auto dimension : {D::TEXTURE_2D, D::TEXTURE_2D_ARRAY}) {
+    const auto image = Image(30, 300, dimension);
+    Check(MaterialSamplerImage2D({image, {}, {}}), "ordinary uploaded view uses 2D sampling semantics");
+    Check(!MaterialSamplerImage2D({image, image, {}}) &&
+          !MaterialSamplerImage2D({image, {}, image}), "compound bindings remain outside ordinary sampler ownership");
+  }
+  Check(!MaterialSamplerImage2D({}) &&
+        !MaterialSamplerImage2D({Image(31, 301, D::TEXTURE_3D), {}, {}}) &&
+        !MaterialSamplerImage2D({Image(32, 302, D::TEXTURE_CUBE), {}, {}}),
+        "missing, volume and cube images cannot normalize third-coordinate sampler state");
   const NativeTextureIndices nulls{1, 2, 3};
   auto two = Image(10, 100, D::TEXTURE_2D_ARRAY);
   auto cube = Image(20, 200, D::TEXTURE_CUBE);
@@ -245,6 +257,25 @@ int main() {
         "frame-age pruning handles unsigned frame wrap");
 
   const plume::RenderSamplerDesc base;
+  for (uint32_t bits = 0; bits < 8; ++bits) for (uint32_t u = 0; u < 3; ++u) for (uint32_t v = 0; v < 3; ++v) {
+    constexpr MaterialSampleFilter filters[]{MaterialSampleFilter::Nearest, MaterialSampleFilter::Linear};
+    constexpr MaterialSampleAddress addresses[]{MaterialSampleAddress::Wrap, MaterialSampleAddress::Mirror, MaterialSampleAddress::Clamp};
+    constexpr plume::RenderTextureAddressMode backend[]{plume::RenderTextureAddressMode::WRAP,
+        plume::RenderTextureAddressMode::MIRROR, plume::RenderTextureAddressMode::CLAMP};
+    const auto owned = MaterialSamplerDesc({{filters[bits & 1], filters[(bits >> 1) & 1], filters[(bits >> 2) & 1]}, addresses[u], addresses[v]});
+    Check(owned.minFilter == ((bits & 1) ? plume::RenderFilter::LINEAR : plume::RenderFilter::NEAREST) &&
+        owned.magFilter == ((bits & 2) ? plume::RenderFilter::LINEAR : plume::RenderFilter::NEAREST) &&
+        owned.mipmapMode == ((bits & 4) ? plume::RenderMipmapMode::LINEAR : plume::RenderMipmapMode::NEAREST) &&
+        owned.addressU == backend[u] && owned.addressV == backend[v], "semantic 2D sampler backend mapping");
+    auto imported = owned;
+    imported.addressW = plume::RenderTextureAddressMode::BORDER;
+    imported.borderColor = plume::RenderBorderColor::OPAQUE_WHITE;
+    Check(MaterialSamplerMatches2D(owned, imported), "unused W/border canonicalized only for owned non-border 2D contract");
+    imported.addressU = backend[(u + 1) % 3];
+    Check(!MaterialSamplerMatches2D(owned, imported), "address mismatch must remain visible");
+    imported = owned; imported.minLOD = 1;
+    Check(!MaterialSamplerMatches2D(owned, imported), "other sampler fields cannot be hidden by comparison");
+  }
   const SamplerKey key(base);
   auto distinct = [&](const plume::RenderSamplerDesc &d) {
     Check(SamplerKey(d) != key, "sampler state omitted from identity");

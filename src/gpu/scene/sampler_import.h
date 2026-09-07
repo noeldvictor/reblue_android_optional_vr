@@ -9,12 +9,13 @@
 #include <bit>
 #include <cstdint>
 #include <optional>
+#include "gpu/scene/native_material_sampler.h"
 
 namespace bd::gpu::scene {
 // These are boundary fields, NOT a native material/sampler format. Ordinary
-// draws still import fetch state because several material producers write it
-// inline. Do not make a live native sampler authoritative until those writers
-// have been replaced. Retained native recipes use RenderSamplerDesc already.
+// unconverted draws still import fetch state because some producers write it
+// inline. Verified ordinary 2D materials fold addressing at load and consume
+// fresh owned filters; other consumers must not assume their writers are owned.
 enum class SamplerField : uint32_t {
   AddressU, AddressV, AddressW, BorderColor, MagFilter, MinFilter, MipFilter
 };
@@ -104,6 +105,23 @@ inline uint32_t ImportSceneFilterSetting(uint32_t setting) {
   case 3: return 2;
   default: return 1;
   }
+}
+inline std::optional<MaterialSampleFilter> ImportMaterialFilter(SamplerField field, uint32_t value) {
+  if (value > 4) return {};
+  if (field == SamplerField::MipFilter)
+    return (value & 3) == 0 ? MaterialSampleFilter::Nearest : MaterialSampleFilter::Linear;
+  if (field == SamplerField::MinFilter || field == SamplerField::MagFilter)
+    return value == 0 ? MaterialSampleFilter::Nearest : MaterialSampleFilter::Linear;
+  return {};
+}
+inline NativeSamplerFilterPass ImportMaterialFilterDefaults(uint32_t min, uint32_t mag, uint32_t mip) {
+  NativeSamplerFilterPass result;
+  for (auto &slot : result) slot = NativeSamplerFilters{};
+  result[0] = NativeSamplerFilters{
+      *ImportMaterialFilter(SamplerField::MinFilter, ImportSceneFilterSetting(min)),
+      *ImportMaterialFilter(SamplerField::MagFilter, ImportSceneFilterSetting(mag)),
+      *ImportMaterialFilter(SamplerField::MipFilter, ImportSceneFilterSetting(mip))};
+  return result;
 }
 // Complete sub_82184A88 plan, in source order. Only the first five slots and
 // these five fields are reset; W, border, and all other fields inherit.

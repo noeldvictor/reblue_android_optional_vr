@@ -9,6 +9,7 @@
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_primitive_policy.h"
 #include "gpu/scene/native_lighting.h"
+#include "gpu/scene/native_material_sampler.h"
 
 #include <array>
 #include <cstddef>
@@ -95,6 +96,7 @@ struct NativeMaterialRange {
   NativeReflectionRecipe reflection;
   NativePrimitiveShaderInputs shader;
   NativeMaterialFeatureRecipe features;
+  std::array<NativeSamplerAddress, 5> sampler_addresses = MaterialSamplerEntry();
   // Unknown until a bone-index command; an explicit empty binding is unskinned.
   std::optional<NativeSkinBinding> skin;
   uint32_t index_count = 0;

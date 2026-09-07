@@ -39,6 +39,56 @@ ModelMaterialImport Mesh(uint32_t key, uint8_t power = 12) {
 
 void TestNativeModelMaterials() {
   {
+    for (uint16_t kind : {0x0700, 0x0800}) for (uint16_t payload = 0; payload < 256; ++payload) {
+      const uint16_t commands[]{0x1000, 1, 0, 0x0735, 0x070a, 0x0805, 0x1000, 1, 3,
+          uint16_t(kind | payload), 0x1000, 1, 6, 0xff};
+      std::vector<NativeMaterialRange> ranges;
+      Require(DecodeMeshMaterials(commands, ranges) && ranges.size() == 3, "sampler command decode");
+      auto expected = MaterialSamplerEntry();
+      Require(ranges[0].sampler_addresses == expected, "node-entry addressing is load-owned");
+      expected[0] = {MaterialSampleAddress::Clamp, MaterialSampleAddress::Clamp};
+      expected[3] = expected[4] = {MaterialSampleAddress::Mirror, MaterialSampleAddress::Mirror};
+      Require(ranges[1].sampler_addresses == expected, "independent channels and forced normal-map channel");
+      const auto channel = kind == 0x0800 ? 4 : payload / 16;
+      const auto u = (payload % 16) / 4, v = payload % 4;
+      constexpr MaterialSampleAddress modes[]{MaterialSampleAddress::Wrap, MaterialSampleAddress::Mirror, MaterialSampleAddress::Clamp};
+      if (channel < expected.size()) {
+        if (u != 3) expected[channel].u = modes[u];
+        if (v != 3) expected[channel].v = modes[v];
+      }
+      Require(ranges[2].sampler_addresses == expected, "all payloads preserve axes independently");
+      auto before = ranges;
+      Require(!DecodeMeshMaterials(std::span(commands).first(std::size(commands) - 1), ranges) &&
+          ranges[2].sampler_addresses == before[2].sampler_addresses, "truncated sampler decode is transactional");
+    }
+    const uint16_t repeated[]{0x070a, 0x0705, 0x070a, 0x1000, 1, 0, 0xff};
+    std::vector<NativeMaterialRange> ranges;
+    Require(DecodeMeshMaterials(repeated, ranges) && ranges[0].sampler_addresses[0].u == MaterialSampleAddress::Clamp,
+        "address commands are never elided by previous command identity");
+    NativeSamplerFilterPass filters;
+    for (auto &slot : filters) slot = NativeSamplerFilters{};
+    auto samplers = ComposeMaterialSamplers(MaterialSamplerEntry(), filters);
+    Require(samplers[0] && samplers[1] && samplers[2] && !samplers[3] && samplers[4],
+        "unknown inherited channel cannot borrow pass wrap default");
+    filters[0].reset();
+    Require(!ComposeMaterialSamplers(MaterialSamplerEntry(), filters)[0], "missing filter publication refuses that slot");
+    NativeSamplerFilterPublication publication;
+    Require(!publication.Read(5, 3), "no uninitialized filter pass");
+    publication.Publish(filters, 5, 3);
+    const auto retained = publication.Read(5, 3);
+    Require(retained && !publication.Read(4, 3) && !publication.Read(5, 2), "frame and view isolation");
+    publication.Set(5, 3, 1, MaterialFilterField::Min, MaterialSampleFilter::Nearest);
+    Require(publication.Read(5, 3)->at(1)->min == MaterialSampleFilter::Nearest &&
+        retained->at(1)->min == MaterialSampleFilter::Linear, "late setter does not mutate queued value copy");
+    publication.Set(5, 3, 1, MaterialFilterField::Mag, {});
+    publication.Set(5, 3, 1, MaterialFilterField::Mag, MaterialSampleFilter::Nearest);
+    Require(!publication.Read(5, 3)->at(1), "partial update cannot recover unknown filters");
+    publication.Set(5, 2, 2, MaterialFilterField::Mip, MaterialSampleFilter::Nearest);
+    Require(!publication.Read(5, 3) && retained->at(2), "foreign pass writer invalidates old eligibility");
+    publication.Publish(filters, 6, 3); publication.Reset();
+    Require(!publication.Read(6, 3) && retained->at(4), "reset cannot destroy an already retained packet");
+  }
+  {
     // Load-time control ordering; ranges must not retain a command interpreter.
     const uint16_t commands[]{0x1000, 1, 0, 0x0301, 0x040c, 0x0500, 0x1000, 1, 3,
         0xe000, 0x040c, 0x1000, 1, 6, 0x040d, 0x1000, 1, 9,
@@ -158,7 +208,9 @@ void TestNativeModelMaterials() {
     NativeLightingPass lighting;
     lighting.inputs.ambient = {.125f, .25f, .5f, 1};
     lighting.inputs.specular_enabled = 1;
-    auto packet = BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy, lights, {}, lighting);
+    NativeSamplerFilterPass filters;
+    filters[0] = NativeSamplerFilters{};
+    auto packet = BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy, lights, {}, lighting, filters);
     Require(packet && packet->geometry && packet->world[12] == 7 && packet->policy.direct &&
             packet->receiver_shadow == NativeShadowPolicy::Receive && (packet->material_mask & kNativeDiffuse) &&
             packet->material_values[0] == object.colour, "owned pose/material/geometry/texture/policy packet");
@@ -170,13 +222,14 @@ void TestNativeModelMaterials() {
             "mismatched model generation cannot assemble a packet");
     object.colour[0] = std::numeric_limits<float>::infinity();
     Require(!BuildNativeObjectPrimitive(pose, 0, 0, object, textures, policy), "nonfinite object input refused");
-    textures = {}; object = {}; source = {}; lights = {}; lighting = {}; gpu_owner.reset();
+    textures = {}; object = {}; source = {}; lights = {}; lighting = {}; filters = {}; gpu_owner.reset();
     models.Retire(100); instances.Retire(id); pose.reset(); model.reset(); stale = {};
     Require(!gpu_lifetime.expired() && !image_lifetime.expired() && *packet->textures.images[0] == 73 &&
             packet->textures.uv[3] == 4 && packet->world[12] == 7 && packet->material_values[0][0] == .5f &&
             packet->lights && (*packet->lights)[0].colour.x == .75f &&
             packet->lighting && packet->lighting->inputs.ambient[0] == .125f &&
             packet->features == NativeMaterialFeatures{true, true, false, false, false} &&
+            packet->samplers[0] && packet->samplers[0]->u == MaterialSampleAddress::Wrap && !packet->samplers[1] &&
             packet->shader == NativePrimitiveShaderInputs{2, true, 0},
             "queued packet survives object scope, source and model/instance retirement");
     Require(models.Publish(100, {Mesh(20, 42)}), "same source key may be reused");

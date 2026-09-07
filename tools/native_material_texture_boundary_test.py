@@ -86,6 +86,29 @@ class MaterialTextureBoundaryTest(unittest.TestCase):
         self.assertIn("channel == 5", self.draw)  # reflection owns its separate producer
         self.assertIn("p.scene_texture_recipe.UsesSlot(channel)", self.draw)
 
+    def test_native_samplers_have_owned_filter_and_address_producers(self):
+        core = (ROOT / "src/gpu/scene/native_material_sampler.h").read_text()
+        producer = (ROOT / "src/gpu/scene/native_sampler_bridge.cpp").read_text()
+        for forbidden in ("be_u32", "bd::mem", "PPCContext", "fetch", "NodeTag"):
+            self.assertNotIn(forbidden, core.split("#pragma once", 1)[1])
+        self.assertIn("filters.Publish(ImportMaterialFilterDefaults(min, mag, mip)", producer)
+        self.assertIn("TrackFilter(slot, field, requested)", producer)
+        self.assertIn("filters.Reset(); // unowned production", producer)
+        getter = producer.split("std::optional<NativeSamplerFilterPass> FindNativeSamplerFilters(", 1)[1].split("\n}", 1)[0]
+        self.assertNotIn("bd::mem", getter)
+        self.assertIn("filters.Read(FrameStatFrameCount(), render_view)", getter)
+        getter = self.bridge.split("std::optional<NativeMaterialSamplers> FindNativeMaterialSamplers(", 1)[1].split(
+            "void NativeMaterialSamplerCheck", 1)[0]
+        for forbidden in ("bd::mem", "Word(", "DecodeSamplerRecipe", "ReadCommands", "Video::"):
+            self.assertNotIn(forbidden, getter)
+        self.assertIn("ComposeMaterialSamplers(range.sampler_addresses, *filters)", getter)
+        self.assertIn("if (found && *found != value) return {}", getter)
+        self.assertIn("if (!(*samplers)[slot] || !MaterialSamplerImage2D(binding)) return false", self.draw)
+        self.assertLess(self.draw.index("values.samplers[slot] = (*samplers)[slot]"),
+                        self.draw.index("native_samplers[slot] = MaterialSamplerDesc(*sampler)"))
+        self.assertIn("NativeMaterialSamplerNoteDraw()", self.draw)
+        self.assertIn("e.native_material_sampler_mask = d.native_material_sampler_mask", self.draw)
+
     def test_ordered_features_use_live_owners_and_preflight_before_replay(self):
         data = (ROOT / "src/gpu/scene/native_material_data.h").read_text()
         decode = (ROOT / "src/gpu/scene/native_material_data.cpp").read_text()

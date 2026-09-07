@@ -404,6 +404,11 @@ def verify_material_features(text):
     return _verify_owned_shader_inputs(text, "native-material-feature")
 
 
+def verify_material_samplers(text):
+    """Require fresh ordinary sampler comparisons and actual recipe consumption."""
+    return _verify_owned_shader_inputs(text, "native-material-sampler")
+
+
 def _verify_owned_shader_inputs(text, name):
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
         raise ValueError("owned shader diagnostic exceeds 400 KiB")
@@ -478,6 +483,7 @@ def main():
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
     parser.add_argument("--material-features", action="store_true")
+    parser.add_argument("--material-samplers", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -504,6 +510,7 @@ def main():
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
         material_features = verify_material_features(text) if args.material_features else None
+        material_samplers = verify_material_samplers(text) if args.material_samplers else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -543,6 +550,8 @@ def main():
         print("PASS: post-event owned lighting pass " + ", ".join(f"{k}={v}" for k, v in lighting_pass.items()))
     if material_features is not None:
         print("PASS: post-event owned material features " + ", ".join(f"{k}={v}" for k, v in material_features.items()))
+    if material_samplers is not None:
+        print("PASS: post-event owned material samplers " + ", ".join(f"{k}={v}" for k, v in material_samplers.items()))
     return 0
 
 
