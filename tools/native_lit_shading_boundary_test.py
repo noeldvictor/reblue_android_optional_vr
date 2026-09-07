@@ -6,6 +6,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LitShadingBoundaryTest(unittest.TestCase):
+    def test_owned_fog_and_late_publication_invalidation(self):
+        core = (ROOT / "src/gpu/scene/native_fog.h").read_text()
+        for forbidden in ("g_PSC", "PPCContext", "bd::mem", "NodeTag", "uint32_t", "plume::"):
+            self.assertNotIn(forbidden, core)
+        source = (ROOT / "src/gpu/scene/native_fog_source.h").read_text()
+        self.assertIn("std::array<NativeFogWrite, 16>", source)
+        self.assertIn("result.fog = previous", source)
+        self.assertNotIn("bd::mem::store", source)
+        bridge = (ROOT / "src/gpu/scene/native_fog_bridge.cpp").read_text()
+        self.assertEqual(bridge.count("__imp__sub_82179270(ctx, base)"), 2)
+        self.assertIn("if (REXCVAR_GET(bd_native_materials_verify))", bridge)
+        self.assertIn("expected == revision", bridge)
+        self.assertIn("current[0].frame == FrameStatFrameCount()", bridge)
+        self.assertIn("current[1].frame == FrameStatFrameCount()", bridge)
+        owner = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        self.assertIn("publication->fog = FindNativeFogLayers()", owner)
+        self.assertEqual(owner.count("NativeFogIsCurrent(scope->fog_revision)"), 2)
+        packet = (ROOT / "src/gpu/scene/native_object_primitive.h").read_text()
+        self.assertIn("std::optional<NativeFogLayers> fog", packet)
+        draw = (ROOT / "src/gpu/scene/host_draw.cpp").read_text()
+        self.assertLess(draw.index("d.bools[4 + i] ="), draw.index("CheckNativeFogLayers(*fog, t_ps_block, d.bools[4])"))
+
     def test_selected_lights_are_semantic_owned_values(self):
         core = (ROOT / "src/gpu/scene/native_selected_lights.h").read_text()
         for forbidden in ("g_PSC", "PPCContext", "bd::mem", "NodeTag", "uint32_t", "plume::"):

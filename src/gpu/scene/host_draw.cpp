@@ -80,6 +80,7 @@
 #include "gpu/scene/native_texture_table_bridge.h"
 #include "gpu/scene/native_texture_table_source.h"
 #include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/native_texture_binding.h"
 #include "gpu/scene/native_texture_binding_bridge.h"
@@ -1608,6 +1609,10 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
     d.bools_set[4 + i] = p.ps_bools_set[i] | (d.bools[4 + i] ^ p.ps_bools_before[i]);
   }
   d.scene_textures = p.scene_texture_recipe;
+  if (REXCVAR_GET(bd_native_materials_verify) && s.pipelineState.pixelShader &&
+      s.pipelineState.pixelShader->shaderCacheEntry &&
+      s.pipelineState.pixelShader->shaderCacheEntry->hash == 0xFB83DD3F5E67CEB7ull)
+    if (const auto fog = FindNativeMaterialFog(tag)) CheckNativeFogLayers(*fog, t_ps_block, d.bools[4]);
   for (u32 i = 0; i < kSceneTextureSlots.size(); ++i) {
     if (!d.scene_textures.Uses(SceneTextureRole(i)))
       continue;

@@ -8,6 +8,7 @@
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_texture_table_bridge.h"
 #include "gpu/scene/native_texture_binding_bridge.h"
@@ -31,6 +32,8 @@ struct NativeObjectTextureState {
   std::optional<NativeMaterialObjectInputs> object;
   std::optional<NativeSelectedLights> lights;
   std::optional<NativeNodeSelectedLights> node_lights;
+  std::optional<NativeFogLayers> fog;
+  uint64_t fog_revision = 0;
   NativeTextureTableHandle table;
   MaterialImageSelection<NativeTextureBinding> fallback;
   MaterialTextureInputs<NativeTextureBinding> inputs;
@@ -99,6 +102,8 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     publication->generation = publication->model ? publication->model->Generation() : 0;
     if (pose && pose->model == publication->model) publication->pose = std::move(pose);
     publication->object = ReadMaterialObjectInputs(*visual, Word);
+    publication->fog = FindNativeFogLayers();
+    publication->fog_revision = NativeFogRevision();
     // Per-node light selections execute later than this scope. Do not snapshot
     // another node's lights as object-wide data; the direct path must own those updates.
     if (const auto per_node = Word(uint64_t(*visual)+3380); per_node && !*per_node)
@@ -249,7 +254,8 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
   if (!mesh || primitive >= mesh->values.size() || primitive >= mesh->policies.size()) return {};
   auto result = BuildNativeObjectPrimitive(scope->pose, node, primitive,
       *scope->object, mesh->values[primitive], mesh->policies[primitive],
-      SelectNativeObjectLights(scope->lights, scope->node_lights, node));
+      SelectNativeObjectLights(scope->lights, scope->node_lights, node),
+      NativeFogIsCurrent(scope->fog_revision) ? scope->fog : std::nullopt);
   object_stats.packets += result.has_value();
   return result;
 }
@@ -270,6 +276,14 @@ std::optional<NativeSelectedLights> FindNativeMaterialLights(const NodeTag &tag)
 void NativeMaterialObjectInputCheck(bool same) {
   ++object_stats.checked;
   if (!same && ++object_stats.wrong <= 4) BD_WARN("[native-object-input-mismatch] object colour/shininess publication");
+}
+std::optional<NativeFogLayers> FindNativeMaterialFog(const NodeTag &tag) {
+  const auto *scope = current;
+  // A nested or late publisher invalidates older active scopes too. Do not
+  // reimport source data in this consumer or borrow the preceding pass's fog.
+  if (!scope || tag.from_list || tag.ctx_va != scope->context || tag.visual_va != scope->visual ||
+      !NativeFogIsCurrent(scope->fog_revision)) return {};
+  return scope->fog;
 }
 
 const NativeMaterialTextureValues *FindNativeMaterialTextures(
@@ -324,6 +338,7 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  NativeFogReport();
   NativeSelectedLightsReport();
   BD_INFO("[native-object-inputs] {} publications {} owned colour reads {} unavailable; {} checks wrong {}; {} owned primitive packets; no direct draw claimed",
           object_stats.publications, object_stats.reads, object_stats.missing,

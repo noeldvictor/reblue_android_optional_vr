@@ -141,7 +141,7 @@ inline std::optional<NativeRigidPassGPU> BuildRigidPass(const NativeRigidPassInp
     packed.colour_opacity = {fog.colour.x, fog.colour.y, fog.colour.z, fog.opacity};
     packed.mode = {uint32_t(fog.disabled), uint32_t(fog.radial), uint32_t(fog.blend), 0};
     if (!RigidFinite(packed.origin_start) || !RigidFinite(packed.direction_end) ||
-        !RigidFinite(packed.colour_opacity) || (!fog.disabled && fog.end <= fog.start) ||
+        !RigidFinite(packed.colour_opacity) || (!fog.disabled && fog.end == fog.start) ||
         fog.blend < LitFogBlend || fog.blend > LitFogSubtract) return {};
   }
   return result;

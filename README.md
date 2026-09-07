@@ -58,22 +58,21 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **the selected-light publisher is now host
-code, and object packets own its correctly timed per-node light values.** Run924
-adds 13,870 matching publications and 1,322 matching normal-lit draw-input checks,
-with no fallback calls; the selected rigid asset owns one directional light and
-two disabled slots. Material behavior tests and 250 source/scenario checks pass.
-Host82 adds defensive invalidation; the inspected field image is from host81.
-Movement and the existing field/shadow gates pass; known cliff marks/blur remain.
-No raw captures or cache files were added.
+Latest desktop checkpoint (2026-09-07): **object packets now own both fog layers
+as well as selected lights.** Run926 adds 2,400 matching host fog publications
+and 1,335 matching normal-lit draw-input checks, with zero fallback or mismatches.
+The actual field's descending height-fog range exposed and corrected an overly
+strict native pass validator. Material behavior tests, 254 source/scenario checks
+and host84 pass. Movement and existing field/shadow gates pass; the inspected
+image retains known cliff marks/blur. No raw captures or cache files were added.
 
 Next: connect the packet for the already-persisted 162-vertex rigid field asset to
-live fog/pass producers and direct scene/shadow submission, then prove
+remaining live pass inputs and direct scene/shadow submission, then prove
 interpreter/template-free cold-load and reload. UV conversion and exact shader
 flags remain unresolved; an owned packet alone is not shader eligibility.
 **No live game object uses the new native rigid shaders yet.** Source-free GPU
 loading, full-game/both-eye qualification and any speedup remain unproven.
-[Evidence and next integration](research/20260907_0442_owned-selected-lights.md).
+[Evidence and next integration](research/20260907_0510_owned-fog.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no
@@ -138,7 +137,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render poses retaining load-owned node/primitive associations and bounds, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production and direct consumers; replace source-tree discovery, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, owned object color/image/UV packets, GPU-tested native rigid shaders with explicit bindings, lighting/state producers, pass binders, water and Toon callbacks | Connect live native rigid consumers and light/fog owners; volume/deferred and remaining override families; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, owned object color/image/UV/light/fog packets, GPU-tested native rigid shaders with explicit bindings, lighting/state producers, pass binders, water and Toon callbacks | Connect live native rigid consumers and remaining pass inputs; volume/deferred and remaining override families; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |

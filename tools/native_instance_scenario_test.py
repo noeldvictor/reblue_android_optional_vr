@@ -1,6 +1,7 @@
 import unittest
 import re
 from native_instance_scenario import verify_model_nodes, verify_object_inputs, verify_selected_lights
+from native_instance_scenario import verify_fog
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -572,6 +573,37 @@ class SelectedLightScenarioTest(unittest.TestCase):
                     text.replace("draw checks wrong 0", "draw checks wrong 1", 1), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_selected_lights(bad)
+
+
+class FogScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-fog] 100 updates 10 inactive 1 compatibility 2 resets; 110 checks wrong 0; 100 object snapshots 7 unavailable; 100 draw checks 100 active layers wrong 0;"
+        rows[4] = "[native-fog] 150 updates 20 inactive 2 compatibility 2 resets; 170 checks wrong 0; 150 object snapshots 9 unavailable; 150 draw checks 150 active layers wrong 0;"
+        return rows
+
+    def test_fresh_active_fog_and_complete_publication_checks(self):
+        self.assertEqual(verify_fog("\n".join(self.rows())), dict(
+            updates_delta=50, inactive_delta=10, compatibility_delta=1, resets_delta=0,
+            checks_delta=60, snapshots_delta=50, unavailable_delta=2, draw_checks_delta=50, active_layers_delta=50))
+
+    def test_stale_reset_incomplete_inactive_and_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150", "100"), text.replace("170 checks", "169 checks"),
+                    text.replace("150 object", "100 object"), text.replace("150 draw", "100 draw"),
+                    text.replace("150 active", "100 active"), text.replace("2 compatibility", "0 compatibility"),
+                    text.replace("bg41_01", "bg42_01"), "\n".join(self.rows()[1:]),
+                    "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2]),
+                    text + "\n[native-material-context] mode Loading"):
+            with self.assertRaises(Pending):
+                verify_fog(bad)
+
+    def test_mismatch_and_limits(self):
+        text = "\n".join(self.rows())
+        for bad in ("[native-fog-mismatch]\n" + text, text.replace("checks wrong 0", "checks wrong 1", 1),
+                    text.replace("layers wrong 0", "layers wrong 1", 1), "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_fog(bad)
 
 
 if __name__ == "__main__":

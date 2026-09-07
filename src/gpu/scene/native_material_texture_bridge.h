@@ -31,6 +31,7 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
     const NativeInstancePose &pose, uint32_t node, uint32_t primitive);
 std::optional<NativeMaterialObjectInputs> FindNativeMaterialObjectInputs(const NodeTag &tag);
 std::optional<NativeSelectedLights> FindNativeMaterialLights(const NodeTag &tag);
+std::optional<NativeFogLayers> FindNativeMaterialFog(const NodeTag &tag);
 // Authored-selection binding is resolved only at the producer boundary.
 bool PublishNativeMaterialLights(uint32_t selection, const NativeSelectedLights &lights);
 void InvalidateNativeMaterialLights();

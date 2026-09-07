@@ -289,9 +289,14 @@ void NoteNativeModelNodeCandidate(const NativeInstancePose &pose, uint32_t index
             packet->textures.owns_uv, packet->textures.uv[0], packet->textures.uv[1], packet->textures.uv[2], packet->textures.uv[3],
             packet->material_values[0][0], packet->material_values[0][1], packet->material_values[0][2], packet->material_values[0][3],
             packet->policy.routing_known, packet->policy.direct, packet->policy.deferred, packet->policy.alpha_test);
-    BD_INFO("[native-rigid-lights] geometry {:016X} owned {} kinds {} {} {}; fog/shader eligibility pending",
+    BD_INFO("[native-rigid-lights] geometry {:016X} owned {} kinds {} {} {}; shader eligibility pending",
         packet->geometry->id, packet->lights.has_value(), packet->lights ? (*packet->lights)[0].kind : -1,
         packet->lights ? (*packet->lights)[1].kind : -1, packet->lights ? (*packet->lights)[2].kind : -1);
+    BD_INFO("[native-rigid-fog] geometry {:016X} owned {} disabled {} {} ranges {:.9g}/{:.9g} {:.9g}/{:.9g}; shader/pass eligibility pending",
+        packet->geometry->id, packet->fog.has_value(), packet->fog ? (*packet->fog)[0].disabled : true,
+        packet->fog ? (*packet->fog)[1].disabled : true,
+        packet->fog ? (*packet->fog)[0].start : 0, packet->fog ? (*packet->fog)[0].end : 0,
+        packet->fog ? (*packet->fog)[1].start : 0, packet->fog ? (*packet->fog)[1].end : 0);
   }
 }
 

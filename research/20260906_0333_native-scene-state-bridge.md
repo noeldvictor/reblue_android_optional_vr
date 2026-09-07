@@ -2260,3 +2260,67 @@ these outputs by purpose at the next checkpoint. Other objects/metadata/source/
 Git deltas unknown. Cleanup-end free58.89 GiB; drive-wide use+28,233,728 B
 (26.93 MiB) from this turn's first preflight, not all attributable to task files.
 Same original exception/floor/raw0 gate; no budget reset or new raw allowance.
+
+### Owned fog continuation, 2026-09-07
+
+Parent8e92e3f, prior checkpoint verified/pushed. First free63,232,987,136 B;
+pre-build measured63,228,907,520 B; no active build/renderer. Four new fog files
+and bounded owner/consumer/test integration;254 Python guards/scenarios pass.
+Reuse material and desktop trees, <=4 MiB retained fixture/log growth estimate
+and <=256 MiB temporary build overlap. Enforce original3 GiB exception and
+floor62,509,998,080 B plus per-build256 MiB stop, aggregate10 MiB build logs.
+No guest/shader rebuild, new tree, asset cook or raw allowance. Material23/CPU21
+then host83 are planned; all retries share these limits. One bounded field/pixel
+run will be separately preflighted. Preserve run924/image and passing logs until
+replacement evidence passes; retire superseded artifacts at this checkpoint.
+
+Material23/PID27528, CPU21/PID30512 (0.10 s behavior/0.11 s CTest) and host83/
+PID28536 pass. Host-only objects/link, codegen up-to-date; no guest/shader build.
+Build-end free63,227,383,808 B. Planned one <=75 s full post-event field run:
+fog producer and normal-lit active-fog comparisons added to the existing gates,
+<=400 KiB text, one <=160 KiB replacement JPEG; aggregate image10,242,626 B plus
+incoming163,840 B fits10 MiB. Raw/perf/dump/cache persistence/cook off; original
+floor plus192 MiB free-drop stop and guaranteed exact profile restoration.
+Keep prior924/image until fresh matching checks and actual pixels qualify.
+
+Run925/PID30644 terminal05:06:02;333,008 B text, no image/raw/cache. Owner profile
+restored exactly. One layer is refused repeatedly, zero owned snapshots/draw
+checks: gate correctly fails, prior924/image remain baseline. Log SHA256
+D45702875FB3FD94FF113AD4B0857BCD60C922B086FEE42C7CA513637B5B60FB.
+Review found an overly strict ascending-range assumption in both fog import and
+existing native rigid pass validation: the shared/original shader permits signed
+nonzero end-minus-start. Preserve descending endpoints; refuse only singular
+active ranges. Add independent descending-falloff CPU coverage and bounded
+refusal/packet endpoint diagnostics to establish whether this explains the live
+layer. Measured free63,225,409,536 B. Material24/CPU22/host84 and one same-bounded
+retry are planned; no budget reset, prior failed evidence retained until resolved.
+Changing the C++ section of the rigid input header may regenerate its three
+small native shaders; no translator or guest-source changes are requested.
+
+Material24/PID31084, CPU22/PID28028 (0.10 s behavior/0.12 s CTest), host84/
+PID25416 and254 Python checks pass. Run926/PID25840 terminal05:10:04, all15
+settings audited, exact profile restored. Fresh contexts2005/2305 add2,400 fog
+publications/comparisons,33,600 owned snapshots,1,335 draw checks/2,670 active
+layers; zero fallback/unavailable/mismatch. The selected asset owns active ranges
+0/1600 and100/-200, confirming the descending-range diagnosis. Existing gates,
+light checks and movement pass. Inspected127,143 B1920x1080 image: coherent
+running Shu/terrain/foliage/shadows, known cliff marks/blur remain; not sequence/
+both-eye qualification. Retained228,077 B run926 text. No raw/cache/perf/dump/cook
+outputs; hashes, exact binary and limitations in20260907_0510_owned-fog.md.
+
+After validation, removed17 exact superseded agent files: material22/23,CPU20/21,
+host81/82/83 stdout/stderr; run924/925 text and old selected-light window image.
+The refused descending-range failure is resolved and its hash/cause preserved.
+Kept material24/CPU22/host84 logs, run926/image, selected asset and all distinct
+protected baseline/GPU/motion/failure/raw evidence.718,226 logical B removed;
+immediate free63,188,860,928 ->63,189,598,208 B: **737,280 B (720 KiB) actually
+reclaimed**, credited once. Build logs are reproducible; retired exact runtime
+text/image files are no longer retained. No build/renderer producer remains.
+
+Known retained growth121,983 B: material tree+50,331, build logs-874,
+flat image-9,083, field text-11,575, host exe+15,360/PDB+77,824. Additional code/
+fixture bytes cover owned fog and signed-endpoint validation; replace retained
+verification by purpose at the next checkpoint. Other objects/metadata/source/Git
+deltas unknown. Ending free58.85 GiB; drive-wide use+43,388,928 B (41.38 MiB)
+from this continuation's first measurement, not all attributable to task files.
+Original exception/floor/raw0 gate unchanged; no new storage allowance.

@@ -1,6 +1,7 @@
 #include "gpu/scene/native_lit_shading.h"
 #include "gpu/scene/native_rigid_inputs.h"
 #include "gpu/scene/native_selected_lights_source.h"
+#include "gpu/scene/native_fog_source.h"
 #include <unordered_map>
 #include <limits>
 #include <array>
@@ -53,6 +54,81 @@ Vec ReferenceFog(Vec colour, LitVector p, LitVector camera, LitFog fog) {
 }
 }
 void TestNativeLitShading() {
+  {
+    std::unordered_map<uint64_t, uint32_t> words;
+    constexpr uint32_t owner = 1000;
+    const auto setup = [&] {
+      words.clear(); words[owner+8] = 0x01000000;
+      for (uint32_t n = 0; n < 12; ++n) words[owner+12+n*4] = std::bit_cast<uint32_t>(float(n+1));
+      words[owner+60] = 1; words[owner+64] = 0;
+      for (uint32_t n = 0; n < 7; ++n) {
+        const auto descriptor = owner+(n < 3 ? 96+n*20 : 156+(n-3)*16);
+        words[descriptor+4] = 2000+n*32; words[descriptor+12] = 2;
+        words[2000+n*32+12] = 4000+n*64;
+        for (uint32_t part = 0; part < 16; part += 4) words[4000+n*64+(n < 3 ? 32 : 8)+part] = 0;
+      }
+    };
+    const auto read = [&](uint64_t address) -> std::optional<uint32_t> {
+      const auto it = words.find(address);
+      return it == words.end() ? std::nullopt : std::optional(it->second);
+    };
+    const auto prepare = [&](const std::optional<LitFog> &previous = {}) {
+      return PrepareNativeFog(owner, previous, read);
+    };
+    setup();
+    const auto owned = prepare();
+    Require(owned && owned->count == 16 && owned->fog && owned->fog->radial && !owned->fog->disabled &&
+            owned->fog->start == 11 && owned->fog->end == 12 && owned->fog->opacity == 10,
+            "authored fog produces owned named inputs and a bounded complete staging plan");
+    for (size_t n = 0; n < owned->count; ++n) words[owned->writes[n].address] = owned->writes[n].word;
+    Require(words[4032] == std::bit_cast<uint32_t>(1.f) && words[4044] == std::bit_cast<uint32_t>(11.f) &&
+            words[4108] == std::bit_cast<uint32_t>(12.f) && words[4172] == std::bit_cast<uint32_t>(10.f) &&
+            words[4200] == 0 && words[4264] == 1 && words[4328] == 1 && words[4392] == 0,
+            "original float and boolean descriptor packing");
+    for (uint32_t mode : {0u,1u,2u,UINT32_MAX}) for (uint32_t blend : {0u,1u,2u,UINT32_MAX}) {
+      setup(); words[owner+60] = mode; words[owner+64] = blend;
+      const auto result = prepare();
+      Require(result && result->fog->disabled == (mode == 0) &&
+              (mode == 0 ? result->fog->end == 0 && result->fog->opacity == 0 :
+                result->fog->radial == (mode == 1) && result->fog->blend == (blend == 0 ? LitFogBlend : blend == 1 ? LitFogAdd : LitFogSubtract)),
+              "disabled/radial/planar and blend/add/subtract authored modes");
+    }
+    words.clear(); words[owner+8] = 0;
+    Require(prepare() && !prepare()->fog && !prepare()->count, "inactive unknown fog is not invented");
+    auto inactive = prepare(owned->fog);
+    Require(inactive && inactive->fog->start == 11 && !inactive->count,
+            "inactive fog preserves the last publication without touching authored fields/descriptors");
+    words.clear();
+    NativeRigidPassInputs pass;
+    pass.fog = {*owned->fog, *ComposeNativeFog({})};
+    Require(BuildRigidPass(pass).has_value(), "fog pass packs after source destruction");
+    setup(); words[owner+52] = std::bit_cast<uint32_t>(12.f); words[owner+56] = std::bit_cast<uint32_t>(11.f);
+    const auto descending = prepare();
+    Require(descending && descending->fog && descending->fog->start == 12 && descending->fog->end == 11,
+            "descending authored fog range is valid, not a singular range");
+    words.clear(); pass.fog[0] = *descending->fog;
+    Require(BuildRigidPass(pass).has_value(), "native GPU pass preserves descending fog endpoints");
+    const auto colour = LitVec(.8f,.5f,.1f), p = LitVec(0,0,11.5f), camera = LitVec(0,0,0);
+    const auto actual = ApplyLitFog(colour,p,camera,*descending->fog);
+    const auto expected = ReferenceFog(V(colour),p,camera,*descending->fog);
+    Require(Near(actual.x,expected[0]) && Near(actual.y,expected[1]) && Near(actual.z,expected[2]),
+            "descending fog falloff matches the independent reference");
+    setup(); words[owner+52] = words[owner+56];
+    Require(!prepare(), "singular active fog range refused");
+    setup(); words[owner+36] = std::bit_cast<uint32_t>(std::numeric_limits<float>::infinity());
+    Require(!prepare(), "nonfinite fog refused");
+    setup(); words[2000+12] = owner+12-32;
+    Require(!prepare(), "fog source/output aliases rejected before writes");
+    setup(); words[2000+12] = owner+68-32; words[owner+68] = 1;
+    Require(!prepare(), "fog destination cannot alias owner identity");
+    setup(); words[2000+32+12] = words[2000+12];
+    Require(!prepare(), "overlapping fog outputs refused");
+    setup(); words.erase(owner+100);
+    Require(!prepare(), "missing fog buffer descriptor refused");
+    setup(); words[owner+108] = UINT32_MAX;
+    Require(!prepare() && !PrepareNativeFog(UINT32_MAX-3, {}, read) && !PrepareNativeFog(0, {}, read),
+            "fog address overflow and null owners refused");
+  }
   {
     std::unordered_map<uint64_t, uint32_t> words;
     const uint32_t owner = 1000, selection = 2000, records = 4000;

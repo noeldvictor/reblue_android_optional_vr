@@ -362,6 +362,33 @@ def verify_selected_lights(text):
                     (b[i] - a[i] for i in (0, 1, 2, 3, 5, 6, 7))))
 
 
+def verify_fog(text):
+    """Require active fog, fresh owned snapshots and complete producer checks."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("fog diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-fog\] (\d+) updates (\d+) inactive (\d+) compatibility (\d+) resets; (\d+) checks wrong (\d+); (\d+) object snapshots (\d+) unavailable; (\d+) draw checks (\d+) active layers wrong (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-fog-mismatch]" in line:
+            raise ValueError("native fog mismatch")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[5] or values[10]:
+                raise ValueError("fog differs at publication or draw consumption")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if (any(b[i] < a[i] for i in range(len(b))) or
+            any(b[i] - a[i] < 32 for i in (0, 6, 8)) or b[9] <= a[9] or
+            b[4] - a[4] != b[0] - a[0] + b[1] - a[1]):
+        raise Pending("need fresh completely checked fog updates, owned snapshots and active-layer draw checks")
+    return dict(zip(("updates_delta", "inactive_delta", "compatibility_delta", "resets_delta",
+                     "checks_delta", "snapshots_delta", "unavailable_delta", "draw_checks_delta", "active_layers_delta"),
+                    (b[i] - a[i] for i in (0, 1, 2, 3, 4, 6, 7, 8, 9))))
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -410,6 +437,7 @@ def main():
     parser.add_argument("--model-nodes", action="store_true")
     parser.add_argument("--object-inputs", action="store_true")
     parser.add_argument("--selected-lights", action="store_true")
+    parser.add_argument("--fog", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -432,6 +460,7 @@ def main():
         nodes = verify_model_nodes(text) if args.model_nodes else None
         objects = verify_object_inputs(text) if args.object_inputs else None
         lights = verify_selected_lights(text) if args.selected_lights else None
+        fog = verify_fog(text) if args.fog else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -463,6 +492,8 @@ def main():
         print("PASS: post-event owned object inputs " + ", ".join(f"{k}={v}" for k, v in objects.items()))
     if lights is not None:
         print("PASS: post-event owned selected lights " + ", ".join(f"{k}={v}" for k, v in lights.items()))
+    if fog is not None:
+        print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     return 0
 
 
