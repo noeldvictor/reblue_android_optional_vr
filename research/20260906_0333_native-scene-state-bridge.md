@@ -3535,3 +3535,39 @@ that drive-wide gain is not attributed to cleanup. Existing attempt logs and
 fixture outputs remain retained pending replacement verification; their final
 growth inventory is still pending. Original allowance/floor and protected
 failure/pixel evidence remain unchanged. Host115/profile are not restamped.
+
+Continuation after808aa45: the preceding turn preserved and pushed the connected
+source/test checkpoint, resolved rigid13's terminal storage-stop status and
+corrected active acceptance claims; it did not advance host/game qualification.
+First measured free81,861,492,736 B. No owned renderer/build/test process remains.
+Actual trees: material8,333,551 B/41files,texture70,641,489 B/129,GPU10,658,612 B/
+11, build logs236,678 B/156. Attributed retained net+33,769 B since the coverage
+correction baseline (other objects/CMake/source/Git not included).
+Reuse the compiled fixture for rigid14,32 MiB free-drop/300 s/10 MiB aggregate
+logs; after passing, host116 may reuse the existing tree with192 MiB peak and
+the original62,509,998,080 B floor. No guest rebuild, raw/perf/cook output.
+New text remains bounded; a later changed-code run956 can reserve800 KiB log
+and110 KiB mono inspection only after checking the existing75 MiB diagnostics
+guard and full strict cutout/reload chain. No automatic game-image acceptance.
+
+Rigid14/PID37760 passes46 GPU modes1.30/1.31 s, validation0/0. Host116/PID29224/
+session48752 exits0 after host compile/link, codegen0 written/no guest objects.
+320 Python checks pass. Run956/PID28364/session24363 exits0 after the full strict
+cold/reload chain: each fresh300-frame epoch emits/retires300 textured shadows,
+with scene cutouts+1,000/998 cold and+949/947 reloaded. Generation93/instance144
+fully retires at title before207/435. New mono JPEG101,553 B was inspected:
+tree-trunk gaps leave pixel acceptance open; no matched camera baseline yet.
+Profile restored exactly; no producers or new raw/perf/cache/dump/cook output.
+Keep945/948/941. Details/hashes/next observation in1927 report.
+
+Removed24 superseded CPU/build/GPU logs54,186 B, old955 cold-only log364,742 B,
+and unreferenced generated alpha-only shader header31,075 B after replacements.
+Total26files/450,003 logical B, no protected data/evidence removed. Exact old
+logs gone; reports/tests preserve results/reproducibility. Immediate free gains
+8,192/57,344/368,640/32,768 B are not isolated from other volume activity.
+Counted retained net+155,039 B, retaining956 log488,126 B and JPEG101,553 B for
+the visual question: GPU tree+414, logs-35,653, exe/PDB-3,584, old955-364,742,
+old shader header-31,075. Material/texture trees unchanged this continuation;
+GPU10,659,026 B/10files, logs201,025 B/136. Other objects/CMake/source/Git not
+allocated. Ending free81,856,401,408 B, drive-wide loss5,091,328 B since first;
+not wholly task-attributed. Original3 GiB exception/floor unchanged.

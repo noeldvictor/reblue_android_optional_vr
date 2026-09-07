@@ -115,7 +115,7 @@ diagnostics stopped at time/storage limits without reproducing that mismatch;
 the prior failure remains open. The local loop now checks full diagnostics
 headroom before booting. [Current UV investigation and evidence](research/20260907_1638_uv-boundary-provenance.md).
 
-**Scene cutouts host-built; corrected shadow coverage awaiting integration:**
+**Scene and corrected shadow cutouts pass live reload; pixels still open:**
 direct alpha-tested rigid materials now have owned, ordered model cutoffs,
 object/pass overrides and blend inputs feeding the native scene shader and queue.
 This preserves blended cutout ordering and depth writes; it does not assume a
@@ -129,12 +129,19 @@ ordinary textured phase1 casters take the deferred route, which native admission
 rejected. Source now connects that depth-only family to the native queue and uses
 the authored **fixed texture-alpha cutoff of 0.6**, without scene/object/vertex
 alpha or generic cutoff state. Zero-texture casters use the solid program; the
-unnecessary alpha-only shader is removed. CPU fixtures pass. Full GPU rerun,
-host integration, fresh textured-shadow/reload gates and game pixels remain
-pending; host115 does not contain this correction. No speedup claim.
+unnecessary alpha-only shader is removed. Host116 contains the correction.
+All46 GPU cases and the full cold/reloaded-field checks pass in run956: each
+fresh300-frame epoch emits and retires **300 textured shadow casters**, alongside
+textured scene cutouts. Old source/GPU generations retire correctly.
+
+The inspected image shows gaps between nearby tree-trunk sections, so visual
+acceptance remains open. The prior baseline has a different camera position;
+the cause needs a matched-state investigation, not a passing-counter inference.
+No speedup claim; real batches are still singletons.
 [Cutout contract, verification and remaining gates](research/20260907_1713_native-scene-cutouts.md).
 [Shadow connection and current verification](research/20260907_1742_native-cutout-shadows.md).
 [Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
+[Corrected contract, live reload and open pixel issue](research/20260907_1927_corrected-shadow-coverage.md).
 
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, phase0 cutout casting,
@@ -149,20 +156,19 @@ are preserved. Authored update producers, live inherited-binding acceptance, bro
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification:320 Python source/scenario checks and both expanded C++ fixtures
-passed during this connection. The corrected GPU fixture compiled; modes0..43
-passed before an overlapping-caster fixture placement failed its coverage check.
-That placement is corrected, but the 46-mode rerun stopped at the disk-space
-guard before completion. Earlier 37/41-mode shadow results tested a superseded
-alpha model, not the recovered contract; scene modes0..22 remain unchanged.
-Host115 contains the earlier importer fix, not this shadow correction; host107/run945 remains
+Verification:320 Python source/scenario checks, both expanded C++ fixtures and
+46 GPU modes pass. The GPU run takes1.30 s with zero validation errors/warnings,
+including exact cutoff boundaries and overlapping casters in reversed order.
+Earlier37/41-mode shadow results tested a superseded alpha model; scene modes0..22
+remain unchanged. Host116/run956 passes both strict field epochs, but its new
+image needs investigation; host107/run945 remains
 the last accepted live/pixel result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, host-built scene cutouts, corrected shadow-cutout source/fixtures, native indirect draws and selected-object reload proof | Shadow integration, live layered/cutout acceptance, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
+| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, live scene/textured-shadow cutouts through reload, native indirect draws and selected-object lifetime proof | Tree-gap pixel investigation, layered/inherited-light coverage, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |

@@ -100,22 +100,24 @@ Textured shadow emissions remain0, so the new strict cutout-family gate stays
 pending. Keep948/941 failures and the normal profile unchanged.
 [Current integration, source correction and evidence](../research/20260907_1838_cutout-integration.md).
 
-Current correction (source/fixtures, not host115): `sub_82174270` selects the
+Current correction (host116/run956): `sub_82174270` selects the
 phase1 shadowmap route for ordinary deferred casters; their texture-enabled
 participation was excluded by native admission. The original shadowmap PS uses
 fixed base alpha0.6, no object/vertex alpha, generic cutoff or negative-U sentinel.
 Ordinary phase1 depth-only deferred casters now join the existing native queue;
 zero-texture casters use the solid shader. Unsupported effects/skin/wind/forced
 passes remain excluded, and scene deferred ordering is unchanged.
-Material CPU36 and output CPU20 pass. GPU36 compiles the corrected fixture;
-rigid12 passed modes0..43 before the overlap fixture's far caster was found level
-with the nearer receiver. Placement is corrected without relaxed tolerances.
-Rigid13 was stopped by the32 MiB free-drop guard before completion: no46-mode
-pass, host116 build, new game run or pixels. Next finish the bounded GPU check,
-then host integration and fresh textured-shadow/lifetime/reload/pixel gates.
-Keep948/941 and host107/run945 unchanged; run955's zero-texture counts do not
-qualify this corrected coverage. Contract and attempt details are in the
-[cumulative ledger](../research/20260906_0333_native-scene-state-bridge.md#2026-09-07-phase1-coverage-correction-same-allowance).
+Material CPU36/output CPU20 pass. Rigid14 passes all46 GPU cases (1.30 s,
+validation0/0), including corrected overlap placement and reversed instance order.
+Host116 links without guest object compilation. Run956 passes the full strict
+cold/reloaded-field chain: each fresh300-frame epoch emits/retires300 textured
+shadow casters; scene cutouts also advance, and generation93 fully retires before
+generation207. Batches remain singletons and sampled layered draws remain0.
+The new mono image has visible tree-trunk gaps, so pixel acceptance is open.
+Identify affected node/material/pose/participation and camera relation; preserve
+a matched-state correctness question rather than retrying for nicer framing.
+Keep948/941 failures and host107/run945's last accepted pixels unchanged.
+[Corrected contract, current live proof and pixel question](../research/20260907_1927_corrected-shadow-coverage.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
@@ -176,14 +178,15 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    culling/participation/lifetime and targeted pixel checks. Do not stop at another
    source-reader helper or claim all2,898 light bindings are native draws.
 2. **Material families and characters.** Direct blended-cutout scene ownership
-   is now connected, host-built and CPU/GPU-tested, pending fresh game
-   emission/pixel/interoperation evidence. Phase1 casting now has corrected
-   source/CPU coverage for the actual fixed-alpha shadowmap and ordinary deferred
-   participants. Complete the46-mode GPU rerun and incremental host integration
-   before a changed-code game probe; host115 still has the superseded shader.
-   Run955 proves fresh textured scene emission, not authored shadow coverage or
-   a complete reload/pixel result. Verify representative textured shadow draws
-   from the newly admitted family and min-depth ordering with retained consumers.
+   is connected, host-built and CPU/GPU-tested, with live emission through reload;
+   visual/interoperation acceptance remains open. Phase1 casting now has corrected
+   source/CPU/GPU and live reload coverage for the actual fixed-alpha shadowmap
+   and ordinary deferred participants. Host116/run956 proves fresh textured
+   scene/shadow emissions and lifetime handling in both epochs. Its tree-trunk
+   image gaps remain an unqualified visual boundary: distinguish authored
+   camera fading/clipping, native scene geometry/material participation and
+   retained consumers before selecting a fix. Keep representative layered,
+   inherited-light and both-eye coverage explicit; do not infer them from reload.
    Preserve the new
    textured emission/fence gate and all ordering/legacy/pixel gates. Integrate these paired
    scene/shadow consumers, then wind and translucent
