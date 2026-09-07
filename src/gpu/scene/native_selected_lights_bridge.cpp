@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_selected_lights_source.h"
+#include "gpu/scene/native_light_selection_source.h"
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/frame_stats.h"
@@ -13,9 +14,11 @@
 #include <rex/cvar.h>
 #include <rex/hook.h>
 #include <rex/ppc/context.h>
+#include <rex/system/xthread.h>
 #include <stdexcept>
 
 REX_EXTERN(__imp__sub_8218B0F0);
+REX_EXTERN(__imp__sub_8218A8C8);
 REXCVAR_DECLARE(bool, bd_native_lighting);
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
 
@@ -35,6 +38,10 @@ struct Stats {
   uint64_t draw_checks = 0, draw_wrong = 0;
 };
 thread_local Stats stats;
+struct SelectionStats {
+  uint64_t updates = 0, rebuilt = 0, candidates = 0, compatibility = 0, checked = 0, wrong = 0;
+};
+thread_local SelectionStats selection_stats;
 std::optional<uint32_t> Word(uint64_t address) {
   if (!address || (address & 3) || address > UINT32_MAX-3) return {};
   const auto *value = bd::mem::try_at<const be_u32>(uint32_t(address));
@@ -45,6 +52,65 @@ void Report() {
           "{} checks wrong {}; {} object snapshots {} unavailable; {} draw checks wrong {}; authored selection and shader staging adapters remain",
       stats.publications, stats.changes, stats.compatibility, stats.checked, stats.wrong,
       stats.snapshots, stats.unavailable, stats.draw_checks, stats.draw_wrong);
+  BD_INFO("[native-light-selection] {} updates {} rebuilds {} candidates {} compatibility; {} checks wrong {}; authored snapshot/storage adapters remain",
+      selection_stats.updates, selection_stats.rebuilt, selection_stats.candidates,
+      selection_stats.compatibility, selection_stats.checked, selection_stats.wrong);
+}
+bool Select(PPCContext &ctx, uint8_t *base) {
+  if (ctx.r3.u32 != kManager || ctx.r1.u32 < 704 || (ctx.r1.u32 & 15) ||
+      !rex::system::XThread::GetCurrentThread()) return false;
+  const auto view = Word(kView);
+  if (!view || *view >= 16) return false;
+  const auto selection = ctx.r4.u32;
+  // Includes the deepest original scoring/ray stack, for comparison and safe
+  // unsupported fallback. Reject aliases before any selection write occurs.
+  const auto safe_word = [&](uint64_t address) -> std::optional<uint32_t> {
+    if (address < ctx.r1.u32 && address+4 > uint64_t(ctx.r1.u32)-704) return {};
+    return Word(address);
+  };
+  const auto control = [&](uint32_t address) -> std::optional<uint32_t> {
+    return LightSelectionOutput(address, selection, *view) ? std::nullopt : safe_word(address);
+  };
+  constexpr uint32_t kLiveOwner = (uint32_t(-32137) << 16)+30280;
+  constexpr uint32_t kPrimaryThread = (uint32_t(-32035) << 16)-26664;
+  constexpr uint32_t kSpecialScene = (uint32_t(-32035) << 16)-26232;
+  constexpr uint32_t kScale = (uint32_t(-32247) << 16)-3992;
+  constexpr uint32_t kAngleScale = (uint32_t(-32250) << 16)+11844;
+  constexpr uint32_t kRayMin = (uint32_t(-32247) << 16)-5560;
+  constexpr uint32_t kRayMax = (uint32_t(-32250) << 16)+8116;
+  const auto owner = control(kLiveOwner), primary = control(kPrimaryThread), scene = control(kSpecialScene);
+  const auto scale = control(kScale), angle = control(kAngleScale), low = control(kRayMin), high = control(kRayMax);
+  if (!control(kView) || !owner || !primary || !scene || !scale || !angle || !low || !high ||
+      control(kOne) != 0x3f800000u || control(kZero) != 0u) return false;
+  bool special_scene = false;
+  if (*scene) {
+    if (*scene > UINT32_MAX-1035) return false;
+    const auto mode = control(*scene+1032);
+    if (!mode) return false;
+    special_scene = *mode == 1;
+  }
+  const NativeLightSelectionSource source{kManager, selection, *owner, *view,
+      rex::system::XThread::GetCurrentThreadId() == *primary, special_scene,
+      {std::bit_cast<float>(*scale),std::bit_cast<float>(*angle),std::bit_cast<float>(*low),std::bit_cast<float>(*high)}};
+  const auto plan = PrepareNativeLightSelection(source, safe_word);
+  if (!plan) return false;
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    __imp__sub_8218A8C8(ctx, base);
+    ++selection_stats.checked;
+    for (const auto &write : plan->writes) {
+      const auto actual = Word(write.address);
+      if (!actual || *actual != write.after) {
+        ++selection_stats.wrong;
+        BD_ERROR("[native-light-selection-mismatch] selection {:08X} view {} address {:08X} actual {:08X} expected {:08X}",
+            selection, *view, write.address, actual.value_or(0), write.after);
+        throw std::runtime_error("Native light selection differs from original");
+      }
+    }
+  }
+  for (const auto &write : plan->writes)
+    if (write.before != write.after) bd::mem::store<uint32_t>(write.address, write.after);
+  ++selection_stats.updates; selection_stats.rebuilt += plan->rebuilt; selection_stats.candidates += plan->candidates;
+  return true;
 }
 bool Publish(PPCContext &ctx, uint8_t *base) {
   const auto selection = ctx.r4.u32;
@@ -143,8 +209,17 @@ void PublishNativeSelectedLights(PPCContext &ctx, uint8_t *base) {
     __imp__sub_8218B0F0(ctx, base);
   }
 }
+void UpdateNativeLightSelection(PPCContext &ctx, uint8_t *base) {
+  if (!REXCVAR_GET(bd_native_lighting) || !Select(ctx, base)) {
+    ++selection_stats.compatibility;
+    __imp__sub_8218A8C8(ctx, base);
+  }
+}
 } // namespace bd::gpu::scene
 
 REX_HOOK_RAW(sub_8218B0F0) {
   bd::gpu::scene::PublishNativeSelectedLights(ctx, base);
+}
+REX_HOOK_RAW(sub_8218A8C8) {
+  bd::gpu::scene::UpdateNativeLightSelection(ctx, base);
 }

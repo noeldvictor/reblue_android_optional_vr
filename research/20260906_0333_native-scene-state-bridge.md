@@ -2482,3 +2482,37 @@ objects/source/Git/metadata deltas unknown. Cleanup-end58.56 GiB free;
 drive-wide free increased113,995,776 B from first measure, mostly unattributed
 concurrent activity, not cleanup credit. Original limits/floor remain unchanged;
 review and replace equivalent evidence at the next checkpoint.
+
+### Host light-selection continuation, 2026-09-07
+
+Parent a2004cb verified/pushed. First source-only free62,872,088,576 B;
+output preflight62,842,773,504 B, no active producers. The intervening drop had
+no large task outputs; no cleanup credit. Same original3 GiB exception,
+62,509,998,080 B floor/raw0 gate; <=192 MiB link overlap planned, build256 MiB
+and runtime192 MiB free-drop stops.75 s/400 KiB log/160 KiB JPEG and10 MiB
+aggregate build logs/images, all attempts counted together.
+
+Material29/PID27160,CPU27/PID26168,host91/PID29640 pass. No guest objects or
+shader regeneration; codegen0 written/up to date.267 all-boundary Python checks
+pass. Run933/PID31508,07:26:37-07:27:38, passes fresh selection/rebuild/candidate
+comparisons and all prior field/movement/light/fog/shadow/sampler gates. All15
+settings audited,116 B profile restored exactly, no producer remains. No new
+raw/perf/cache/dump/cooked outputs.249,997 B log and inspected144,660 B JPEG
+replace equivalent prior evidence. Contracts/hashes:20260907_0727_native-light-selection.md.
+
+Cleanup removed eight exact superseded agent-created files after replacement
+qualification: host90,material28/CPU26 stdout/stderr,932 text and sampler JPEG.
+373,861 logical B removed; immediate free62,939,316,224 ->62,939,705,344 B:
+**389,120 B actually reclaimed**, credited once. Build logs reproducible; exact
+retired runtime text/image no longer retained, hashes/findings remain in research.
+Keep host91/material29/CPU27/933/image, selected asset and all distinct protected
+GPU/baseline/flat/VR/movement/failure/raw evidence. No raw archive allowance added.
+
+Retained material tree7,912,406 B, build logs183,089 B, window images10,251,060 B.
+Known component growth277,258 B: material+151,347,logs+709,image+9,086,
+runtime text+15,764,exe+14,336/PDB+86,016. This retains new ownership/fixture code
+and replacement evidence, not another verification set. Other objects/source/
+Git/metadata deltas unknown. Cleanup-end58.62 GiB free; drive-wide free increased
+67,616,768 B (64.48 MiB) from first measure, mostly unattributed activity, not
+cleanup credit. Original budgets/floor unchanged; next review replaces equivalent
+verification rather than accumulating it.

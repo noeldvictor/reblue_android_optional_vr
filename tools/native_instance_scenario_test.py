@@ -2,7 +2,7 @@ import unittest
 import re
 from native_instance_scenario import verify_model_nodes, verify_object_inputs, verify_selected_lights
 from native_instance_scenario import verify_fog, verify_primitive_shader, verify_lighting_pass, verify_material_features
-from native_instance_scenario import verify_material_samplers
+from native_instance_scenario import verify_material_samplers, verify_light_selection
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -574,6 +574,35 @@ class SelectedLightScenarioTest(unittest.TestCase):
                     text.replace("draw checks wrong 0", "draw checks wrong 1", 1), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_selected_lights(bad)
+
+
+class LightSelectionScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-light-selection] 100 updates 30 rebuilds 90 candidates 2 compatibility; 100 checks wrong 0;"
+        rows[4] = "[native-light-selection] 150 updates 40 rebuilds 120 candidates 2 compatibility; 150 checks wrong 0;"
+        return rows
+
+    def test_fresh_scored_selection(self):
+        self.assertEqual(verify_light_selection("\n".join(self.rows())), dict(
+            updates_delta=50, rebuilds_delta=10, candidates_delta=30, checks_delta=50))
+
+    def test_stale_missing_scoring_reset_incomplete_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150", "100"), text.replace("150 checks", "149 checks"),
+                    text.replace("40 rebuilds", "30 rebuilds"), text.replace("120 candidates", "90 candidates"),
+                    text.replace("120 candidates", "1 candidates"), text.replace("bg41_01", "bg42_01"),
+                    "\n".join(self.rows()[1:]), text + "\n[native-material-context] mode Loading",
+                    "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2])):
+            with self.assertRaises(Pending):
+                verify_light_selection(bad)
+
+    def test_mismatch_limits_and_fallback_growth(self):
+        text = "\n".join(self.rows())
+        for bad in ("[native-light-selection-mismatch]\n" + text, text.replace("wrong 0", "wrong 1", 1),
+                    text.replace("120 candidates 2", "120 candidates 3"), "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_light_selection(bad)
 
 
 class PrimitiveShaderScenarioTest(unittest.TestCase):

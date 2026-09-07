@@ -362,6 +362,33 @@ def verify_selected_lights(text):
                     (b[i] - a[i] for i in (0, 1, 2, 3, 5, 6, 7))))
 
 
+def verify_light_selection(text):
+    """Fresh scored/rebuilt selections, complete original checks and no fallback growth."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("light-selection diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-light-selection\] (\d+) updates (\d+) rebuilds (\d+) candidates (\d+) compatibility; (\d+) checks wrong (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-light-selection-mismatch]" in line:
+            raise ValueError("native light selection mismatch")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[5]:
+                raise ValueError("light selection differs from original")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if (any(b[i] < a[i] for i in range(len(b))) or b[0] - a[0] < 32 or
+            b[1] <= a[1] or b[2] <= a[2] or b[4] - a[4] != b[0] - a[0]):
+        raise Pending("need fresh scored/rebuilt light selections with complete original comparisons")
+    if b[3] != a[3]:
+        raise ValueError("light selection used compatibility fallback in the field window")
+    return dict(zip(("updates_delta", "rebuilds_delta", "candidates_delta", "checks_delta"),
+                    (b[i] - a[i] for i in (0, 1, 2, 4))))
+
+
 def verify_fog(text):
     """Require active fog, fresh owned snapshots and complete producer checks."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -479,6 +506,7 @@ def main():
     parser.add_argument("--model-nodes", action="store_true")
     parser.add_argument("--object-inputs", action="store_true")
     parser.add_argument("--selected-lights", action="store_true")
+    parser.add_argument("--light-selection", action="store_true")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -506,6 +534,7 @@ def main():
         nodes = verify_model_nodes(text) if args.model_nodes else None
         objects = verify_object_inputs(text) if args.object_inputs else None
         lights = verify_selected_lights(text) if args.selected_lights else None
+        selection = verify_light_selection(text) if args.light_selection else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -542,6 +571,8 @@ def main():
         print("PASS: post-event owned object inputs " + ", ".join(f"{k}={v}" for k, v in objects.items()))
     if lights is not None:
         print("PASS: post-event owned selected lights " + ", ".join(f"{k}={v}" for k, v in lights.items()))
+    if selection is not None:
+        print("PASS: post-event host light selection " + ", ".join(f"{k}={v}" for k, v in selection.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     if primitive_shader is not None:

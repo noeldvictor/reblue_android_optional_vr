@@ -6,6 +6,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LitShadingBoundaryTest(unittest.TestCase):
+    def test_light_selection_is_native_transactional_and_verified(self):
+        core = (ROOT / "src/gpu/scene/native_light_selection.h").read_text()
+        for forbidden in ("PPCContext", "bd::mem", "NodeTag", "g_PSC"):
+            self.assertNotIn(forbidden, core)
+        source = (ROOT / "src/gpu/scene/native_light_selection_source.h").read_text()
+        self.assertIn("std::array<NativeLightSelectionWrite, 5>", source)
+        self.assertIn("count > 300", source)
+        self.assertIn("LightSelectionOutput(address", source)
+        self.assertNotIn("bd::mem::store", source)
+        bridge = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
+        self.assertIn("REX_HOOK_RAW(sub_8218A8C8)", bridge)
+        self.assertEqual(bridge.count("__imp__sub_8218A8C8(ctx, base)"), 2)
+        self.assertLess(bridge.index("PrepareNativeLightSelection(source, safe_word)"),
+                        bridge.index("bd::mem::store<uint32_t>(write.address, write.after)"))
+
     def test_owned_lighting_pass_replaces_only_verified_pair_history(self):
         core = (ROOT / "src/gpu/scene/native_lighting.h").read_text()
         for forbidden in ("PPCContext", "bd::mem", "NodeTag", "g_PSC"):

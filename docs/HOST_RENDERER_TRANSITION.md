@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after ordinary 2D sampler consumption and field run932.
+Updated 2026-09-07 after host light selection/scoring and field run933.
 The dependency map below owns the detail; keep this queue outcome-oriented.
 
 1. **Finish one direct native static object, then expand material families.**
@@ -44,8 +44,10 @@ The dependency map below owns the detail; keep this queue outcome-oriented.
    Connect this existing packet to the existing backend in dependency order:
 
    - Finish the live vertex/pass and remaining shadow inputs. Own the correctly
-     timed per-node light producer currently reached through the shader callback;
-     moving a draw earlier must not borrow lights from a previous object or pass.
+     timed per-node light producer currently reached through the shader callback.
+     Selection/scoring now have a host implementation and source-to-pass fixture;
+     move that producer before the callback as part of direct submission, without
+     borrowing lights from a previous object or pass.
      Ordinary 2D filters/addressing are now owned; cube/volume/inherited-axis
      samplers remain separate unsupported families, not frozen defaults.
    - Route a completely supported node before `HostDrawReplay`/original capture
@@ -115,7 +117,7 @@ must connect. It is not a second roadmap or a new renderer framework.
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelRenderData`, `NativeInstancePose::model`, `FindNativeObjectPrimitive`/`BuildNativeObjectPrimitive`, owned geometry/materials/bounds and object color/image/UV/policy publications | Packet assembly and shared material preparation now select owned programs, with no `NodeTag`/source lookup. Packets retain resources after scope retirement; ordinary color composition is a live consumer. Feed these packets into direct submission. Only `PrepareReplayMaterialMesh` keeps the bounded source alias index; remove it when replay's last consumer migrates. Source-to-object publication itself still needs replacement. |
-| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | `NativeLightingInputs` owns ambient/camera/shadow sampling. Host publishers produce the three semantic light records and two fog layers; correctly scoped publications feed retained packets. Authored selection/scoring/snapshot updates, fog initialization/updates and compatibility staging/flush remain. Connect remaining pass inputs and exact material/UV-family interpretation; do not import registers per draw as the finished producer. |
+| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass`, explicit GPU layout and owned selected lights/fog | `NativeLightingInputs` owns ambient/camera/shadow sampling. Host selection/scoring and publishers produce the three semantic light records; scoped lights/fog feed retained packets. The light caller's shader-callback timing, authored snapshot/storage updates, fog initialization/updates and compatibility staging/flush remain. Connect remaining pass inputs and exact material/UV-family interpretation; do not import registers per draw as the finished producer. |
 | Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Actual native shaders now work in the Vulkan fixture, using the production factory/description/binding cores. Connect the game object producer and shared cache selection; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
 
@@ -144,6 +146,18 @@ lighting pass values, composed ordinary material features and 2D samplers as wel
 remaining shadow/vertex-pass inputs, correctly timed per-node lights, complete native pass bindings and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
+
+[Light-selection evidence](../research/20260907_0727_native-light-selection.md):
+material29/CPU27,267 Python checks and host91 pass. Run933 adds14,332 exact
+selection comparisons,36 full reselections and9,936 candidates in consecutive
+post-event windows2017/2317, with no field fallback. Existing light publication,
+draw-consumption, sampler/fog/shadow and movement gates pass. CPU tests cover
+128,000 ranked candidates, incremental/dirty updates, live-vs-snapshot category,
+bounds/aliases and source destruction before native pass consumption. The
+inspected image retains known cliff marks/blur; no raw/cache growth. This removes
+the supported selection/scoring body, not its old callback timing, authored light
+snapshot producer or direct native scene/shadow submission. Cold-load/reload and
+both-eye acceptance remain open; no speedup claim.
 
 [Sampler evidence](../research/20260907_0655_owned-material-samplers.md): material28/CPU26,
 sampler1/CPU1, binding21/CPU19, 263 Python checks and host90 pass. Run932 adds
