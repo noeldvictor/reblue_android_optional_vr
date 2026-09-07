@@ -58,22 +58,24 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **primitive texture-layer and vertex-color
-inputs are load-owned and consumed by ordinary scene draws.** Run927 adds 1,332
-matching comparisons and 42,166 owned-input draws in fresh field windows.
-Material behavior tests, 257 source/scenario checks and host85 pass. Movement,
-light/fog and existing field/shadow gates pass; the inspected image retains
-known cliff marks/blur. No raw captures or cache files were added.
+Latest desktop checkpoint (2026-09-07): **ordinary draws now take ambient light,
+camera position and color grading from a fresh native pass, not captured pixel
+constant history.** Run929 adds 1,242 matching comparisons and 38,435 owned-pass
+draws in post-event field windows. Lighting/material fixtures, 259 source/scenario
+checks and host87 pass. Movement and existing field/light/fog/shadow gates pass;
+the inspected image retains known cliff marks/blur. No raw captures or cache
+files were added; superseded small verification outputs were removed.
 
 Next: connect the packet for the already-persisted 162-vertex rigid field asset to
 remaining live pass inputs and direct scene/shadow submission, then prove
 interpreter/template-free cold-load and reload. Its exact shader pair and UV
 formula are now identified; one layer, enabled vertex color and zero declaration
-bones are confirmed. Remaining lighting/sampler/pass inputs still need native
-ownership; observed flags must not become frozen defaults.
+bones are confirmed. The packet now retains lighting pass values too. Ordered
+material switches, sampler recipes, shadow inputs and complete native pass/draw
+routing remain; observed flags must not become frozen defaults.
 **No live game object uses the new native rigid shaders yet.** Source-free GPU
 loading, full-game/both-eye qualification and any speedup remain unproven.
-[Evidence and next integration](research/20260907_0535_owned-primitive-shader-inputs.md).
+[Evidence and next integration](research/20260907_0602_owned-lighting-pass.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no

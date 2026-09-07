@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after owned primitive shader inputs and field run927. The first
+Updated 2026-09-07 after owned lighting pass consumption and field run929. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -81,6 +81,10 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    scene replay consumes the first two with matching field comparisons. The
    selected object's exact shader pair/UV formula are identified; remaining
    lighting switches, samplers and pass inputs precede direct submission.
+   Its packet now retains a fresh, view-scoped lighting pass. Ordinary scene
+   replay consumes ambient/camera/color grading without captured pixel-pass
+   history; wrong-view, stale-frame and reset publications are unavailable.
+   Vertex pass history, ordered switches, samplers and shadow inputs remain.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -162,10 +166,23 @@ defaults to freeze into its asset or proof of exact shader eligibility. Run924
 also observes its owned light kinds `(directional, disabled, disabled)` after
 the per-node callback. Run923's object-wide-only snapshot missed these updates;
 the consumer gate failed instead of accepting startup publisher checks.
-Reuse this selected asset, not a library-wide recook. Connect its owned packet,
-connect remaining lighting/sampler/pass inputs and
+Reuse this selected asset, not a library-wide recook. Its packet now retains
+lighting pass values as well. Connect ordered material switches, sampler recipes,
+shadow inputs, complete native pass bindings and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
+
+[Lighting pass evidence](../research/20260907_0602_owned-lighting-pass.md):
+lighting1/CPU1, material26/CPU24, 259 Python checks and host87 pass. Run929 adds
+1,242 matching pass-input comparisons and38,435 owned-pass draws in consecutive
+post-event windows, with existing field/movement gates passing. The packet owns
+ambient/camera/color/shadow sampling values; ordinary replay no longer requires
+interpreted PS c0/c1 freshness or c2 history. Vertex pass constants and the
+template/interpreter branch remain. First attempt928 correctly failed the
+coverage gate: the lighting texture-slot ID was not the scene render-view ID.
+The corrected producer uses the shared scene identity; no new raw/cache outputs,
+and the inspected field image retains known cliff marks/blur. No direct native
+shader submission, cold-load/reload, both-eye or speedup claim.
 
 [Primitive shader evidence](../research/20260907_0535_owned-primitive-shader-inputs.md):
 material25/CPU23,257 Python checks and host85 pass. Run927 adds1,332 matching

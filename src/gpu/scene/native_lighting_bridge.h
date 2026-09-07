@@ -9,6 +9,10 @@
 #include "gpu/scene/native_selected_lights.h"
 namespace bd::gpu::scene {
 struct NodeTag;
+std::optional<NativeLightingPass> FindNativeLightingPass(uint32_t render_view);
+std::optional<NativeLightingPass> NativeNodeLightingPass(const NodeTag &tag);
+bool CheckNativeLightingPass(const NativeLightingPass &pass, const uint8_t *pixel_constants);
+void NoteNativeLightingPassDraw();
 // Source selection identity is checked only at object publication, not drawing.
 std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection);
 void NativeSelectedLightsReport();

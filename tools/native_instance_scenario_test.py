@@ -1,7 +1,7 @@
 import unittest
 import re
 from native_instance_scenario import verify_model_nodes, verify_object_inputs, verify_selected_lights
-from native_instance_scenario import verify_fog, verify_primitive_shader
+from native_instance_scenario import verify_fog, verify_primitive_shader, verify_lighting_pass
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -596,6 +596,20 @@ class PrimitiveShaderScenarioTest(unittest.TestCase):
                     "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_primitive_shader(bad)
+
+
+class LightingPassScenarioTest(unittest.TestCase):
+    def test_fresh_pass_comparison_and_consumption(self):
+        text = "\n".join(PrimitiveShaderScenarioTest().rows()).replace("native-primitive-shader", "native-lighting-pass")
+        self.assertEqual(verify_lighting_pass(text), dict(checks_delta=50, draws_delta=60))
+        for bad in (text.replace("150", "100"), text.replace("160", "100"), text.replace("150", "1"),
+                    text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading"):
+            with self.assertRaises(Pending):
+                verify_lighting_pass(bad)
+        for bad in (text.replace("wrong 0", "wrong 1", 1), "[native-lighting-pass-mismatch]\n" + text,
+                    "x" * (MAX_LOG_BYTES + 1)):
+            with self.assertRaises(ValueError):
+                verify_lighting_pass(bad)
 
 
 class FogScenarioTest(unittest.TestCase):

@@ -6,6 +6,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class LitShadingBoundaryTest(unittest.TestCase):
+    def test_owned_lighting_pass_replaces_only_verified_pair_history(self):
+        core = (ROOT / "src/gpu/scene/native_lighting.h").read_text()
+        for forbidden in ("PPCContext", "bd::mem", "NodeTag", "g_PSC"):
+            self.assertNotIn(forbidden, core)
+        self.assertIn("frame == frame_ && view == view_", core)
+        bridge = (ROOT / "src/gpu/scene/native_lighting_bridge.cpp").read_text()
+        self.assertEqual(bridge.count("current.Reset()"), 2)
+        self.assertIn("current.Read(FrameStatFrameCount(), render_view)", bridge)
+        self.assertIn("current.Publish(*pass, FrameStatFrameCount(), bd::mem::load<uint32_t>(kRenderViewIdVa))", bridge)
+        owner = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        self.assertIn("render_view = Word(kRenderViewIdVa)", owner)
+        packet = (ROOT / "src/gpu/scene/native_object_primitive.h").read_text()
+        self.assertIn("std::optional<NativeLightingPass> lighting", packet)
+        draw = (ROOT / "src/gpu/scene/host_draw.cpp").read_text()
+        self.assertIn("draw.native_lighting_pass && !lighting_pass", draw)
+        self.assertIn("d.native_lighting_pass && r.reg < 3", draw)
+        self.assertIn("return !draw.native_lighting_pass", draw)
+        self.assertIn("LightingPixelInputs(*lighting_pass)", draw)
+        start = draw.index("if (d.indexed && vs_hash == 0xB5C88BB6295138CCull")
+        self.assertIn("ps_hash == 0xFB83DD3F5E67CEB7ull", draw[start:start + 120])
+        self.assertLess(start, draw.index("d.native_lighting_pass = CheckNativeLightingPass"))
+
     def test_owned_fog_and_late_publication_invalidation(self):
         core = (ROOT / "src/gpu/scene/native_fog.h").read_text()
         for forbidden in ("g_PSC", "PPCContext", "bd::mem", "NodeTag", "uint32_t", "plume::"):

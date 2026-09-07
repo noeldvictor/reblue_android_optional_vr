@@ -8,6 +8,7 @@
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/guest_scene.h"
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_texture_table_bridge.h"
@@ -26,6 +27,7 @@ REXCVAR_DEFINE_BOOL(bd_native_primitive_policies, true, kCvarGroup,
 namespace bd::gpu::scene {
 struct NativeObjectTextureState {
   uint32_t context = 0, visual = 0, graph = 0, table_offset = 0;
+  uint32_t render_view = 0;
   uint64_t generation = 0;
   NativeModelRenderHandle model;
   std::shared_ptr<const NativeInstancePose> pose;
@@ -93,9 +95,10 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
   try {
     const auto visual = Word(context), graph = Word(uint64_t(context) + 4);
     const auto table = Word(uint64_t(context) + 12), phase = Word(uint64_t(context) + 16);
+    const auto render_view = Word(kRenderViewIdVa);
     const auto selected = Word(kSelection + 4), offset = Word(kSelection), fallback = Word(kSelection + 32);
     if (!visual || !graph || !*graph || !table || !phase || *phase ||
-        !selected || *selected != *table || !offset || !fallback) { ++stats.unsupported; return; }
+        !selected || *selected != *table || !offset || !fallback || !render_view) { ++stats.unsupported; return; }
     auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture);
     if (!inputs) { ++stats.unsupported; return; }
     auto publication = std::make_unique<NativeObjectTextureState>();
@@ -112,6 +115,7 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     publication->table = *table ? FindLoadedNativeTextureTable(*table) : nullptr;
     if (!publication->generation || (*table && !publication->table)) { ++stats.unsupported; return; }
     publication->context = context; publication->visual = *visual; publication->graph = *graph;
+    publication->render_view = *render_view;
     if (REXCVAR_GET(bd_native_primitive_policies))
       publication->policy_inputs = ReadPrimitivePolicyInputs(context, *visual, Word);
     publication->table_offset = *offset; publication->fallback = Capture(*fallback);
@@ -256,7 +260,8 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
   auto result = BuildNativeObjectPrimitive(scope->pose, node, primitive,
       *scope->object, mesh->values[primitive], mesh->policies[primitive],
       SelectNativeObjectLights(scope->lights, scope->node_lights, node),
-      NativeFogIsCurrent(scope->fog_revision) ? scope->fog : std::nullopt);
+      NativeFogIsCurrent(scope->fog_revision) ? scope->fog : std::nullopt,
+      FindNativeLightingPass(scope->render_view));
   object_stats.packets += result.has_value();
   return result;
 }

@@ -12,6 +12,7 @@
 #include "gpu/resources.h"
 #include "gpu/scene/lighting_shader_bridge.h"
 #include "gpu/scene/node_tag.h"
+#include "gpu/scene/guest_scene.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -40,11 +41,12 @@ constexpr uint32_t kTextureList = Address(-32035, -26540);
 constexpr uint32_t kSlot = Address(-32035, -26424);
 constexpr uint32_t kKernelScale = Address(-32250, 3208);
 std::mutex lighting_mutex;
-std::optional<NativeLightingPass> current;
+NativeLightingPublication current;
 struct Stats {
   uint64_t produced = 0, compatibility = 0, refused = 0, resets = 0;
   uint64_t checked = 0, wrong = 0, draw_checks = 0, draw_wrong = 0;
   uint64_t replayed = 0, missing_extent = 0;
+  uint64_t pass_checks = 0, pass_wrong = 0, pass_draws = 0;
   uint32_t frame = 0;
 } stats;
 void Report() {
@@ -57,6 +59,8 @@ void Report() {
           stats.produced, stats.compatibility, stats.refused, stats.resets,
           stats.checked, stats.wrong, stats.draw_checks, stats.draw_wrong,
           stats.replayed, stats.missing_extent);
+  BD_INFO("[native-lighting-pass] {} checks wrong {}; {} owned-input draws; ambient/camera/colour history removed for ordinary pair; remaining pass adapters pending",
+          stats.pass_checks, stats.pass_wrong, stats.pass_draws);
   stats.frame = frame;
 }
 bool Range(uint64_t address, uint64_t bytes) {
@@ -79,7 +83,8 @@ LightingVector ReadVector(uint32_t address) {
 std::optional<NativeLightingPass> Prepare(uint32_t source, bool enabled) {
   if (!Range(source, 68) || !Range(kStaging, 412) || !Range(kFlags, 20) ||
       !Range(kCamera, 16) || !Range(kScene, 20) ||
-      !Range(kTextureList, 4) || !Range(kSlot, 4) || !Range(kKernelScale, 4))
+      !Range(kTextureList, 4) || !Range(kSlot, 4) || !Range(kKernelScale, 4) ||
+      !Range(kRenderViewIdVa, 4))
     return {};
   // The original resets staging before reading the lighting descriptor. A
   // descriptor alias into that block has sequential semantics, not a snapshot.
@@ -89,9 +94,9 @@ std::optional<NativeLightingPass> Prepare(uint32_t source, bool enabled) {
   NativeLightingInputs inputs;
   inputs.receivers_enabled = enabled;
   inputs.receiver_filter = bd::mem::load<uint8_t>(source + 13);
-  inputs.secondary_shadow = bd::mem::load<uint8_t>(source + 16);
-  inputs.shadow_mode = bd::mem::load<uint8_t>(source + 17);
-  inputs.specular = bd::mem::load<uint8_t>(source + 18);
+  inputs.fog_enabled = bd::mem::load<uint8_t>(source + 16);
+  inputs.specular_enabled = bd::mem::load<uint8_t>(source + 17);
+  inputs.normal_mapping = bd::mem::load<uint8_t>(source + 18);
   inputs.light_count = bd::mem::load<int32_t>(source + 24);
   inputs.ambient = ReadVector(source + 28);
   inputs.camera_position = ReadVector(kCamera);
@@ -100,8 +105,8 @@ std::optional<NativeLightingPass> Prepare(uint32_t source, bool enabled) {
   inputs.shadow_threshold = bd::mem::load<float>(source + 64);
   static uint32_t bias_reports = 0;
   if (REXCVAR_GET(bd_shadow_fit_diag) && FrameStatFrameCount() > 1800 && bias_reports++ < 12)
-    BD_INFO("[native-lighting] sun bias {} threshold {} mode {} secondary {}",
-            inputs.shadow_bias, inputs.shadow_threshold, inputs.shadow_mode, inputs.secondary_shadow);
+    BD_INFO("[native-lighting] sun bias {} threshold {} specular {} fog {}",
+            inputs.shadow_bias, inputs.shadow_threshold, inputs.specular_enabled, inputs.fog_enabled);
   inputs.shadow_kernel_scale = bd::mem::load<float>(kKernelScale);
   for (uint32_t i = 0; i < 3; ++i)
     inputs.scene_origin[i] = bd::mem::load<float>(kScene + i * 4);
@@ -138,8 +143,8 @@ bool SameWord(uint32_t actual, uint32_t expected, bool floating) {
        std::isnan(std::bit_cast<float>(expected)));
 }
 std::array<uint32_t, 5> Flags(const NativeLightingPass &pass) {
-  return {~0u, pass.inputs.shadow_mode, pass.inputs.secondary_shadow,
-           pass.inputs.receiver_filter, pass.inputs.specular};
+  return {~0u, pass.inputs.specular_enabled, pass.inputs.fog_enabled,
+           pass.inputs.receiver_filter, pass.inputs.normal_mapping};
 }
 void Compare(const NativeLightingPass &pass, const LightingStagingImage &image) {
   ++stats.checked;
@@ -168,7 +173,7 @@ void UpdateNativeLighting(PPCContext &ctx, uint8_t *base) {
   if (!pass) {
     {
       std::lock_guard lock(lighting_mutex);
-      current.reset();
+      current.Reset();
       ++stats.compatibility;
       stats.refused += REXCVAR_GET(bd_native_lighting);
     }
@@ -194,7 +199,8 @@ void UpdateNativeLighting(PPCContext &ctx, uint8_t *base) {
   const auto flags = Flags(*pass);
   for (uint32_t i = 0; i < flags.size(); ++i)
     bd::mem::store<uint32_t>(kFlags + i * 4, flags[i]);
-  current = *pass;
+  // kSlot selects a lighting texture, not the scene render-view identity.
+  current.Publish(*pass, FrameStatFrameCount(), bd::mem::load<uint32_t>(kRenderViewIdVa));
   ++stats.produced;
   stats.missing_extent += !pass->inputs.sample_extent;
   ctx.r3.u64 = 1;
@@ -202,15 +208,36 @@ void UpdateNativeLighting(PPCContext &ctx, uint8_t *base) {
 }
 void InvalidateNativeLighting() {
   std::lock_guard lock(lighting_mutex);
-  current.reset();
+  current.Reset();
   ++stats.resets;
 }
-std::optional<LightingVector> NativeNodeShadowSampling(const NodeTag &tag) {
+std::optional<NativeLightingPass> FindNativeLightingPass(uint32_t render_view) {
+  if (!REXCVAR_GET(bd_native_lighting)) return {};
+  std::lock_guard lock(lighting_mutex);
+  return current.Read(FrameStatFrameCount(), render_view);
+}
+std::optional<NativeLightingPass> NativeNodeLightingPass(const NodeTag &tag) {
   if (!REXCVAR_GET(bd_native_lighting) || !tag.valid || tag.from_list ||
       !tag.ctx_va || bd::mem::try_load<uint32_t>(tag.ctx_va + 16, ~0u) != 0)
     return {};
+  return FindNativeLightingPass(tag.render_view);
+}
+std::optional<LightingVector> NativeNodeShadowSampling(const NodeTag &tag) {
+  const auto pass = NativeNodeLightingPass(tag);
+  return pass ? std::optional(pass->shadow_sampling) : std::nullopt;
+}
+bool CheckNativeLightingPass(const NativeLightingPass &pass, const uint8_t *pixel_constants) {
+  const auto expected = LightingPixelInputs(pass);
+  const bool same = std::memcmp(expected.data(), pixel_constants, sizeof(expected)) == 0;
   std::lock_guard lock(lighting_mutex);
-  return current ? std::optional(current->shadow_sampling) : std::nullopt;
+  ++stats.pass_checks;
+  if (!same && ++stats.pass_wrong <= 4)
+    BD_WARN("[native-lighting-pass-mismatch] ambient/camera/colour differ at ordinary draw");
+  return same;
+}
+void NoteNativeLightingPassDraw() {
+  std::lock_guard lock(lighting_mutex);
+  ++stats.pass_draws;
 }
 void CheckNativeShadowSampling(const LightingVector &expected,
                                 const uint8_t *pixel_constants) {

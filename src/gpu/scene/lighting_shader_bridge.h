@@ -20,6 +20,9 @@ inline void ApplyPrimitiveShaderBits(const PrimitiveShaderBits &bits, uint32_t &
   pixel = (pixel & ~7u) | bits.pixel;
 }
 using LightingStagingImage = std::array<uint32_t, 103>;
+inline std::array<LightingVector, 3> LightingPixelInputs(const NativeLightingPass &pass) {
+  return {pass.inputs.ambient, pass.inputs.camera_position, pass.inputs.color_scale};
+}
 inline LightingStagingImage PackLightingStaging(const NativeLightingPass &pass) {
   LightingStagingImage result{};
   const auto &inputs = pass.inputs;
@@ -34,10 +37,10 @@ inline LightingStagingImage PackLightingStaging(const NativeLightingPass &pass) 
   vector(112, inputs.color_scale);
   vector(224, pass.shadow_sampling);
   vector(288, pass.scene_sampling);
-  result[340 / 4] = inputs.specular;
+  result[340 / 4] = inputs.normal_mapping;
   result[348 / 4] = inputs.receiver_filter;
-  result[352 / 4] = inputs.secondary_shadow;
-  result[360 / 4] = inputs.shadow_mode;
+  result[352 / 4] = inputs.fog_enabled;
+  result[360 / 4] = inputs.specular_enabled;
   result[364 / 4] = inputs.light_count > 0;
   result[368 / 4] = inputs.light_count > 1;
   for (size_t offset = 372; offset <= 384; offset += 4)
@@ -48,8 +51,8 @@ inline LightingStagingImage PackLightingStaging(const NativeLightingPass &pass) 
   // seven ambient/camera/colour/bias writes, two scene writes, optional extent
   // writes, and each nonzero feature transition. No native consumer needs it.
   result[408 / 4] = 9 + (inputs.sample_extent ? 2 : 0) +
-      (inputs.receiver_filter != 0) + (inputs.secondary_shadow != 0) +
-      (inputs.shadow_mode != 0) + (inputs.specular != 0) +
+      (inputs.receiver_filter != 0) + (inputs.fog_enabled != 0) +
+      (inputs.specular_enabled != 0) + (inputs.normal_mapping != 0) +
       (inputs.light_count > 0) + (inputs.light_count > 1);
   return result;
 }

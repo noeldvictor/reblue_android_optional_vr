@@ -2369,3 +2369,41 @@ inputs; replace equivalent verification by purpose at the next checkpoint.
 Other objects/source/metadata/Git deltas unknown. Ending free58.49 GiB;
 drive-wide use+83,304,448 B (79.45 MiB) since this continuation's first measure,
 not all attributable to task files. Original cumulative limits remain unchanged.
+
+### Owned lighting-pass continuation, 2026-09-07
+
+Parentafe5491 verified/pushed. First free62,773,608,448 B, no active producers;
+prior post-push free62,778,208,256 B differs by4,599,808 B, not attributed to
+unchanged retained outputs. Original3 GiB exception and62,509,998,080 B floor
+remain, including both attempts below. Planned <=192 MiB incremental link overlap,
+existing build256 MiB/runtime192 MiB drop stops;400 KiB text/160 KiB JPEG,
+aggregate logs10 MiB/images10 MiB. No raw/perf/cache/cook/dump allowance.
+
+Lighting1/CPU1 and material26/CPU24 pass; host86 and corrected87 pass, only host
+objects/link. A wrapper parse error started no producer. Run928/PID26808 stopped
+with zero eligible lighting comparisons because its new view identity used a
+lighting texture slot; failed coverage, no image. Corrected to the shared scene
+render-view ID. Post928 free62,769,586,176 B; host87 end62,769,532,928 B.
+Run929/PID25960 terminal05:59:34 passes fresh lighting, prior field and movement
+gates; all15 settings audited and exact profile restored. End free62,768,562,176 B.
+259 Python checks pass. New evidence232,568 B text/129,132 B inspected JPEG;
+no new cache/dump/perf/raw files. Known cliff marks/blur remain; no native direct
+game shader, reload/both-eye or speedup claim. Hashes and exact windows in
+20260907_0602_owned-lighting-pass.md.
+
+Replacement validated before cleanup: removed11 exact obsolete files, host85/86,
+material25/CPU23 stdout/stderr,927/928 text and primitive-shader JPEG.
+608,941 logical B removed; immediate free62,767,718,400→62,768,340,992 B:
+**622,592 B (608 KiB) actually reclaimed**, credited once. Build logs reproducible;
+exact retired runtime text/image no longer retained. Preserve current fixture and
+host87 logs,929/image, selected cooked asset, all distinct protected evidence.
+No owned renderer/build remains.
+
+Retained material tree7,686,080 B; aggregate build logs179,992 B; window
+images10,235,532 B. Known component growth10,112 B: material+2,925,
+logs-2,757, image-6,287, runtime text+1,383, exe+2,560/PDB+12,288.
+Lighting fixture, other objects/source/Git/metadata deltas not fully attributed.
+Growth covers ownership/test code, not an extra retained verification set.
+Cleanup-end free58.46 GiB; drive-wide use+5,267,456 B (5.02 MiB) from first measure.
+Same original budgets/floor/raw0 gate; no new allowance. Review equivalent
+verification for replacement at the next checkpoint, not accumulation.

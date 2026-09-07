@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <utility>
 
 namespace bd::gpu::scene {
 using LightingVector = std::array<float, 4>;
@@ -16,9 +17,10 @@ struct LightingExtent {
 };
 struct NativeLightingInputs {
   bool receivers_enabled = true;
-  // Preserve the source byte values at the temporary engine ABI boundary.
-  uint8_t receiver_filter = 0, secondary_shadow = 0, shadow_mode = 0;
-  uint8_t specular = 0;
+  // Preserve byte values at the temporary ABI boundary. The normal-lit shader
+  // calls PS b3 normal mapping, b6 fog and b8 specular (not shadow modes).
+  uint8_t receiver_filter = 0, fog_enabled = 0, specular_enabled = 0;
+  uint8_t normal_mapping = 0;
   int32_t light_count = 0;
   LightingVector ambient{}, camera_position{}, color_scale{};
   float shadow_bias = 0, shadow_threshold = 0;
@@ -33,10 +35,26 @@ struct NativeLightingPass {
   LightingVector scene_sampling{};
 };
 
+// One current pass, not a history cache. A reset/unsupported producer discards
+// eligibility; another view or frame cannot borrow the preceding publication.
+// Copies already returned to queued native packets retain their value lifetime.
+class NativeLightingPublication {
+  std::optional<NativeLightingPass> pass_;
+  uint32_t frame_ = 0, view_ = 0;
+public:
+  void Publish(NativeLightingPass pass, uint32_t frame, uint32_t view) {
+    pass_ = std::move(pass); frame_ = frame; view_ = view;
+  }
+  void Reset() { pass_.reset(); }
+  std::optional<NativeLightingPass> Read(uint32_t frame, uint32_t view) const {
+    return frame == frame_ && view == view_ ? pass_ : std::nullopt;
+  }
+};
+
 inline NativeLightingPass ComposeNativeLighting(NativeLightingInputs inputs) {
   if (!inputs.receivers_enabled) {
     inputs.receiver_filter = 0;
-    inputs.specular = 0;
+    inputs.normal_mapping = 0;
   }
   NativeLightingPass result{inputs};
   result.shadow_sampling = {inputs.shadow_bias, inputs.shadow_threshold, 0, 0};

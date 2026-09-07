@@ -147,6 +147,7 @@ struct SubDraw {
   bool native_uv_recipe = false;
   bool native_primitive_policy = false;
   std::optional<NativePrimitiveShaderInputs> native_shader_inputs;
+  bool native_lighting_pass = false;
   std::optional<NativeSkinBinding> skin;
   std::optional<bool> material_disables_shadow;
   std::optional<NativeReflectionRecipe> reflection;
@@ -839,6 +840,7 @@ bool MergeDraws(std::vector<SubDraw> &have, const std::vector<SubDraw> &now) {
     x.native_uv_recipe = y.native_uv_recipe;
     x.native_primitive_policy = y.native_primitive_policy;
     x.native_shader_inputs = y.native_shader_inputs;
+    x.native_lighting_pass = y.native_lighting_pass;
     x.material_disables_shadow = y.material_disables_shadow;
     // Keep each binding with its original inherited-state snapshot. Replacing
     // only the native half here can pair an old dynamic surface with a newly
@@ -1619,6 +1621,10 @@ void HostDrawCapture(const VideoState &s, const QueuedDraw &q, u32 device_guest,
   const uint64_t vs_hash = vertex_shader && vertex_shader->shaderCacheEntry ? vertex_shader->shaderCacheEntry->hash : 0;
   const uint64_t ps_hash = pixel_shader && pixel_shader->shaderCacheEntry ? pixel_shader->shaderCacheEntry->hash : 0;
   if (d.indexed && vs_hash == 0xB5C88BB6295138CCull && ps_hash == 0xFB83DD3F5E67CEB7ull) {
+    if (const auto pass = NativeNodeLightingPass(tag)) {
+      d.native_lighting_pass = CheckNativeLightingPass(*pass, t_ps_block);
+      if (!d.native_lighting_pass) p.replayable = false;
+    }
     if (const auto inputs = FindNativePrimitiveShaderInputs(tag, d.index_va, d.stream_va[0], d.start_index, d.count)) {
       if (const auto bits = PackPrimitiveShaderBits(*inputs)) {
         const bool same = (d.bools[0] & 16u) == bits->vertex && (d.bools[4] & 7u) == bits->pixel;
@@ -2308,6 +2314,7 @@ bool HostDrawReplay(const NodeTag &tag) {
   const auto shadow_inputs = REXCVAR_GET(bd_native_shadow_inputs)
       ? ImportNodeShadowInputs(tag) : std::nullopt;
   const auto shadow_sampling = NativeNodeShadowSampling(tag);
+  const auto lighting_pass = NativeNodeLightingPass(tag);
   const auto reflection_inputs = NodeReflectionInputs(tag);
   const bool model_owns_reflection = reflection_inputs && ModelOwnsReflectionBinding(tag);
   bool sampled_verify = false;
@@ -2361,6 +2368,7 @@ bool HostDrawReplay(const NodeTag &tag) {
       values.mask = 0;
       values.textures = nullptr;
       const auto &draw = t->draws[i];
+      if (draw.native_lighting_pass && !lighting_pass) return false;
       values.policy.reset();
       if (draw.native_primitive_policy) {
         values.policy = FindNativePrimitivePolicy(tag, draw.index_va, draw.stream_va[0], draw.start_index, draw.count);
@@ -2448,6 +2456,7 @@ bool HostDrawReplay(const NodeTag &tag) {
         }
       }
       for (const RegDelta &r : d.ps_delta) {
+        if (d.native_lighting_pass && r.reg < 3) continue;
         if (r.reg < kPassPsRegs)
           continue;
         if (r.reg == 9 && shadow_sampling)
@@ -2560,19 +2569,21 @@ bool HostDrawReplay(const NodeTag &tag) {
         }
       }
     }
-    // The pass's camera block has to have been written this frame by an
-    // interpreted draw of this view; until then this draw interprets (and
-    // writes it, if it is the first entry of its visual).
+    // The remaining vertex pass block still needs this frame's interpreted
+    // publication. Only unconverted pixel families need captured ambient/camera;
+    // every owned draw was preflighted against the current native pass above.
     for (u32 r = 0; r < kPassVsRegs; ++r)
       if (!pr || pr->vs_frame[r] != frame) {
         ++st.why_pass;
         return false;
       }
-    for (u32 r = 0; r < kPassPsRegs; ++r)
-      if (!pr || pr->ps_frame[r] != frame) {
-        ++st.why_pass;
-        return false;
-      }
+    if (std::any_of(t->draws.begin(), t->draws.end(),
+                   [](const SubDraw &draw) { return !draw.native_lighting_pass; }))
+      for (u32 r = 0; r < kPassPsRegs; ++r)
+        if (!pr || pr->ps_frame[r] != frame) {
+          ++st.why_pass;
+          return false;
+        }
     // Sampled verification: every Nth replay candidate is composed and then
     // interpreted and diffed, in an otherwise normal run, so a run that goes
     // wrong reports what its replays would have composed differently.
@@ -2848,6 +2859,7 @@ bool HostDrawReplay(const NodeTag &tag) {
       std::memcpy(t_vs_block + r.reg * 16, r.stable ? r.value : v->vs[r.reg], 16);
     }
     for (const RegDelta &r : d.ps_delta) {
+      if (d.native_lighting_pass && r.reg < 3) continue;
       if (r.reg < kPassPsRegs)
         continue;
       if (r.reg == 9 && shadow_sampling)
@@ -2895,13 +2907,19 @@ bool HostDrawReplay(const NodeTag &tag) {
           std::memcpy(t_ps_block + reg * 16, v, 16);
       }
     }
-    // The pass camera, from this frame's interpreted draws of this view.
+    // Vertex pass history remains; ordinary pixel lighting is producer-owned.
     {
       const PassRegs &pass = st.pass_regs[tag.render_view];
       for (u32 r = 0; r < kPassVsRegs; ++r)
         std::memcpy(t_vs_block + r * 16, pass.vs[r], 16);
-      for (u32 r = 0; r < kPassPsRegs; ++r)
-        std::memcpy(t_ps_block + r * 16, pass.ps[r], 16);
+      if (d.native_lighting_pass) {
+        const auto values = LightingPixelInputs(*lighting_pass);
+        std::memcpy(t_ps_block, values.data(), sizeof(values));
+        NoteNativeLightingPassDraw();
+      } else {
+        for (u32 r = 0; r < kPassPsRegs; ++r)
+          std::memcpy(t_ps_block + r * 16, pass.ps[r], 16);
+      }
     }
     std::memcpy(t_vs_block + 20 * 16, world_rows, sizeof(world_rows));
     if (d.skin) {

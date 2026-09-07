@@ -22,6 +22,23 @@ int main() {
   inputs.scene_origin = {2, 3, 4};
   inputs.scene_range = 8;
   const auto first = ComposeNativeLighting(inputs);
+  NativeLightingPublication publication;
+  assert(!publication.Read(7, 3));
+  publication.Publish(first, 7, 3);
+  auto retained = publication.Read(7, 3);
+  assert(retained && !publication.Read(8, 3) && !publication.Read(7, 4));
+  auto replacement = first;
+  replacement.inputs.ambient[0] = 9;
+  publication.Publish(replacement, 7, 4);
+  assert(!publication.Read(7, 3) && publication.Read(7, 4)->inputs.ambient[0] == 9);
+  publication.Publish(replacement, 7, 3); // same-frame late update, not an old cache entry
+  assert(publication.Read(7, 3)->inputs.ambient[0] == 9);
+  replacement = {};
+  publication.Reset(); // unsupported/reset/nested producer must invalidate eligibility
+  assert(!publication.Read(7, 3));
+  assert(retained->inputs.ambient == inputs.ambient);
+  assert((LightingPixelInputs(*retained) == std::array<LightingVector, 3>{
+      inputs.ambient, inputs.camera_position, inputs.color_scale}));
   assert((first.shadow_sampling == LightingVector{0, 0.5f, 0, 0}));
   assert((first.scene_sampling == LightingVector{2, 3, 4, 0.125f}));
   inputs.sample_extent = LightingExtent{1920, 1080};
@@ -41,9 +58,9 @@ int main() {
   for (int count : {-1, 0, 1, 2, 3}) {
     inputs.light_count = count;
     inputs.receiver_filter = 2;
-    inputs.secondary_shadow = 3;
-    inputs.shadow_mode = 4;
-    inputs.specular = 5;
+    inputs.fog_enabled = 3;
+    inputs.specular_enabled = 4;
+    inputs.normal_mapping = 5;
     for (bool enabled : {false, true}) {
       inputs.receivers_enabled = enabled;
       const auto pass = ComposeNativeLighting(inputs);
