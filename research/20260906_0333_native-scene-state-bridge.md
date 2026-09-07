@@ -1330,3 +1330,38 @@ Keep final build 53 /material 10 /CPU 09 and run 900/image, not every attempt.
 Prior protected raw/normal flat-XR/unresolved broad failures and game data remain.
 Post-cleanup drive-wide use 73,199,616 B from draft start, not all attributable to
 the task. Source/docs/Git writes follow; no new raw allowance or budget reset.
+
+### Load-owned texture tables, same checkpoint
+
+Continued the unpublished table draft on `e85b290` after a read-only planning
+review. Completed synchronous/asynchronous table publication, separate teardown,
+immutable image leases and atomic mirror-to-table publication now feed normal
+host lookup. Source-selected return ABI, resource/dynamic overrides, direct
+object submission and the full desktop gate remain. Host 59, binding CPU 05,
+material CPU 10, 146 source guards and 18 scenario cases pass. Comparison run 905
+adds 22,326 matching lookups /22,006 image checks; normal-table run 906 adds 21,745
+lookups with zero original comparison/fallback/refusals and an inspected image.
+5,736 live tables /2,172,192 B. Every owned session is terminal, every temporary
+profile restored. Full evidence/failures: `20260906_1955_native-texture-tables.md`.
+
+Draft preflight **64,571,400,192 B**; this continuation pre-build **64,515,645,440 B**.
+Same <=256 MiB build overlap /<=4 MiB fixture-log plan and original cumulative
+ceilings. Zero new raw/perf/cache/dump files, no new tree or asset cooking; mesh
+cache unchanged at 3,510 /36,510,144 B. New binding exe/object **2,186,660 B**,
+953,901 B growth; concurrent snapshot/retirement/8,192-list coverage retained in
+one fixture. The table RAM byte budget stays 16 MiB; the record limit corrects
+2,048 to16,384 after source/runtime proof of thousands of distinct inline lists.
+
+After validating replacements, removed **39 exact superseded logs/JPEGs**,
+**1,478,619 logical B**. Immediate free-space measurements reclaim **1,527,808 B**,
+counted once. Keep comparison/normal logs 905/906, normal table JPEG and final
+host59/binding05/material11-CPU10 logs. Prior normal flat/XR, broad failures,
+raw archive and game data remain protected. Comparable retained fixture/log/image
+set grows **1,163,567 B** for new lifecycle/concurrency and comparison/normal
+coverage; replace by verification purpose, not per attempt.
+
+Post-cleanup free **64,424,288,256 B**; drive-wide use **147,111,936 B** from this
+draft's preflight, not all attributable to the smaller retained diagnostic growth.
+Scoped producer/output checks leave the intervening drive-wide difference
+unattributed; do not call it cleanup. Final source/docs/Git writes remain charged.
+No new raw allowance, budget reset, Quest run or full native-frame claim.

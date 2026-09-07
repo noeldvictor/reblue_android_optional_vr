@@ -58,19 +58,26 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest ownership checkpoint (2026-09-06): native instance IDs and immutable render
-poses now feed host traversal and replayed world transforms. Publication follows
-the actual render handoff, including late pose edits; normal draw lookup does not
-import matrices. The scoped field check has 239 live instances /360 KiB,
-118,851 fresh matching pose reads and no pose lookup misses or refusals.
-Host build, Release behavioral fixture, 137 source guards and 11 scenario cases
-pass. One 1920x1080 field image was inspected; **movement, sequences, both eyes
-and full-game qualification remain open**. Original pose calculation/copy,
+Latest ownership checkpoint (2026-09-06): texture tables now publish native image
+leases after completed synchronous/asynchronous loading, with atomic image/table
+publication and generation-safe replacement/retirement. The field has 5,736
+tables /2.07 MiB. Comparison adds 22,326 matching lookups and 22,006 matching image
+checks; normal texture lookup adds 21,745 reads with zero original comparison or
+fallback calls. Host/CPU checks, 146 source guards and 18 scenario cases pass.
+A normal 1920x1080 field image was inspected. Source selection/return ABI, dynamic
+overrides and remaining resource consumers are still adapters; the direct native
+reflection consumer was not exercised. **Movement, sequences, both eyes and
+full-game qualification remain open.**
+[Texture-table implementation and evidence](research/20260906_1955_native-texture-tables.md).
+
+Native instance IDs and immutable render poses feed host traversal/replay after
+the final handoff, including late edits. The new normal-table check adds 118,941
+matching pose reads with no misses/refusals. Original pose calculation/copy,
 secondary palettes, source lookup and retained draw templates remain.
 [Instance implementation and evidence](research/20260906_1850_native-instance-render-poses.md).
 
 The preceding load-owned geometry path supplies 2,973 primitive geometries and
-their material associations. The new field check adds 51,624 native-handle draws
+their material associations. The new field check adds 51,863 native-handle draws
 and 2,700 matching geometry checks. Independent layouts, complete native object/
 texture/pass records and direct scene/shadow submission are next.
 [Geometry implementation](research/20260906_1743_load-owned-model-geometry.md).
@@ -90,7 +97,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 
 | Area | Implemented foundation | Ownership still required |
 | --- | --- | --- |
-| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; load-owned primitive geometry/material associations, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and texture associations, independent layouts, dynamic geometry and streaming/backpressure |
+| Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; load-owned primitive geometry/material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native asset/scene identities and object texture/pass associations, independent layouts, dynamic geometry and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
 | Materials | Native material assets, load-owned primitive recipes, lighting/state producers, parameter storage, pass binders, water and Toon callbacks | Native geometry/texture/lighting associations, all recipes, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |

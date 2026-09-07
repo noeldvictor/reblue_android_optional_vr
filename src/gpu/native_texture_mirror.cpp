@@ -31,6 +31,9 @@
 #include "gpu/host_resource_heap.h"
 #include "gpu/host_mips.h"
 #include "gpu/texture_upload.h"
+#include "gpu/scene/native_texture_table_bridge.h"
+#include "gpu/scene/native_texture_table_source.h"
+#include "gpu/scene/native_texture_binding_bridge.h"
 #include <rex/cvar.h>
 
 REXCVAR_DECLARE(bool, bd_host_mips);
@@ -485,6 +488,7 @@ GuestTexture *GetOrCreateNativeMirror(u32 guest_va, u32 name_va) {
         std::move(it->second));
     g_native_mirrors.erase(it);
     g_native_invalidation.fetch_add(1, std::memory_order_relaxed);
+    scene::NativeTextureTableImageChanged(guest_va, {});
   }
 
   xe::xe_gpu_texture_fetch_t fetch;
@@ -571,6 +575,8 @@ GuestTexture *GetOrCreateNativeMirror(u32 guest_va, u32 name_va) {
       g_native_names[guest_va] = {NormalizeTextureName(name),
                                   ++g_native_name_seq};
   }
+  auto table_binding = scene::CaptureNativeTexture(raw);
+  scene::NativeTextureTableImageChanged(guest_va, {table_binding, bool(table_binding.primary)});
   return raw;
 }
 
@@ -655,6 +661,18 @@ GuestTexture *ResolveGuestTexture(u32 guest_va) {
   return nullptr;
 }
 
+void WithNativeTextureTableSnapshot(std::span<const u32> sources,
+    const std::function<void(std::vector<scene::NativeTextureTableSlot>)> &publish) {
+  scene::PublishTextureTableSnapshot(g_mirror_mutex, sources, [](u32 source) {
+    auto *texture = source ? HostResourceHeap::FromGuest<GuestTexture>(source) : nullptr;
+    if (!texture) {
+      const auto it = g_native_mirrors.find(source);
+      if (it != g_native_mirrors.end()) texture = it->second.get();
+    }
+    return scene::CaptureNativeTexture(texture);
+  }, publish);
+}
+
 void EvictNativeTexture(u32 guest_va) {
   if (!guest_va)
     return;
@@ -668,6 +686,7 @@ void EvictNativeTexture(u32 guest_va) {
       std::move(it->second));
   g_native_mirrors.erase(it);
   g_native_names.erase(guest_va);
+  scene::NativeTextureTableImageChanged(guest_va, {});
   ++g_native_name_seq; // the by-name cache keys on it
   g_native_invalidation.fetch_add(1, std::memory_order_relaxed);
 }

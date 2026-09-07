@@ -75,6 +75,8 @@
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_instance_bridge.h"
+#include "gpu/scene/native_texture_table_bridge.h"
+#include "gpu/scene/native_texture_table_source.h"
 #include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/native_texture_binding.h"
@@ -419,6 +421,16 @@ std::optional<ReflectionBinding> ResolveReflectionAddress(std::optional<u32> add
 }
 std::optional<ReflectionBinding> ResolveReflectionBinding(
     const ReflectionTextureImport &inputs, const NativeReflectionRecipe &recipe) {
+  if (recipe.source == ReflectionTextureSource::Table && inputs.has_table) {
+    const auto binding = FindLoadedNativeTableTexture(inputs.table_source,
+        TextureTableSourceIndex(inputs.table_offset, recipe.table_index));
+    if (binding) {
+      // A known null still means inherited state at the compatibility endpoint.
+      // Do not turn it into a native unbind while that consumer remains.
+      if (!binding->primary) { ++t_reflection_stats.null; return {}; }
+      return ReflectionBinding{*binding, nullptr};
+    }
+  }
   return ResolveReflectionAddress(
       SelectReflectionTextureImport(inputs, recipe, ReadReflectionWord));
 }

@@ -3,11 +3,15 @@
  * @license BSD 3-Clause License
  */
 #include "gpu/scene/native_texture_binding.h"
+#include "gpu/scene/native_texture_table.h"
+#include "gpu/scene/native_texture_table_source.h"
 #include "gpu/scene/fenced_asset_cache.h"
 #include "gpu/scene/scene_recipe_residency.h"
 #include "gpu/sampler_key.h"
 #include <cstdlib>
 #include <iostream>
+#include <latch>
+#include <thread>
 
 using namespace bd::gpu;
 using namespace bd::gpu::scene;
@@ -29,7 +33,135 @@ static NativeTextureGpuHandle Image(uint64_t id, uint32_t slot, D dim) {
   return gpu;
 }
 
+static void TestTextureTables() {
+  // Literal source addresses/layout are independent of the production decoder.
+  std::unordered_map<uint64_t, uint32_t> source{{0x1000, 3}, {0x1004, 0x2000},
+      {0x2018, 0x3000}, {0x2034, 0}, {0x2050, 0x3000}};
+  auto read = [&](uint64_t address) -> std::optional<uint32_t> {
+    const auto it = source.find(address);
+    return it == source.end() ? std::nullopt : std::optional(it->second);
+  };
+  auto keys = ReadTextureTableSources(0x1000, read);
+  Check(keys && *keys == std::vector<uint32_t>({0x3000, 0, 0x3000}), "complete loaded table layout");
+  source[0x40B8] = 0x1000;
+  Check(!CompletedTextureTable(0x4000, 0, read) && !CompletedTextureTable(0x4000, 2, read),
+        "allocated async table cannot publish before all requests finish");
+  Check(CompletedTextureTable(0x4000, 1, read) == 0x1000,
+        "completed async poll publishes the asset's table, not the boolean return");
+  source[0x40B8] = 0;
+  Check(!CompletedTextureTable(0x4000, 1, read) &&
+        !CompletedTextureTable(UINT32_MAX - 3, 1, read), "absent/overflow async table refused");
+  Check(!ReadTextureTableSources(0, read) && !ReadTextureTableSources(0x1001, read) &&
+        !ReadTextureTableSources(UINT32_MAX - 3, read), "table header bounds/alignment");
+  source[0x1000] = 4097;
+  Check(!ReadTextureTableSources(0x1000, read), "table count checked before allocation");
+  source[0x1000] = 3; source[0x1004] = UINT32_MAX - 15;
+  Check(!ReadTextureTableSources(0x1000, read), "record address cannot wrap");
+  source[0x1004] = 0x2000; source.erase(0x2050);
+  Check(!ReadTextureTableSources(0x1000, read), "partial table never publishes a prefix");
+  source[0x1000] = 0; source[0x1004] = 0;
+  Check(ReadTextureTableSources(0x1000, read)->empty(), "empty table is valid without entries");
+  Check(TextureTableSourceIndex(UINT32_MAX, 2) == 1 && TextureTableSourceIndex(7, 3) == 10,
+        "source offset addition preserves unsigned 32-bit behavior");
+
+  NativeTextureTableLibrary library;
+  NativeTextureTableSlot initial{{Image(70, 700, D::TEXTURE_2D_ARRAY), {}, {}}, true};
+  std::vector<NativeTextureTableSlot> slots{initial, {{}, true}, initial};
+  auto table = library.Create(std::move(slots), keys->capacity() * sizeof(uint32_t));
+  const auto first_id = table->id;
+  const auto first_bytes = library.Bytes();
+  Check(first_id && first_bytes && library.Live() == 1, "bounded native identity and accounting");
+  auto unchanged = RebindTextureTable(library, table, *keys, keys->capacity(), 0x9999, initial);
+  Check(unchanged == table && library.Bytes() == first_bytes, "unrelated image creates no table");
+  unchanged.reset();
+  unchanged = RebindTextureTable(library, table, *keys, keys->capacity(), 0x3000, initial);
+  Check(unchanged == table && library.Bytes() == first_bytes, "identical image reuses the existing table");
+  unchanged.reset();
+  const NativeTextureTableSlot changed{{Image(80, 800, D::TEXTURE_CUBE), {}, {}}, true};
+  std::mutex snapshot_mutex;
+  std::latch captured(1), update_attempted(1);
+  auto current_image = initial.image;
+  bool update_blocked = false;
+  std::thread updater([&] {
+    captured.wait();
+    update_blocked = !snapshot_mutex.try_lock();
+    if (!update_blocked) snapshot_mutex.unlock();
+    update_attempted.count_down();
+    std::lock_guard lock(snapshot_mutex);
+    current_image = changed.image;
+  });
+  NativeTextureTableHandle snapshot;
+  const uint32_t snapshot_sources[] = {0x3000, 0};
+  PublishTextureTableSnapshot(snapshot_mutex, snapshot_sources, [&](uint32_t source) {
+    if (source) { captured.count_down(); update_attempted.wait(); }
+    return source ? current_image : NativeTextureBinding{};
+  }, [&](std::vector<NativeTextureTableSlot> snapshot_slots) {
+    Check(update_blocked && snapshot_slots[0].available &&
+          snapshot_slots[0].image == initial.image && snapshot_slots[1].available &&
+          !snapshot_slots[1].image.primary, "mirror lock spans snapshot collection and publication");
+    snapshot = library.Create(std::move(snapshot_slots));
+  });
+  updater.join();
+  Check(current_image == changed.image && snapshot->slots[0].image == initial.image,
+        "later replacement cannot mutate a published immutable generation");
+  snapshot.reset();
+  try {
+    PublishTextureTableSnapshot(snapshot_mutex, {}, [](uint32_t) { return NativeTextureBinding{}; },
+        [](auto) { throw 1; });
+    Check(false, "publication exception must escape");
+  } catch (int) {}
+  Check(snapshot_mutex.try_lock(), "publication failure must release the mirror lock");
+  snapshot_mutex.unlock();
+  auto replacement = RebindTextureTable(library, table, *keys, keys->capacity(), 0x3000, changed);
+  Check(replacement && replacement->id > first_id && replacement->slots[0].image == changed.image &&
+        replacement->slots[2].image == changed.image && replacement->slots[1].available &&
+        !replacement->slots[1].image.primary, "replace every alias, preserve known null selection");
+  Check(table->slots[0].image == initial.image && library.Live() == 2,
+        "old consumers retain the exact immutable image generation");
+  auto invalidated = RebindTextureTable(library, replacement, *keys, keys->capacity(),
+                                        0x3000, NativeTextureTableSlot{});
+  Check(invalidated && !invalidated->slots[0].available && !invalidated->slots[2].available &&
+        invalidated->slots[1].available, "eviction marks unavailable without inventing a null binding");
+  auto repaired = RebindTextureTable(library, invalidated, *keys, keys->capacity(), 0x3000, changed);
+  Check(repaired && repaired->slots[0].image == changed.image && repaired->slots[0].available,
+        "subsequent image publication repairs its live source associations");
+  Check(!RebindTextureTable(library, table, std::span<const uint32_t>(*keys).first(1),
+                           keys->capacity(), 0x3000, changed), "association mismatch refused");
+  source.clear(); keys->clear(); initial = {};
+  Check(table->slots[0].image.primary->asset->id == 70, "native assets survive source destruction");
+  table.reset(); replacement.reset(); invalidated.reset(); repaired.reset();
+  Check(library.Live() == 0 && library.Bytes() == 0, "all table generations release their accounting");
+  auto empty = library.Create({});
+  Check(empty && empty->id > first_id, "retirement cannot reuse a native table ID");
+  Check(!library.Create(std::vector<NativeTextureTableSlot>(4097)), "native table slot cap");
+  Check(!library.Create({}, SIZE_MAX), "adapter byte accounting cannot overflow");
+  NativeTextureTableLibrary tiny(1);
+  Check(!tiny.Create({}), "even an empty owner needs budget");
+  NativeTextureTableLibrary one(NativeTextureTableLibrary::kMaxBytes, 1);
+  auto pinned = one.Create({changed});
+  Check(pinned && !one.Create({changed}), "pinned tables count against the live-owner cap");
+  pinned.reset();
+  Check(bool(one.Create({changed})), "releasing the lease restores capacity");
+  NativeTextureTableLibrary inline_lists;
+  std::vector<NativeTextureTableHandle> references;
+  for (size_t i = 0; i < 8192; ++i) {
+    auto reference = inline_lists.Create({changed}, sizeof(uint32_t));
+    Check(bool(reference), "many inline single-slot lists must not be capped by GPU image count");
+    references.push_back(std::move(reference));
+  }
+  Check(inline_lists.Live() == references.size() &&
+        inline_lists.Bytes() <= NativeTextureTableLibrary::kMaxBytes,
+        "inline list aliases retain one image within the unchanged aggregate byte budget");
+  references.clear();
+  Check(inline_lists.Live() == 0 && inline_lists.Bytes() == 0,
+        "retiring all inline lists releases the complete table accounting");
+  NativeTextureTableHandle survivor;
+  { NativeTextureTableLibrary temporary; survivor = temporary.Create({changed}); }
+  Check(survivor->slots[0].image.primary->asset->id == 80, "native lease may outlive the library");
+}
+
 int main() {
+  TestTextureTables();
   const NativeTextureIndices nulls{1, 2, 3};
   auto two = Image(10, 100, D::TEXTURE_2D_ARRAY);
   auto cube = Image(20, 200, D::TEXTURE_CUBE);

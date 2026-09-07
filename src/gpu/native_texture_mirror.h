@@ -15,12 +15,15 @@
 
 #include <string_view>
 #include <vector>
+#include <functional>
+#include <span>
 
 #include <rex/types.h>
 
 #include "gpu/resources.h"
 
 namespace bd::gpu {
+namespace scene { struct NativeTextureTableSlot; }
 
 // nullptr when format/dimension unsupported or the build fails. name_va is the
 // guest VA of the asset basename (bdAllocRenderBuffer arg0), logged on
@@ -32,6 +35,12 @@ GuestTexture *GetOrCreateNativeMirror(u32 guest_va, u32 name_va = 0);
 // Resolves a guest VA to its host GuestTexture (HostResourceHeap object or
 // native mirror), or nullptr if neither.
 GuestTexture *ResolveGuestTexture(u32 guest_va);
+
+// Load-time only. Collect immutable image leases and publish their table while
+// mirror replacement/eviction is excluded. The callback may acquire its table
+// mutex, but must not reenter mirror/resource lookup or acquire the Video lock.
+void WithNativeTextureTableSnapshot(std::span<const u32> sources,
+    const std::function<void(std::vector<scene::NativeTextureTableSlot>)> &publish);
 
 // Queues the host GuestTexture for deferred teardown.
 void EvictNativeTexture(u32 guest_va);

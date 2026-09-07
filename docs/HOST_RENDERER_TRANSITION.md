@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-06 after native instance render-pose publication. These milestones organize the
+Updated 2026-09-06 after load-owned native texture tables. These milestones organize the
 unchanged completion requirements above; none is a substitute for the full gate.
 
 1. **Scene/material dependency map and targeted verification.** Start from
@@ -51,6 +51,11 @@ unchanged completion requirements above; none is a substitute for the full gate.
    Native IDs and final render-pose snapshots now feed traversal/replay, including
    the actual dirty-state-gated handoff and late pose writers. Pose calculation,
    original copy, secondary palettes and the source index remain temporary.
+   Texture tables now publish at completed sync/async load boundaries and retire
+   at both teardown paths. Atomic image/table publication handles concurrent
+   replacement. Native image leases and normal host lookup are active, but the
+   source-selected return ABI and downstream resource/dynamic overrides remain.
+   Connect these owners to complete native object/material/pass records next.
    Scenario checks must establish feature execution; empty queues are untested.
    The loader visibility/slot readers and idle-state contract are corrected:
    two post-event state-0 samples now pass with positive material/lookup deltas.
@@ -88,6 +93,24 @@ work over introducing a new build system. No overall development-speed
 multiplier is established.
 
 ## Latest qualified checkpoint
+
+Texture tables (2026-09-06): immutable image leases and native runtime IDs now
+publish after actual load completion; replacement/eviction preserves immutable
+old generations. Limits are 16,384 tables /16 MiB, including pinned owners/index
+accounting. The field's thousands of inline lists are distinct from GPU image
+count; source tracing corrected the initial 2,048-table cap. The atomic snapshot
+removes global-epoch false refusals and closes the collection/publication race.
+Host 59, binding CPU 05, material CPU 10, 146 source guards and 18 scenario cases
+pass. Comparison run 905 adds 22,326 matching lookups /22,006 image checks.
+Normal-table run 906 adds 21,745 lookups with zero original comparison/fallback,
+zero refusals and an inspected field image; 5,736 tables /2,172,192 B. Fresh
+pose/geometry/material checks also match. Other material verification remains
+enabled to establish the field gate; this is not a whole-renderer diagnostics-off
+or performance run. Source selection/return ABI, dynamic overrides, resource
+consumers and direct static-object submission remain. Reflection's new direct
+native-image consumer has zero observations. Movement/reload/sequences/both-eye
+and full-game qualification remain open. Evidence:
+`research/20260906_1955_native-texture-tables.md`.
 
 Instance render poses (2026-09-06): native IDs/generations, bounded immutable pose
 storage, completed render-handoff publication and traversal/replay consumers.

@@ -1,5 +1,6 @@
 import unittest
-from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify
+import re
+from native_instance_scenario import MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables
 
 
 def metric(reads=100, checks=100, wrong=0, refused=0):
@@ -73,6 +74,70 @@ class InstanceScenarioTest(unittest.TestCase):
         with self.assertRaises(Pending):
             verify("\n".join(rows))
 
+
+def table_metric(reads=100, images=100, wrong=0, image_wrong=0, refused=0):
+    return (f"[native-texture-tables] 5 published 1 retired 4 indexed / 2000 bytes; "
+            f"2 replacements {refused} refused; {reads} lookups 7 fallback; {reads} checks wrong {wrong}; "
+            f"{images} image checks wrong {image_wrong}; 0 native image reads 0 unavailable;")
+
+
+class TextureTableScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2], rows[4] = table_metric(), table_metric(150, 140)
+        return rows
+
+    def test_fresh_nonnull_images(self):
+        result = verify_texture_tables("\n".join(self.rows()))
+        self.assertEqual(result["lookups_delta"], 50)
+        self.assertEqual(result["image_checks_delta"], 40)
+        self.assertEqual(result["native_image_reads_delta"], 0)  # not falsely qualified
+
+    def test_any_failed_publication_or_comparison_is_fatal(self):
+        for bad in (table_metric(wrong=1), table_metric(image_wrong=1), table_metric(refused=1)):
+            with self.assertRaises(ValueError):
+                verify_texture_tables("\n".join([bad] + self.rows()))
+
+    def test_null_only_or_stale_images_do_not_qualify(self):
+        for images in (0, 100):
+            rows = self.rows(); rows[-1] = table_metric(150, images)
+            with self.assertRaises(Pending):
+                verify_texture_tables("\n".join(rows))
+
+    def test_unexercised_publisher_fails_after_ready_field_lookups(self):
+        rows = self.rows()
+        rows[-1] = table_metric(0, 0).replace("7 fallback", "10000 fallback")
+        with self.assertRaisesRegex(ValueError, "no field consumers"):
+            verify_texture_tables("\n".join(rows))
+
+    def test_startup_wrong_scene_and_nonconsecutive_samples(self):
+        rows = self.rows()
+        for bad in ([table_metric(1000, 1000)] + [r for r in rows if "context" in r],
+                    rows[:-1] + ["[native-material-context] " + READY, rows[-1]],
+                    [r.replace("field-state 0", "field-state 4") for r in rows]):
+            with self.assertRaises(Pending):
+                verify_texture_tables("\n".join(bad))
+
+    def test_bounded_and_interleaved(self):
+        with self.assertRaises(ValueError):
+            verify_texture_tables("x" * (MAX_LOG_BYTES + 1))
+        self.assertEqual(verify_texture_tables("\n".join(self.rows() + [
+            "[native-material-context] " + READY]))["image_checks_delta"], 40)
+
+    def test_normal_mode_requires_fresh_reads_without_original_calls(self):
+        rows = self.rows()
+        rows = [re.sub(r"\d+ checks wrong", "0 checks wrong", row).replace(
+            "7 fallback", "0 fallback") for row in rows]
+        rows = [re.sub(r"\d+ image checks", "0 image checks", row) for row in rows]
+        result = verify_texture_tables("\n".join(rows), comparison=False)
+        self.assertEqual(result["lookups_delta"], 50)
+        self.assertEqual(result["checks_delta"], 0)
+        for bad in ("\n".join(rows).replace("0 fallback", "1 fallback"),
+                    "\n".join(self.rows())):
+            with self.assertRaises(ValueError):
+                verify_texture_tables(bad, comparison=False)
+        with self.assertRaises(Pending):
+            verify_texture_tables("\n".join(rows).replace("150 lookups", "100 lookups"), comparison=False)
 
 if __name__ == "__main__":
     unittest.main()

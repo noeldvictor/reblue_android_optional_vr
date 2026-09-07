@@ -14,6 +14,7 @@ struct ReflectionTextureImport {
   uint32_t pass_default = 0;
   uint32_t table_offset = 0, table_count = 0, table_entries = 0, fallback = 0;
   bool has_table = false;
+  uint32_t table_source = 0; // temporary bridge key, not a native texture ID
 };
 constexpr uint32_t kReflectionPassDefault = (uint32_t(-32036) << 16) - 22280 + 68;
 constexpr uint32_t kReflectionTableState = (uint32_t(-32036) << 16) - 7864;
@@ -33,6 +34,7 @@ std::optional<ReflectionTextureImport> ReadReflectionTextureImport(Read read) {
   if (!pass || !table)
     return {};
   result.pass_default = *pass;
+  result.table_source = *table;
   if (!*table)
     return result;
   const auto offset = read(kReflectionTableState);
