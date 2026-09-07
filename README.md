@@ -115,8 +115,19 @@ diagnostics stopped at time/storage limits without reproducing that mismatch;
 the prior failure remains open. The local loop now checks full diagnostics
 headroom before booting. [Current UV investigation and evidence](research/20260907_1638_uv-boundary-provenance.md).
 
+**New scene cutout connection, pending host compilation and game acceptance:**
+direct alpha-tested rigid materials now have owned, ordered model cutoffs,
+object/pass overrides and blend inputs feeding the native scene shader and queue.
+This preserves blended cutout ordering and depth writes; it does not assume a
+fixed cutoff or treat translucent siblings as opaque. CPU fixtures and 23 tiny
+two-eye GPU cases pass. Textured cutout shadows still use their unconverted route.
+Further builds/runs are paused because drive-wide usage crossed the unchanged
+checkpoint storage floor; the tested game executable remains host111.
+[Cutout contract, verification and remaining gates](research/20260907_1713_native-scene-cutouts.md).
+
 The handoff-owned lighting publication contains 2,898 node bindings; these are
-not all verified native scene draws. Skin/deformation, alpha/deferred,
+not all verified native scene draws. Skin/deformation, textured cutout casting,
+sorted/translucent materials,
 normal/reflection and texture-dependent effects remain unconverted here.
 Source tree, object/pass and other producer adapters also remain.
 [Owned-lighting contract](research/20260907_1342_owned-scene-lighting.md).
@@ -127,18 +138,18 @@ are preserved. Authored update producers, live inherited-binding acceptance, bro
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification: 313 Python source/scenario checks pass; existing C++ fixtures remain
-the behavior evidence for unchanged rendering code.
-The new GPU evidence covers twelve 8x8 two-eye pixel cases in 1.08 seconds with
-zero Vulkan validation errors/warnings, including three-layer instanced draws
-with different per-instance values. Host111 is built; host107/run945 remains
+Verification: 314 Python source/scenario checks and expanded C++ fixtures pass.
+The current GPU evidence covers 23 8x8 two-eye pixel cases in 2.87 seconds with
+zero Vulkan validation errors/warnings, including layered instancing, all eight
+cutout comparisons, blending and discarded-pixel depth preservation. Host111
+predates the cutout connection; host107/run945 remains
 the last accepted live result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
-| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, fixture-verified layered scene route, native indirect draws and selected-object reload proof | Live layered-scene acceptance, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
+| Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, fixture-verified layered/cutout scene route, native indirect draws and selected-object reload proof | Host cutout compilation, live layered/cutout acceptance, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
 | Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |

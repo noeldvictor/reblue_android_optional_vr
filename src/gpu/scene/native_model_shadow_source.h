@@ -33,8 +33,12 @@ std::optional<NativeMaterialControl> ReadModelMaterialControl(std::optional<uint
     return {};
   const uint32_t enabled = (*present & 1) ? *flags : 0;
   // Even absent bit0 restores defaults. A null table is the distinct no-op.
-  // The second handler writes only output+4, not these four switch bytes.
-  return NativeMaterialControl{true, bool(enabled & 1), bool(enabled & 2), bool(enabled & 8)};
+  // sub_8228AB18 consumes the next word regardless of bit1, but publishes zero
+  // when that bit is absent. Import the required payload only when enabled.
+  // Preserve independently known lighting/shadow flags if alpha is unavailable.
+  const auto alpha = !(*present & 2) ? std::optional<uint32_t>(0) :
+      address <= UINT32_MAX - 11 ? read(uint32_t(address + 8)) : std::nullopt;
+  return NativeMaterialControl{true, bool(enabled & 1), bool(enabled & 2), bool(enabled & 8), alpha};
 }
 template <typename Reader>
 NativeShadowPolicy ReadModelShadowPolicy(std::optional<uint32_t> table,

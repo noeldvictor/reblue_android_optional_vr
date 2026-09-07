@@ -40,24 +40,25 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
   return result;
 }
 void Run(RenderDevice &device, uint32_t mode) {
+  const bool cutout = mode >= 12, untextured = mode == 10 || mode == 21;
   // Canonical asset semantics, deliberately unrelated to translated locations.
   NativeMeshData mesh;
   mesh.streams.push_back({0,80,{}});
   mesh.attributes = {{MeshSemantic::Position,0,0}, {MeshSemantic::Normal,0,16},
                      {MeshSemantic::TexCoord,0,32}, {MeshSemantic::Color,0,48}, {MeshSemantic::TexCoord,2,64}};
   NativeVertexInputLibrary inputs;
-  auto input = NativeRigidVertexInput(mesh, inputs, mode >= 6 && mode != 10);
+  auto input = NativeRigidVertexInput(mesh, inputs, mode >= 6 && !untextured);
   Need(bool(input), "Native rigid input");
   auto programs = CreateNativeRigidPrograms(device, input);
   Need(programs.scene && programs.shadow, "Production rigid shader programs");
   mesh = {}; input.reset(); // consuming owned inputs after source data retires
 
   auto world = Identity(); world[0] = 1.2f; world[5] = 1.25f; world[12] = .1f; world[13] = -.1f;
-  const bool instanced = mode == 4 || mode == 11;
-  const uint32_t flags = (mode == 10 ? 0 : RigidAlbedo) | RigidVertexColour | RigidDiffuse | RigidSpecular |
+  const bool instanced = mode == 4 || mode == 11 || mode == 20;
+  const uint32_t flags = (untextured ? 0 : RigidAlbedo) | RigidVertexColour | RigidDiffuse | RigidSpecular |
       (mode == 1 || instanced ? RigidReceiveShadow : 0) | (mode >= 2 ? RigidFogEnabled : 0);
-  const uint32_t detail_layers = mode == 5 ? 1 : mode >= 6 && mode != 10 ? 2 : 0;
-  const RigidFloat4 base_uv{.5f,.5f,mode == 7 ? -2.f : .5f,.5f};
+  const uint32_t detail_layers = mode == 5 ? 1 : mode >= 6 && !untextured ? 2 : 0;
+  const RigidFloat4 base_uv{.5f,.5f,mode == 7 || mode == 22 ? -2.f : .5f,.5f};
   const std::array<RigidFloat4,2> detail_uv{{{.75f,.5f,mode == 8 ? -2.f : 1.05f,.7f},
                                           {.6f,.65f,mode == 9 ? -2.f : 1.15f,.35f}}};
   const auto object = BuildRigidObject(world, {.5f,.75f,1,.8f}, {.1f,.2f,.15f,8}, base_uv, flags, detail_uv, detail_layers);
@@ -98,6 +99,15 @@ void Run(RenderDevice &device, uint32_t mode) {
         {.1f,.2f,.15f,8},base_uv,flags,instance_uv,detail_layers),*BuildRigidPass(references[n])};
     transform[14] -= .25f;
     shadow_instances[n] = {*BuildRigidObject(transform,{1,1,1,1},{0,0,0,8},{1,1,0,0},0),scene_instances[n].pass_data};
+  }
+  if (cutout) for (uint32_t n=0;n<instance_count;++n) {
+    // Exact alpha=1/.5 boundaries after vertex/object/base multiplication.
+    // Detail image alpha must affect RGB only. Distinct per-instance references
+    // catch accidentally batch-wide cutoffs in the real indirect draw.
+    auto &data = scene_instances[n].object_data;
+    data.diffuse.w = 2.f;
+    Need(SetRigidCutout(data, mode == 20 && n ? 128 : mode == 22 ? 64 : 255,
+        mode < 20 ? mode-12 : RigidCutoutGE), "Rigid cutout pack");
   }
   const auto alignment = static_cast<VulkanDevice &>(device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment;
   const auto placement = PlanNativeRigidStorage(instance_count,uint32_t(alignment));
@@ -157,8 +167,8 @@ void Run(RenderDevice &device, uint32_t mode) {
   shadow_set->setBuffer(0,storage.get(),placement->bytes,&caster_view);
   // Match the real queue's legal inactive descriptors too: these point at the
   // owned depth image but must never supply a material sample for disabled layers.
-  sets[1]->setTexture(0, mode == 10 ? shadow.get() : albedo.get(), RenderTextureLayout::SHADER_READ,
-      mode == 10 ? shadow_view.get() : albedo_view.get());
+  sets[1]->setTexture(0, untextured ? shadow.get() : albedo.get(), RenderTextureLayout::SHADER_READ,
+      untextured ? shadow_view.get() : albedo_view.get());
   for (uint32_t n=0;n<2;++n)
     sets[1]->setTexture(n+1, n < detail_layers ? details[n].get() : shadow.get(), RenderTextureLayout::SHADER_READ,
         n < detail_layers ? detail_views[n].get() : shadow_view.get());
@@ -183,7 +193,7 @@ void Run(RenderDevice &device, uint32_t mode) {
   ApplyNativePipelineProgram(*programs.scene, pipeline_desc);
   pipeline_desc.inputSlots = &slot; pipeline_desc.inputSlotsCount = 1;
   pipeline_desc.renderTargetCount = 1; pipeline_desc.renderTargetFormat[0] = colour_desc.format;
-  pipeline_desc.renderTargetBlend[0] = RenderBlendDesc::Copy();
+  pipeline_desc.renderTargetBlend[0] = cutout ? RenderBlendDesc::AlphaBlend() : RenderBlendDesc::Copy();
   pipeline_desc.depthTargetFormat = RenderFormat::D32_FLOAT;
   pipeline_desc.depthEnabled = pipeline_desc.depthWriteEnabled = true;
   pipeline_desc.depthFunction = RenderComparisonFunction::LESS; pipeline_desc.cullMode = RenderCullMode::NONE;
@@ -242,7 +252,9 @@ void Run(RenderDevice &device, uint32_t mode) {
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::SHADER_READ));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(colour.get(),RenderTextureLayout::COLOR_WRITE));
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(depth.get(),RenderTextureLayout::DEPTH_WRITE));
-  commands->setFramebuffer(scene_fb.get()); commands->clearColor(0,RenderColor(0,0,0,0));
+  const float background[4]{.0625f,.125f,.25f,.5f};
+  commands->setFramebuffer(scene_fb.get());
+  commands->clearColor(0,cutout ? RenderColor(background[0],background[1],background[2],background[3]) : RenderColor(0,0,0,0));
   commands->clearDepthStencil(true,false,1,0);
   bindings.layout = programs.scene->Layout(); bindings.sets[0] = sets[0].get();
   bindings.set_count = 3;
@@ -325,7 +337,25 @@ void Run(RenderDevice &device, uint32_t mode) {
     auto expected=ComposeLitSurface(surface,reference.lights[0],reference.lights[1],reference.lights[2],response[0],response[1],response[2]);
     if(mode>=2) for(const auto &fog:reference.fog) expected=ApplyLitFog(expected,position,camera,fog);
     expected=LitScale(LitAdd(expected,LitVec(reference.colour_grade.x,.02f,.03f)),.9f);
-    const float rgba[]{expected.x,expected.y,expected.z,diffuse.w*.5f*texture_alpha};
+    float rgba[]{expected.x,expected.y,expected.z,diffuse.w*.5f*texture_alpha};
+    bool accepted = true;
+    if (cutout) {
+      const float threshold = mode == 20 && n ? 128.f/255 : mode == 22 ? 64.f/255 : 1.f;
+      const float alpha = rgba[3];
+      // Independent oracle, not the production shader predicate or flags.
+      switch (mode < 20 ? mode-12 : 0) {
+      case 0: accepted = alpha >= threshold; break;
+      case 1: accepted = false; break;
+      case 2: accepted = alpha < threshold; break;
+      case 3: accepted = alpha == threshold; break;
+      case 4: accepted = alpha <= threshold; break;
+      case 5: accepted = alpha > threshold; break;
+      case 6: accepted = alpha < threshold || alpha > threshold; break;
+      case 7: accepted = true; break;
+      }
+      for (uint32_t c=0;c<4;++c)
+        rgba[c] = accepted ? rgba[c]*(c == 3 ? 1.f : alpha)+background[c]*(1-alpha) : background[c];
+    }
     const auto pixel=eye*size*size+y*size+x;
     for(uint32_t c=0;c<4;++c) {
       const float actual=pixels[pixel*4+c], error=std::abs(actual-rgba[c]);
@@ -335,12 +365,12 @@ void Run(RenderDevice &device, uint32_t mode) {
       }
       maximum_error=(std::max)(maximum_error,error);
     }
-    Need(std::abs(pixels[2*colour_bytes/4+pixel]-world_z*(eye?.5f:1.f))<1e-5f,"Rigid per-eye depth mismatch");
+    Need(std::abs(pixels[2*colour_bytes/4+pixel]-(accepted ? world_z*(eye?.5f:1.f) : 1.f))<1e-5f,"Rigid per-eye depth mismatch");
     Need(std::abs(pixels[(2*colour_bytes+2*depth_bytes)/4+y*size+x]-(world_z-.25f))<1e-5f,"Rigid caster depth mismatch");
   }
   readback->unmap();
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" eyes=2 pixels=128 max_error="<<maximum_error
-           <<"; instances="<<instance_count<<" native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
+           <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" opaque caster; native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
 }
 }
-void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<12;++mode) Run(device,mode); }
+void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<23;++mode) Run(device,mode); }

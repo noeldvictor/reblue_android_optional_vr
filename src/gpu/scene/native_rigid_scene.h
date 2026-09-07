@@ -1,5 +1,5 @@
 /**
- * @brief Whole-node native opaque scene admission and retained draw inputs.
+ * @brief Whole-node native opaque/cutout scene admission and retained inputs.
  * @copyright Copyright (c) 2026 reblue contributors
  * @license BSD 3-Clause, see LICENSE
  */
@@ -10,6 +10,7 @@
 #include "gpu/scene/native_shadow.h"
 #include "gpu/scene/native_scene_lights.h"
 #include "gpu/native_target_images.h"
+#include "gpu/scene/native_blend.h"
 
 namespace bd::gpu::scene {
 struct NativeRigidReceiver {
@@ -17,6 +18,11 @@ struct NativeRigidReceiver {
   RenderMatrix world_to_shadow{};
   LightingVector colour{};
   NativeShadowInputs visibility;
+};
+struct NativeRigidCutoutInputs {
+  uint32_t reference = 0, comparison = RigidCutoutGE;
+  bool alpha_to_coverage = false;
+  BlendState blend;
 };
 struct NativeRigidScenePlan {
   std::shared_ptr<const NativeGeometry> geometry;
@@ -29,18 +35,20 @@ struct NativeRigidScenePlan {
   PrimitiveCull cull;
   bool draw;
   std::optional<NativeSceneLightTicket> light_ticket;
+  BlendState blend;
+  bool alpha_to_coverage = false;
 };
 // Transitional object producer: resolves source bindings before returning the
 // retained, address-free plan. It never interprets/captures/replays the node.
 std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject(
     const NativeInstancePose &pose, uint32_t node, const char *&refusal);
 bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans);
-// Share opaque participation rules with casting, then classify the scene shader
+// Share rigid participation rules with casting, then classify the scene shader
 // from authored recipes, before a missing pose/texture can choose legacy drawing.
 inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
     const NativeModelMaterialProgram &program,
     const std::optional<PrimitivePolicyInputs> &inputs) {
-  auto admission = PrepareNativeRigidCasterAdmission(program, inputs);
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true);
   if (admission.route != NativeRigidCasterRoute::Native) return admission;
   const auto unsupported = SelectedNativeRigidShadow(program)
       ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
@@ -58,7 +66,8 @@ inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
 inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     const NativeModelMaterialProgram &program,
     const NativeObjectPrimitive<NativeTextureBinding> &packet,
-    const NativeRigidReceiver &receiver, const char **refusal = nullptr) {
+    const NativeRigidReceiver &receiver, const char **refusal = nullptr,
+    std::optional<NativeRigidCutoutInputs> cutout = {}) {
   const auto refuse = [&](const char *reason) -> std::optional<NativeRigidScenePlan> {
     if (refusal) *refusal = reason;
     return {};
@@ -78,9 +87,11 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       packet.shader.texture_layers > 3 || !packet.shader.vertex_colour ||
       !packet.features || packet.features->reflection || packet.features->normal_mapping ||
       !packet.lights || !packet.fog || !packet.camera || !packet.lighting ||
-      !packet.policy.routing_known || packet.policy.deferred || packet.policy.alpha_test ||
+      !packet.policy.routing_known || packet.policy.deferred ||
       !packet.textures.owns_uv ||
       packet.receiver_shadow == NativeShadowPolicy::Unknown) return refuse("native primitive owners or shader features unavailable");
+  if (packet.policy.alpha_test && (!cutout || !cutout->blend.alphaBlendEnable))
+    return refuse("owned cutout reference, comparison or enabled blend factors unavailable");
   const auto &geometry = packet.geometry;
   const uint32_t layers = packet.shader.texture_layers;
   const auto vertex_input = layers == 3 ? geometry->layered_rigid_vertex_input : geometry->rigid_vertex_input;
@@ -115,7 +126,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   const auto &uv = packet.textures.uv;
   const auto &uv2 = packet.textures.secondary_uv;
   const auto offset = [](float u, float v) { return RigidFloat4{1.f/512,1.f/512,1.f/512+u,1.f/512+v}; };
-  const auto object = BuildRigidObject(packet.world, vector(packet.material_values[0]),
+  auto object = BuildRigidObject(packet.world, vector(packet.material_values[0]),
       packet.features->specular ? vector(packet.material_values[1]) : RigidFloat4{}, offset(uv[0],uv[1]), flags,
       {offset(uv[2],uv[3]), offset(uv2[0],uv2[1])}, layers ? layers-1 : 0);
   NativeRigidPassInputs inputs;
@@ -134,7 +145,14 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   inputs.lights = *packet.lights; inputs.fog = *packet.fog;
   const auto pass = BuildRigidPass(inputs);
   if (!object || !pass) return refuse("nonfinite native object/pass GPU inputs");
-  return NativeRigidScenePlan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
+  if (packet.policy.alpha_test && !SetRigidCutout(*object, cutout->reference, cutout->comparison))
+    return refuse("unsupported native cutout comparison");
+  NativeRigidScenePlan plan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
       packet.policy.cull, packet.policy.direct};
+  if (packet.policy.alpha_test) {
+    plan.blend = cutout->blend;
+    plan.alpha_to_coverage = cutout->alpha_to_coverage;
+  }
+  return plan;
 }
 } // namespace bd::gpu::scene

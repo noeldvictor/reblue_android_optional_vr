@@ -33,6 +33,7 @@ struct NativePrimitivePolicy {
   PrimitiveCull cull = PrimitiveCull::None;
   bool routing_known = false, direct = false, deferred = false;
   bool alpha_test = false, shadow_allowed = true;
+  bool sorted = false; // Preserve pre-suppression participation for ordered defaults.
   bool operator==(const NativePrimitivePolicy &) const = default;
 };
 inline PrimitiveCull ResolvePrimitiveCull(PrimitiveWinding winding, PrimitiveCull basis) {
@@ -96,7 +97,7 @@ bool ComposePrimitivePolicies(std::span<const PrimitivePolicyStep> steps,
                             (inputs.phase == 1 && !shadow);
     values.push_back({ResolvePrimitiveCull(range.winding, inputs.pass_cull),
         texture_route_known, texture_route_known && !suppressed && !pass_sorted,
-        texture_route_known && !suppressed && pass_sorted, pass_alpha, shadow});
+        texture_route_known && !suppressed && pass_sorted, pass_alpha, shadow, pass_sorted});
   }
   out = std::move(values);
   return true;
@@ -118,7 +119,7 @@ inline NativePrimitivePlan SummarizePrimitivePlan(std::span<const NativePrimitiv
     // Include it until that consumer accepts the named native field too.
     const uint8_t bits = value.routing_known | (value.direct << 1) |
         (value.deferred << 2) | (value.alpha_test << 3) | (value.shadow_allowed << 4) |
-        (uint8_t(value.cull) << 5);
+        (uint8_t(value.cull) << 5) | (value.sorted << 7);
     plan.stamp = (plan.stamp ^ bits) * 1099511628211ull;
   }
   plan.stamp = (plan.stamp ^ values.size()) * 1099511628211ull;

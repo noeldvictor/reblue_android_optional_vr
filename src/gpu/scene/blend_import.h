@@ -91,6 +91,11 @@ inline uint32_t FoldBlendAlpha(uint32_t requested) {
   // SDK shared-alpha rule includes SRC_ALPHA_SAT -> ONE in the alpha lane.
   return rgb | ((((rgb << 4) | (rgb & 0x1010)) << 12) & 0xefef0000u);
 }
+inline std::optional<BlendState> DecodeEnabledBlendImport(const BlendShadow &source) {
+  const auto effective = (source.flags & 0x40000000u) ? source.requested : FoldBlendAlpha(source.requested);
+  if (!SupportedBlendWord(effective)) return {};
+  return DecodeBlendImport(effective, source.flags | 0x80000000u);
+}
 inline bool PublishBlendShadow(BlendShadow &s, uint32_t offset,
                                uint32_t value) {
   const auto index = BlendImportIndex(offset);

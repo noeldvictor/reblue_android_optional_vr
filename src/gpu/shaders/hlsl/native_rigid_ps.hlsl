@@ -1,5 +1,5 @@
 // Native zero-to-three-layer rigid family. Normal maps, reflections, wind, skin
-// and alpha-tested/translucent recipes require their own explicit eligibility.
+// and sorted/translucent recipes require their own explicit eligibility.
 #include "src/gpu/scene/native_rigid_shader.h"
 // The native texture uploader and native target owner publish array views even
 // for mono images. Both eyes sample layer zero of this ordinary material and
@@ -52,6 +52,7 @@ float4 main(RigidFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
     }
   }
   const float4 albedo = texture_colour * object_data.diffuse * fragment.colour;
+  if ((flags & RigidCutout) && !RigidCutoutPasses(object_data.flags.z, albedo.a, asfloat(object_data.flags.w))) discard;
   const float3 normal = normalize(fragment.normal);
   const LitVector position = RigidVector(fragment.world);
   const LitVector camera = RigidVector(pass_data.cameras[eye].xyz);

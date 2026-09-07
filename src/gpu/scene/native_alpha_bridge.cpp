@@ -187,4 +187,9 @@ AlphaState CurrentAlphaIntent() {
   Report();
   return intent;
 }
+std::optional<AlphaState> FindNativeAlphaIntent() {
+  std::lock_guard lock(alpha_mutex);
+  if (!REXCVAR_GET(bd_native_alpha) || !initialized) return {};
+  return intent;
+}
 } // namespace bd::gpu::scene

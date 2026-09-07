@@ -9,6 +9,7 @@
 #include "gpu/scene/native_lit_shading.h"
 #include <cstddef>
 #include <cstdint>
+#include <bit>
 #include <type_traits>
 namespace bd::gpu::scene {
 using RigidUInt = uint32_t;
@@ -34,14 +35,32 @@ struct RigidFogGPU {
   RigidUint4 mode; // disabled, radial, blend, reserved zero
 };
 static const RigidUInt RigidAlbedo = 1, RigidVertexColour = 2, RigidDiffuse = 4,
-                  RigidSpecular = 8, RigidReceiveShadow = 16, RigidFogEnabled = 32;
+                  RigidSpecular = 8, RigidReceiveShadow = 16, RigidFogEnabled = 32, RigidCutout = 64;
+static const RigidUInt RigidCutoutGE = 0, RigidCutoutNever = 1, RigidCutoutLess = 2,
+    RigidCutoutEqual = 3, RigidCutoutLE = 4, RigidCutoutGreater = 5, RigidCutoutNE = 6, RigidCutoutAlways = 7;
+// Native material semantics, not translated specialization bits. Ordered NE
+// rejects NaN on CPU and GPU; Always accepts it. The real fragment input is the
+// base texture alpha multiplied by object and vertex alpha, not detail alpha.
+inline bool RigidCutoutPasses(RigidUInt comparison, float alpha, float threshold) {
+  switch (comparison) {
+  case RigidCutoutGE: return alpha >= threshold;
+  case RigidCutoutNever: return false;
+  case RigidCutoutLess: return alpha < threshold;
+  case RigidCutoutEqual: return alpha == threshold;
+  case RigidCutoutLE: return alpha <= threshold;
+  case RigidCutoutGreater: return alpha > threshold;
+  case RigidCutoutNE: return alpha < threshold || alpha > threshold;
+  case RigidCutoutAlways: return true;
+  default: return false;
+  }
+}
 struct NativeRigidObjectGPU {
   RigidMatrix world;
   RigidFloat4 normal_rows[3]; // inverse transpose, row-vector convention
   RigidFloat4 diffuse, specular; // diffuse RGBA; specular RGB/shininess
   RigidFloat4 uv_scale_offset; // named UV scale.xy + offset.zw
   RigidFloat4 detail_uv_scale_offset[2];
-  RigidUint4 flags; // x flags above; y texture layer count (0..3); zw zero
+  RigidUint4 flags; // x flags above; y layers (0..3); z cutoff compare; w float cutoff bits
 };
 struct NativeRigidPassGPU {
   RigidMatrix world_to_clip[2], world_to_shadow;
@@ -85,6 +104,16 @@ inline bool RigidFinite(RigidFloat4 value) {
 }
 inline bool RigidFinite(const RigidMatrix &matrix) {
   for (const auto &row : matrix.rows) if (!RigidFinite(row)) return false;
+  return true;
+}
+inline bool SetRigidCutout(NativeRigidObjectGPU &object, uint32_t reference, uint32_t comparison) {
+  if (comparison > RigidCutoutAlways) return false;
+  // Exact unsigned-reference-to-float conversion at the import boundary, with
+  // no invented [0,255] clamp. 0 is already resolved by the material recipe.
+  const float threshold = float(reference) * std::bit_cast<float>(0x3b808081u);
+  object.flags.x |= RigidCutout;
+  object.flags.z = comparison;
+  object.flags.w = std::bit_cast<uint32_t>(threshold);
   return true;
 }
 

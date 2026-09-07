@@ -6,9 +6,11 @@
  */
 #pragma once
 #include "gpu/scene/native_alpha.h"
+#include <optional>
 struct PPCContext;
 namespace bd::gpu::scene {
 bool UpdateAlphaImport(PPCContext &ctx, uint8_t *base);
 void ResetAlphaImport();
 AlphaState CurrentAlphaIntent();
+std::optional<AlphaState> FindNativeAlphaIntent(); // No bootstrap or source refresh.
 } // namespace bd::gpu::scene

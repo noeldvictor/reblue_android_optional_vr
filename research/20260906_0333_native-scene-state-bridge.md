@@ -3370,3 +3370,42 @@ compression-7,435,281,exe+7,168,PDB+28,672,logs+1,887,new949/951+664,637.
 Objects/CMake/source/Git unallocated. Firstfree62,920,818,688 ->cleanup-end
 63,058,419,712 B is137,601,024 B drive-wide gain, not cleanup attribution.
 No owned producer remains. All original budgets/protected raw sets unchanged.
+
+Continuation after b910ae9: the push-only turn was no renderer progress. Source
+work now connects load-owned ordered alpha references and object/pass cutout
+inputs to the native rigid scene shader and blended pipeline. Solid shadow
+casting is unchanged; textured cutout casting and live acceptance remain pending.
+First measured free63,759,519,744 B; before producers62,583,951,360 B. This
+1,175,568,384 B drive-wide drop is not attributed to these small source edits;
+existing fixture sizes remain material8,227,410 B, texture70,319,344 B and
+GPU10,585,571 B. No agent producer has run during this drop. Original floor
+62,509,998,080 B and3 GiB exception remain unchanged.314 artifact-free Python
+checks pass. Reuse existing trees for sequential material35/CPU33, output35/
+CPU18 and GPU29/rigid08, each <=32 MiB free-drop/peak,300 s supervisor and10 MiB
+aggregate logs. Recheck peak overlap before every producer. New logs <=64 KiB;
+no raw/images/perf/cache/cook outputs. Host112 needs <=192 MiB peak above the
+floor and is paused until that reserve fits. Preserve all unresolved-failure
+evidence and the last accepted945 image; no fixture can restamp game acceptance.
+
+Material35/PID24032/session20560 and CPU33/PID34692 pass (0.12/0.15 s);
+output35/PID21864 and CPU18/PID36272 pass (0.41/0.44 s). GPU29/PID36328/
+session27134 compiles four production shaders and the existing fixture; rigid08/
+PID36048 passes23 two-eye8x8 modes (2.87/2.89 s), including eleven new blended
+cutout modes, zero Vulkan validation errors/warnings, one absent-GOG-overlay
+loader message. Raw/image output0. All handles terminal. Host112 was not launched;
+its192 MiB peak never fit. A later four-source syntax plan (10..13; alpha/blend
+names added to the existing supervisor) failed32 MiB preflight before producer
+or log creation. Free62,335,897,600 B was then below the unchanged floor; no
+more build/game work. Profile and host111 exe hashes unchanged. Source guards314
+pass; host compilation and live cutout/legacy-interoperation acceptance pending.
+
+Removed12 superseded material34/CPU32/output34/CPU17/GPU28/rigid07 logs after
+replacement CPU/GPU coverage passed,8,214 logical B. Free62,240,915,456 ->
+62,240,931,840 B,16,384 B observed (external volume activity not isolated).
+Exact old log text gone; prior reports preserve results and tests are reproducible.
+All game/UV/light/baseline/pixel evidence remains. Counted retained net+197,469 B:
+material+63,416,texture+119,466,GPU fixture+8,731,build logs+5,856. Logs195,935 B/
+136files; no new game logs/cache/dumps since16:40. Root shader headers/CMake/
+source/Git unallocated. Inventory ending free62,243,811,328 B is1,515,708,416 B
+drive-wide loss from first measurement, not attributed to this small retained
+growth. Continue low-storage source work; unchanged reserve gates all producers.

@@ -14,6 +14,7 @@
 #include "gpu/scene/native_rigid_route.h"
 #include "gpu/scene/native_rigid_lifecycle.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
+#include "gpu/scene/blend_import.h"
 #include <array>
 #include <limits>
 #ifdef NDEBUG
@@ -949,6 +950,45 @@ void RigidScenePacket() {
     assert(!build());
   }
   packet = good;
+  {
+    packet.policy.alpha_test = true;
+    NativeRigidCutoutInputs cutout{128,RigidCutoutGE,true,{}};
+    cutout.blend.alphaBlendEnable = true;
+    cutout.blend.srcBlend = RenderBlend::SRC_ALPHA;
+    cutout.blend.destBlend = RenderBlend::INV_SRC_ALPHA;
+    const auto cutout_plan = PrepareNativeRigidScene(program,packet,receiver,nullptr,cutout);
+    assert(cutout_plan && (cutout_plan->object.flags.x & RigidCutout) && cutout_plan->alpha_to_coverage &&
+        cutout_plan->blend == cutout.blend && cutout_plan->object.flags.z == RigidCutoutGE &&
+        std::bit_cast<float>(cutout_plan->object.flags.w) == 128.f*std::bit_cast<float>(0x3b808081u));
+    cutout.reference = 255; cutout.comparison = RigidCutoutAlways;
+    const auto changed = PrepareNativeRigidScene(program,packet,receiver,nullptr,cutout);
+    assert(changed && std::bit_cast<float>(changed->object.flags.w) == 1.f &&
+        cutout_plan->object.flags.z == RigidCutoutGE); // retained plan is immutable
+    cutout.comparison = 8;
+    assert(!PrepareNativeRigidScene(program,packet,receiver,nullptr,cutout));
+    cutout.comparison = 0; cutout.blend.alphaBlendEnable = false;
+    assert(!PrepareNativeRigidScene(program,packet,receiver,nullptr,cutout));
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    for (uint32_t compare=0;compare<8;++compare) {
+      assert(RigidCutoutPasses(compare,nan,.5f) == (compare == RigidCutoutAlways));
+      assert(RigidCutoutPasses(compare,.5f,nan) == (compare == RigidCutoutAlways));
+      assert(RigidCutoutPasses(compare,.5f,.5f) ==
+          (compare == RigidCutoutGE || compare == RigidCutoutEqual || compare == RigidCutoutLE || compare == RigidCutoutAlways));
+    }
+    assert(!RigidCutoutPasses(8,1,0));
+    // Requested factors must survive an opaque predecessor's disabled COPY
+    // output. Shared-alpha folding and separate-alpha modes remain distinct.
+    BlendShadow blend;
+    blend.requested = 6u | (7u<<8) | (1u<<16);
+    const auto enabled = DecodeEnabledBlendImport(blend);
+    assert(enabled && enabled->alphaBlendEnable && enabled->srcBlend == RenderBlend::SRC_ALPHA &&
+        enabled->destBlend == RenderBlend::INV_SRC_ALPHA && enabled->srcBlendAlpha == RenderBlend::SRC_ALPHA);
+    blend.flags = 0x40000000u;
+    assert(DecodeEnabledBlendImport(blend)->srcBlendAlpha == RenderBlend::ONE);
+    blend.requested = 31;
+    assert(!DecodeEnabledBlendImport(blend)); // no ZERO fallback for unsupported constant factors
+    packet = good;
+  }
   program.ranges.push_back(program.ranges[0]); assert(!build()); program.ranges.pop_back();
   // No asset-ID ceiling and no dropped sibling: semantic admission precedes
   // resources. The individual packet builder refuses missing active inputs.
@@ -988,6 +1028,11 @@ void RigidScenePacket() {
   assert(classify() == NativeRigidCasterRoute::Legacy); program.ranges[1].features.normal_mapping_requested = false;
   program.ranges[1].shader.vertex_colour.reset(); assert(classify() == NativeRigidCasterRoute::Refused);
   program.ranges[1].shader = program.ranges[0].shader;
+  program.policy_steps = {{PrimitivePolicyOperation::Alpha,17,0}};
+  program.ranges[1].policy_step_end = 1;
+  assert(classify() == NativeRigidCasterRoute::Native &&
+      PrepareNativeRigidCasterAdmission(program,scene_policy).route == NativeRigidCasterRoute::Legacy);
+  program.policy_steps.clear();
   program.policy_steps.push_back({PrimitivePolicyOperation::Alpha,1,0}); program.ranges[1].policy_step_end = 1;
   assert(classify() == NativeRigidCasterRoute::Legacy); // Unsupported sibling cannot be omitted.
   program.policy_steps.clear(); program.ranges.resize(1); program.geometries.resize(1); program.materials.resize(1);

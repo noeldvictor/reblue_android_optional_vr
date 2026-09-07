@@ -28,7 +28,7 @@
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
     "Fail-closed native opaque rigid caster families, including multi-primitive nodes; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
-    "Fail-closed native mono opaque rigid scene families with zero-to-three texture layers; no node interpreter/template warm-up.");
+    "Fail-closed native mono opaque/cutout rigid scene families with zero-to-three texture layers; no node interpreter/template warm-up.");
 namespace bd::gpu::scene {
 struct NativeRigidDrawStore {
   struct Batch {
@@ -237,6 +237,9 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     pipeline_state.renderTargetFormat = shape->format;
     pipeline_state.depthStencilFormat = plume::RenderFormat::D32_FLOAT_S8_UINT;
     pipeline_state.sampleCount = static_cast<plume::RenderSampleCounts>(shape->samples);
+    bool blend_dirty = false;
+    ApplyBlendState(plan.blend, pipeline_state, blend_dirty);
+    pipeline_state.enableAlphaToCoverage = plan.alpha_to_coverage && shape->samples > 1;
     pipeline_state.cullMode = plan.cull == PrimitiveCull::Back ? plume::RenderCullMode::BACK :
         plan.cull == PrimitiveCull::Front ? plume::RenderCullMode::FRONT : plume::RenderCullMode::NONE;
     SanitizePipelineState(pipeline_state);
@@ -265,7 +268,10 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     draw.framebuffer = commands->Framebuffer();
     draw.viewport = plume::RenderViewport(0, 0, float(shape->width), float(shape->height));
     draw.scissor = plume::RenderRect(0, 0, shape->width, shape->height); draw.has_viewport = true;
-    draw.render_view = 3; draw.zwrite = true; draw.reorderable = true;
+    draw.render_view = 3; draw.zwrite = true;
+    // Blended cutouts keep their authored ordering and depth writes. They are
+    // not opaque reorder candidates merely because their alpha also discards.
+    draw.reorderable = !plan.blend.alphaBlendEnable;
     require(draw.bindings.Valid(), "invalid native scene descriptor contract");
     item->geometry = geometry; item->input = {plan.object,plan.pass};
     item->model_generation = pose.model_generation; item->instance = pose.instance;

@@ -71,6 +71,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       current.winding = kind == 0x1000 ? PrimitiveWinding::Reverse :
                         kind == 0x2000 ? PrimitiveWinding::Pass : PrimitiveWinding::TwoSided;
       ranges.push_back(current);
+      current.resets_alpha_reference = false;
     } else if (kind == 0x4000) {
       current.stream = command & 0x0fff;
       current.vertex_record = commands[cursor];
@@ -82,7 +83,11 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       if (!value) {
         current.features.diffuse = MaterialDiffuseMode::Unknown;
         current.features.specular_requested.reset();
+        current.resets_alpha_reference = true;
+        current.alpha_reference.reset();
       } else if (value->applies) {
+        current.resets_alpha_reference = true;
+        current.alpha_reference = value->alpha_reference;
         current.features.diffuse = value->disable_diffuse ? MaterialDiffuseMode::Disabled : MaterialDiffuseMode::Object;
         // The node-entry specular value is zero. Both disabling it and restoring
         // that entry value reset it; a later repeated power command stays elided.

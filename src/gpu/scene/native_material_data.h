@@ -31,6 +31,9 @@ enum class MaterialDiffuseMode : uint8_t { Object, Disabled, Enabled, Unknown };
 struct NativeMaterialControl {
   bool applies = false;
   bool disable_diffuse = false, disable_specular = false, disable_shadow = false;
+  // Zero means resolve the live pass default, not an explicit zero cutoff.
+  // Missing alpha data must not invalidate independently known lighting flags.
+  std::optional<uint32_t> alpha_reference = 0;
 };
 // Folded in command order at load, including repeated-command elision and
 // control-table null semantics. Live object/pass gates remain separate.
@@ -106,6 +109,11 @@ struct NativeMaterialRange {
   uint16_t stream = 0;
   // Import-only index into the model's control table, not a shader bool value.
   uint16_t control_record = 0xffff;
+  // A control command resets the node's running cutoff, even when it selects
+  // the same record twice. No reset means retain the preceding draw's resolved
+  // default. This is a folded recipe, not a draw-time command stream.
+  bool resets_alpha_reference = false;
+  std::optional<uint32_t> alpha_reference = 0;
   uint32_t texture_assignment_end = 0;
   uint32_t policy_step_end = 0;
   PrimitiveWinding winding = PrimitiveWinding::Pass;

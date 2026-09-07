@@ -5,6 +5,10 @@
  */
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_material_texture_source.h"
+#include "gpu/scene/native_material_alpha_source.h"
+#include "gpu/scene/native_alpha_bridge.h"
+#include "gpu/scene/native_blend_bridge.h"
+#include "gpu/scene/native_rigid_draw.h"
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_lighting_bridge.h"
@@ -46,6 +50,8 @@ struct NativeObjectTextureState {
   MaterialImageSelection<NativeTextureBinding> fallback;
   MaterialTextureInputs<NativeTextureBinding> inputs;
   std::optional<PrimitivePolicyInputs> policy_inputs;
+  std::optional<NativeMaterialAlphaInputs> alpha_inputs;
+  std::optional<NativeRigidCutoutInputs> cutout_pass;
   struct Mesh {
     std::shared_ptr<const ModelMaterialImport> owner;
     const NativeModelMaterialProgram *program = nullptr;
@@ -92,6 +98,24 @@ MaterialImageSelection<NativeTextureBinding> Capture(uint32_t source) {
   return binding.primary ? MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind, std::move(binding)}
                          : MaterialImageSelection<NativeTextureBinding>{};
 }
+std::optional<NativeRigidCutoutInputs> CaptureCutoutPass() {
+  const auto alpha = FindNativeAlphaIntent();
+  const auto blend = FindNativeEnabledBlendIntent();
+  if (!alpha || !blend) return {};
+  uint32_t comparison;
+  switch (alpha->compare) {
+  case AlphaCompare::GreaterEqual: comparison = RigidCutoutGE; break;
+  case AlphaCompare::Never: comparison = RigidCutoutNever; break;
+  case AlphaCompare::Less: comparison = RigidCutoutLess; break;
+  case AlphaCompare::Equal: comparison = RigidCutoutEqual; break;
+  case AlphaCompare::LessEqual: comparison = RigidCutoutLE; break;
+  case AlphaCompare::Greater: comparison = RigidCutoutGreater; break;
+  case AlphaCompare::NotEqual: comparison = RigidCutoutNE; break;
+  case AlphaCompare::Always: comparison = RigidCutoutAlways; break;
+  default: return {};
+  }
+  return NativeRigidCutoutInputs{0, comparison, alpha->alpha_to_coverage, *blend};
+}
 }
 
 NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
@@ -127,6 +151,10 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     publication->stack = stack;
     if (REXCVAR_GET(bd_native_primitive_policies))
       publication->policy_inputs = ReadPrimitivePolicyInputs(context, *visual, Word);
+    if (NativeRigidSceneEnabled() && *render_view == 3) {
+      publication->alpha_inputs = ReadMaterialAlphaInputs(*visual, Word);
+      publication->cutout_pass = CaptureCutoutPass();
+    }
     publication->table_offset = *offset; publication->fallback = Capture(*fallback);
     publication->inputs = std::move(*inputs);
     publication->bytes += (publication->inputs.overrides.capacity() + publication->inputs.late_images.capacity()) *
@@ -182,7 +210,16 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
   refusal = "whole-node ordinary scene family unavailable";
-  if (PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs).route != NativeRigidCasterRoute::Native) return {};
+  const auto admission = PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs);
+  if (admission.route != NativeRigidCasterRoute::Native) return {};
+  const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
+      [](const auto &policy) { return policy.alpha_test; });
+  std::vector<uint32_t> references;
+  if (cutouts) {
+    refusal = "owned whole-node cutout references or pass unavailable";
+    if (!scope->alpha_inputs || !scope->cutout_pass ||
+        !ComposeMaterialAlphaReferences(program->ranges, admission.policies, *scope->alpha_inputs, references)) return {};
+  }
   refusal = "fresh completed primary shadow or receiver colour unavailable";
   const auto receiver = FindNativePrimaryReceiver(scope->visual,scope->render_view);
   if (!receiver) return {};
@@ -202,9 +239,11 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
     const auto lights = FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
     if (!lights) return {};
     packet->lights = lights->lights; // values survive publication/source/GPU retirement
+    auto cutout = cutouts ? scope->cutout_pass : std::nullopt;
+    if (cutout) cutout->reference = references[primitive];
     refusal = "whole-node scene shader resources unavailable";
     auto plan = PrepareNativeRigidScene(*program, *packet,
-        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal);
+        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal, cutout);
     if (!plan) {
       // Failure-only context for the exact next producer decision. No probe
       // loop, frame dump, weakened admission or partial sibling replacement.

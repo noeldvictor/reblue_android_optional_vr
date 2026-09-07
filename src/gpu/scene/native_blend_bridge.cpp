@@ -201,4 +201,9 @@ BlendState CurrentBlendIntent(uint32_t device) {
   Report();
   return intent;
 }
+std::optional<BlendState> FindNativeEnabledBlendIntent() {
+  std::lock_guard lock(blend_mutex);
+  if (!REXCVAR_GET(bd_native_blend) || !initialized_device) return {};
+  return DecodeEnabledBlendImport(imported);
+}
 } // namespace bd::gpu::scene

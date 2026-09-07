@@ -30,10 +30,12 @@ struct NativeRigidCasterAdmission {
 // Classify the authored family before consulting a pose or GPU allocation.
 // Depth-only opaque casting does not consume material colour, texture layers,
 // samplers or lights. Skin/deformation, alpha and volume/effect routing do.
+// Scene admission can request cutouts; depth-only admission must not use that
+// extension until a separate texture-owning caster producer/program is connected.
 // The original selected asset stays fail-closed even if its contract regresses.
 inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     const NativeModelMaterialProgram &program,
-    const std::optional<PrimitivePolicyInputs> &inputs) {
+    const std::optional<PrimitivePolicyInputs> &inputs, bool scene_cutouts = false) {
   if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
       program.ranges.size() != program.geometries.size()) return {};
   const auto unsupported = SelectedNativeRigidShadow(program)
@@ -52,7 +54,7 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
   if (!ComposePrimitivePolicies(std::span(program.policy_steps), std::span(program.ranges), *inputs,
       [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Unknown; }, policies)) return {};
   for (const auto &policy : policies)
-    if (!policy.routing_known || policy.deferred || policy.alpha_test) return {unsupported};
+    if (!policy.routing_known || policy.deferred || (policy.alpha_test && !scene_cutouts)) return {unsupported};
   return {NativeRigidCasterRoute::Native, std::move(policies)};
 }
 inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadow(

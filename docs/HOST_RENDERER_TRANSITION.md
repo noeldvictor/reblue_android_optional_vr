@@ -70,6 +70,17 @@ Next observation needs the mismatching node/technique and exact owned/live/stagi
 shader values to identify the first divergence; no speculative outgoing mirror
 or guessed causal test. [Current investigation and retained evidence](../research/20260907_1638_uv-boundary-provenance.md).
 
+Independent scene ownership progress: direct blended cutouts now connect the
+load-owned ordered cutoff recipe and object/pass inputs to native scene shader,
+pipeline and indirect submission. 314 Python checks, expanded material/output
+C++ fixtures and 23 two-eye GPU modes pass (2.87 s, zero validation errors/warnings).
+This is not game acceptance: host111 is unchanged; the new host link and later
+syntax checks could not start within the unchanged storage reserve. No game run
+or capture. Depth-only admission still refuses alpha; its phase1 texture/colour
+producer and textured caster program remain to implement. Preserve sorted siblings,
+legacy interoperation and all outstanding UV/light/pixel gates.
+[Cutout connection and current evidence](../research/20260907_1713_native-scene-cutouts.md).
+
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
 The direct consumer now uses `NativeSceneLightingPublication`: semantic lights
@@ -107,7 +118,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    scene-shaded objects, culling/occlusion and real multi-instance groups. The
    opaque caster family now handles whole multi-primitive nodes without material
    ID or scene texture-layer restrictions; its submission, actual emission and
-   fence gates pass in both reload epochs. Skin/wind, alpha/deferred and
+   fence gates pass in both reload epochs. Skin/wind, textured cutout casting, deferred and
    texture-dependent effect participation remain explicit unsupported families.
    The new ordinary0..3-layer shader, independent third UV owner and whole-node
    scene submission and ordered light inheritance are implemented. Host110/run948
@@ -128,8 +139,11 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    multi-object native emissions using those owners, no legacy warm-up, plus
    culling/participation/lifetime and targeted pixel checks. Do not stop at another
    source-reader helper or claim all2,898 light bindings are native draws.
-2. **Material families and characters.** Extend the same path to alpha-tested,
-   wind and translucent materials; deliver native skeleton/skin assets, animation/
+2. **Material families and characters.** Direct blended-cutout scene ownership
+   is now connected and CPU/GPU-tested, pending host compilation and fresh game
+   emission/pixel/interoperation evidence. Next connect phase1 textured cutout
+   casting using its actual image/colour rules, then wind and translucent
+   materials; deliver native skeleton/skin assets, animation/
    pose production and GPU skinning as connected character paths. Test authored
    changes and field/battle/cutscene/shadow lifetimes. Cook only formats/assets
    actually needed, with stable IDs, persistence and bounded streaming.

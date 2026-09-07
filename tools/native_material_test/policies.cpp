@@ -1,6 +1,7 @@
 #include "gpu/scene/native_material_data.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_primitive_policy_source.h"
+#include "gpu/scene/native_material_alpha_source.h"
 #include <iostream>
 #include <stdexcept>
 #include <unordered_map>
@@ -39,7 +40,8 @@ void TestNativePrimitivePolicies() {
   Require(compose() && SummarizePrimitivePlan(values).deferred == 4, "pass two forces alpha/sorted participation");
   inputs.pass_mode = 3;
   Require(compose() && SummarizePrimitivePlan(values).direct == 2 &&
-      SummarizePrimitivePlan(values).suppressed == 2, "pass three excludes ordinary alpha participants");
+      SummarizePrimitivePlan(values).suppressed == 2 && values[1].sorted && !values[2].sorted,
+      "pass three preserves sorted policy while suppressing both alpha participants");
   inputs.pass_mode = 0; inputs.phase = 1; inputs.technique = 3; inputs.wind_rejects_shadow = true;
   Require(compose() && values[0].direct && !values[1].shadow_allowed && !values[3].shadow_allowed &&
       !values[3].direct && !values[3].deferred, "zero alpha does not erase earlier shadow rejection");
@@ -114,5 +116,59 @@ void TestNativePrimitivePolicies() {
   memory.clear();
   Require(imported->shadow_modulates_colour && imported->wind_rejects_shadow,
           "owned pass publication survives source destruction");
+  {
+    // Reset-to-default is an action, not just a material value. A repeated E000
+    // must reset a default latched by an earlier opaque/sorted/suppressed draw.
+    const uint16_t commands[]{0x0901,0x2000,1,0, 0x0911,0x2000,1,3,
+        0xe000,0x2000,1,6, 0xe001,0x2000,1,9, 0xe000,0x2000,1,12,
+        0x0901,0xe000,0x2000,1,15, 0x0911,0x2000,1,18,0xff};
+    Require(DecodeMeshMaterials(commands,ranges,nullptr,&steps,[](uint16_t index) {
+      return std::optional(NativeMaterialControl{true,false,false,false,index ? 192u : 0u});
+    }), "cutoff reset recipe decode");
+    inputs = {}; inputs.pass_mode = 3;
+    Require(compose() && values[0].sorted && !values[0].deferred && !values[0].direct,
+        "suppressed sorted primitive still selects sorted default");
+    NativeMaterialAlphaInputs alpha{64,128};
+    std::vector<uint32_t> references;
+    Require(ComposeMaterialAlphaReferences(ranges,values,alpha,references) &&
+        references == std::vector<uint32_t>{128,128,64,192,64,128,128},
+        "ordered default latching, explicit reference and repeated reset");
+    alpha.object_reference = 0;
+    Require(ComposeMaterialAlphaReferences(ranges,values,alpha,references) &&
+        references == std::vector<uint32_t>(7,0), "explicit zero object override is not pass default");
+    alpha.object_reference.reset(); alpha.direct_reference = alpha.sorted_reference = 0;
+    Require(ComposeMaterialAlphaReferences(ranges,values,alpha,references) &&
+        references == std::vector<uint32_t>{0,0,0,192,0,0,0}, "zero pass defaults remain unresolved until next primitive");
+    const auto before_references = references;
+    ranges[3].alpha_reference.reset();
+    Require(!ComposeMaterialAlphaReferences(ranges,values,alpha,references) && references == before_references,
+        "unknown control fails transactionally, never a previous object's cutoff");
+    Require(!ComposeMaterialAlphaReferences({},values,alpha,references) &&
+        !ComposeMaterialAlphaReferences(ranges,std::span(values).first(1),alpha,references), "cutoff cardinality bound");
+    const uint16_t null_control[]{0xe000,0x2000,1,0,0xff};
+    Require(DecodeMeshMaterials(null_control,ranges,nullptr,nullptr,[](uint16_t) {
+      return std::optional(NativeMaterialControl{});
+    }) && !ranges[0].resets_alpha_reference, "null control table is no reset");
+    Require(DecodeMeshMaterials(null_control,ranges) && ranges[0].resets_alpha_reference &&
+        !ranges[0].alpha_reference, "unknown table produces unknown reset, not absent control");
+  }
+  {
+    constexpr uint32_t defaults = (uint32_t(-32036) << 16) - 22280;
+    constexpr uint32_t override_byte = (uint32_t(-32035) << 16) - 26711;
+    memory = {{defaults+60,64},{defaults+64,128},{visual+3120,1},{visual+3124,17},
+        {scene+212,0},{override_byte & ~3u,0xaa00bbcc}};
+    const auto alpha = ReadMaterialAlphaInputs(visual,read);
+    Require(alpha && alpha->direct_reference == 64 && alpha->sorted_reference == 128 &&
+        alpha->object_reference == 17, "cutout input byte and object override precedence");
+    memory[scene+212] = 1; memory.erase(visual+3124);
+    Require(ReadMaterialAlphaInputs(visual,read) && !ReadMaterialAlphaInputs(visual,read)->object_reference,
+        "blocked special override does not read unused object cutoff");
+    memory[override_byte & ~3u] = 0xaa01bbcc;
+    Require(!ReadMaterialAlphaInputs(visual,read), "external state override is not ordinary cutout policy");
+    Require(!ReadMaterialAlphaInputs(visual+1,read) && !ReadMaterialAlphaInputs(UINT32_MAX-3,read),
+        "cutout input alignment and complete word bounds");
+    memory.clear();
+    Require(alpha->object_reference == 17, "copied cutout inputs survive source destruction");
+  }
   std::cout << "native primitive winding, alpha/pass participation, compound invalidation and bounds passed\n";
 }

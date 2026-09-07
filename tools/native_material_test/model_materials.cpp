@@ -517,6 +517,18 @@ void TestNativeModelMaterials() {
         control->disable_shadow == bool((present & 1) && (flags & 8)), "independent present and feature bits");
   }
   words[1000] = 1;
+  words[1000] = 2; words[1008] = 127;
+  Require(ReadModelMaterialControl(1000,0,controls)->alpha_reference == 127,
+      "second control handler owns independent alpha payload");
+  words.erase(1008);
+  Require(ReadModelMaterialControl(1000,0,controls) &&
+      !ReadModelMaterialControl(1000,0,controls)->alpha_reference &&
+      ReadModelShadowPolicy(1000,0,controls) == NativeShadowPolicy::Receive,
+      "missing alpha payload does not erase independently known shadow flags");
+  words[1000] = 0;
+  Require(ReadModelMaterialControl(1000,0,controls)->alpha_reference == 0,
+      "absent second handler bit restores the pass-default recipe without payload");
+  words[1000] = 1;
   for (uint32_t flags = 0; flags < 16; ++flags) {
     words[1004] = flags;
     Require(ReadModelShadowPolicy(1000, 0, controls) ==

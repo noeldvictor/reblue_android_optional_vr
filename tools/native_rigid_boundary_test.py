@@ -225,8 +225,33 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         schema = (ROOT / "src/gpu/scene/native_rigid_program.h").read_text()
         self.assertIn("layer < 4", schema)
         fixture = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
-        self.assertIn("mode<12", fixture)
+        self.assertIn("mode<23", fixture)
         self.assertIn("detail_colours[layer-1]", fixture)
+
+    def test_cutouts_use_owned_recipe_and_shader_not_draw_state(self):
+        source = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        producer = source.split("NativeObjectTextureScope::NativeObjectTextureScope", 1)[1].split(
+            "NativeObjectTextureScope::~NativeObjectTextureScope", 1)[0]
+        self.assertIn("ReadMaterialAlphaInputs(*visual, Word)", producer)
+        self.assertIn("publication->cutout_pass = CaptureCutoutPass()", producer)
+        consumer = source.split("std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject", 1)[1].split(
+            "bool CommitNativeRigidSceneLights", 1)[0]
+        self.assertIn("ComposeMaterialAlphaReferences(program->ranges, admission.policies", consumer)
+        self.assertIn("cutout->reference = references[primitive]", consumer)
+        for forbidden in ("Word(", "CurrentAlphaIntent", "CurrentBlendIntent", "Video::AlphaThreshold", "pipelineState"):
+            self.assertNotIn(forbidden, consumer)
+        draw = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        self.assertIn("ApplyBlendState(plan.blend, pipeline_state, blend_dirty)", draw)
+        self.assertIn("draw.reorderable = !plan.blend.alphaBlendEnable", draw)
+        self.assertIn("plan.alpha_to_coverage && shape->samples > 1", draw)
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
+        self.assertIn("RigidCutoutPasses(object_data.flags.z, albedo.a, asfloat(object_data.flags.w))", shader)
+        self.assertLess(shader.index("const float4 albedo ="), shader.index("RigidCutoutPasses("))
+        for path, function in (("native_alpha_bridge.cpp", "FindNativeAlphaIntent"),
+                               ("native_blend_bridge.cpp", "FindNativeEnabledBlendIntent")):
+            body = (ROOT / "src/gpu/scene" / path).read_text().split(function + "() {", 1)[1].split("\n}", 1)[0]
+            for forbidden in ("Bootstrap", "ReadShadow", "ReadImport", "bd::mem::"):
+                self.assertNotIn(forbidden, body)
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()
