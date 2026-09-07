@@ -40,6 +40,10 @@ struct NativeGeometry {
   u64 id = 0, layout = 0;
   bool canonical_vertices = false;
   NativeVertexInputHandle vertex_input;
+  // The production native scene/shadow signature, resolved from the asset at
+  // upload/load time. Null means the explicit rigid inputs are unavailable;
+  // never discover them later from a translated draw or source declaration.
+  NativeVertexInputHandle rigid_vertex_input;
   u32 strides[16]{};
   plume::RenderVertexBufferView streams[16]{};
   u32 stream_mask = 0;

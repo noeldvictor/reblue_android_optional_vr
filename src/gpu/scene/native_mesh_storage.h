@@ -9,8 +9,19 @@
 #include "gpu/scene/native_mesh_data.h"
 #include <filesystem>
 #include <mutex>
+#include <charconv>
+#include <string_view>
 
 namespace bd::gpu::scene {
+
+constexpr uint64_t kNativeMeshSelectedMaxBytes = 2ull << 20;
+// A single content identity, never a path/glob or a partial hexadecimal parse.
+inline uint64_t ParseNativeMeshSelection(std::string_view text) {
+  if (text.size() != 16) return 0;
+  uint64_t id = 0;
+  const auto parsed = std::from_chars(text.data(), text.data() + text.size(), id, 16);
+  return parsed.ec == std::errc{} && parsed.ptr == text.data() + text.size() ? id : 0;
+}
 
 struct NativeMeshDiskBudget {
   uint64_t max_bytes = 256ull << 20;
@@ -43,7 +54,8 @@ public:
   explicit NativeMeshDiskCache(std::filesystem::path directory,
                                NativeMeshDiskBudget budget = {});
   bool Read(uint64_t key, NativeMeshData &mesh);
-  bool Write(uint64_t key, const NativeMeshData &mesh);
+  bool Write(uint64_t key, const NativeMeshData &mesh,
+             uint64_t max_write_bytes = kNativeMeshMaxBytes);
   NativeMeshDiskStats Stats() const;
   static std::filesystem::path FileName(uint64_t key);
 

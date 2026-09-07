@@ -58,21 +58,21 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **native instance poses now retain their
-loaded model's node-to-primitive association and bounds**. The host walk consumes
-those owned bounds; fresh field checks add 1,761,600 matching reads with no missing
-associations or mismatches. CPU lifetime/budget tests, host74–76, 238 source/scenario
-checks and eight runner tests pass. Run919's image was inspected; run920 adds
-stable candidate content IDs and passes the field/movement/shadow gates without
-another image. Known cliff artifacts/blur remain.
+Latest desktop checkpoint (2026-09-07): **the selected rigid field asset is now
+persisted and independently readable**, and uploaded geometry retains the native
+scene/shadow vertex layout. Geometry `258694267A8DBAEE`, material
+`63B8D67932573E51`, has 162 vertices /158 triangles in a 17,572-byte file. All four
+required attributes exist. Mesh behavior tests, host77 and 240 source/scenario
+checks pass; run921 repeats the field/movement/shadow text gates with exactly
+one cache write and no captures. Run919 remains the latest inspected game image,
+tied to its earlier binary; known cliff artifacts/blur remain.
 
-The next target is an actual single-primitive `bg41_01` node, geometry
-`258694267A8DBAEE`, material `63B8D67932573E51`. Its canonical geometry is currently
-memory-only, not a persisted source-free asset. Connect owned object color/UV/
-images and live light/fog producers to direct scene/shadow submission, then prove
-interpreter/template-free cold-load and reload. **No live game object uses the
-new native rigid shaders yet.** This is not full-game/both-eye qualification or
-a measured speedup. [Evidence and next integration](research/20260907_0312_native-model-node-associations.md).
+Next: connect this object's owned color/UV/images and live light/fog inputs to
+direct scene/shadow submission, then prove interpreter/template-free cold-load
+and reload. Its UVs still need the material-family conversion; attribute presence
+alone is not shader eligibility. **No live game object uses the new native rigid
+shaders yet.** Source-free GPU loading, full-game/both-eye qualification and any
+speedup remain unproven. [Evidence and next integration](research/20260907_0340_selected-native-rigid-asset.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no

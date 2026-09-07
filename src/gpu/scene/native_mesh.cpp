@@ -8,6 +8,7 @@
 #include "gpu/scene/native_mesh_data.h"
 #include "gpu/scene/native_mesh_cook.h"
 #include "gpu/scene/native_mesh_storage.h"
+#include "gpu/scene/native_rigid_program.h"
 
 #include <algorithm>
 #include <bit>
@@ -19,6 +20,7 @@
 #include <xxhash.h>
 #include <rex/graphics/xenos.h>
 #include <rex/runtime.h>
+#include <rex/cvar.h>
 
 #include "core/logging.h"
 #include "core/memory_helpers.h"
@@ -26,6 +28,8 @@
 #include "gpu/device.h"
 #include "gpu/frame_stats.h"
 #include "gpu/resources.h"
+
+REXCVAR_DECLARE(std::string, bd_native_mesh_cook_target);
 
 namespace bd::gpu::scene {
 namespace {
@@ -51,6 +55,7 @@ struct Store {
   u32 built = 0, loaded = 0, refused = 0, budget_refused = 0;
   u32 native_draws = 0, legacy_draws = 0, last_frame = 0;
   u32 canonical_meshes = 0, canonical_draws = 0, source_free_loads = 0;
+  bool selected_reported = false;
 };
 Store &store() {
   static Store s;
@@ -107,6 +112,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   result->layout = data.layout;
   result->canonical_vertices = !data.attributes.empty();
   result->vertex_input = std::move(vertex_input);
+  result->rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs);
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
   result->start_index = chunk.used / 4;
@@ -270,14 +276,27 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   auto result = Upload(s, data, key, std::move(vertex_input));
   if (!result)
     return {};
+  const uint64_t selection = ParseNativeMeshSelection(REXCVAR_GET(bd_native_mesh_cook_target));
+  const bool selected = selection && key == selection && !data.attributes.empty();
   if (loaded)
     ++s.loaded;
   else {
     // Persistence refusal never discards usable native GPU geometry or routes
     // this draw back through the guest. Keep one bounded resident result.
-    if (r.persist)
-      DiskCache().Write(key, data);
+    if (r.persist || selected)
+      DiskCache().Write(key, data, r.persist ? kNativeMeshMaxBytes : kNativeMeshSelectedMaxBytes);
     ++s.built;
+  }
+  if (!s.selected_reported && selected) {
+    s.selected_reported = true;
+    NativeMeshData check;
+    const bool persisted = DiskCache().Read(key, check) && NativeMeshContentId(check) == key;
+    BD_INFO("[native-mesh-selected] geometry {:016X} persisted {} reused {} rigid input {}; {} indices, {} attributes, stride {}; no direct draw claimed",
+            key, persisted, loaded, bool(result->rigid_vertex_input), data.indices.size(),
+            data.attributes.size(), data.streams[0].stride);
+    for (const auto &attribute : data.attributes)
+      BD_INFO("[native-mesh-selected-schema] semantic {} index {} offset {}",
+              uint32_t(attribute.semantic), attribute.index, attribute.offset);
   }
   s.meshes.emplace(key, result);
   s.import_aliases.emplace(import_key, key);

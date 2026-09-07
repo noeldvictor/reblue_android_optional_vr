@@ -62,6 +62,14 @@ weights remain zero while missing color alpha remains one.
 source buffers or declarations; v1 cannot use that entry point. Direct native
 scene/shadow object submission is still pending.
 
+Upload/import and source-free disk load also resolve `NativeRigidVertexInput`
+into `NativeGeometry::rigid_vertex_input`: explicit native locations0..3 for
+Position/Normal/TexCoord0/Color0. Missing attributes leave that handle null,
+without discarding usable geometry. It shares the existing bounded input library.
+This does not route a game draw or establish its material/pass eligibility.
+In particular, v2 preserves decoded input values: texture sampling units still
+depend on the material family, not just the presence of a TexCoord attribute.
+
 Both formats share the existing historical `native_meshes/v1` directory and
 its 256 MiB/16,384-file disk budget, writer lease and 20 GiB reserve. A new version
 does not grant a second cache allowance. Valid conflicting files are never
@@ -69,7 +77,27 @@ overwritten, and no bulk migration is performed. GPU storage retains its separat
 256 MiB limit; metadata is bounded to 16,384 geometries and 32,768 temporary
 import aliases. Direct native loads do not consult that alias map.
 
+For a bounded targeted cook, `bd_native_mesh_cook_target` defaults to empty.
+With material verification suppressing normal persistence, setting one exact
+nonzero16-digit hexadecimal content ID permits only that canonical asset, at
+most2 MiB, under the same cache limits. Invalid/empty IDs select nothing. Normal
+persistence outside verification is unchanged; this setting is not a global
+cache-disable switch. Per-write byte limits are checked before filesystem writes.
+Read one selected asset without the game/GPU or new output files:
+
+```powershell
+out/native_mesh_check/native_mesh_test.exe --inspect out/build/win-amd64-release/cache/native_meshes/v1 258694267A8DBAEE
+```
+
+Inspection validates the content ID, reports schema/lane ranges and whether the
+native shader input exists. It does not declare a direct render or GPU-load pass.
+
 ## Verification status
+
+Latest selected-asset check: mesh11/CPU10, host77 and field921 pass; exactly one
+17,572 B asset was persisted. Its162 vertices/474 indices have all four native
+inputs; UV0 is16383..16895 and still requires family-specific conversion. No
+new image/raw output. See the [selected asset evidence](../research/20260907_0340_selected-native-rigid-asset.md).
 
 The rebuilt mesh fixture (build09/CPU08) passes canonical numeric/schema/storage
 checks, source-destroyed input consumption and the synthetic-pulling correction.

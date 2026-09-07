@@ -110,14 +110,14 @@ bool NativeMeshDiskCache::Read(uint64_t key, NativeMeshData &mesh) {
   return true;
 }
 
-bool NativeMeshDiskCache::Write(uint64_t key, const NativeMeshData &mesh) {
+bool NativeMeshDiskCache::Write(uint64_t key, const NativeMeshData &mesh, uint64_t max_write_bytes) {
   std::lock_guard lock(mutex_);
   const auto fail = [&] { ++stats_.write_failures; return false; };
   const auto refuse = [&] { ++stats_.budget_refusals; return fail(); };
   std::vector<uint8_t> bytes;
   if (!EncodeNativeMesh(mesh, bytes))
     return fail();
-  if (!budget_.max_files || bytes.size() > budget_.max_bytes)
+  if (!budget_.max_files || bytes.size() > budget_.max_bytes || bytes.size() > max_write_bytes)
     return refuse();
   if (!SafeDirectoryAncestors(directory_))
     return fail();

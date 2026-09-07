@@ -2085,3 +2085,60 @@ sizes unchanged; actual latest binary hash in dated report.238 guards/scenarios
 pass again. Logs179,228 B (+747 from prior tally), comparable retained growth
 121,979 B plus136,192 host exe/PDB. Build-end free63,313,158,144 B; no additional
 cleanup savings or reset. Run919 pixels/920 text remain tied to host74/75.
+
+### Selected native rigid asset, same checkpoint (2026-09-07)
+
+Parent a4b4555; previous turn verified progress, committed/pushed clean. First
+free63,298,228,224 B; no active renderer/build processes. Same original3 GiB
+exception/floor62,509,998,080 B/raw0 gate; no budget reset. Reuse mesh fixture
+tree1,419,621 B and desktop tree. Plan <=4 MiB fixture/log retained growth and
+<=256 MiB per-build overlap. Selected geometry258694267A8DBAEE may add only one
+<=2 MiB file to the existing36,510,144 B native cache, under its aggregate writer
+limits. No broad recook, guest/shader rebuild, new tree or raw/image capture.
+Keep run920 text/run919 image and distinct GPU fixture evidence until equivalent
+replacement checks pass. Native shader input ownership is added at upload/load;
+game draws are not rerouted by this change. Actual schema inspection is needed
+before the selected object's direct consumer can be declared eligible.
+
+Mesh06 failed on Windows min/max macros; fixed locally. Mesh10 built, CPU09
+failed because the new fixture's nested directory interfered with an older
+inventory assertion, not a production storage failure. Isolated scratch state;
+mesh11/PID25416 and CPU10/PID30208 pass (0.12 s behavior/0.13 s CTest). Host77/
+PID28004 passes, up-to-date codegen and host objects/link only. No producer left.
+240 Python checks pass. Host exe48,346,624/PDB107,438,080 B; mesh tree1,490,087 B
+(+70,466), logs187,058 B (+7,830). Same source/shader consumers, no game reroute.
+
+Runtime preflight03:33:45 free63,006,949,376 B. Scoped cache/hlsl/perf files
+modified since03:20: zero; current modified host object/metadata payload24,587,804 B
+is not its net growth (prior per-object baseline unavailable). Drive-wide loss
+291,278,848 B exceeds known artifacts; attribution remains unknown. Inspected
+scope before continuing; enforce original floor AND per-run192 MiB growth stop.
+One<=75 s full field regression with explicit selected cook, <=400 KiB log,
+one<=2 MiB mesh file, no image/raw/perf/dump. Owner116 B profile hash unchanged.
+
+Run921/PID27672 terminal03:35:38, all15 settings effective/exact profile restored.
+Full field text gates pass; bounds+1,761,600 matching reads, poses+113,082,
+movement30 samples/+37.772134 units. Exactly one17,572 B mesh file added; cache
+3511files/36,527,716 B, one write/zero refusals. Read-only fixture verifies native
+content/schema and retained input after CPU-data destruction. UV0 still16383..
+16895; exact live material-family UV/flags remain unresolved. No direct game
+route/source-free GPU load. No new raw/image/perf/dump; inspected run919 image
+remains tied to host74. Run921 log236,311 B replaces run920 text. New source and
+artifact hashes in `20260907_0340_selected-native-rigid-asset.md`.
+
+After equivalent checks passed, removed13 exact superseded log files: mesh
+builds09/06/10, CPU08/09 and host76 stdout/stderr, plus run920 full text. Causes
+of the two test-side failures remain in the report; build/test logs reproducible,
+old field text gone but recorded observations/hashes remain. Current mesh11/
+CPU10/host77 logs, run921 and run919 image, distinct GPU/baseline/motion/raw
+evidence preserved.241,190 logical B; immediate free63,316,140,032 ->63,316,393,984 B,
+**253,952 B (248 KiB) actually reclaimed**, credited once. Earlier604 KiB cleanup
+is not part of this turn's savings. No renderer/build producer remains.
+
+Final measured mesh tree+70,466 B, build logs+1,922 B, field-log replacement+1,029 B,
+selected asset+17,572 B, host exe/PDB+56,832 B: known retained growth147,821 B for
+the new asset/input coverage; other objects/metadata/source/Git deltas unknown.
+Cleanup-end free58.968 GiB, drive-wide gain18,165,760 B from this turn's first;
+independent volume gains are not credited as cleanup. Same original cap/floor/
+raw0 gate; retain the selected native asset for direct consumption and replace
+the field/build logs by purpose, not by every revision.

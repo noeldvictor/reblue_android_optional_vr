@@ -5,6 +5,10 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_mesh_storage.h"
+#include "gpu/scene/native_rigid_program.h"
+#include <bit>
+#include <algorithm>
+#include <limits>
 #include <barrier>
 #include <charconv>
 #include <chrono>
@@ -64,6 +68,11 @@ std::vector<uint8_t> Bytes(const NativeMeshData &mesh) {
 } // namespace
 
 void TestMeshStorage() {
+  Require(ParseNativeMeshSelection("258694267A8DBAEE") == 0x258694267a8dbaeeull &&
+          ParseNativeMeshSelection("258694267a8dbaee") == 0x258694267a8dbaeeull, "exact content selection");
+  for (const auto text : {"", "0", "0000000000000000", "0258694267A8DBAEE0", "258694267A8DBAEx",
+                           " 58694267A8DBAEE", "0x8694267A8DBAEE", "../694267A8DBAEE"})
+    Require(!ParseNativeMeshSelection(text), "malformed/empty selection must disable cooking");
   const auto mesh = Mesh();
   const auto bytes = Bytes(mesh);
   constexpr uint64_t metadata = 64ull << 10;
@@ -119,6 +128,16 @@ void TestMeshStorage() {
     Require(!zero.Write(1, mesh) && !fs::exists(scratch.path / "disabled"), "oversized output creates nothing");
     NativeMeshDiskCache no_files(scratch.path / "no-files", {1024, 0, 0});
     Require(!no_files.Write(1, mesh) && !fs::exists(scratch.path / "no-files"), "zero file cap creates nothing");
+    Scratch selected_scratch;
+    NativeMeshDiskCache selected(selected_scratch.path / "selected", {1024, 20, 0});
+    Require(!selected.Write(1, mesh, bytes.size() - 1) && !fs::exists(selected_scratch.path / "selected"),
+            "selected output cap checked before directories or writes");
+    Require(selected.Write(1, mesh, bytes.size()) && !selected.Write(2, mesh, 0),
+            "selected exact-byte limit and zero allowance");
+    const auto selected_stamp = fs::last_write_time(selected_scratch.path / "selected" / selected.FileName(1));
+    Require(selected.Write(1, mesh, bytes.size()) &&
+            selected_stamp == fs::last_write_time(selected_scratch.path / "selected" / selected.FileName(1)),
+            "selected reuse preserves bytes and modification time");
     NativeMeshDiskCache reserve(scratch.path, {1024, 20, UINT64_MAX});
     Require(!reserve.Write(2, mesh) && reserve.Stats().budget_refusals == 1, "free-space reserve refusal");
   }
@@ -213,4 +232,46 @@ int VerifyMeshCache(const char *path) {
   std::cout << "read-only native mesh verification: " << files << " files / " << bytes
             << " bytes loaded without source memory or writes\n";
   return 0;
+}
+
+int InspectNativeMesh(const char *path, const char *selection) {
+  // One bounded native asset only; no SDK, game, GPU, repairs or output files.
+  const uint64_t key = ParseNativeMeshSelection(selection);
+  Require(key != 0, "inspection requires an exact nonzero content ID");
+  const auto file = fs::path(path) / NativeMeshDiskCache::FileName(key);
+  Require(fs::file_size(file) <= kNativeMeshSelectedMaxBytes, "selected inspection byte cap");
+  NativeMeshDiskCache cache(path, {0, 0, UINT64_MAX});
+  NativeMeshData mesh;
+  Require(cache.Read(key, mesh) && NativeMeshContentId(mesh) == key, "native content integrity");
+  NativeVertexInputLibrary inputs;
+  const auto input = NativeRigidVertexInput(mesh, inputs);
+  const auto &stream = mesh.streams[0];
+  std::cout << "native asset " << selection << ": " << fs::file_size(file) << " bytes, "
+            << mesh.indices.size() << " indices, " << stream.bytes.size() / stream.stride
+            << " vertices, stride " << stream.stride << ", rigid input " << bool(input) << '\n';
+  for (const auto &attribute : mesh.attributes) {
+    std::array<float, 4> lo, hi;
+    lo.fill(std::numeric_limits<float>::infinity()); hi.fill(-std::numeric_limits<float>::infinity());
+    for (size_t vertex = 0; vertex < stream.bytes.size(); vertex += stream.stride)
+      for (uint32_t lane = 0; lane < 4; ++lane) {
+        uint32_t bits = 0;
+        const size_t offset = vertex + attribute.offset + lane * 4;
+        for (uint32_t b = 0; b < 4; ++b) bits |= uint32_t(stream.bytes[offset + b]) << (b * 8);
+        const float value = std::bit_cast<float>(bits);
+        lo[lane] = (std::min)(lo[lane], value); hi[lane] = (std::max)(hi[lane], value);
+      }
+    std::cout << "semantic " << uint32_t(attribute.semantic) << " index " << attribute.index
+              << " offset " << attribute.offset << " lanes";
+    for (uint32_t lane = 0; lane < 4; ++lane) std::cout << " [" << lo[lane] << ',' << hi[lane] << ']';
+    std::cout << '\n';
+  }
+  mesh = {}; // native shader input ownership is independent of loaded CPU bytes
+  if (input) {
+    Require(input->Streams() == 1 && input->Elements().size() == 4 &&
+            input->ShaderDecode() == VertexShaderDecode{}, "source-free rigid input");
+    for (uint32_t n = 0; n < 4; ++n)
+      Require(input->Elements()[n].location == n && input->Elements()[n].slotIndex == 0,
+              "explicit native shader locations");
+  }
+  return 0; // unavailable input is reported, not a claim of renderer eligibility
 }

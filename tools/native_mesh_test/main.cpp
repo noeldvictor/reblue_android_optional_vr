@@ -15,11 +15,14 @@ void TestMeshStorage();
 void TestVertexInput();
 void TestMeshCook();
 int VerifyMeshCache(const char *path);
+int InspectNativeMesh(const char *path, const char *selection);
 static int RunTests(int argc, char **argv) {
   if (argc == 3 && std::string_view(argv[1]) == "--verify-cache")
     return VerifyMeshCache(argv[2]);
+  if (argc == 4 && std::string_view(argv[1]) == "--inspect")
+    return InspectNativeMesh(argv[2], argv[3]);
   if (argc != 1) {
-    std::cerr << "usage: native_mesh_test [--verify-cache <directory>]\n";
+    std::cerr << "usage: native_mesh_test [--verify-cache <directory> | --inspect <directory> <content-id>]\n";
     return 2;
   }
   std::vector<uint32_t> tris;

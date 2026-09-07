@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after native model-node association checks and field runs919/920. The first
+Updated 2026-09-07 after selected native geometry persistence and field run921. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -133,10 +133,13 @@ material `63B8D67932573E51`, model-local node64, sole primitive, technique0/view
 in `bg41_01`. Runtime instance144/generation93 identify that observation only,
 not persistent asset IDs. The material has modulation off, black specular/power0;
 diffuse comes from the live object color. Its skin command is unspecified and
-its canonical vertex schema still needs explicit eligibility checking. No v2
-cache file exists for that geometry yet: verification cooks it in memory and
-disables persistence. Persist/validate only this selected asset under existing
-budgets, not the whole library. Complete color/UV/image/light/fog ownership and
+its canonical vertex schema now has all four required native inputs. Its17,572 B
+v2 file is persisted and independently inspected;162 vertices/158 triangles.
+Upload/load retains `rigid_vertex_input`, independent of translated locations.
+UV0 values16383..16895 still require the actual material-family conversion; the
+related cached CS-normal shader uses `(uv+1)/512+offset`, not yet proven as this
+object's exact live variant. Reuse this selected asset, not a library-wide recook.
+Complete color/UV/image/light/fog ownership and
 whole-node preflight before routing it. Other families must keep drawing; these
 IDs identify a target, not a completed direct object or permission to drop siblings.
 
@@ -174,6 +177,18 @@ program guards brought these to 116 /231; rigid shader guards now bring them to
 separate C++ and runtime evidence follows below.
 
 ## Latest qualified checkpoint
+
+Selected native rigid asset (2026-09-07): geometry upload/load now resolves and
+retains the production native shader vertex input. An opt-in exact content ID
+allows one<=2 MiB asset during otherwise persistence-disabled verification, using
+the same aggregate disk cache and reserve. Mesh11/CPU10, host77 and240 Python
+checks pass. Run921 repeats the complete existing field text gate, writes exactly
+one17,572 B file and no raw/image/perf/dump. Independent read validates identity,
+actual attributes and input lifetime after CPU data destruction. The schema has
+Position/Normal/UV0/Color, but UV units and live material flags still need exact
+family resolution. No game draw reroute, source-free GPU load or new game pixel
+qualification; run919 remains the inspected image tied to host74. Evidence:
+`research/20260907_0340_selected-native-rigid-asset.md`.
 
 Native model-node associations (2026-09-07): load traversal preserves every
 node-to-program association, including shared meshes; duplicate matrix indices

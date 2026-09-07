@@ -463,6 +463,10 @@ REXCVAR_DEFINE_BOOL(bd_host_draw, true, kCvarGroup,
                     "guest's per-node interpreter.");
 // Desktop geometry and disk reuse qualified in native_mesh_test and flat /
 // multiview captures. Device qualification waits for the full host frame.
+REXCVAR_DEFINE_STRING(bd_native_mesh_cook_target, "", kCvarGroup,
+                    "Optional single 16-digit native geometry content ID to persist during "
+                    "material verification; at most 2 MiB, same aggregate cache budget. "
+                    "Empty disables selected cooking; this does not enable direct rendering.");
 REXCVAR_DEFINE_BOOL(bd_native_meshes, true, kCvarGroup,
                     "Cook loaded model meshes into persistent native assets "
                     "and shared host geometry buffers.");
