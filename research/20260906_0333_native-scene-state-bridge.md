@@ -2714,3 +2714,55 @@ replacement evidence is retained until its coverage is superseded. Other objects
 source/Git and unrelated volume activity are not fully attributed. Cleanup-end
 63,111,065,600 B/58.777 GiB free,4,456,448 B drive-wide use from output preflight.
 Keep the same cumulative ledger/budget for continued lifecycle work.
+
+### Hard-off routing continuation, 2026-09-07
+
+Parent096d732. Same original3 GiB exception and62,509,998,080 B floor;
+100 MiB diagnostics/10 MiB logs/images, incoming raw0, no budget reset.
+Output preflight63,084,503,040 B free; owner profile hash unchanged and no
+renderer/build producer active. The20,017,152 B drive-wide decrease from the
+previous post-push measurement is not attributed to source edits or cleanup.
+Planned incremental host/CPU-fixture overlap under192 MiB, reusing the existing
+256 MiB free-drop/300 s/10 MiB aggregate-log supervisor. No shader changes:
+GPU26/rigid05 remains applicable to unchanged programs. Retain937/image until
+equivalent replacement passes. New hard-off negative/lifetime cases require
+the existing CPU fixture; no new tree, assets, cache or raw capture is planned.
+Output21/PID27848 and CPU6/PID14616 passed, then expanded missing-geometry
+identity rejection before runtime. Output22/PID24552 and CPU7/PID24236 pass
+0.37/0.39 s. Host97/PID27176 and refined host98/PID29904 pass; the latter
+rebuilds one host source. Codegen0 written/up to date, no guest objects. All288
+Python checks pass. Final host build-end62,884,683,776 B free. Scoped CPU fixture
+growth is2,777,301 B; executable/PDB growth40,448 B. The larger drive-wide fall
+does not match these retained outputs and is not fully attributed. No producer
+was left running; no extra tree or capture was created to investigate it.
+
+Pre-runtime62,816,825,344 B free. The minimal new runtime output still fit the
+original floor and the existing192 MiB per-run free-drop limit. Run938/PID31104,
+10:42:22-10:43:25, passes cold-start hard-off admission before first native draw
+at frame764 plus all existing fresh field/movement/scene/shadow gates.300 scene
+and shadow admissions/emissions, merged instances0, no hard-off refusal.
+Actual selected-asset teardown/reload remains pending. All18 settings audited;
+exact116 B profile restored. New259,886 B log and inspected119,222 B JPEG;
+raw/perf/cache/cook/dump outputs0. Runtime-end62,728,318,976 B free; no owned
+producer survives. No shader/GPU rerun. Details and hashes are in
+20260907_1045_native-rigid-hard-off.md.
+
+Removed14 verified superseded agent files after938/image passed: output20/21,
+CPU5/6,host96/97 stdout/stderr plus937 log/batch JPEG.422,147 logical B;
+free62,644,748,288 ->62,645,186,560 B: **438,272 B actually reclaimed** once.
+Old runtime text/image no longer retained; hashes/findings remain, tests are
+regenerable. Keep938/image,host98,output22/CPU7, unchangedGPU26/rigid05 and all
+distinct protected baseline/flat/VR/movement/failure/raw evidence. No source,
+game data, profile or active build tree deleted.
+
+CPU tree68,896,433 B (+2,777,301), GPU tree unchanged10,487,791 B,
+build logs184,150 B (-28,516), images10,225,622 B (-24,379), runtime+16,152 B,
+exe48,527,360 B (+7,680), PDB108,650,496 B (+32,768). Known component growth
+**2,781,006 B** for the linked real model registry/lifetime fixture and native
+guard, with one replacement runtime set. Other objects/source/Git and unrelated
+volume activity remain unattributed. Cleanup-end58.343 GiB free;439,316,480 B
+drive-wide use from preflight is not all task storage. Actual peak not separately
+recorded; supervisors preserved the original floor. No more build/run queued.
+The next producer must remeasure/reconcile this same budget before launching;
+only135,188,480 B remained above its operational floor at cleanup, not a new
+allowance. New raw stays0 and the protected historical archive is unchanged.

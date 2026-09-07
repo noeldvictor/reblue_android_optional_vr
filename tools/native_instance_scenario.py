@@ -464,6 +464,34 @@ def verify_rigid_batches(text):
                 shadow_instances_delta=b[3]-a[3], shadow_calls_delta=b[4]-a[4], merged_instances_delta=b[5]-a[5])
 
 
+def verify_rigid_hard_off(text):
+    """Pre-cull hard-off admission, not proof of teardown/reload or GPU output."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("rigid hard-off diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-rigid-hard-off\] frame (\d+) scene checks (\d+) shadow checks (\d+); node (\d+) generation (\d+);")
+    contexts, metrics = [], []
+    first_native = None
+    for index, line in enumerate(text.splitlines()):
+        if "[native-rigid-hard-off] refused:" in line:
+            raise ValueError("hard-off native routing refused; fallback cannot qualify")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        if first_native is None and re.search(r"\[native-rigid-(?:scene|shadow)\] frame \d+ submitted [1-9]\d*", line):
+            first_native = index
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if not values[4]:
+                raise ValueError("hard-off native model generation is invalid")
+            metrics.append((index, values))
+    if not metrics or first_native is None or metrics[0][0] >= first_native:
+        raise Pending("need hard-off admission before the first native submission")
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1, 2)) or b[3:] != a[3:]:
+        raise Pending("need fresh scene/shadow admission in one loaded generation")
+    return dict(scene_checks_delta=b[1]-a[1], shadow_checks_delta=b[2]-a[2])
+
+
 def verify_shadow_images(text):
     """Require fresh native shadow completion and exact image-owner publication."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -612,6 +640,7 @@ def main():
     parser.add_argument("--rigid-shadow", action="store_true")
     parser.add_argument("--rigid-scene", action="store_true")
     parser.add_argument("--rigid-batches", action="store_true")
+    parser.add_argument("--rigid-hard-off", action="store_true")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -644,6 +673,7 @@ def main():
         rigid_shadow = verify_rigid_shadow(text) if args.rigid_shadow else None
         rigid_scene = verify_rigid_scene(text) if args.rigid_scene else None
         rigid_batches = verify_rigid_batches(text) if args.rigid_batches else None
+        rigid_hard_off = verify_rigid_hard_off(text) if args.rigid_hard_off else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -690,6 +720,8 @@ def main():
         print("PASS: post-event direct rigid scene " + ", ".join(f"{k}={v}" for k, v in rigid_scene.items()))
     if rigid_batches is not None:
         print("PASS: post-event native rigid batches " + ", ".join(f"{k}={v}" for k, v in rigid_batches.items()))
+    if rigid_hard_off is not None:
+        print("PASS: pre-cull hard-off rigid routing (reload unqualified) " + ", ".join(f"{k}={v}" for k, v in rigid_hard_off.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     if primitive_shader is not None:

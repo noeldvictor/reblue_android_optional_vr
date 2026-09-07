@@ -50,6 +50,7 @@
 #include "gpu/scene/deferred_consumer.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/node_tag.h"
+#include "gpu/scene/native_rigid_route_bridge.h"
 #include "gpu/scene/scene_recorder.h"
 
 extern "C" void __imp__bdSceneNodeDrawSingle(PPCContext &__restrict ctx,
@@ -114,6 +115,7 @@ void DiagAfter(u32 device) {
 } // namespace
 
 REX_HOOK_RAW(bdSceneNodeDrawSingle) {
+  bd::gpu::scene::RequireNativeRigidLegacyNode(ctx.r6.u32, ctx.r3.u32);
   // Proof the override is live, once. A hook on a function nobody has watched
   // fire is a guess - this file exists to remove that doubt before anything is
   // built on it.

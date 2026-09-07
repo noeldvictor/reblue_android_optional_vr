@@ -6,12 +6,15 @@
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_instance_source.h"
 #include "gpu/scene/native_material.h"
+#include "gpu/scene/native_rigid_route.h"
+#include "gpu/scene/native_rigid_route_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
 #include "core/settings.h"
 #include "gpu/frame_stats.h"
 #include <algorithm>
+#include <stdexcept>
 #include <rex/cvar.h>
 #include <rex/hook.h>
 #include <rex/ppc/context.h>
@@ -20,6 +23,11 @@
 REXCVAR_DEFINE_BOOL(bd_native_instances, true, kCvarGroup,
     "Producer-owned instance poses for native traversal and draw transforms.");
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
+REXCVAR_DECLARE(bool, bd_native_rigid_scene);
+REXCVAR_DECLARE(bool, bd_native_rigid_shadow);
+REXCVAR_DECLARE(bool, bd_host_walk);
+REXCVAR_DEFINE_BOOL(bd_native_rigid_hard_off, false, kCvarGroup,
+    "Require load-owned rigid routing before culling and reject selected-family legacy entry in every view. Requires both native rigid paths.");
 REX_EXTERN(__imp__bdVisualObjectInitBones);
 REX_EXTERN(__imp__sub_82140DF8);
 REX_EXTERN(__imp__sub_8213F5E8);
@@ -183,6 +191,57 @@ bool CopyNativeInstanceWorld(const NodeTag &tag, float out[16]) {
   if (!pose || tag.node_index >= pose->transforms.size()) return false;
   std::copy_n(pose->transforms[tag.node_index].begin(), 16, out);
   return true;
+}
+
+namespace {
+void RouteRequire(bool valid, const char *reason) {
+  if (valid) return;
+  BD_ERROR("[native-rigid-hard-off] refused: {}; no interpreter/capture/replay fallback", reason);
+  throw std::runtime_error(reason);
+}
+bool HardOffEnabled() {
+  if (!REXCVAR_GET(bd_native_rigid_hard_off)) return false;
+  RouteRequire(REXCVAR_GET(bd_native_rigid_scene) && REXCVAR_GET(bd_native_rigid_shadow) &&
+      REXCVAR_GET(bd_host_walk) && REXCVAR_GET(bd_native_instances),
+      "hard-off requires native scene, shadow, host walk and instance producers");
+  return true;
+}
+}
+
+std::shared_ptr<const NativeModelRenderData> LoadNativeRigidRouteModel(uint32_t context) {
+  if (!HardOffEnabled()) return {};
+  const auto graph = Word(uint64_t(context) + offsetof(GuestTraverseCtx, sceneGraph));
+  const auto model = graph ? FindLoadedNativeModel(*graph) : nullptr;
+  RouteRequire(bool(model), "load-owned traversal model unavailable");
+  return model;
+}
+
+void RequireNativeRigidWalkNode(const std::shared_ptr<const NativeModelRenderData> &model,
+    const NativeInstancePose *pose, uint32_t node, uint32_t view) {
+  if (!HardOffEnabled()) return;
+  const auto decision = PrepareNativeRigidRoute(model, pose, node, view);
+  RouteRequire(decision.route != NativeRigidRoute::Refused, decision.refusal);
+  if (decision.route == NativeRigidRoute::Legacy) return;
+  // Fixed-size counters, no lifetime index or retained templates. This proves
+  // admission ran before culling; actual GPU emissions remain a separate gate.
+  thread_local uint64_t scene = 0, shadow = 0;
+  thread_local uint32_t reported = 0;
+  thread_local bool first = true;
+  ++(decision.route == NativeRigidRoute::Scene ? scene : shadow);
+  const auto frame = FrameStatFrameCount();
+  if (first || frame - reported >= 300) {
+    BD_INFO("[native-rigid-hard-off] frame {} scene checks {} shadow checks {}; node {} generation {}; load-owned admission before culling, legacy entry disabled",
+        frame, scene, shadow, node, model->Generation());
+    first = false; reported = frame;
+  }
+}
+
+void RequireNativeRigidLegacyNode(uint32_t context, uint32_t mesh) {
+  if (!HardOffEnabled()) return;
+  const auto graph = Word(uint64_t(context) + offsetof(GuestTraverseCtx, sceneGraph));
+  const auto owned = graph ? FindLoadedNativeModelMaterials(*graph, mesh) : nullptr;
+  RouteRequire(bool(owned), "legacy node cannot be classified from its loaded model");
+  RouteRequire(NativeRigidLegacyAllowed(owned.get()), "selected family reached legacy node entry");
 }
 } // namespace bd::gpu::scene
 

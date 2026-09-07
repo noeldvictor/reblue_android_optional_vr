@@ -58,7 +58,7 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-Latest **live-game** checkpoint (2026-09-07, host96/run937): one real rigid
+Latest **live-game** checkpoint (2026-09-07, host98/run938): one real rigid
 field object now uses native programs for **both scene and shadow draws**.
 Whole-node admission bypasses its interpreter, capture and replay; fresh field
 windows add 300 scene draw emissions and 300 fence retirements. Its retained
@@ -66,19 +66,24 @@ packet binds current per-node lights, receiver values and explicit image views.
 Both paths now use native instance storage and indexed indirect submission in
 the shared queue. The field target produced single-instance batches, not a
 measured draw-call reduction.
+Hard-off mode now selects from the loaded model before pose fallback/culling
+and rejects entry to the selected family's old renderer in every view. The
+cold-start field run passes with 300 fresh scene and shadow admission checks;
+missing ownership cannot silently warm an old draw template.
 The inspected field image is coherent, with known cliff marks/distant blur.
-Both acceptance switches remain off in the normal profile.
-[Native-batch evidence](research/20260907_1016_native-rigid-batches.md).
+All three acceptance switches remain off in the normal profile.
+[Hard-off evidence](research/20260907_1045_native-rigid-hard-off.md).
 
 Latest **GPU-fixture** checkpoint: five 8x8 two-eye pixel cases pass in
 1.22 seconds with zero Vulkan validation errors/warnings. The new case draws
 two instances together with different transforms, colours, lights and fog;
 both scene and caster use native indexed indirect commands. Nonzero storage/
-command offsets and production-style array views are exercised. All 284 Python
-source/scenario checks and the focused C++ batching fixture pass.
+command offsets and production-style array views are exercised. All 288 Python
+source/scenario checks pass; the expanded C++ fixture also covers missing poses,
+missing geometry identities, stale generations and source-address reuse.
 
-**This is still one opt-in object, not a fully native scene.** Interpreter/
-template-free cold-load/reload acceptance and runtime multi-object batch coverage
+**This is still one opt-in object, not a fully native scene.** Cold-start hard-off
+routing passes; actual teardown/reload and runtime multi-object batch coverage
 remain for the already-cooked asset path. Object/pass source adapters and the original
 receiver callback remain explicitly tracked; no complete lifecycle, both-eye
 qualification or performance improvement is claimed.

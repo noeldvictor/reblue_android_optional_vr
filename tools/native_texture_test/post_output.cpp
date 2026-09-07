@@ -10,6 +10,7 @@
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_rigid_batch.h"
+#include "gpu/scene/native_rigid_route.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include <array>
 #include <limits>
@@ -640,6 +641,78 @@ void CameraAndRigidCaster() {
   program = {}; material.reset(); geometry.reset();
   assert(caster->geometry && caster->geometry->count == 474); // source/model lifetime independent
 }
+void RigidHardOffRouting() {
+  using namespace bd::gpu::scene;
+  const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+  const auto mesh = [](uint32_t key, bool selected, bool bounds = true) {
+    ModelMaterialImport result; result.source_mesh = key;
+    auto &p = result.program; p.valid = true; p.ranges.resize(1);
+    p.materials.resize(1); p.shadow_policies.resize(1); result.source_bindings.resize(1);
+    auto geometry = std::make_shared<NativeGeometry>();
+    geometry->id = selected ? 0x258694267A8DBAEEull : 42;
+    p.geometries.push_back(std::move(geometry));
+    if (bounds) p.bounds = std::array<float,4>{0,0,0,1};
+    return result;
+  };
+  ModelMaterialRegistry models;
+  const ModelNodeSourceBinding nodes[]{{0,100}, {1,200}};
+  assert(models.Publish(10, {mesh(100,true),mesh(200,false)}, nodes));
+  auto model = models.FindModel(10);
+  NativeInstancePose pose{1,model->Generation(),model,{identity,identity}};
+  const auto route = [&](uint32_t node, uint32_t view) {
+    return PrepareNativeRigidRoute(model,&pose,node,view).route;
+  };
+  assert(route(0,1) == NativeRigidRoute::Shadow && route(0,3) == NativeRigidRoute::Scene);
+  assert(route(1,3) == NativeRigidRoute::Legacy);
+  // Selection exists before the first pose handoff, not after an old draw.
+  assert(PrepareNativeRigidRoute(model,nullptr,0,3).route == NativeRigidRoute::Refused);
+  assert(PrepareNativeRigidRoute(model,nullptr,1,3).route == NativeRigidRoute::Legacy);
+  assert(PrepareNativeRigidRoute({},&pose,0,3).route == NativeRigidRoute::Refused);
+  for (uint32_t view : {0u,2u,4u,~0u}) assert(route(0,view) == NativeRigidRoute::Refused);
+  assert(route(2,3) == NativeRigidRoute::Refused);
+  pose.transforms.clear(); assert(route(0,3) == NativeRigidRoute::Refused);
+  pose.transforms = {identity,identity};
+  pose.instance = 0; assert(route(0,3) == NativeRigidRoute::Refused); pose.instance = 1;
+  ++pose.model_generation; assert(route(0,3) == NativeRigidRoute::Refused); --pose.model_generation;
+  assert(!NativeRigidLegacyAllowed(nullptr));
+  assert(!NativeRigidLegacyAllowed(models.Find(10,100).get()));
+  assert(NativeRigidLegacyAllowed(models.Find(10,200).get()));
+  auto invalid = mesh(300,false); invalid.program.valid = false;
+  assert(!NativeRigidLegacyAllowed(&invalid));
+  invalid = mesh(300,false); invalid.program.geometries[0].reset();
+  assert(!NativeRigidLegacyAllowed(&invalid)); // Missing native geometry must not hide selection.
+  auto unknown_id = std::make_shared<NativeGeometry>();
+  invalid.program.geometries[0] = unknown_id; assert(!NativeRigidLegacyAllowed(&invalid));
+  invalid.program.geometries.clear(); assert(!NativeRigidLegacyAllowed(&invalid));
+  const ModelNodeSourceBinding incomplete_node[]{{0,300}};
+  invalid = mesh(300,true); invalid.program.geometries[0].reset();
+  assert(models.Publish(20,{invalid},incomplete_node));
+  assert(PrepareNativeRigidRoute(models.FindModel(20),nullptr,0,3).route == NativeRigidRoute::Refused);
+  models.Retire(20);
+
+  // Teardown and source-address reuse: the old lease is valid for already
+  // queued work, but cannot authorize new traversal against the replacement.
+  const auto retained = model;
+  models.Retire(10);
+  assert(!models.FindModel(10) && !models.Find(10,100));
+  assert(PrepareNativeRigidRoute(models.FindModel(10),&pose,0,3).route == NativeRigidRoute::Refused);
+  assert(models.Publish(10,{mesh(100,true),mesh(200,false)},nodes));
+  model = models.FindModel(10);
+  assert(model != retained && model->Generation() != retained->Generation());
+  assert(route(0,3) == NativeRigidRoute::Refused);
+  pose.model_generation = model->Generation(); // Even a forged matching stamp is insufficient.
+  assert(route(0,3) == NativeRigidRoute::Refused);
+  pose.model = model; assert(route(0,3) == NativeRigidRoute::Scene);
+  assert(models.Publish(10,{mesh(100,true,false),mesh(200,false)},nodes));
+  model = models.FindModel(10); pose.model = model; pose.model_generation = model->Generation();
+  assert(route(0,3) == NativeRigidRoute::Refused); // No source-bounds fallback.
+  const ModelNodeSourceBinding ambiguous[]{{0,100},{0,200}};
+  assert(models.Publish(10,{mesh(100,true),mesh(200,false)},ambiguous));
+  model = models.FindModel(10); pose.model = model; pose.model_generation = model->Generation();
+  assert(route(0,3) == NativeRigidRoute::Refused);
+  assert(!models.Publish(10,{mesh(100,true)},nodes));
+  assert(!models.FindModel(10)); // Failed replacement cannot expose the prior generation.
+}
 void RigidScenePacket() {
   using namespace bd::gpu::scene;
   const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -936,6 +1009,7 @@ int main() {
   SceneFramebufferOwnership();
   DepthOnlyCommands();
   CameraAndRigidCaster();
+  RigidHardOffRouting();
   RigidScenePacket();
   RigidBatches();
   SceneCommands();

@@ -53,6 +53,7 @@
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_rigid_route_bridge.h"
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/host_frustum_bridge.h"
@@ -124,6 +125,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
       LoadF32(ctx_va + offsetof(GuestTraverseCtx, radiusScale));
   const auto instance_pose = FindNativeInstancePose(
       bd::mem::try_load<u32>(ctx_va), bd::mem::try_load<u32>(ctx_va + 4), palette);
+  const auto route_model = LoadNativeRigidRouteModel(ctx_va);
   NativeObjectTextureScope textures(ctx_va, instance_pose);
 
   const u32 saved_r1 = ctx.r1.u32;
@@ -246,6 +248,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             (flags & kNodeHasGeometry) ? static_cast<u32>(n->mesh) : 0;
         if (mesh) {
           const u32 index = static_cast<u32>(n->matrixIndex);
+          RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id);
           const u32 matrix = palette + (index << 6);
           // One translation per object, not one per float: the walk visits
           // every node of every visual, and the per-read validation showed

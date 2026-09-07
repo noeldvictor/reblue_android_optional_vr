@@ -6,6 +6,7 @@ from native_instance_scenario import verify_material_samplers, verify_light_sele
 from native_instance_scenario import verify_rigid_shadow
 from native_instance_scenario import verify_rigid_scene
 from native_instance_scenario import verify_rigid_batches
+from native_instance_scenario import verify_rigid_hard_off
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -795,6 +796,40 @@ class RigidBatchScenarioTest(unittest.TestCase):
                     "x"*(MAX_LOG_BYTES+1)):
             with self.assertRaises(ValueError):
                 verify_rigid_batches(bad)
+
+
+class RigidHardOffScenarioTest(unittest.TestCase):
+    def text(self):
+        rows = scenario()
+        rows[2] = "[native-rigid-hard-off] frame 100 scene checks 100 shadow checks 100; node 64 generation 93;"
+        rows[4] = "[native-rigid-hard-off] frame 150 scene checks 150 shadow checks 150; node 64 generation 93;"
+        return "\n".join([
+            "[native-rigid-hard-off] frame 1 scene checks 0 shadow checks 1; node 64 generation 93;",
+            "[native-rigid-shadow] frame 1 submitted 1"] + rows)
+
+    def test_fresh_admission_not_reload_or_emission_proof(self):
+        self.assertEqual(verify_rigid_hard_off(self.text()),
+                         dict(scene_checks_delta=50, shadow_checks_delta=50))
+
+    def test_late_enable_missing_consumer_and_mixed_generations_cannot_pass(self):
+        text = self.text()
+        for bad in ("\n".join(text.splitlines()[1:]),
+                    text.replace("shadow checks 150", "shadow checks 100"),
+                    text.replace("scene checks 150", "scene checks 100"),
+                    text.replace("frame 150", "frame 100"),
+                    text.replace("frame 150 scene checks 150 shadow checks 150; node 64 generation 93;",
+                                 "frame 150 scene checks 150 shadow checks 150; node 64 generation 94;"),
+                    text.replace("bg41_01", "bg42_01"),
+                    text + "\n[native-material-context] mode Loading"):
+            with self.assertRaises(Pending):
+                verify_rigid_hard_off(bad)
+
+    def test_refusal_and_invalid_generation_remain_visible(self):
+        for bad in ("[native-rigid-hard-off] refused: selected pose\n" + self.text(),
+                    self.text().replace("generation 93", "generation 0"),
+                    "x" * (MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError):
+                verify_rigid_hard_off(bad)
 
 
 class FogScenarioTest(unittest.TestCase):

@@ -6,6 +6,26 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeRigidBoundaryTest(unittest.TestCase):
+    def test_hard_off_selection_precedes_pose_fallback_and_every_legacy_path(self):
+        walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
+        guard = walk.index("RequireNativeRigidWalkNode(route_model, instance_pose.get(), index, view_id)")
+        self.assertLess(guard, walk.index("const bool native_pose ="))
+        self.assertLess(guard, walk.index("if ((!native_pose && !mp)"))
+        node = (ROOT / "src/gpu/hooks/scene_node.cpp").read_text().split(
+            "REX_HOOK_RAW(bdSceneNodeDrawSingle) {", 1)[1].split("// A node whose material", 1)[0]
+        self.assertTrue(node.lstrip().startswith(
+            "bd::gpu::scene::RequireNativeRigidLegacyNode(ctx.r6.u32, ctx.r3.u32);"))
+        bridge = (ROOT / "src/gpu/scene/native_instance_bridge.cpp").read_text()
+        self.assertIn("REXCVAR_DEFINE_BOOL(bd_native_rigid_hard_off, false", bridge)
+        for required in ("FindLoadedNativeModel(*graph)", "FindLoadedNativeModelMaterials(*graph, mesh)",
+                         "PrepareNativeRigidRoute(model, pose, node, view)",
+                         "NativeRigidLegacyAllowed(owned.get())", "throw std::runtime_error(reason)"):
+            self.assertIn(required, bridge)
+        policy = (ROOT / "src/gpu/scene/native_rigid_route.h").read_text()
+        self.assertLess(policy.index("SelectedNativeRigidShadow(*program)"), policy.index("if (!pose)"))
+        for forbidden in ("bd::mem::", "__imp__", "HostDrawReplay", "NodeTag"):
+            self.assertNotIn(forbidden, policy)
+
     def test_direct_scene_has_a_live_producer_and_an_emission_gate(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
