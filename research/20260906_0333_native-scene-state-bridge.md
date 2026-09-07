@@ -1759,3 +1759,61 @@ Exe/PDB grow171,520 B; other outputs lack complete byte baselines, not zero.
 Images10,240,140 B,245,620 B headroom. End free at cleanup63,181,299,712 B,
 drive-wide use201,752,576 B from current first63,383,052,288 B; identified outputs
 do not explain all volume activity. Same original3 GiB cap/floor and raw0 remain.
+
+### Named lit shader arithmetic, same checkpoint (2026-09-07)
+
+Parent e712978; preceding turn was verified progress, pushed and clean. First
+free63,016,787,968 B, no owned producers. Source tracing found that the normal
+lit material still repeated three light and two fog register-machine blocks.
+The live shader now calls named, shared C++/HLSL arithmetic, removing that
+specific blocker for a direct rigid shader. Its texture/shadow front-end and
+binding ABI remain; this is not a replacement definition of direct submission.
+
+Pre-output free63,357,468,672 B, material fixture7,268,861 B, aggregate logs150,998 B,
+images10,240,140 B. Reuse material16/CPU14 and host68. Plan <=4 MiB fixture/log/
+single host-shader header growth, <=256 MiB compile/link overlap; no guest or
+translated shader regeneration, no new cache/cook/tree. The new shared header
+is an explicit dependency of only the normal host material shader, not every
+host shader. Same original65,462,788,096 B starting ledger, owner-approved3 GiB
+cap/floor62,509,998,080 B, diagnostics100 MiB/logs10 MiB/images10 MiB/raw0 remain.
+Keep run915 and its sanity image until an equivalent live replacement qualifies.
+
+Material16/CPU14 passed (0.09 s behavior/0.11 s CTest), including1,200 independent
+light samples and fog matrices. Host68/PID22152 terminal failure at the single
+normal host shader: HLSL rejects struct-valued ternaries. Replaced that expression
+with an equivalent explicit assignment/branch; no runtime launched. Codegen
+module remained up to date, no guest/translated shader objects rebuilt. Fixture
+7,314,236 B (+45,375), shader header previous314,931 B. Retry material17/CPU15/
+host69 shares the same original budget, existing tree and <=4 MiB/256 MiB plan.
+
+Material17/CPU15 and host69 passed (owned PIDs26804/23168/14368 terminal), CTest
+0.13 s, host retry6.002 s.170 boundary guards/52 scenario tests pass. Emitted
+SPIR-V has fragment/multiview entry, finite math and image gather operations;
+header298,505 B (-16,426). Fixture7,315,534 B (+46,673), aggregate build logs159,962 B
+(+8,964); exe48,264,704 B/PDB107,036,672 B (combined -5,632). Free63,355,977,728 B,
+no producer remains. Run916 budget: <=75 s normal flat native MSAA/precache-on,
+same previous gates plus fresh normal-lit queued use, <=400 KiB log and one
+1920x1080 quality60 JPEG <=160 KiB within245,620 B image overlap. Explicit
+bd_host_materials=true; no raw/perf/cache/dump growth, exact profile restoration.
+This is shader-use/pixel sanity, not numerical GPU parity or direct-object proof.
+
+Run916 /PID780 passed,01:04:52..01:06:02, all14 settings effective. Fresh field
+windows2038/2338 add56,835 updated normal-lit queued draws; all previous geometry/
+material/image/UV/pose/table/shadow/policy/movement gates pass. One1920x1080
+quality60 JPEG136,607 B inspected; known cliff artifacts/blur remain, not GPU
+numerical parity/sequence/reload/both-eye proof. Exact profile restored, no new
+raw/perf/cache/dumps or remaining owned producer. Evidence:
+`20260907_0108_named-lit-shading.md`.
+
+Removed14 exact verified superseded files: run915 log/primitive image and logs
+from material15/CPU13/host67, material16/CPU14/resolved failed host68. Logical
+363,770 B; immediate free63,352,668,160 ->63,353,044,992 B, measured376,832 B
+(368 KiB) reclaimed once. Protected evidence untouched; small prior reports/
+hashes remain, old runtime files gone, build logs reproducible.
+
+Comparable fixture/log/image growth59,550 B (new numerical/live shader coverage):
+fixture+46,673, aggregate logs-4,769 (now146,229), runtime log+14,779, image+2,867.
+Normal shader header-16,426 B, exe/PDB-5,632 B. Other outputs lack complete byte
+baselines, not zero. Images10,243,007 B,242,753 B overlap headroom. Cleanup ending
+free63,353,044,992 B, drive-wide gain336,257,024 B from first63,016,787,968 B;
+only376,832 B attributed to cleanup. Same original cap/floor and raw0 remain.

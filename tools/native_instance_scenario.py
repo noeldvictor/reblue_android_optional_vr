@@ -37,6 +37,7 @@ PRIMITIVE_POLICY_METRIC = re.compile(
     r"(\d+) direct (\d+) deferred (\d+) suppressed candidates; "
     r"(\d+) reads (\d+) unavailable; (\d+) checks wrong (\d+); "
     r"(\d+) draws (\d+) cull changes (\d+) compound refreshes;")
+LIT_SHADING_METRIC = re.compile(r"\[native-lit-shading\] (\d+) normal-lit queued draws;")
 
 
 class Pending(ValueError):
@@ -249,6 +250,23 @@ def verify_primitive_policies(text):
             "compound_refreshes_delta": b[12] - a[12]}
 
 
+def verify_lit_shading(text):
+    """Live queued use, not a numerical pixel comparison or a complete native draw."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("lit-shading diagnostic exceeds 400 KiB")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = LIT_SHADING_METRIC.search(line)
+        if match:
+            metrics.append((index, tuple(map(int, match.groups()))))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] - a[0] < 32:
+        raise Pending("normal lit shading must have fresh queued field draws")
+    return {"queued_draws_delta": b[0] - a[0]}
+
+
 def verify_movement(text):
     """Require observed displacement during one fresh, uninterrupted field walk."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -292,6 +310,7 @@ def main():
     parser.add_argument("--shadow-policies", action="store_true")
     parser.add_argument("--material-textures", action="store_true")
     parser.add_argument("--primitive-policies", action="store_true")
+    parser.add_argument("--lit-shading", action="store_true")
     args = parser.parse_args()
     try:
         with args.log.open("rb") as source:
@@ -309,6 +328,7 @@ def main():
         shadow = verify_shadow_policies(text) if args.shadow_policies else None
         textures = verify_material_textures(text) if args.material_textures else None
         policies = verify_primitive_policies(text) if args.primitive_policies else None
+        lit = verify_lit_shading(text) if args.lit_shading else None
     except Pending as error:
         print(f"Pending: {error}")
         return 2
@@ -330,6 +350,8 @@ def main():
         print("PASS: post-event native material textures " + ", ".join(f"{k}={v}" for k, v in textures.items()))
     if policies is not None:
         print("PASS: post-event native primitive policies " + ", ".join(f"{k}={v}" for k, v in policies.items()))
+    if lit is not None:
+        print("PASS: post-event named lit shading " + ", ".join(f"{k}={v}" for k, v in lit.items()))
     return 0
 
 

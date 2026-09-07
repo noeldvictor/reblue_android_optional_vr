@@ -41,4 +41,5 @@ uint32_t EvaluateNativeMaterial(const NodeTag &tag,
 void NativeMaterialCheck(uint32_t mask, const std::array<float, 4> values[3],
                          const uint8_t *pixel_constants);
 void NativeMaterialNoteReplay(uint32_t mask);
+void NoteNativeLitQueuedDraw();
 } // namespace bd::gpu::scene

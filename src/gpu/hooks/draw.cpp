@@ -52,6 +52,7 @@
 #include "gpu/frame.h"
 #include "gpu/post_chain.h"
 #include "gpu/scene/host_draw.h"
+#include "gpu/scene/native_material.h"
 #include "gpu/scene/native_texture_binding.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/scene/scene_recorder.h"
@@ -78,6 +79,7 @@ REXCVAR_DECLARE(f64, bd_stereo_separation);
 REXCVAR_DECLARE(f64, bd_stereo_convergence);
 
 REXCVAR_DECLARE(bool, bd_draw_phase_timing);
+REXCVAR_DECLARE(bool, bd_host_materials);
 
 namespace {
 // Defined beside UploadAndBindUpVertices below.
@@ -782,6 +784,9 @@ void DispatchDraw(u32 device_guest, u32 primitive_type, const char *name,
     LedgerNote(bd::gpu::scene::CurrentNodeTag(), q,
                bd::gpu::scene::HostDrawReplaying() ? "replay" : "interp");
     bd::gpu::DrawQueuePush(q);
+    if (ps_hash == 0xFB83DD3F5E67CEB7ull && REXCVAR_GET(bd_host_materials) &&
+        !s.pipelineState.occlusionCounting)
+      bd::gpu::scene::NoteNativeLitQueuedDraw();
   };
   const auto finish_deferred = [&]() {
     s.deferring_draw = false;

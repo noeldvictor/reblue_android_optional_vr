@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after native primitive-policy desktop verification. The first
+Updated 2026-09-07 after named lit/fog shader desktop verification. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -48,6 +48,11 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    inputs; live cull consumption passes the field check. Next, connect named
    shader inputs and direct scene/shadow submission for one ordinary opaque
    rigid field family (no skin or volume/special override dependency).
+   The normal lit shader now shares named light/fog arithmetic with CPU tests;
+   its input bindings, texture/shadow frontend and vertex shader still require
+   an explicit native contract. These scalar structs are semantic inputs, not
+   a raw C++/GPU constant-buffer layout. Reuse the evaluator in that contract;
+   replacing shader math alone does not provide native scene light/fog owners.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
    range is opaque. Object/pass source setup and replay templates remain.
@@ -58,7 +63,8 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    console imports. Run that family's cold-load/reload acceptance with its
    interpreter and template capture disabled, not just declining to call them
    when a warm cache happens to exist. Select and record the actual model,
-   material family and scene before claiming coverage. Destroy import-source storage in fixtures before native
+   material family and scene before claiming coverage. Destroy import-source
+   storage in fixtures before native
    consumption. Verify generation reuse, async completion and late writers.
    Expand opaque rigid objects to alpha-tested/wind/translucent families without
    dropping deferred participants. Cook small batches under existing independent
@@ -95,6 +101,21 @@ is explicitly unconverted. These are expansion work, not permission to silently
 drop participants from the initial acceptance scene.
 
 ## Latest qualified checkpoint
+
+Named lit shading (2026-09-07): the live normal material uses shared named
+light/fog arithmetic instead of310 lines of repeated register-machine logic.
+All material branches remain. Material17/CPU15, host69,170 source guards and52
+scenario tests pass. Independent references cover1,200 light cases, coloured
+shadow composition and ordered radial/planar blend/add/subtract fog. Host68's
+HLSL struct-ternary compile error was corrected; only the normal host shader
+rebuilt, no guest objects/translated shader cache. Run916 adds56,835 normal-lit
+queued draws in fresh post-event field windows; all prior geometry/material/
+pose/table/shadow/policy/movement gates pass. One1920x1080 image inspected,
+known cliff artifacts/blur remain; no numerical GPU parity/sequence/reload/
+both-eye claim. No new raw/perf/cache/dumps, exact profile restored, superseded
+component and resolved compile-retry outputs retired. Shader ABI/front-end,
+source selection/templates and the direct native object gap remain.
+Evidence: `research/20260907_0108_named-lit-shading.md`.
 
 Native primitive participation (2026-09-07): material15/CPU13, host67,167 source
 guards and49 scenario cases pass. Flat normal-MSAA/precache-on run915 adds45,313

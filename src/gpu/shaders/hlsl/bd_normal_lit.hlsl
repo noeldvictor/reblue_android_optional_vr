@@ -2,13 +2,13 @@
 // shader substituted at link time (guest_shaders.cpp, bd_host_materials).
 // The recompiled body (dump of 2026-09-03, hash above) with the host's
 // shadow kernel: four gathers instead of thirty texture operations. The
-// rest stays as recompiled on purpose: every other path sits under a
-// uniform boolean and costs nothing when the material does not take it,
-// and a scene outside the census does take it (the detail textures on a
-// building, found when they were dropped). The verbatim copy was
-// verified indistinguishable from the guest shader before this rewrite.
+// light/fog arithmetic now uses native_lit_shading.h's named, CPU-tested
+// contract. Binding/register inputs and the texture/shadow front-end remain
+// temporary adapters. Keep all material branches, including detail textures
+// and reflections: a field census does not cover every authored material.
 
 #include "thirdparty/XenosRecomp/XenosRecomp/shader_common.h"
+#include "src/gpu/scene/native_lit_shading.h"
 
 
 #ifdef __spirv__
@@ -222,6 +222,30 @@ cbuffer SharedConstants : register(b2, space4)
 	#define g_bTexture0 BOOL_BIT(128)
 	#define g_bTexture1 BOOL_BIT(129)
 	#define g_bTexture2 BOOL_BIT(130)
+
+LitLight ImportLitLight(float4 position, float4 direction, float4 colour, float4 parameters) {
+	LitLight light;
+	light.position = LitVec(position.x, position.y, position.z);
+	light.direction = LitVec(direction.x, direction.y, direction.z);
+	light.colour = LitVec(colour.x, colour.y, colour.z);
+	light.inverse_range = colour.w;
+	light.cone_cosine = parameters.x;
+	light.cone_strength = direction.w;
+	light.kind = position.w < .5 ? LitDisabled : position.w < 1.5 ? LitDirectional :
+		position.w < 2.5 ? LitSpot : LitPoint;
+	return light;
+}
+LitFog ImportLitFog(float4 position, float4 direction, float4 colour,
+                   bool disabled, bool radial, bool blend, bool add) {
+	LitFog fog;
+	fog.origin = LitVec(position.x, position.y, position.z);
+	fog.direction = LitVec(direction.x, direction.y, direction.z);
+	fog.colour = LitVec(colour.x, colour.y, colour.z);
+	fog.start = direction.w; fog.end = position.w; fog.opacity = colour.w;
+	fog.disabled = disabled; fog.radial = radial;
+	fog.blend = blend ? LitFogBlend : add ? LitFogAdd : LitFogSubtract;
+	return fog;
+}
 
 #ifndef __spirv__
 [shader("pixel")]
@@ -478,316 +502,36 @@ void main(
 		if (any(shadow_uv < 0.0) || any(shadow_uv > 1.0))
 			r7.y = c252.x;
 	}
-	r7.x = c250.y > g_vLightPos1.w;
-	p0 = r7.x == 0.0;
-	ps = p0 ? 0.0 : 1.0;
-	if (p0)
-	{
-		r7.x = c253.w > g_vLightPos1.w;
-		p0 = r7.x != 0.0;
-		ps = p0 ? 0.0 : 1.0;
-		if (p0)
-		{
-			r0.xyz = max(-g_vLightDir1.zyx, -g_vLightDir1.zyx);
-			ps = max(c252.x, c252.x);
-			r7.z = ps;
-		}
-		else
-		{
-			r7.w = c250.x > g_vLightPos1.w;
-			r3.xyz = r2.xyz + -g_vLightPos1.xyz;
-			r0.xyz = -r2.xyz + g_vLightPos1.xyz;
-			r7.z = dot(r0.xyz, r0.xyz);
-			r7.x = dot(r3.zxy, r3.zxy);
-			ps = clamp(rsqrt(abs(r7.z)), FLT_MIN, FLT_MAX);
-			r7.z = ps;
-			r0.xyz = r0.zyx * r7.zzz;
-			ps = sqrt(abs(r7.x));
-			r7.x = ps;
-			ps = saturate(g_vLightDiffuse1.w * r7.x);
-			r7.x = ps;
-			r7.z = -r7.x + c252.x;
-			p0 = r7.w != 0.0;
-			ps = p0 ? 0.0 : 1.0;
-			if (p0)
-			{
-				r7.x = -g_vLightParam1.x + c252.x;
-				r7.w = dot(-r0.xzy, g_vLightDir1.zxy);
-				ps = clamp(rcp(r7.x), FLT_MIN, FLT_MAX);
-				r7.x = ps;
-				r7.w = saturate(r7.w + -g_vLightParam1.x);
-				ps = g_vLightDir1.w * r7.x;
-				r7.x = ps;
-				r7.x = saturate(r7.x * r7.w);
-				r7.z = r7.x * r7.z;
-			}
-		}
-		r3.xyz = r9.xyz + r0.xyz;
-		r7.w = dot(r3.xzy, r3.xzy);
-		r7.x = dot(r8.xzy, r0.xzy);
-		ps = clamp(rsqrt(abs(r7.w)), FLT_MIN, FLT_MAX);
-		r7.w = ps;
-		r0.xyz = r3.xyz * r7.www;
-		r7.w = dot(r0.xzy, r8.xzy);
-		r0.yz = max(r7.xw, c252.yy);
-		ps = clamp(log2(abs(r0.z)), FLT_MIN, FLT_MAX);
-		r7.x = ps;
-		ps = g_vObjectSpecular.w * r7.x;
-		r7.x = ps;
-		ps = exp2(r7.x);
-		r0.x = ps;
-		r3.xy = r0.xy * r7.zz;
+	// Named material arithmetic; this file remains the temporary binding ABI.
+	const LitVector native_position = LitVec(r2.x, r2.y, r2.z);
+	const LitVector native_normal = LitVec(r8.z, r8.y, r8.x);
+	const LitVector native_view = LitVec(r9.z, r9.y, r9.x);
+	const LitVector native_camera = LitVec(g_vCameraPos.x, g_vCameraPos.y, g_vCameraPos.z);
+	const LitLight light0 = ImportLitLight(g_vLightPos1, g_vLightDir1, g_vLightDiffuse1, g_vLightParam1);
+	const LitLight light1 = ImportLitLight(g_vLightPos2, g_vLightDir2, g_vLightDiffuse2, g_vLightParam2);
+	const LitLight light2 = ImportLitLight(g_vLightPos3, g_vLightDir3, g_vLightDiffuse3, g_vLightParam3);
+	const LitResponse response0 = EvaluateLitLight(light0, native_position, native_normal, native_view, g_vObjectSpecular.w);
+	const LitResponse response1 = EvaluateLitLight(light1, native_position, native_normal, native_view, g_vObjectSpecular.w);
+	const LitResponse response2 = EvaluateLitLight(light2, native_position, native_normal, native_view, g_vObjectSpecular.w);
+	LitSurface surface;
+	surface.albedo = LitVec(r1.x, r1.y, r1.z);
+	surface.specular = LitVec(g_vObjectSpecular.x, g_vObjectSpecular.y, g_vObjectSpecular.z);
+	surface.ambient = LitVec(g_vLightAmbient.x, g_vLightAmbient.y, g_vLightAmbient.z);
+	surface.shadow_colour = LitVec(g_vShadowSubColor.x, g_vShadowSubColor.y, g_vShadowSubColor.z);
+	surface.shadow_strength = g_vShadowSubColor.w;
+	surface.shadow_visibility = r7.y;
+	surface.diffuse_enabled = g_bDiffuse;
+	surface.specular_enabled = g_bSpecular;
+	LitVector colour = ComposeLitSurface(surface, light0, light1, light2, response0, response1, response2);
+	if (g_bFog) {
+		colour = ApplyLitFog(colour, native_position, native_camera,
+			ImportLitFog(g_vFogPos1, g_vFogDir1, g_vFogColor1, g_bFogMode1,
+				BOOL_BIT(149), BOOL_BIT(150), BOOL_BIT(151)));
+		colour = ApplyLitFog(colour, native_position, native_camera,
+			ImportLitFog(g_vFogPos2, g_vFogDir2, g_vFogColor2, g_bFogMode2,
+				BOOL_BIT(153), BOOL_BIT(154), BOOL_BIT(155)));
 	}
-	else
-	{
-		r3.xy = -abs(r7.xx) > c252.yy;
-	}
-	r7.x = c250.y > g_vLightPos2.w;
-	p0 = r7.x != 0.0;
-	ps = p0 ? 0.0 : 1.0;
-	if (p0)
-	{
-		r7.zw = -abs(r7.xx) > c252.yy;
-	}
-	else
-	{
-		r7.x = c253.w > g_vLightPos2.w;
-		p0 = r7.x != 0.0;
-		ps = p0 ? 0.0 : 1.0;
-		if (p0)
-		{
-			r0.xyz = max(-g_vLightDir2.zyx, -g_vLightDir2.zyx);
-			ps = max(c252.x, c252.x);
-			r7.z = ps;
-		}
-		else
-		{
-			r7.w = c250.x > g_vLightPos2.w;
-			r5.xyz = r2.xyz + -g_vLightPos2.xyz;
-			r0.xyz = -r2.xyz + g_vLightPos2.xyz;
-			r7.z = dot(r0.xyz, r0.xyz);
-			r7.x = dot(r5.zxy, r5.zxy);
-			ps = clamp(rsqrt(abs(r7.z)), FLT_MIN, FLT_MAX);
-			r7.z = ps;
-			r0.xyz = r0.zyx * r7.zzz;
-			ps = sqrt(abs(r7.x));
-			r7.x = ps;
-			ps = saturate(g_vLightDiffuse2.w * r7.x);
-			r7.x = ps;
-			r7.z = -r7.x + c252.x;
-			p0 = r7.w != 0.0;
-			ps = p0 ? 0.0 : 1.0;
-			if (p0)
-			{
-				r7.x = -g_vLightParam2.x + c252.x;
-				r7.w = dot(-r0.xzy, g_vLightDir2.zxy);
-				ps = clamp(rcp(r7.x), FLT_MIN, FLT_MAX);
-				r7.x = ps;
-				r7.w = saturate(r7.w + -g_vLightParam2.x);
-				ps = g_vLightDir2.w * r7.x;
-				r7.x = ps;
-				r7.x = saturate(r7.x * r7.w);
-				r7.z = r7.x * r7.z;
-			}
-		}
-		r5.xyz = r9.xyz + r0.xyz;
-		r7.w = dot(r5.xzy, r5.xzy);
-		r7.x = dot(r8.xzy, r0.xzy);
-		ps = clamp(rsqrt(abs(r7.w)), FLT_MIN, FLT_MAX);
-		r7.w = ps;
-		r0.xyz = r5.xyz * r7.www;
-		r7.w = dot(r0.xzy, r8.xzy);
-		r0.yz = max(r7.xw, c252.yy);
-		ps = clamp(log2(abs(r0.z)), FLT_MIN, FLT_MAX);
-		r7.x = ps;
-		ps = g_vObjectSpecular.w * r7.x;
-		r7.x = ps;
-		ps = exp2(r7.x);
-		r0.x = ps;
-		r7.zw = r0.xy * r7.zz;
-	}
-	r7.x = c250.y > g_vLightPos3.w;
-	p0 = r7.x != 0.0;
-	ps = p0 ? 0.0 : 1.0;
-	if (p0)
-	{
-		r0.xy = -abs(r7.xx) > c252.yy;
-	}
-	else
-	{
-		r7.x = c253.w > g_vLightPos3.w;
-		p0 = r7.x != 0.0;
-		ps = p0 ? 0.0 : 1.0;
-		if (p0)
-		{
-			r0.xyz = max(-g_vLightDir3.zyx, -g_vLightDir3.zyx);
-			ps = max(c252.x, c252.x);
-			r0.w = ps;
-		}
-		else
-		{
-			r3.z = c250.x > g_vLightPos3.w;
-			r5.xyz = r2.xyz + -g_vLightPos3.xyz;
-			r0.yzw = -r2.xyz + g_vLightPos3.xyz;
-			r0.x = dot(r0.yzw, r0.yzw);
-			r7.x = dot(r5.zxy, r5.zxy);
-			ps = clamp(rsqrt(abs(r0.x)), FLT_MIN, FLT_MAX);
-			r0.x = ps;
-			r0.xyz = r0.wzy * r0.xxx;
-			ps = sqrt(abs(r7.x));
-			r7.x = ps;
-			ps = saturate(g_vLightDiffuse3.w * r7.x);
-			r7.x = ps;
-			r0.w = -r7.x + c252.x;
-			p0 = r3.z != 0.0;
-			ps = p0 ? 0.0 : 1.0;
-			if (p0)
-			{
-				r7.x = -g_vLightParam3.x + c252.x;
-				r3.z = dot(-r0.xzy, g_vLightDir3.zxy);
-				ps = clamp(rcp(r7.x), FLT_MIN, FLT_MAX);
-				r7.x = ps;
-				r3.z = saturate(r3.z + -g_vLightParam3.x);
-				ps = g_vLightDir3.w * r7.x;
-				r7.x = ps;
-				r7.x = saturate(r7.x * r3.z);
-				r0.w = r7.x * r0.w;
-			}
-		}
-		r5.xyz = r9.xyz + r0.xyz;
-		r7.x = dot(r5.xzy, r5.xzy);
-		r0.x = dot(r8.xzy, r0.xzy);
-		ps = clamp(rsqrt(abs(r7.x)), FLT_MIN, FLT_MAX);
-		r7.x = ps;
-		r5.xyz = r5.xyz * r7.xxx;
-		r0.y = dot(r5.xzy, r8.xzy);
-		r0.yz = max(r0.xy, c252.yy);
-		ps = clamp(log2(abs(r0.z)), FLT_MIN, FLT_MAX);
-		r7.x = ps;
-		ps = g_vObjectSpecular.w * r7.x;
-		r7.x = ps;
-		ps = exp2(r7.x);
-		r0.x = ps;
-		r0.xy = r0.xy * r0.ww;
-	}
-	if (g_bDiffuse)
-	{
-		r3.yzw = r3.yyy * g_vLightDiffuse1.xyz;
-		r5.xyz = r3.yzw + g_vLightAmbient.xyz;
-		ps = c252.x - r7.y;
-		r7.x = ps;
-		r3.yzw = r3.zwy * r7.xxx + -r7.xxx;
-		r3.yzw = r3.zwy * g_vShadowSubColor.www + r7.xxx;
-		r5.xyz = r7.www * g_vLightDiffuse2.zxy + r5.zxy;
-		r0.yzw = r0.yyy * g_vLightDiffuse3.yzx + r5.zxy;
-	}
-	if (g_bDiffuse)
-	{
-		r0.yzw = -r3.zwy * g_vShadowSubColor.xyz + r0.wyz;
-		r1.xyz = r1.xyz * r0.yzw;
-	}
-	if (g_bSpecular)
-	{
-		r7.w = r3.x * r7.y;
-		r7.xyz = r7.zzz * g_vLightDiffuse2.xyz;
-		r7.xyz = r7.www * g_vLightDiffuse1.zxy + r7.zxy;
-		r7.xyz = r0.xxx * g_vLightDiffuse3.yzx + r7.zxy;
-		r7.xyz = r7.zxy * c253.xyz;
-		r1.xyz = r7.xyz * g_vObjectSpecular.xyz + r1.xyz;
-	}
-	if (g_bFog)
-	{
-		if (!g_bFogMode1)
-		{
-			r7.x = g_vFogPos1.w + -g_vFogDir1.w;
-			ps = clamp(rcp(r7.x), FLT_MIN, FLT_MAX);
-			r7.x = ps;
-			if (BOOL_BIT(149))
-			{
-				r7.yzw = r2.xyz + -g_vCameraPos.xyz;
-				r7.y = dot(r7.wyz, r7.wyz);
-				ps = sqrt(abs(r7.y));
-				r7.y = ps;
-				r7.y = r7.y + -g_vFogDir1.w;
-				r7.x = saturate(r7.y * r7.x);
-				r7.xyzw = r7.xxxx * g_vFogColor1.zyxw;
-			}
-			else
-			{
-				r7.yzw = r2.zyx + -g_vFogPos1.zyx;
-				r7.y = dot(r7.ywz, g_vFogDir1.zxy);
-				r7.y = r7.y + -g_vFogDir1.w;
-				r7.x = saturate(r7.y * r7.x);
-				r7.xyzw = r7.xxxx * g_vFogColor1.zyxw;
-			}
-		}
-		else
-		{
-			r7.xyzw = -abs(r7.xxxx) > c252.yyyy;
-		}
-		if (BOOL_BIT(150))
-		{
-			r7.xyz = r7.xyz + -r1.zyx;
-			r0.xyz = r7.xyz * r7.www + r1.zyx;
-		}
-		else
-		{
-			r7.xyz = r7.xyz * r7.www;
-			if (BOOL_BIT(151))
-			{
-				r0.xyz = r7.xyz + r1.zyx;
-			}
-			else
-			{
-				r0.xyz = -r7.xyz + r1.zyx;
-			}
-		}
-		if (!g_bFogMode2)
-		{
-			r7.x = g_vFogPos2.w + -g_vFogDir2.w;
-			ps = clamp(rcp(r7.x), FLT_MIN, FLT_MAX);
-			r7.x = ps;
-			if (BOOL_BIT(153))
-			{
-				r7.yzw = r2.xyz + -g_vCameraPos.xyz;
-				r7.y = dot(r7.wyz, r7.wyz);
-				ps = sqrt(abs(r7.y));
-				r7.y = ps;
-				r7.y = r7.y + -g_vFogDir2.w;
-				r7.x = saturate(r7.y * r7.x);
-				r7.xyzw = r7.xxxx * g_vFogColor2.zyxw;
-			}
-			else
-			{
-				r7.yzw = r2.zyx + -g_vFogPos2.zyx;
-				r7.y = dot(r7.ywz, g_vFogDir2.zxy);
-				r7.y = r7.y + -g_vFogDir2.w;
-				r7.x = saturate(r7.y * r7.x);
-				r7.xyzw = r7.xxxx * g_vFogColor2.zyxw;
-			}
-		}
-		else
-		{
-			r7.xyzw = -abs(r7.xxxx) > c252.yyyy;
-		}
-		if (BOOL_BIT(154))
-		{
-			r7.xyz = r7.xyz + -r0.xyz;
-			r1.xyz = r7.zyx * r7.www + r0.zyx;
-		}
-		else
-		{
-			r7.xyz = r7.xyz * r7.www;
-			if (BOOL_BIT(155))
-			{
-				r1.xyz = r7.zyx + r0.zyx;
-			}
-			else
-			{
-				r1.xyz = -r7.zyx + r0.zyx;
-			}
-		}
-	}
+	r1.xyz = float3(colour.x, colour.y, colour.z);
 	r7.xyz = r1.xyz + g_vColorK.xyz;
 	r1.xyz = r7.zyx * g_vColorK.www;
 	if (g_bDebug0)

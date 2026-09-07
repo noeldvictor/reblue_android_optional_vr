@@ -44,6 +44,7 @@ std::atomic<uint64_t> shadow_policy_hits{0}, shadow_policy_misses{0};
 thread_local uint64_t geometry_draws = 0, geometry_checked = 0, geometry_wrong = 0;
 thread_local uint32_t checked[3]{}, wrong[3]{}, last_report = 0;
 thread_local uint32_t composed[3]{};
+thread_local uint64_t native_lit_queued = 0;
 
 NativeMaterialLibrary &Library() {
   static NativeMaterialLibrary library([] {
@@ -411,6 +412,7 @@ void NativeMaterialCheck(uint32_t mask, const std::array<float, 4> values[3],
   NativeMaterialNoteReplay(0);
 }
 
+void NoteNativeLitQueuedDraw() { ++native_lit_queued; }
 void NativeMaterialNoteReplay(uint32_t mask) {
   for (uint32_t field = 0; field < 3; ++field)
     if (mask & (1u << field))
@@ -453,6 +455,8 @@ void NativeMaterialNoteReplay(uint32_t mask) {
             geometry_checked, geometry_wrong);
     const auto assets = Library().Stats();
     NativeMaterialTextureReport();
+    BD_INFO("[native-lit-shading] {} normal-lit queued draws; named light/fog evaluator; "
+            "source shader selection, binding ABI and templates remain", native_lit_queued);
     BD_INFO("[native-material-assets] {} cooked, {} loaded, {} resident, {} memory hits; "
             "{} invalid, {} write failures, {} budget refusals; {} model recipe bytes",
             assets.cooked, assets.loaded, assets.resident, assets.memory_hits,

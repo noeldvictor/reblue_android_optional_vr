@@ -3,7 +3,7 @@ import re
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
-    verify_material_textures, verify_primitive_policies,
+    verify_material_textures, verify_primitive_policies, verify_lit_shading,
 )
 
 
@@ -425,6 +425,33 @@ class PrimitivePolicyScenarioTest(unittest.TestCase):
                 verify_primitive_policies(bad)
         self.assertEqual(verify_primitive_policies("\n".join(self.rows() + [
             "[native-material-context] " + READY]))["draws_delta"], 50)
+
+
+class LitShadingScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-lit-shading] 100 normal-lit queued draws;"
+        rows[4] = "[native-lit-shading] 150 normal-lit queued draws;"
+        return rows
+
+    def test_fresh_queued_use(self):
+        self.assertEqual(verify_lit_shading("\n".join(self.rows())), dict(queued_draws_delta=50))
+
+    def test_missing_stale_reset_or_startup_is_not_coverage(self):
+        rows = self.rows()
+        for bad in ("\n".join(scenario()), "\n".join(rows).replace("150", "100"),
+                    "\n".join(rows).replace("150", "10"), "\n".join(rows[1:]),
+                    "\n".join([rows[2], rows[4]] + [r for r in rows if "context" in r])):
+            with self.assertRaises(Pending):
+                verify_lit_shading(bad)
+
+    def test_bounded_and_lost_readiness(self):
+        with self.assertRaises(ValueError):
+            verify_lit_shading("x" * (MAX_LOG_BYTES + 1))
+        with self.assertRaises(Pending):
+            verify_lit_shading("\n".join(self.rows() + ["[native-material-context] mode Loading"]))
+        self.assertEqual(verify_lit_shading("\n".join(self.rows() + [
+            "[native-material-context] " + READY]))["queued_draws_delta"], 50)
 
 
 if __name__ == "__main__":
