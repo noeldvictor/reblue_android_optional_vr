@@ -36,6 +36,12 @@ function(reblue_host_shader STEM PROFILE)
     if(STEM STREQUAL "bd_normal_lit")
         list(APPEND hlsl_includes "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_lit_shading.h")
     endif()
+    if(STEM MATCHES "^native_rigid_")
+        list(APPEND hlsl_includes
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_inputs.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_shader.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_lit_shading.h")
+    endif()
 
     foreach(target_list IN ITEMS REBLUE_D3D12_TARGETS REBLUE_VULKAN_TARGETS)
         if(NOT ${target_list})
@@ -69,6 +75,9 @@ function(reblue_host_shader STEM PROFILE)
         foreach(target IN LISTS ${target_list})
             target_sources(${target} PRIVATE "${out}")
         endforeach()
+        if(STEM MATCHES "^native_rigid_" AND ext STREQUAL "spirv" AND TARGET native_scene_snapshot_test)
+            target_sources(native_scene_snapshot_test PRIVATE "${out}")
+        endif()
     endforeach()
 endfunction()
 

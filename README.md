@@ -58,21 +58,20 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **the shared pipeline cache can now accept
-owned native shader programs and layouts without `GuestShader` wrappers**.
-Programs retain shader/input/layout resources across bounded background compilation
-and cached pipeline lifetime; mixed native/translated inputs are refused. This
-connects to the preceding explicit draw-binding contract. Two C++ fixtures,
-host72, 231 source/scenario checks and eight runner tests pass. Field run918
-passes the existing geometry/material/pose/shadow/movement/binding regression;
-one full-resolution image was inspected, with known cliff artifacts and blur
-remaining. **Native program selection has CPU coverage only; no game producer
-uses it yet.** A real native shader pair/input layout, model/instance primitive
-packet and direct scene/shadow consumer remain next. Source selection/templates
-and translated instance records still exist. No new raw/perf/asset-cache output;
-superseded evidence was removed. This is not cold-load/reload, sequence/both-eye
-qualification or a measured speedup.
-[Evidence and remaining boundaries](research/20260907_0217_native-pipeline-programs.md).
+Latest desktop checkpoint (2026-09-07): **real native rigid scene/shadow shaders
+now pass Vulkan pixel tests without translated shader/register inputs**. They
+use named geometry, explicit object/pass buffers, albedo, lights, fog and native
+shadow sampling. Four 8x8 two-eye cases pass color/depth comparisons on an RTX
+3060 with zero validation errors/warnings; the GPU test takes 1.21 seconds and
+writes no captures. CPU packing/reference tests, the existing snapshot/MSAA
+matrix, host73, 234 source/scenario checks and eight runner tests also pass.
+**No live game object uses these shaders yet.** Next: owned model/instance
+primitive packets and actual light/fog producers feeding direct scene/shadow
+submission, then interpreter/template-free cold-load and reload acceptance.
+The preceding run918 remains the existing engine-path field/pixel regression;
+it did not exercise these shaders, and known cliff artifacts/blur remain. This
+is not full-game/both-eye qualification or a measured game speedup.
+[Evidence and remaining boundaries](research/20260907_0245_native-rigid-shaders.md).
 
 Canonical geometry owns named values and immutable vertex inputs independently
 of the imported declaration. Unsupported layouts still use transitional packed
@@ -132,7 +131,7 @@ not geometry/instance ownership. [Evidence](research/20260906_1701_native-mesh-s
 | --- | --- | --- |
 | Assets | Persistent, versioned `.bdmesh`, `.bdtex` and `.bdmat`; canonical named rigid vertices, geometry-owned runtime inputs, primitive material associations and texture tables, shared GPU data, mip cooking, generated LOD support and bounded owners | Complete native object texture/pass associations and source-free consumers; remaining packed/dynamic layouts, compact assets and streaming/backpressure |
 | Scene submission | Host traversal/replay, native instance identities/render-pose snapshots, packet intent, frustum/occlusion culling, instancing, vertex pulling and indirect draws | Complete native object/update production; replace source lookup, retained guest draw templates and remaining resource dependencies |
-| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, object-published image/UV values, named lit/fog shader arithmetic, lighting/state producers, pass binders, water and Toon callbacks | Complete direct shader/pass consumers, volume/deferred and remaining override families, bool/sampler inputs; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
+| Materials | Native material assets, load-owned primitive/shadow/texture programs, ordinary alpha/cull/participation composition, object-published image/UV values, GPU-tested native rigid shaders with explicit bindings, lighting/state producers, pass binders, water and Toon callbacks | Connect live native rigid consumers and light/fog owners; volume/deferred and remaining override families; remove temporary source index, shader-register ABI, mirrors/getters and remaining callbacks |
 | Characters | Explicit per-draw joint bindings and host-owned current palette gathering | Native skeleton/skin assets, animation/pose production and complete GPU skinning ownership |
 | Frame, shadows and reflections | Host view/pass scheduling, native scene attachments/framebuffers, ordinary MSAA resolves, image snapshots and sun-shadow lifecycle | Native scene/camera/light/participant producers, secondary shadows, reflection recipes and remaining getter/compatibility scopes |
 | Effects, post and UI | Native post images and many post effects; host effect lifecycle, sorted/deferred scheduling and immediate vertex submission | Authored effect/vertex producers and storage, remaining callbacks, UI ownership and event coverage |
@@ -158,7 +157,7 @@ this tooling checkpoint does not itself convert additional rendering.
 
 1. Complete one real native static-object path from cooked geometry/materials
    and instance updates through direct scene/shadow submission. Establish
-   native shader/texture/pass contracts on the canonical rigid layouts; remove its
+   live producers for the GPU-tested native shader/texture/pass contracts; remove its
    guest-renderer warm-up, source lookup and captured templates. Verify movement
    and reload behavior, then expand material families.
 2. Complete character asset, pose, joint-palette and GPU skinning ownership.
@@ -172,7 +171,7 @@ need appropriate GPU/pixel checks. Startup-only counters or an empty effect
 queue do not qualify an authored field/effect path.
 
 **Faster delivery focus:** select one ordinary opaque rigid field family and
-finish its named shader inputs plus direct scene/shadow consumer using the
+connect its owned inputs to the native shaders and direct scene/shadow consumer using the
 owners already built. Its acceptance test must cold-load and reload with its
 guest rendering interpreter and template capture disabled. Add another adapter
 only if it removes a named blocker for that path; defer broad recooking and

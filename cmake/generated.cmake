@@ -46,6 +46,19 @@ endforeach()
 # The host lit material (gpu/shaders/hlsl/bd_normal_lit.hlsl) replaces the
 # guest's bd_normal_ps by hash at link time; 6.1 for SV_ViewID.
 reblue_host_shader(bd_normal_lit ps_6_1 -D REBLUE_RECOMP)
+# Explicit native rigid family, shared with the small real-Vulkan fixture.
+reblue_host_shader(native_rigid_vs vs_6_1)
+reblue_host_shader(native_rigid_shadow_vs vs_6_1)
+reblue_host_shader(native_rigid_ps ps_6_1)
+if(TARGET native_scene_snapshot_test)
+    # The fixture is declared in a child directory; give Ninja an explicit
+    # cross-directory ordering edge before compiling the production factory.
+    add_custom_target(native_rigid_shader_headers DEPENDS
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_vs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_ps.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.spirv.h")
+    add_dependencies(native_scene_snapshot_test native_rigid_shader_headers)
+endif()
 # The occlusion proxy (gpu/occlusion_cull.cpp): a cube per node under a query.
 reblue_host_shader(occ_proxy_vs vs_6_1 -D REBLUE_RECOMP)
 reblue_host_shader(occ_proxy_ps ps_6_0)

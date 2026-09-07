@@ -1,4 +1,6 @@
 #include "gpu/scene/native_lit_shading.h"
+#include "gpu/scene/native_rigid_inputs.h"
+#include <limits>
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -49,6 +51,29 @@ Vec ReferenceFog(Vec colour, LitVector p, LitVector camera, LitFog fog) {
 }
 }
 void TestNativeLitShading() {
+  const RenderMatrix world{2,0,0,0, 0,4,0,0, 0,0,.5f,0, 3,5,7,1};
+  const auto object = BuildRigidObject(world, {1,2,3,1}, {.1f,.2f,.3f,8}, {2,3,4,5}, RigidDiffuse);
+  Require(object && object->normal_rows[0].x == .5f && object->normal_rows[1].y == .25f &&
+          object->normal_rows[2].z == 2 && object->world.rows[3].z == 7, "rigid row-vector/normal packing");
+  auto bad_world = world; bad_world[0] = 0;
+  Require(!BuildRigidObject(bad_world,{1,1,1,1},{0,0,0,8},{1,1,0,0},0), "singular rigid matrix refused");
+  bad_world = world; bad_world[3] = 1;
+  Require(!BuildRigidObject(bad_world,{1,1,1,1},{0,0,0,8},{1,1,0,0},0), "projective object refused");
+  Require(!BuildRigidObject(world,{1,1,1,1},{0,0,0,8},{1,1,0,0},64), "unknown rigid flags refused");
+  NativeRigidPassInputs pass;
+  pass.world_to_clip = {world, world}; pass.world_to_shadow = world;
+  for (auto &fog : pass.fog) fog.disabled = true;
+  pass.lights[0] = {LitVec(1,2,3),LitVec(4,5,6),LitVec(7,8,9),.25f,.5f,.75f,LitSpot};
+  pass.fog[0] = {LitVec(1,2,3),LitVec(0,1,0),LitVec(.2f,.3f,.4f),5,10,.8f,false,true,LitFogSubtract};
+  const auto packed = BuildRigidPass(pass);
+  Require(packed && packed->lights[0].position_range.w == .25f && packed->lights[0].kind.x == LitSpot &&
+          packed->fog[0].origin_start.w == 5 && packed->fog[0].mode.z == LitFogSubtract &&
+          packed->fog[0].mode.y == 1 && packed->fog[0].mode.w == 0, "explicit light/fog packing");
+  pass.fog[0].end = 5; Require(!BuildRigidPass(pass), "empty fog range refused"); pass.fog[0].end = 10;
+  pass.lights[0].kind = 99; Require(!BuildRigidPass(pass), "unknown light refused"); pass.lights[0].kind = LitSpot;
+  pass.lights[0].cone_cosine = 1; Require(!BuildRigidPass(pass), "singular cone refused"); pass.lights[0].cone_cosine = .5f;
+  pass.cameras[1].x = std::numeric_limits<float>::quiet_NaN();
+  Require(!BuildRigidPass(pass), "nonfinite second eye refused");
   LitLight light{};
   light.direction=LitVec(0,0,-1); light.position=LitVec(0,0,5);
   light.colour=LitVec(.4f,.6f,.8f); light.kind=LitDirectional;

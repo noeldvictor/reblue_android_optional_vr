@@ -1949,3 +1949,54 @@ metadata/helper/source deltas lack full baselines, not zero. Host exe/PDB grows
 end free63,335,129,088 B (58.99 GiB), drive-wide gain322,220,032 B from current
 first63,012,909,056 B; only397,312 B is attributed to cleanup. Same original
 ledger/cap/floor and raw0 gate remain, without reset or double-credit.
+
+### Production native rigid shaders, same checkpoint (2026-09-07)
+
+Parentd98b980, previous goal turn verified progress, committed/pushed clean.
+Current first free63,333,982,208 B, no owned producers. Pre-build63,334,043,648 B.
+Original ledger/cap/floor/raw0 are unchanged; no reset. Implement actual rigid
+scene/shadow shaders with named object/pass/texture inputs, no translated shader
+common include, shared light/fog math and explicit two-eye matrices. Reuse the
+existing tiny real-Vulkan scene snapshot fixture with a --rigid selection, not
+a new build tree/game boot. No game object producer is connected yet.
+
+Budget <=8 MiB added fixture/shader/log artifacts, <=128 MiB compile/link overlap,
+same diagnostics100 MiB/log10 MiB/free floor62,509,998,080 B. Existing GPU fixture
+8,364,855 B (exe705,024/PDB7,053,312), material fixture7,315,534 B, logs176,692 B.
+GPU test uses8x8 mono shadow and two-eye colour/depth images, bounded CPU/GPU
+buffers,5 s fence and30 s CTest; no raw/image/export/cache/perf/profile output.
+Only three new host shaders compile, not translated shaders or guest objects.
+Preserve run918/image and distinct prior numerical/snapshot coverage until
+equivalent replacements pass. Retained new artifacts must add shader coverage,
+then be replaced by purpose rather than accumulated across retries.
+
+Material18/CPU16 pass (0.10 s behavior/0.12 s CTest). Fixture21 failed before GPU
+work on generated-header ordering and Windows max macro; both corrected.
+Fixture22 passes, only3 new host shaders compiled. Rigid01 reveals an exact
+shadow-frustum-edge oracle instability and unused depth attributes; move samples
+strictly inside and use position-only shadow input. Fixture23/PID30020 passes.
+Rigid02/PID30332 passes4 two-eye cases/all512 color pixels plus eye/caster depths,
+max color error0.0000404567, validation0/0,1.21 s. Snapshot19/PID31048 passes all8
+layer/MSAA combinations, validation0/0,1.04 s. No raw/image/cache/profile outputs.
+Host73/PID28680 passes9.882 s, host-only compilation/link, codegen up to date;
+no guest objects/translated shaders.234 Python checks and8 runner tests pass.
+No game producer calls the native factory; run918/image remain tied to host72.
+Evidence: `20260907_0245_native-rigid-shaders.md`.
+
+Reused GPU fixture now10,395,399 B (+2,030,544), material7,338,480 B (+22,946),
+three new shader headers248,925 B. Host exe48,325,632/PDB107,266,048, combined
++116,224; new host factory object550,320 B. These add actual native shader
+coverage, not another build tree. Retire equivalent logs on replacement; keep
+current binaries/objects needed for incremental development. Other object/
+metadata/source/helper deltas lack full baselines, not zero.
+
+Validated replacements, then removed14 exact superseded agent logs: material17/
+CPU15, snapshot03, snapshot builds01/04/21 and rigid01 stdout/stderr.20,826 logical
+B; immediate free63,285,940,224 ->63,285,972,992 B, measured32,768 B reclaimed
+once. Earlier distinct failure logs and protected baseline/raw/motion/run918
+evidence are preserved; game data/profile untouched. Removed logs reproducible;
+failed attempt hashes/causes retained in the dated report. No active producer.
+Aggregate logs175,763 B (-929). Known retained fixture/shader/log growth2,301,486
+B, plus666,544 host exe/PDB/new object. Cleanup-end free58.94 GiB; drive-wide use
++48,009,216 B from this turn's first free, not all attributed to the task. Same
+original cap/floor/raw0 and retention triggers remain; no budget reset.

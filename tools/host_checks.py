@@ -19,6 +19,7 @@ AREAS = {
     "material": (
         "native_texture_table_boundary_test", "native_material_texture_boundary_test",
         "native_primitive_policy_boundary_test", "native_lit_shading_boundary_test",
+        "native_rigid_boundary_test",
     ),
     "instance": ("native_instance_boundary_test",),
     "scenario": ("native_instance_scenario_test",),

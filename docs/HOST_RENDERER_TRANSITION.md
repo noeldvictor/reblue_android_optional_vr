@@ -30,7 +30,7 @@ All of these remain required; shipping an intermediate component is not completi
 
 ## Active work queue
 
-Updated 2026-09-07 after native program CPU checks and the desktop regression. The first
+Updated 2026-09-07 after native rigid shader GPU checks and host73. The first
 two former milestones are one producer-to-consumer outcome; full scope is unchanged.
 
 1. **Complete a native static-object path, then expand its material families.**
@@ -48,18 +48,19 @@ two former milestones are one producer-to-consumer outcome; full scope is unchan
    inputs; live cull consumption passes the field check. Next, connect named
    shader inputs and direct scene/shadow submission for one ordinary opaque
    rigid field family (no skin or volume/special override dependency).
-   The normal lit shader now shares named light/fog arithmetic with CPU tests;
-   its input bindings, texture/shadow frontend and vertex shader still require
-   an explicit native contract. These scalar structs are semantic inputs, not
-   a raw C++/GPU constant-buffer layout. Reuse the evaluator in that contract;
-   replacing shader math alone does not provide native scene light/fog owners.
+   Production native rigid scene/shadow shaders now consume named attributes,
+   explicit 176-byte object/608-byte pass buffers, textures and samplers. Four
+   tiny two-eye Vulkan color/depth cases pass using the shared light/fog core;
+   packing is explicit, not a memcpy of its semantic structs. These shaders
+   are not connected to game objects yet; live scene light/fog ownership remains.
    The shared queue accepts explicit layouts/descriptor sets/offsets, with
    binding-aware batching and exact caller restoration. The shared pipeline cache
    now accepts owned native shader/layout/input programs; background jobs and
    cached pipelines pin their resources, with bounded native retention. Native
-   program selection has CPU coverage only: no game producer uses it yet, and
-   instance-record gathering remains translated. Connect a real native rigid
-   shader pair/input layout and object packet through these contracts next,
+   cache selection has CPU coverage; the production rigid shader factory,
+   pipeline-description and binding cores now have real GPU fixture coverage.
+   No game producer uses the native programs yet, and instance-record gathering
+   remains translated. Connect the owned object packet and live pass producers next,
    not another broad compatibility layer.
    Preserve the ordered null/override semantics and extend unsupported families;
    do not freeze animated overrides into mesh assets or assume every strip
@@ -110,7 +111,7 @@ drop participants from the initial acceptance scene.
 
 ### Direct rigid-object dependency map
 
-Source audit at `11f5d94`, updated for native pipeline programs (2026-09-07).
+Source audit at `11f5d94`, updated for native rigid shaders (2026-09-07).
 This records why the latest component
 checks are not an end-to-end object conversion, and where the next implementation
 must connect. It is not a second roadmap or a new renderer framework.
@@ -118,8 +119,8 @@ must connect. It is not a second roadmap or a new renderer framework.
 | Required contract | Reuse | Concrete remaining dependency |
 | --- | --- | --- |
 | An object/primitive packet selected by owned handles | `NativeModelMaterialProgram`, `NativeGeometry`, `NativeInstancePose`, object image/UV/policy publications | `PrepareMaterialMesh` still selects by `NodeTag`/source graph and consumers match source IB/VB/range keys. Publish an immutable model/instance-to-primitive association before drawing; the submission core must not discover it from captured draws. |
-| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, named light/fog evaluator and native image leases | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The normal shader still imports these from register bindings. Finish their producer ownership and define an explicit C++/GPU layout, including sampler/material flags; scalar evaluator structs alone are not that layout. |
-| Native shader/pipeline binding | Existing Plume device/framebuffers/queue; explicit `GraphicsBindings`; `NativePipelineProgram` with async/cache ownership | The emitter no longer requires three offsets, and the cache has a wrapper-free native program branch with explicit specializations. Only CPU fixtures create native programs so far. Supply the actual rigid shader pair/input layout and object producer; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
+| Explicit vertex, material and pass inputs | Canonical attributes, `GetNativeRenderTransforms`, native image leases, `BuildRigidObject`/`BuildRigidPass` and explicit GPU layout | `NativeLightingInputs` owns ambient/camera/shadow sampling, **not** the three actual light records or two fog layers. The live normal shader still imports these from registers. Publish owned lights/fog and associate native material/UV inputs with actual model primitives; do not repack translated registers per draw as the finished producer. |
+| Native shader/pipeline binding | Existing Plume device/framebuffers/queue; `GraphicsBindings`; bounded `NativePipelineProgram`; GPU-tested `CreateNativeRigidPrograms` with scene and position-only shadow inputs | Actual native shaders now work in the Vulkan fixture, using the production factory/description/binding cores. Connect the game object producer and shared cache selection; live engine bindings and translated instance gathering remain. Do not copy an old pipeline template or create a parallel renderer. |
 | Direct scene and shadow submission | Existing traversal, culling, instancing/pulling, indirect submission and native pass commands | `bdSceneNodeDrawSingle` still chooses `HostDrawReplay` or the original interpreter, then captures templates/list entries. Route a completely supported object before that branch, with whole-node preflight so unsupported siblings cannot be lost or duplicated. Shadow casting and receiving are separate responsibilities. |
 
 Start by selecting and recording an actual model/content identity and primitive
@@ -157,10 +158,26 @@ Focused model/instance selection also passes from outside the repository cwd.
 Both revised repository skills passed their frontmatter validator. That tooling
 checkpoint made no renderer change or new runtime output. The subsequent binding
 checkpoint expanded the selection to 113 rigid-path /228 broader checks; native
-program guards now bring these to 116 /231 respectively. Their
+program guards brought these to 116 /231; rigid shader guards now bring them to
+119 /234 respectively. Their
 separate C++ and runtime evidence follows below.
 
 ## Latest qualified checkpoint
+
+Native rigid shaders (2026-09-07): production scene VS/PS and shadow VS use named
+geometry, explicit object/pass buffers and texture/sampler sets, with no translated
+shader common/register ABI. Material18/CPU16 covers packing/refusals and the
+existing independent lighting/fog reference. Vulkan rigid02 compares all 512
+color pixels across four two-eye cases plus scene/caster depth; maximum color
+error 0.0000404567, zero validation errors/warnings, 1.21 s. Snapshot19 also passes
+all eight layer/MSAA combinations. Fixture23, host73, 234 source/scenario checks
+and eight runner tests pass. Reuse existing trees, no game run/raw/image export.
+This removes the missing native shader/input implementation dependency, not the
+live object/light/fog producer or source selection/template dependencies. No
+compatibility consumer can be deleted yet. Full cache-selection GPU integration,
+actual model identity, cold-load/reload and scene/shadow/both-eye game acceptance
+remain next. Run918 stays tied to host72, not the new binary. Evidence:
+`research/20260907_0245_native-rigid-shaders.md`.
 
 Native pipeline programs (2026-09-07): the shared cache accepts an immutable
 native shader/layout/input/specialization owner without calling the translated
