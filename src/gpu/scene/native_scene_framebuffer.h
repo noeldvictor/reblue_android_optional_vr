@@ -17,7 +17,8 @@ struct NativeSceneFramebuffer {
   std::unique_ptr<plume::RenderFramebuffer> framebuffer;
 
   bool Matches(const plume::RenderTexture *color, const plume::RenderTexture *depth) const {
-    return sources[0] && sources[1] && sources[0]->image.get() == color && sources[1]->image.get() == depth;
+    return sources[1] && (sources[0] ? sources[0]->image.get() : nullptr) == color &&
+        sources[1]->image.get() == depth;
   }
 };
 using NativeSceneFramebufferHandle = std::shared_ptr<const NativeSceneFramebuffer>;
@@ -33,7 +34,7 @@ public:
   template <typename Create>
   NativeSceneFramebufferHandle Acquire(const std::array<NativeTargetImageHandle, 2> &sources,
       const plume::RenderTexture *density_map, Create &&create) {
-    if (!Compatible(sources)) return {};
+    if (!Compatible(sources) || (!sources[0] && density_map)) return {};
     // The cache keeps the old owner alive until its fence; expired weak keys
     // cannot match recycled image addresses or retain source images themselves.
     std::erase_if(keys_, [](const auto &key) { return key.owner.expired(); });
@@ -47,12 +48,12 @@ public:
       auto owner = std::make_shared<NativeSceneFramebuffer>();
       owner->sources = sources;
       owner->density_map = density_map;
-      const plume::RenderTexture *colors[]{sources[0]->image.get()};
+      const plume::RenderTexture *colors[]{sources[0] ? sources[0]->image.get() : nullptr};
       plume::RenderFramebufferDesc desc;
-      desc.colorAttachments = colors;
-      desc.colorAttachmentsCount = 1;
+      desc.colorAttachments = sources[0] ? colors : nullptr;
+      desc.colorAttachmentsCount = sources[0] ? 1u : 0u;
       desc.depthAttachment = sources[1]->image.get();
-      desc.viewMask = sources[0]->shape.layers == 2 ? 3u : 0u;
+      desc.viewMask = sources[1]->shape.layers == 2 ? 3u : 0u;
       desc.fragmentDensityMap = density_map;
       owner->framebuffer = std::forward<Create>(create)(desc);
       return owner->framebuffer ? owner : NativeSceneFramebufferHandle{};
@@ -68,10 +69,14 @@ public:
 
 private:
   static bool Compatible(const std::array<NativeTargetImageHandle, 2> &sources) {
-    if (!sources[0] || !sources[1] || !sources[0]->Sampled() || !sources[1]->Sampled() ||
+    if (!sources[1] || !sources[1]->Sampled() || !sources[1]->shape.Bytes(512ull << 20)) return false;
+    const auto &depth = sources[1]->shape;
+    if (depth.format != plume::RenderFormat::D32_FLOAT_S8_UINT) return false;
+    // A single-sample depth-only pass uses the same native owner/cache.
+    if (!sources[0]) return true;
+    if (!sources[0]->Sampled() || !sources[0]->shape.Bytes(512ull << 20) ||
         sources[0]->image.get() == sources[1]->image.get()) return false;
     const auto &color = sources[0]->shape;
-    const auto &depth = sources[1]->shape;
     return color.format == plume::RenderFormat::R16G16B16A16_FLOAT &&
         depth.format == plume::RenderFormat::D32_FLOAT_S8_UINT &&
         color.width == depth.width && color.height == depth.height && color.layers == depth.layers;

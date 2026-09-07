@@ -55,15 +55,29 @@ public:
     result.clear_ = clear;
     return result;
   }
+  static std::optional<NativeSceneCommands> CreateDepthOnly(
+      const NativeTargetImageHandle &depth, plume::RenderFramebuffer *framebuffer,
+      float clear_depth = 1.f, uint8_t clear_stencil = 0) {
+    if (!depth || !depth->Sampled() || !depth->shape.Bytes(512ull << 20) || !framebuffer ||
+        depth->shape.format != plume::RenderFormat::D32_FLOAT_S8_UINT ||
+        framebuffer->getWidth() != depth->shape.width || framebuffer->getHeight() != depth->shape.height ||
+        !std::isfinite(clear_depth) || clear_depth < 0.f || clear_depth > 1.f) return {};
+    NativeSceneCommands result;
+    result.sources_[1] = depth;
+    result.framebuffer_ = framebuffer;
+    result.clear_ = NativeSceneClear{{}, clear_depth, clear_stencil};
+    return result;
+  }
   bool Matches(const plume::RenderTexture *color, const plume::RenderTexture *depth) const {
-    return sources_[0] && sources_[1] && sources_[0]->image.get() == color && sources_[1]->image.get() == depth;
+    return sources_[1] && (sources_[0] ? sources_[0]->image.get() : nullptr) == color &&
+        sources_[1]->image.get() == depth;
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
   bool ClearPending() const { return clear_.has_value(); }
   // Read only after ending this scope's active render pass. For MSAA this is
   // the ordinary attachment-resolve destination, never the multisample source.
   SampledImage ColorReadImage() const {
-    return resolved_[0].texture ? resolved_[0] : sources_[0]->Sampled();
+    return resolved_[0].texture ? resolved_[0] : sources_[0] ? sources_[0]->Sampled() : SampledImage{};
   }
 
   // Caller flushes outgoing draws before any transition. A resumed pass reuses
@@ -73,6 +87,7 @@ public:
     std::array<plume::RenderTexture *, 2> fresh{};
     uint32_t count = 0;
     for (uint32_t i = 0; i < 4; ++i) {
+      if (i < 2 && !sources_[i]) continue;
       auto *image = i < 2 ? sources_[i]->image.get() : resolved_[i - 2].texture;
       auto *layout = i < 2 ? &sources_[i]->layout : resolved_[i - 2].layout;
       if (!image) continue;
@@ -90,7 +105,7 @@ public:
   }
   template <typename Commands> bool ApplyClear(Commands &commands) {
     if (!clear_) return false;
-    commands.clearColor(0, clear_->color);
+    if (sources_[0]) commands.clearColor(0, clear_->color);
     commands.clearDepthStencil(true, true, clear_->depth, clear_->stencil);
     clear_.reset();
     return true;

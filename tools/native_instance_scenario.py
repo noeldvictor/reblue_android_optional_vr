@@ -389,6 +389,32 @@ def verify_light_selection(text):
                     (b[i] - a[i] for i in (0, 1, 2, 4))))
 
 
+def verify_shadow_images(text):
+    """Require fresh native shadow completion and exact image-owner publication."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("shadow image diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-shadow-images\] begins (\d+) ends (\d+) publications (\d+); ownership checks (\d+) wrong (\d+); compatibility (\d+) (\d+); empty clears (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[4]:
+                raise ValueError("native shadow image ownership mismatch")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if any(b[i] < a[i] for i in range(len(b))):
+        raise Pending("shadow image counters reset")
+    if b[5:7] != a[5:7]:
+        raise ValueError("shadow lifecycle used compatibility in the field window")
+    if any(b[i] - a[i] < 32 for i in range(4)) or b[3] - a[3] != b[2] - a[2]:
+        raise Pending("need fresh completed native shadow passes with fully checked image handoffs")
+    return dict(zip(("begins_delta", "ends_delta", "publications_delta", "checks_delta", "empty_clears_delta"),
+                    (b[i] - a[i] for i in (0, 1, 2, 3, 7))))
+
+
 def verify_fog(text):
     """Require active fog, fresh owned snapshots and complete producer checks."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -507,6 +533,7 @@ def main():
     parser.add_argument("--object-inputs", action="store_true")
     parser.add_argument("--selected-lights", action="store_true")
     parser.add_argument("--light-selection", action="store_true")
+    parser.add_argument("--shadow-images", action="store_true")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -535,6 +562,7 @@ def main():
         objects = verify_object_inputs(text) if args.object_inputs else None
         lights = verify_selected_lights(text) if args.selected_lights else None
         selection = verify_light_selection(text) if args.light_selection else None
+        shadow_images = verify_shadow_images(text) if args.shadow_images else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -573,6 +601,8 @@ def main():
         print("PASS: post-event owned selected lights " + ", ".join(f"{k}={v}" for k, v in lights.items()))
     if selection is not None:
         print("PASS: post-event host light selection " + ", ".join(f"{k}={v}" for k, v in selection.items()))
+    if shadow_images is not None:
+        print("PASS: post-event native shadow images " + ", ".join(f"{k}={v}" for k, v in shadow_images.items()))
     if fog is not None:
         print("PASS: post-event owned fog " + ", ".join(f"{k}={v}" for k, v in fog.items()))
     if primitive_shader is not None:

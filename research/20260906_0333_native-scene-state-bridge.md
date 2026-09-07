@@ -2516,3 +2516,38 @@ Git/metadata deltas unknown. Cleanup-end58.62 GiB free; drive-wide free increase
 67,616,768 B (64.48 MiB) from first measure, mostly unattributed activity, not
 cleanup credit. Original budgets/floor unchanged; next review replaces equivalent
 verification rather than accumulating it.
+
+### Native primary-shadow image continuation, 2026-09-07
+
+Parent95cd24c verified/pushed. First source-only free62,739,849,216 B;
+output preflight62,890,577,920 B. No active renderer/build producer or new large
+task output explained the earlier drop from the previous closing measurement
+or subsequent free-space rise; no cleanup credit. Same original3 GiB exception,
+62,509,998,080 B floor/raw0 gate and prior <=192 MiB link overlap estimate.
+Build256 MiB/runtime192 MiB free-drop stops;75 s/400 KiB log/160 KiB JPEG and
+10 MiB aggregate logs/images unchanged. No new tree, shader generation or cook.
+
+Output15/PID28844,post-output CPU1/PID26548 and host92/PID28092 pass. Codegen0
+written/up to date, host objects only;271 Python source/scenario checks pass.
+Run934/PID20808,07:56:07–07:57:05, passes300 fresh native shadow handoffs and all
+prior field/movement/light/fog/sampler gates. Fifteen settings audited,116 B
+profile restored exactly; no producer remains. No new raw/perf/cache/dump/cooked
+outputs.239,424 B log and inspected135,867 B JPEG replace prior equivalent
+evidence. Known cliff marks/blur remain; no direct native rigid draw, reload,
+both-eye or speedup claim. Contracts/hashes:20260907_0757_native-shadow-images.md.
+
+After qualification, removed six exact superseded agent-created files:
+host91 and output14 stdout/stderr,933 text and light-selection JPEG.397,349
+logical B; free62,888,697,856 ->62,889,103,360 B, **405,504 B reclaimed** once.
+Build logs reproducible; exact retired runtime text/image gone, hashes/findings
+retained in prior research. Preserve output15/CPU1,host92,934/image,material29/
+CPU27 and all distinct protected GPU/flat/VR/movement/failure/raw evidence.
+
+Texture fixture tree62,912,102 B; build logs187,513 B; window images10,242,267 B.
+Known retained component growth158,905 B: texture fixture+142,103,logs+4,424,
+image-8,793,runtime text-10,573,exe+7,168/PDB+24,576. New ownership/fixture code
+and replacement evidence, not an additional runtime set. Other object/source/
+Git deltas unknown. Cleanup-end58.57 GiB free;1,474,560 B (1.41 MiB) used from
+output preflight. Drive-wide free rose149,254,144 B (142.34 MiB) from the first
+source-only measure, mainly unrelated/unattributed activity, not cleanup credit.
+Original budgets/floor unchanged; next review replaces equivalent evidence.

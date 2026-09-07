@@ -5,11 +5,15 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_pass_bridge.h"
+#include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_sun_camera_bridge.h"
 #include "gpu/scene/native_view_bridge.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
 #include "gpu/device.h"
+#include "gpu/draw_queue.h"
+#include "gpu/frame.h"
 #include "gpu/frame_stats.h"
 #include "gpu/host_resource_heap.h"
 #include "gpu/host_targets.h"
@@ -43,11 +47,13 @@ constexpr uint32_t kPrimary = (uint32_t(-32035) << 16) + 24832;
 constexpr uint32_t kEngine = (uint32_t(-32034) << 16) - 19936;
 constexpr uint32_t kPassMode = (uint32_t(-32036) << 16) - 5536;
 constexpr uint32_t kOne = (uint32_t(-32251) << 16) + 20908;
-constexpr uint32_t kDepthFormat = 0x2D200196; // resource-header adapter only
 struct ShadowPass {
   uint32_t source = 0;
   GuestTexture *depth = nullptr, *output = nullptr;
   std::size_t nesting = 0;
+  NativeSceneFramebufferHandle framebuffer;
+  std::optional<NativeSceneCommands> commands;
+  NativeImageLease image;
 };
 thread_local std::vector<ShadowPass> shadows;
 struct Stats {
@@ -56,6 +62,7 @@ struct Stats {
   uint64_t checked = 0, wrong = 0, camera_snapshots = 0, light_fits = 0;
   uint64_t object_culls = 0, object_visible = 0, object_comparisons = 0, object_changed = 0;
   uint64_t character_depth_skipped = 0;
+  uint64_t image_checks = 0;
   uint32_t frame = 0;
 };
 thread_local Stats stats;
@@ -72,6 +79,10 @@ void Report() {
           stats.empty_clears, stats.checked, stats.wrong, stats.camera_snapshots,
           stats.light_fits);
   stats.frame = frame;
+  BD_INFO("[native-shadow-images] begins {} ends {} publications {}; ownership checks {} wrong {}; "
+          "compatibility {} {}; empty clears {}; native depth/image/framebuffer owners, no resolve links",
+          stats.begins, stats.ends, stats.outputs, stats.image_checks, stats.wrong,
+          stats.compatibility_begin, stats.compatibility_end, stats.empty_clears);
   BD_INFO("[native-sun-cull] objects {} visible {} original comparisons {} changed {}; "
           "character light-eye cutoffs skipped {}",
           stats.object_culls, stats.object_visible, stats.object_comparisons, stats.object_changed,
@@ -149,13 +160,21 @@ bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
       ? uint32_t(Settings::Get().ShadowDimension()) : 64u;
   if (!dimension)
     return false;
-  auto *depth = HostTargetAcquire(HostTargetClass::Shadow, dimension, dimension,
-                                  kDepthFormat, 1);
+  auto *depth = HostTargetAcquireNative(HostTargetClass::Shadow,
+      {dimension, dimension, 1, plume::RenderFormat::D32_FLOAT_S8_UINT, 1});
   if (!depth)
     return false;
-  if (output && depth->layers != output->layers) {
+  const NativeImageLease image{depth->nativeTarget, depth->nativeTarget->Sampled()};
+  if (output && !Video::CanPublishNativeImage(image, output)) {
     ReleaseResourceAdapter(depth->selfVa);
-    return false; // unsupported layer policy, before observable pass publication
+    return false; // unsupported output, before observable pass publication
+  }
+  auto framebuffer = AcquireNativeSceneFramebuffer({NativeTargetImageHandle{}, depth->nativeTarget}, nullptr);
+  auto commands = framebuffer ? NativeSceneCommands::CreateDepthOnly(
+      depth->nativeTarget, framebuffer->framebuffer.get()) : std::nullopt;
+  if (!commands) {
+    ReleaseResourceAdapter(depth->selfVa);
+    return false;
   }
   // From this point the native scope must unwind natively, even if a cvar
   // changes. Never execute the original lifecycle after publishing attachments.
@@ -169,8 +188,19 @@ bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
   uint32_t result = 0;
   Check(EnterNativePass(nullptr, depth, result), "Native shadow could not enter its preflighted pass");
   if (output) RetainResourceAdapter(output->selfVa);
-  shadows.push_back({source, depth, output, NativePassDepth()});
-  Video::RequestClear(0x30, 0xFFFFFFFF, 1.0f, 0);
+  shadows.push_back({source, depth, output, NativePassDepth(),
+      std::move(framebuffer), std::move(commands), image});
+  {
+    auto &s = state();
+    std::lock_guard lock(s.mutex);
+    s.frame_present_committed = false;
+    BeginCommandList(s);
+    Check(s.command_list_open, "Native shadow cannot record commands");
+    s.draw_framebuffer_bound = false;
+    // A newly entered scope owns a clear even when it has no casters.
+    s.clear_pending = false;
+    s.clear_flags = 0;
+  }
   SetState(ctx, base, 212, 0);
   ctx.r3.u64 = 0;
   ctx.r4.u64 = camera + 160;
@@ -219,13 +249,34 @@ bool End(PPCContext &ctx, uint8_t *base, uint32_t source) {
         "Native shadow output association changed during its pass");
   // Clear the owned attachment even with no casters: empty means far, not a
   // previous frame, last-drawn surface or a square-texture resolve heuristic.
-  if (pass.depth->hostClearFlags) {
+  if (pass.commands->ClearPending() || pass.depth->hostClearFlags) {
     Check(Video::BindDrawFramebuffer(), "Native shadow clear could not bind its attachment");
     ++stats.empty_clears;
   }
+  {
+    auto &s = state();
+    std::lock_guard lock(s.mutex);
+    DrawQueueFlush(s.command_list);
+    s.command_list->setFramebuffer(nullptr); // finish caster draws and empty clears
+    const auto &image = pass.image.image;
+    if (*image.layout != plume::RenderTextureLayout::SHADER_READ) {
+      const plume::RenderTextureBarrier barrier{image.texture, plume::RenderTextureLayout::SHADER_READ};
+      s.command_list->barriers(plume::RenderBarrierStage::GRAPHICS, &barrier, 1);
+      *image.layout = plume::RenderTextureLayout::SHADER_READ;
+      NoteBarrierCall(1, BarrierSite::Resolve);
+    }
+    s.plume_framebuffer_bound = s.draw_framebuffer_bound = false;
+    s.bound_fb_rt = s.bound_fb_ds = nullptr;
+  }
   if (pass.output) {
-    Check(Video::PublishSceneOutput(pass.depth, pass.output, 1.0f, false),
+    Check(Video::PublishNativeImage(pass.image, pass.output, false),
           "Native shadow depth publication failed");
+    Check(pass.output->nativeImage.owner == pass.image.owner &&
+          pass.output->texture == pass.image.image.texture &&
+          pass.output->descriptorIndex == pass.image.image.descriptor_index &&
+          &pass.output->layout.Get() == pass.image.image.layout && !pass.output->sourceSurface,
+          "Native shadow getter did not retain its exact image/layout/descriptor");
+    ++stats.image_checks;
     ++stats.outputs;
   } else ++stats.null_outputs;
   CallFrame frame(ctx);
@@ -241,6 +292,17 @@ bool End(PPCContext &ctx, uint8_t *base, uint32_t source) {
   return true;
 }
 } // namespace
+
+NativeSceneCommands *ActiveNativeShadowCommands(plume::RenderTexture *color, plume::RenderTexture *depth) {
+  if (shadows.empty() || !shadows.back().commands || NativePassDepth() != shadows.back().nesting)
+    return nullptr;
+  auto &commands = *shadows.back().commands;
+  return commands.Matches(color, depth) ? &commands : nullptr;
+}
+plume::RenderFramebuffer *ActiveNativeShadowFramebuffer(plume::RenderTexture *color, plume::RenderTexture *depth) {
+  const auto *commands = ActiveNativeShadowCommands(color, depth);
+  return commands ? commands->Framebuffer() : nullptr;
+}
 } // namespace bd::gpu::scene
 
 REX_HOOK_RAW(sub_82187168) {

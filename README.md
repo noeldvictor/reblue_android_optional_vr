@@ -58,28 +58,29 @@ recompiled; the local generated executable contains 18,777 function bodies, not
 the original high-level source project. There is no defensible conversion
 percentage based on function or host-draw counts.
 
-Latest desktop checkpoint (2026-09-07): **ordinary object light selection and
-scoring now run on the host.** Run933 adds 14,332 exact original comparisons,
-36 full reselections and 9,936 candidates in fresh post-event field windows,
-with no fallback growth. The CPU fixture checks 128,000 ranked candidates and
-the real selection-to-light-publication-to-native-pass boundary. The material
-fixture, 267 source/scenario checks, host91 and existing rendering/movement gates
-pass. The inspected image retains known cliff marks/blur. No new raw captures
-or cache files; superseded small verification outputs were removed.
+Latest desktop checkpoint (2026-09-07): **the main sun-shadow pass now owns its
+native depth image, framebuffer, clear and sampled-image handoff.** It no longer
+allocates through the console surface pool or publishes a legacy resolve link.
+Run934 verifies 300 fresh shadow image handoffs with no ownership mismatch or
+fallback. The depth-only/lifetime fixture, 271 source/scenario checks, host92
+and existing field/movement gates pass. The inspected image shows coherent
+character/scenery shadows, with known cliff marks/blur still present. No new raw
+captures or cache files; six superseded small verification files were removed.
 
 Next: connect the packet for the already-persisted 162-vertex rigid field asset to
 remaining live pass inputs and direct scene/shadow submission, then prove
 interpreter/template-free cold-load and reload. Its exact shader pair and UV
 formula are now identified; one layer, enabled vertex color and zero declaration
 bones are confirmed. The packet now retains lighting pass values, composed
-material features and ordinary 2D sampler recipes. Remaining shadow/vertex-pass
-inputs and complete native pass/draw routing remain. Host light selection is
+material features and ordinary 2D sampler recipes. The shadow image now has a
+native owner; fresh camera/projection and shadow receiver values still need to
+feed complete native pass/draw routing. Host light selection is
 available, but its caller still sits inside the old shader callback; direct
 submission must invoke the producer before that path. Observed flags must not
 become frozen defaults.
 **No live game object uses the new native rigid shaders yet.** Source-free GPU
 loading, full-game/both-eye qualification and any speedup remain unproven.
-[Evidence and next integration](research/20260907_0727_native-light-selection.md).
+[Evidence and next integration](research/20260907_0757_native-shadow-images.md).
 
 The preceding native rigid scene/shadow shaders pass four 8x8 two-eye Vulkan
 color/depth cases on an RTX 3060, with zero validation errors/warnings and no

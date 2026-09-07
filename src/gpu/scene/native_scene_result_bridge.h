@@ -56,6 +56,9 @@ const NativeSceneResolves *ActiveNativeSceneResolves(plume::RenderTexture *color
 plume::RenderFramebuffer *ActiveNativeSceneFramebuffer(plume::RenderTexture *color,
                                                       plume::RenderTexture *depth);
 NativeSceneCommands *ActiveNativeSceneCommands(plume::RenderTexture *color, plume::RenderTexture *depth);
+// Depth-only sun scopes reuse the same native framebuffer/command owners.
+plume::RenderFramebuffer *ActiveNativeShadowFramebuffer(plume::RenderTexture *color, plume::RenderTexture *depth);
+NativeSceneCommands *ActiveNativeShadowCommands(plume::RenderTexture *color, plume::RenderTexture *depth);
 void BindNativeSceneCommands(VideoState &s, NativeSceneCommands &commands);
 void ApplyNativeSceneClear(VideoState &s, NativeSceneCommands &commands);
 } // namespace bd::gpu::scene

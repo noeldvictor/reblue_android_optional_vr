@@ -188,8 +188,9 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
 }
 
 GuestTexture *HostTargetAcquireNative(HostTargetClass cls, const NativeTargetShape &shape) {
-  const bool depth = cls == HostTargetClass::SceneDepth;
+  const bool depth = cls == HostTargetClass::SceneDepth || cls == HostTargetClass::Shadow;
   if ((cls != HostTargetClass::SceneColor && !depth) ||
+      (cls == HostTargetClass::Shadow && (shape.samples != 1 || shape.layers != 1)) ||
       shape.format != (depth ? plume::RenderFormat::D32_FLOAT_S8_UINT :
           plume::RenderFormat::R16G16B16A16_FLOAT) || !shape.Bytes(512ull << 20)) return nullptr;
   std::lock_guard lock(g_mutex);

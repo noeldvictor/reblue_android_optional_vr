@@ -461,6 +461,7 @@ const NativeSceneResolves *ActiveNativeSceneResolves(plume::RenderTexture *color
 
 plume::RenderFramebuffer *ActiveNativeSceneFramebuffer(plume::RenderTexture *color,
                                                       plume::RenderTexture *depth) {
+  if (auto *shadow = ActiveNativeShadowFramebuffer(color, depth)) return shadow;
   if (const auto *resolved = ActiveNativeSceneResolves(color, depth))
     return resolved->framebuffer.get();
   if (scenes.empty()) return nullptr;
@@ -470,6 +471,7 @@ plume::RenderFramebuffer *ActiveNativeSceneFramebuffer(plume::RenderTexture *col
 }
 
 NativeSceneCommands *ActiveNativeSceneCommands(plume::RenderTexture *color, plume::RenderTexture *depth) {
+  if (auto *shadow = ActiveNativeShadowCommands(color, depth)) return shadow;
   if (scenes.empty() || !scenes.back().commands) return nullptr;
   auto &commands = *scenes.back().commands;
   return commands.Matches(color, depth) ? &commands : nullptr;

@@ -2,7 +2,7 @@ import unittest
 import re
 from native_instance_scenario import verify_model_nodes, verify_object_inputs, verify_selected_lights
 from native_instance_scenario import verify_fog, verify_primitive_shader, verify_lighting_pass, verify_material_features
-from native_instance_scenario import verify_material_samplers, verify_light_selection
+from native_instance_scenario import verify_material_samplers, verify_light_selection, verify_shadow_images
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -603,6 +603,36 @@ class LightSelectionScenarioTest(unittest.TestCase):
                     text.replace("120 candidates 2", "120 candidates 3"), "x" * (MAX_LOG_BYTES + 1)):
             with self.assertRaises(ValueError):
                 verify_light_selection(bad)
+
+
+class ShadowImageScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        rows[2] = "[native-shadow-images] begins 101 ends 100 publications 100; ownership checks 100 wrong 0; compatibility 2 2; empty clears 3;"
+        rows[4] = "[native-shadow-images] begins 151 ends 150 publications 150; ownership checks 150 wrong 0; compatibility 2 2; empty clears 4;"
+        return rows
+
+    def test_fresh_native_pass_and_exact_handoff(self):
+        self.assertEqual(verify_shadow_images("\n".join(self.rows())), dict(
+            begins_delta=50, ends_delta=50, publications_delta=50, checks_delta=50, empty_clears_delta=1))
+
+    def test_stale_reset_missing_incomplete_or_wrong_scene(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("150", "100"), text.replace("checks 150", "checks 149"),
+                    text.replace("begins 151", "begins 1"), text.replace("empty clears 4", "empty clears 1"),
+                    text.replace("bg41_01", "bg42_01"), "\n".join(self.rows()[1:]),
+                    text + "\n[native-material-context] mode Loading",
+                    "\n".join([self.rows()[2], self.rows()[4]] + scenario()[::2])):
+            with self.assertRaises(Pending):
+                verify_shadow_images(bad)
+
+    def test_mismatch_limits_or_fallback_growth(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("wrong 0", "wrong 1", 1), "x" * (MAX_LOG_BYTES + 1),
+                    text.replace("compatibility 2 2; empty clears 4", "compatibility 3 2; empty clears 4"),
+                    text.replace("compatibility 2 2; empty clears 4", "compatibility 2 3; empty clears 4")):
+            with self.assertRaises(ValueError):
+                verify_shadow_images(bad)
 
 
 class PrimitiveShaderScenarioTest(unittest.TestCase):

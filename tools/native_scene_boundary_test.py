@@ -276,21 +276,41 @@ class NativeSceneBoundaryTest(unittest.TestCase):
             self.assertNotIn(name, native)
         self.assertIn("HostTargetClass::Shadow", native)
         self.assertIn("EnterNativePass(nullptr, depth, result)", native)
-        self.assertIn("shadows.push_back({source, depth, output, NativePassDepth()})", native)
+        self.assertIn("shadows.push_back({source, depth, output, NativePassDepth(),", native)
         self.assertIn("RetainResourceAdapter(output->selfVa)", native)
         end = native[native.index("bool End("):]
         self.assertIn("Video::BindDrawFramebuffer()", end)
-        self.assertIn("PublishSceneOutput(pass.depth, pass.output, 1.0f, false)", end)
+        self.assertIn("PublishNativeImage(pass.image, pass.output, false)", end)
         self.assertLess(end.index("LeaveNativePass(result)"),
                         end.index("ReleaseResourceAdapter(pass.depth->selfVa)"))
         self.assertNotIn("bd_native_shadow_passes", end)  # scopes outlive setting changes
 
     def test_shadow_output_does_not_publish_a_post_chain(self):
         self.assertIn("if (publish_post_chain)\n    NoteTileContentLocked", self.output)
-        self.assertIn("PublishSceneOutput(pass.depth, pass.output, 1.0f, false)", self.shadow)
+        self.assertIn("PublishNativeImage(pass.image, pass.output, false)", self.shadow)
         # These two producers are deliberately still counted, never called native.
         self.assertIn("++stats.camera_snapshots", self.shadow)
         self.assertIn("++stats.light_fits", self.shadow)
+
+    def test_shadow_native_owner_reaches_sampling_without_a_legacy_resolve(self):
+        begin = self.shadow.split("bool Begin(", 1)[1].split("bool End(", 1)[0]
+        for forbidden in ("HostTargetAcquire(", "kDepthFormat", "Video::RequestClear"):
+            self.assertNotIn(forbidden, begin)
+        self.assertIn("HostTargetAcquireNative(HostTargetClass::Shadow", begin)
+        self.assertIn("AcquireNativeSceneFramebuffer({NativeTargetImageHandle{}, depth->nativeTarget}, nullptr)", begin)
+        self.assertIn("NativeSceneCommands::CreateDepthOnly(", begin)
+        self.assertLess(begin.index("Video::CanPublishNativeImage(image, output)"), begin.index("CallFrame frame(ctx)"))
+        self.assertLess(begin.index("if (!commands)"), begin.index("CallFrame frame(ctx)"))
+        end = self.shadow.split("bool End(", 1)[1].split("} // namespace", 1)[0]
+        for forbidden in ("PublishSceneOutput(", "copyTexture", "ResolveRtToTexture", "NoteTileContentLocked"):
+            self.assertNotIn(forbidden, end)
+        self.assertLess(end.index("pass.commands->ClearPending()"), end.index("DrawQueueFlush(s.command_list)"))
+        self.assertLess(end.index("DrawQueueFlush(s.command_list)"), end.index("setFramebuffer(nullptr)"))
+        self.assertLess(end.index("RenderTextureLayout::SHADER_READ"), end.index("Video::PublishNativeImage("))
+        self.assertIn("!pass.output->sourceSurface", end)
+        self.assertIn("&pass.output->layout.Get() == pass.image.image.layout", end)
+        self.assertIn("ActiveNativeShadowCommands(color, depth)", self.bridge)
+        self.assertIn("NativePassDepth() != shadows.back().nesting", self.shadow)
 
     def test_native_sun_camera_has_no_guest_fitting_execution(self):
         for name in ("__imp__", "sub_", "REX_EXTERN", "PPCContext", "ClassifyPass"):

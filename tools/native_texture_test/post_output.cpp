@@ -362,10 +362,11 @@ struct SceneSource : RenderTexture {
 };
 struct SceneFramebuffer : OutputFramebuffer {
   std::array<std::weak_ptr<const NativeTargetImage>, 2> sources;
+  std::array<bool, 2> present;
   explicit SceneFramebuffer(const std::array<NativeTargetImageHandle, 2> &images)
-      : sources{images[0], images[1]} {}
+      : sources{images[0], images[1]}, present{bool(images[0]), bool(images[1])} {}
   ~SceneFramebuffer() override {
-    for (const auto &source : sources) assert(!source.expired());
+    for (uint32_t i = 0; i < 2; ++i) if (present[i]) assert(!sources[i].expired());
   }
 };
 void SceneFramebufferOwnership() {
@@ -486,6 +487,80 @@ struct SnapshotRecorder {
     source = src; destination = dst; events.push_back('c');
   }
 };
+void DepthOnlyCommands() {
+  using namespace bd::gpu::scene;
+  for (uint32_t layers : {1u, 2u}) {
+    NativeSceneFramebufferStore store(2);
+    auto source = std::make_shared<NativeTargetImage>();
+    source->shape = {1440, 1584, layers, RenderFormat::D32_FLOAT_S8_UINT, 1};
+    source->image = std::make_unique<SceneSource>();
+    source->descriptor = 12;
+    std::array<NativeTargetImageHandle, 2> pair{NativeTargetImageHandle{}, source};
+    uint32_t created = 0;
+    const auto create = [&](const RenderFramebufferDesc &desc) {
+      ++created;
+      assert(!desc.colorAttachmentsCount && !desc.colorAttachments && !desc.fragmentDensityMap);
+      assert(desc.depthAttachment == source->image.get() && desc.viewMask == (layers == 2 ? 3u : 0u));
+      return std::make_unique<SceneFramebuffer>(pair);
+    };
+    SceneSource density;
+    assert(!store.Acquire(pair, &density, create) && !created);
+    for (uint32_t field = 0; field < 5; ++field) {
+      const auto shape = source->shape;
+      if (field == 0) source->shape.samples = 4;
+      if (field == 1) source->shape.layers = 3;
+      if (field == 2) source->shape.format = RenderFormat::R16G16B16A16_FLOAT;
+      if (field == 3) source->shape.width = 0;
+      if (field == 4) source->shape.width = UINT32_MAX;
+      OutputFramebuffer fb;
+      assert(!store.Acquire(pair, nullptr, create));
+      assert(!NativeSceneCommands::CreateDepthOnly(source, &fb));
+      source->shape = shape;
+    }
+    auto framebuffer = store.Acquire(pair, nullptr, create);
+    assert(framebuffer && created == 1 && framebuffer->Matches(nullptr, source->image.get()));
+    assert(!framebuffer->Matches(source->image.get(), nullptr));
+    assert(store.Acquire(pair, nullptr, create) == framebuffer && created == 1);
+    auto *fb = framebuffer->framebuffer.get();
+    assert(!NativeSceneCommands::CreateDepthOnly({}, fb));
+    assert(!NativeSceneCommands::CreateDepthOnly(source, nullptr));
+    for (float bad : {-1.f, 2.f, std::numeric_limits<float>::quiet_NaN()})
+      assert(!NativeSceneCommands::CreateDepthOnly(source, fb, bad));
+    auto scope = NativeSceneCommands::CreateDepthOnly(source, fb);
+    assert(scope && scope->ClearPending() && !scope->ColorReadImage());
+    assert(scope->Matches(nullptr, source->image.get()) && !scope->Matches(source->image.get(), nullptr));
+    SceneCommandRecorder recorder;
+    assert(scope->Bind(recorder) == 1 && scope->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'b', 'd', 'f', 'z'}));
+    assert(recorder.depth == 1.f && !recorder.stencil && !scope->ClearPending());
+    assert(recorder.writes[0].texture == source->image.get());
+    assert(recorder.writes[0].layout == RenderTextureLayout::DEPTH_WRITE);
+    recorder.events.clear();
+    assert(scope->Bind(recorder) == 0 && !scope->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'f'}));
+    SnapshotRecorder snapshot;
+    assert(!CopySceneSnapshot(snapshot, *scope, source->Sampled()) && snapshot.events.empty());
+    // End-of-pass publication borrows the actual native image/layout. Next
+    // scope clears the reused image, while resize/retirement retain old readers.
+    NativeImageLease receipt{source, source->Sampled()};
+    ImageLayoutRecord getter;
+    getter.Bind(source->layout);
+    source->layout = RenderTextureLayout::SHADER_READ;
+    auto next = NativeSceneCommands::CreateDepthOnly(source, fb);
+    recorder.events.clear();
+    assert(next->Bind(recorder) == 1 && next->ApplyClear(recorder));
+    assert((recorder.events == std::vector<char>{'b', 'f', 'z'}));
+    assert(*receipt.image.layout == getter.Get() && getter.Get() == RenderTextureLayout::DEPTH_WRITE);
+    std::weak_ptr<const NativeTargetImage> weak = source;
+    getter.Unbind(); source.reset(); pair = {}; scope.reset(); next.reset(); framebuffer.reset();
+    store.MarkUnused(0); store.AfterFence(1);
+    assert(store.Stats().resident == 1 && !weak.expired());
+    store.AfterFence(0);
+    assert(!store.Stats().resident && !weak.expired() && receipt);
+    receipt = {};
+    assert(weak.expired());
+  }
+}
 void SceneCommands() {
   using namespace bd::gpu::scene;
   const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
@@ -614,6 +689,7 @@ void SceneCommands() {
 int main() {
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   SceneFramebufferOwnership();
+  DepthOnlyCommands();
   SceneCommands();
   refraction_material_tests::Run();
   water_update_tests::Run();

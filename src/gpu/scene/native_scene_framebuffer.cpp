@@ -12,8 +12,8 @@ NativeSceneFramebufferHandle AcquireNativeSceneFramebuffer(
     const std::array<NativeTargetImageHandle, 2> &sources, const plume::RenderTexture *density_map) {
   auto &s = state();
   std::lock_guard lock(s.mutex);
-  if (!s.ready || s.shutting_down.load() || !sources[0] ||
-      (sources[0]->shape.layers == 2 && !s.device->getCapabilities().multiview) ||
+  if (!s.ready || s.shutting_down.load() || !sources[1] ||
+      (sources[1]->shape.layers == 2 && !s.device->getCapabilities().multiview) ||
       (density_map && !s.device->getCapabilities().fragmentDensityMap)) return {};
   if (!s.native_scene_framebuffers)
     s.native_scene_framebuffers = std::make_shared<NativeSceneFramebufferStore>();
