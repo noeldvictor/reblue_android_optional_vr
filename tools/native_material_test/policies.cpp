@@ -159,12 +159,19 @@ void TestNativePrimitivePolicies() {
         {scene+212,0},{override_byte & ~3u,0xaa00bbcc}};
     const auto alpha = ReadMaterialAlphaInputs(visual,read);
     Require(alpha && alpha->direct_reference == 64 && alpha->sorted_reference == 128 &&
-        alpha->object_reference == 17, "cutout input byte and object override precedence");
+        alpha->object_reference == 17, "cutout object override precedence");
+    memory[override_byte & ~3u] = 0xaa01bbcc;
+    const auto shadow_alpha = ReadMaterialAlphaInputs(visual,read);
+    Require(shadow_alpha && shadow_alpha->direct_reference == 64 && shadow_alpha->sorted_reference == 128 &&
+        shadow_alpha->object_reference == 17,
+        "light-space colour skip does not suppress shadow cutoff defaults or object override");
     memory[scene+212] = 1; memory.erase(visual+3124);
     Require(ReadMaterialAlphaInputs(visual,read) && !ReadMaterialAlphaInputs(visual,read)->object_reference,
         "blocked special override does not read unused object cutoff");
-    memory[override_byte & ~3u] = 0xaa01bbcc;
-    Require(!ReadMaterialAlphaInputs(visual,read), "external state override is not ordinary cutout policy");
+    memory.erase(override_byte & ~3u);
+    Require(ReadMaterialAlphaInputs(visual,read).has_value(), "cutoff does not read the unrelated colour/light-space flag");
+    memory.erase(defaults+60);
+    Require(!ReadMaterialAlphaInputs(visual,read), "missing actual cutoff defaults remain refused");
     Require(!ReadMaterialAlphaInputs(visual+1,read) && !ReadMaterialAlphaInputs(UINT32_MAX-3,read),
         "cutout input alignment and complete word bounds");
     memory.clear();

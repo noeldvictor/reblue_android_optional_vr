@@ -247,6 +247,11 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("detail_colours[layer-1]", fixture)
 
     def test_cutouts_use_owned_recipe_and_shader_not_draw_state(self):
+        alpha = (ROOT / "src/gpu/scene/native_material_alpha_source.h").read_text()
+        self.assertNotIn("override_byte", alpha)
+        self.assertNotIn("26711", alpha)
+        self.assertIn("read(defaults + 60)", alpha)
+        self.assertIn("read(uint64_t(visual) + 3124)", alpha)
         source = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
         producer = source.split("NativeObjectTextureScope::NativeObjectTextureScope", 1)[1].split(
             "NativeObjectTextureScope::~NativeObjectTextureScope", 1)[0]

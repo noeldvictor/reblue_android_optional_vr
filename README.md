@@ -102,7 +102,7 @@ lights or old shader values are guessed. The new C++ fixtures pass; inherited
 game draws and representative layered-scene pixels still need live verification.
 [Ordered light ownership and current build](research/20260907_1544_ordered-scene-lighting.md).
 
-Latest integration, **host110/run948**: a fresh 300-frame cold-field window emitted
+Earlier layered integration, **host110/run948**: a fresh 300-frame cold-field window emitted
 and fence-retired **1,265 additional native scene primitives**, beyond the selected
 regression object. Its cold title teardown also completed. The reloaded field
 then hit a strict **UV mismatch in a remaining legacy draw**, so full reload and
@@ -121,11 +121,17 @@ object/pass overrides and blend inputs feeding the native scene shader and queue
 This preserves blended cutout ordering and depth writes; it does not assume a
 fixed cutoff or treat translucent siblings as opaque. Phase1 shadow casting now
 has its own ordered image/alpha recipe, textured and zero-layer depth shaders,
-retained image bindings and native indirect submission. CPU fixtures and37 tiny
-GPU cases pass. After disk reserve recovered, host112 compiled both connections
-into `reblue_vk.exe` without rebuilding guest objects. No new game run yet.
+retained image bindings and native indirect submission. Host115/run955 now
+exercises these in the game after correcting a cutoff importer that wrongly
+rejected light-space passes. A fresh 300-frame cold-field window adds **1,198
+textured scene-cutout emissions and 8,778 zero-texture shadow-cutout emissions**.
+The existing cold-field regression gates and old-generation teardown pass.
+The disk guard stops the run during the reloaded opening event. Textured-shadow
+emissions remain zero; full reload, authored shadow-alpha equivalence and game
+pixels remain unqualified. No new image or speedup claim.
 [Cutout contract, verification and remaining gates](research/20260907_1713_native-scene-cutouts.md).
 [Shadow connection and current verification](research/20260907_1742_native-cutout-shadows.md).
+[Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
 
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, phase0 cutout casting,
@@ -140,12 +146,13 @@ are preserved. Authored update producers, live inherited-binding acceptance, bro
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification:315 Python source/scenario checks and expanded C++ fixtures pass.
-The current GPU evidence covers37 8x8 two-eye scene/mono-shadow cases in1.86 seconds with
+Verification:320 Python source/scenario checks and expanded C++ fixtures pass.
+The current GPU evidence covers41 8x8 two-eye scene/mono-shadow cases in1.65 seconds with
 zero Vulkan validation errors/warnings, including layered instancing, all eight
-scene/shadow cutout comparisons, blending and discarded-pixel depth preservation.
-Host112 compiles both cutout connections; host107/run945 remains
-the last accepted live result. These fixtures are not full-game stereo
+scene/shadow cutout comparisons, blending, discarded-pixel depth preservation
+and cutout shadows sampled by native receivers with bilinear comparison/PCF.
+Host115 contains the cutoff fix; host107/run945 remains
+the last accepted live/pixel result. These fixtures are not full-game stereo
 or lifecycle acceptance. All acceptance switches remain off in the normal profile.
 
 | Area | Reusable foundation | Still to finish |

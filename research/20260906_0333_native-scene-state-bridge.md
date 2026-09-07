@@ -3459,3 +3459,33 @@ retained net524,436 B, adding exe26,112/PDB90,112/netlogs1,780 to prior406,432.
 Logs200,819 B/136files. Other objects/CMake/source/Git unallocated. Lastfree
 73,573,142,528 B =11,703,443,456 B drive-wide gain since first, not task cleanup.
 Original floor/exception and all protected baseline/failure evidence unchanged.
+
+## 2026-09-07 cutout integration continuation (same allowance)
+
+First free78,924,582,912 B; original3 GiB exception/floor62,509,998,080 B unchanged.
+Host113/PID25168/session6384 and114/PID30120/session97473 pass; run952/PID34196
+stops on192 MiB free-drop guard before useful evidence. GPU32/PID32464/session48551
+builds; rigid10/PID35752 stops on32 MiB guard, then11/PID31932 passes41 pixel modes
+1.65/1.67 s, validation0/0 after concurrent builds are absent. Memory readback only.
+Runs953/PID34072/session21773 and954/PID35800/session3840 identify node65's false
+light-space cutoff refusal. Fixed from exact translated control flow; material37/
+PID22788 and CPU35/PID22244 pass0.17/0.20 s.320 Python checks pass. Host115/
+PID37360/session50752 links with no guest objects rebuilt. All producers terminal.
+
+Run955/PID27696/session70140 clears the refusal and prior cold-field gates:
+fresh1842..2142 textured scene cutout emissions+1,198/retired+1,196, zero-layer
+shadow cutout emissions+8,778/retired+8,766. Textured shadow0 keeps the new gate
+Pending. Old generation93 closes;192 MiB guard stops reloaded opening event.
+No new raw/image/perf/cache/dump;116 B profile restored exactly. Keep945/948/941.
+Detailed source correction, hashes and pending alpha/pixel gates in1838 report.
+
+Retired16 superseded build/test logs25,787 logical B plus952/953 logs64,367 B:
+18 files/90,154 B total, no protected data/evidence deletion. Immediate free deltas
+were+7,376,896,+20,480,+16,384,+69,632 B across four deletions; concurrent volume
+activity is not isolated or claimed as task savings. New retained954/955 logs
+420,247 B preserve precise failure/current cold progress. Material tree8,331,276 B/
+41files (+2,144), texture70,636,050 B/129 unchanged, GPU10,670,060 B/10 (+15,272),
+logs199,175 B/136 (-1,644), exe/PDB+8,192/+28,672. Counted retained growth472,883 B;
+other objects/CMake/source/Git unallocated. Inventory free71,608,135,680 B, down
+7,316,447,232 B drive-wide, not attributed to the~462 KiB subtotal. No allowance
+reset, no new raw exception. Pending reload/textured-shadow/pixels remain explicit.

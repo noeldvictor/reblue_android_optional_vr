@@ -91,6 +91,20 @@ host-only compile/link under the original192 MiB bound. Both cutout connections
 are now in the executable, with no guest object rebuild. No new game or pixel
 acceptance. [Current shadow connection and pending gates](../research/20260907_1742_native-cutout-shadows.md).
 
+Host115/run955 follow-up: the first live cutout refusal was caused by treating
+the light-space colour flag as a cutoff override. The exact translated branch
+skips colour writes, not cutoff defaulting/setters; the importer and causal C++
+fixture now reflect that distinction.320 Python checks pass.41 GPU modes pass
+in1.65 s, validation0/0; four new modes sample cutout shadow depths through the
+native receiver in both eyes, including filtered edges and instanced casters.
+The fresh cold-field1842..2142 window adds1,198 textured scene cutout emissions /
+1,196 retirements and8,778 zero-texture shadow cutout emissions /8,766 retirements.
+All prior cold rigid/receiver/lighting/caster gates pass; old generation93 closes.
+The disk guard stops the reloaded opening event, with no image or reload acceptance.
+Textured shadow emissions remain0, so the new strict cutout-family gate stays
+pending. Keep948/941 failures and the normal profile unchanged.
+[Current integration, source correction and evidence](../research/20260907_1838_cutout-integration.md).
+
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
 The direct consumer now uses `NativeSceneLightingPublication`: semantic lights
@@ -152,8 +166,14 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
 2. **Material families and characters.** Direct blended-cutout scene ownership
    is now connected, host-built and CPU/GPU-tested, pending fresh game
    emission/pixel/interoperation evidence. Phase1 textured/zero-layer cutout
-   casting is also connected, host-built and CPU/GPU-tested, pending
-   live depth/receiver/ordering/lifetime evidence. Next integrate these paired
+   casting is also connected, host-built and CPU/GPU-tested. Run955 proves fresh
+   textured scene and zero-layer caster cutouts in the cold field, not a complete
+   reload/pixel result. Next establish a representative textured-shadow participant
+   from owned material/object inputs instead of repeating the same zero-coverage
+   scenario. Separately recover the original light-space alpha multiplier contract:
+   its colour writes are skipped while the native caster currently copies object
+   alpha. The cutoff fix alone does not qualify that equivalence. Preserve the new
+   textured emission/fence gate and all ordering/legacy/pixel gates. Integrate these paired
    scene/shadow consumers, then wind and translucent
    materials; deliver native skeleton/skin assets, animation/
    pose production and GPU skinning as connected character paths. Test authored
