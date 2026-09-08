@@ -4169,3 +4169,50 @@ the PNG savings, these selected diagnostic scopes grew443,643 B. No new raw,
 performance CSV, asset cook, build or fixture output in this continuation.
 The proposed256 KiB per-image limit still needs owner approval and separate
 aggregate-budget preflight; no further capture is authorized by this checkpoint.
+
+### Immediate GPU geometry ownership (2026-09-08)
+
+Previous turn made progress by committing/pushing964's completed evidence as
+18eeb69. Current source audit confirms queued/native/instanced emissions change
+physical PSO/VB/IB without changing the immediate producer's logical dirty flags.
+Move immediate binding outside those flags, reusing prepared views, pipeline
+cache and existing fence-owned resources. No guest import or queue warm-up is
+added. This corrects an independent handoff contract, not a proven cause of962.
+The existing C++ draw-intent fixture covers real Plume view ranges/gaps/offsets;
+the existing rigid GPU fixture gains three stale-input controls and restorations
+with the unchanged two-eye pixel/depth oracle.351 Python guards/scenario tests
+pass; C++/GPU/host results and live acceptance are pending before these builds.
+
+Preflight free79,936,110,592 B; no renderer/build/test producer live. Reuse original
+3 GiB exception/floor62,509,998,080 B, not a new budget. Texture fixture73,703,715 B
+(131 files), GPU fixture14,961,203 B (17), build/test logs266,448 B (162). Plan
+draw-intent build21/CPU19 and GPU build49/rigid16 using the existing wrapper:
+32 MiB maximum free drop per fixture producer,300 s supervisor/30 s CTest,
+10 MiB aggregate log cap; estimated retained fixture growth below2 MiB and new
+logs below128 KiB. Host127 follows passing fixtures only,192 MiB peak free-drop
+guard covering the incremental object/link overlap. No new image/raw/cook/perf
+output or game launch. Retire only superseded matching success logs after proof;
+all unresolved runtime and distinct GPU evidence remain protected.
+
+Build21/PID33696 and CPU19/PID27096 terminal0; GPU49/PID28652 and rigid16/PID29332
+terminal0.52 two-eye cases pass in1.45 s, validation0/0, including separate
+stale-PSO/VB/IB controls and production restorations. Host127/PID34664 terminal0,
+18eeb6994 dirty; codegen0 written/1 module current, no guest objects compiled.
+EXE48,761,344 B SHA256
+A0792FE25CB53149000151DA5927141A4F38C0CA9DEAA5574FAE2E685AB2C038;
+PDB109,965,312 B SHA256
+DC2B16F2075F15DEAB2BFB05A435B7A5DDD09080454AF1880E4976FB353893C6.
+No game producer or image; all jobs terminal and unchanged owner-profile SHA256
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0 confirmed.
+
+After replacement proof, removed10 superseded draw-build20/CPU18/GPU48/rigid15/
+host126 stdout/stderr files,21,071 logical B once; these success logs are
+reproducible. Current binding/rigid/host logs and distinct screenshot1/visibility3/
+occlusion6 proofs remain, as do every unresolved failure and protected image/raw
+set. New build/test logs22,744 B, net1,673 B growth after cleanup, total268,121 B
+(162 files). Texture fixture74,104,103 B (132 files), up400,388 B; GPU fixture
+15,027,922 B (17 files), up66,719 B. Selected fixture/log scopes net468,780 B
+larger for the new executable/object and causal test coverage. No raw/cook/perf/
+image output. Measured free79,935,156,224 B after cleanup, down954,368 B from
+preflight; host/link/source/Git and unrelated drive activity are separate from
+the selected diagnostic scopes and logical cleanup. Live acceptance remains open.

@@ -22,6 +22,7 @@
 #include "gpu/backend.h"
 #include "gpu/constant_buffers.h"
 #include "gpu/draw_bindings_bridge.h"
+#include "gpu/draw_geometry_bindings.h"
 #include "gpu/vertex_pull.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/native_vertex_input.h"
@@ -243,8 +244,6 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
     // residual nor predictor covered it. Warns once per pipeline, and
     // REBLUE_PSO_CAP builds also capture it for the residual/template tooling.
     RecordPipelineState(lookup, CurrentRenderPassId(), built);
-    if (!s.deferring_draw)
-      s.command_list->setPipeline(pso);
     NotePSOSwitch();
     s.current_pso = pso;
 
@@ -442,15 +441,12 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
     }
   }
 
-  // Clean state is first=255, last=0, so 'first <= last' skips the call when
-  // nothing changed. BeginCommandList force-dirties the full range every
-  // command list reset: D3D12 IA bindings do not survive begin().
+  // Dirty ranges update the logical stream union only. Physical GPU bindings
+  // may have changed during a queue flush even when this draw's intent is clean.
   if (s.dirtyStates.vertexStreamFirst <= s.dirtyStates.vertexStreamLast) {
     const u32 first = s.dirtyStates.vertexStreamFirst;
     const u32 count = u32{s.dirtyStates.vertexStreamLast} - first + 1u;
-    // The union, not the latest range. The immediate path binds only what
-    // changed, so the binding a draw actually sees is everything bound since
-    // the command list began - which is what a deferred draw has to replay.
+    // Preserve all prepared streams, not only the most recently changed range.
     const u32 last = first + count - 1u;
     if (s.bound_vertex_count == 0) {
       s.bound_vertex_first = first;
@@ -462,21 +458,20 @@ bool Video::FlushRenderStateLocked(u32 device_guest) {
       s.bound_vertex_first = lo;
       s.bound_vertex_count = hi - lo + 1u;
     }
-    if (!s.deferring_draw) {
-      s.command_list->setVertexBuffers(first, s.vertex_views + first, count,
-                                       s.input_slots + first);
-    }
   }
 
-  // Re-binds only when SetIndices changed buffer/size/format, or
-  // BeginCommandList force-dirtied after a command list reset.
   if (s.deferring_draw) {
-    // Unconditional, unlike the immediate path: the dirty flag says "changed
-    // since the last draw", which is meaningless once draws are reordered.
+    // Both paths consume complete inputs; a queued draw copies them by value.
     s.pending.index_view = s.index_view;
     s.pending.has_index_buffer = s.index_view.buffer.ref != nullptr;
-  } else if (s.dirtyStates.indices && s.index_view.buffer.ref != nullptr) {
-    s.command_list->setIndexBuffer(&s.index_view);
+  } else {
+    // Native/reordered/pulled draws do not own this logical cache. Rebind its
+    // complete geometry without forcing PSO rebuilds or importing guest state.
+    const u32 first = s.bound_vertex_first, count = s.bound_vertex_count;
+    if (first > 16 || count > 16 - first ||
+        !ApplyImmediateGeometryBindings(*s.command_list, s.current_pso, first,
+            {s.vertex_views + first, count}, {s.input_slots + first, count},
+            &s.index_view)) return false;
   }
 
   if (s.deferring_draw) {

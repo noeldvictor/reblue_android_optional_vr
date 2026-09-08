@@ -33,6 +33,21 @@ class DrawBindingsBoundaryTest(unittest.TestCase):
         build = (ROOT / "tools/native_texture_test/CMakeLists.txt").read_text()
         self.assertIn("host_draw_intent_test draw_intent.cpp draw_bindings.cpp", build)
 
+    def test_immediate_geometry_does_not_use_logical_dirty_flags_as_gpu_state(self):
+        producer = (ROOT / "src/gpu/draw.cpp").read_text()
+        self.assertIn("ApplyImmediateGeometryBindings(*s.command_list, s.current_pso", producer)
+        for old_gate in ("s.command_list->setPipeline(pso)", "s.dirtyStates.indices &&",
+                         "s.command_list->setVertexBuffers("):
+            self.assertNotIn(old_gate, producer)
+        core = (ROOT / "src/gpu/draw_geometry_bindings.h").read_text()
+        for forbidden in ("dirtyStates", "state()", "PPCContext", "bd::mem"):
+            self.assertNotIn(forbidden, core)
+        self.assertIn("draw_geometry.cpp", (ROOT / "tools/native_texture_test/CMakeLists.txt").read_text())
+        pixels = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
+        self.assertIn("ApplyImmediateGeometryBindings(*commands", pixels)
+        self.assertIn("Run(device,0,stale,false)", pixels)
+        self.assertIn("Run(device,0,stale,true)", pixels)
+
 
 if __name__ == "__main__":
     unittest.main()

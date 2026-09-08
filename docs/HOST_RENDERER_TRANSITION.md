@@ -251,11 +251,14 @@ output stream with distinct written extent, overflow refusal, complete JPEG
 markers and explicit4:4:4 chroma.350 Python checks and the expanded CPU fixture
 pass:153,370 B full-resolution JPEG fully decodes, block-centre colour error4
 within the unchanged limit12. Tiny-image tests had missed the larger boundary.
-No new game run has used that encoder correction.
+Run964 reuses host126 and passes the strict cold/reload chain. The frame5005
+probe is refused by the bounded encoder/export; no JPEG is written. This does
+not qualify pixels or explain962. Its log/request and963's truncated export
+remain preserved; the latter now has explicit truncated-evidence filenames.
 
-Next: obtain the valid, bounded renderer-owned post-gamma image with host126
-after reserving additional image overlap and preserving963's truncated export.
-Do not overwrite its fixed probe paths or boot until the existing archive fits.
+The larger per-image budget is awaiting owner approval; the unchanged10 MiB
+aggregate archive also needs independently fitting overlap before another probe.
+Do not overwrite preserved probe paths or boot until the existing archive fits.
 That observation must distinguish stale window capture from a wrong presented
 frame; repeating PrintWindow or relaxing context checks cannot answer that.
 Do not build another capture/renderer framework or make the selected asset a
@@ -264,6 +267,21 @@ scene/animation/event/both-eye gates and Quest readiness remain open.
 [Current-depth GPU contract and integration findings](../research/20260907_2209_native-depth-visibility.md).
 [Runtime receipts, live checks and image discrepancy](../research/20260907_2256_current-depth-runtime.md).
 [Frame ownership, encoder correction and remaining gate](../research/20260908_0006_native-frame-provenance.md).
+
+Independent ownership connection, host127: immediate draws now bind their
+complete cached pipeline/vertex/index inputs, independent of logical dirty bits.
+Queued native/reordered/pulled work can no longer leave those physical bindings
+implicitly owned by the previous draw. CPU preparation/caching and deferred
+value snapshots remain; no new guest imports or forced pipeline compilation.
+351 Python checks, the expanded C++ draw fixture and52 two-eye Vulkan cases
+pass (1.45 s, validation0/0). Six added cases independently poison PSO/VB/IB:
+controls without restoration lose geometry, production restoration matches the
+unchanged colour/depth oracle. Host127 links without guest object compilation.
+No new game run or image: live interoperation and all existing visual failures
+remain unqualified. This is a verified handoff contract, not evidence that it
+caused962. Continue scene ownership using the same native consumers while the
+bounded post-gamma observation awaits its budget; preserve all final gates.
+[Implementation and causal regression evidence](../research/20260908_0033_immediate-geometry-bindings.md).
 
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB

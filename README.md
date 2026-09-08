@@ -195,10 +195,22 @@ real GPU slot fence, retaining frame/request/source identities. Eight Vulkan
 pixel cases pass. Host125/run963 passes strict cold/reload checks and records
 frame5070, but its truncated JPEG is rejected rather than accepted as pixels.
 Host126 fixes bounded JPEG output-length tracking and colour subsampling;
-350 Python checks and the full-resolution encode/decode fixture pass. That
-encoder fix has not yet had a new game-image run. Next: obtain a valid bounded
-post-gamma image, then resolve the original title-logo discrepancy.
+350 Python checks and the full-resolution encode/decode fixture pass. Run964
+passes the strict reload checks, but the bounded encoder/export refuses its
+1920x1080 probe; no new image is written. The proposed larger per-image limit
+still needs approval and room under the unchanged aggregate image budget.
+Valid post-gamma pixels and the original title-logo diagnosis remain pending.
 [Frame ownership, encoder correction and remaining gate](research/20260908_0006_native-frame-provenance.md).
+
+**Host127 removes dirty-flag dependence from immediate GPU geometry binding.**
+After queued/native/instanced work, immediate draws now bind their complete
+pipeline, vertex streams and index view without rebuilding cached pipelines or
+importing guest state. The C++ fixture,351 Python checks and52 two-eye Vulkan
+cases pass with zero validation errors/warnings. Three independent stale-input
+controls lose geometry; production rebinding restores the expected pixels.
+The desktop build passes without guest object compilation. Live game acceptance
+is still pending; this is not a proven fix for the earlier title-logo/tree gaps.
+[Handoff contract, causal fixtures and remaining gates](research/20260908_0033_immediate-geometry-bindings.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

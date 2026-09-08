@@ -27,8 +27,10 @@ struct State {
   } dirtyStates;
 };
 void TestGraphicsBindings();
+void TestImmediateGeometryBindings();
 int main() {
   TestGraphicsBindings();
+  TestImmediateGeometryBindings();
   using namespace bd::gpu;
   State state;
   int imports = 0;

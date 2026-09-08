@@ -7,6 +7,7 @@
 #include "gpu/scene/native_rigid_inputs.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/draw_bindings.h"
+#include "gpu/draw_geometry_bindings.h"
 #include <plume_vulkan.h>
 #include <cstring>
 #include <iostream>
@@ -39,7 +40,7 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
   Need(vmaFlushAllocation(native->device->allocator, native->allocation, 0, VK_WHOLE_SIZE) == VK_SUCCESS, "Rigid upload flush");
   return result;
 }
-void Run(RenderDevice &device, uint32_t mode) {
+void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true) {
   const bool cutout = (mode >= 12 && mode < 23) || mode == 40, untextured = mode == 10 || mode == 21;
   const bool shadow_cutout = mode >= 23, shadow_untextured = mode == 31 || mode == 36 || mode == 38;
   const bool cutout_receiver = mode >= 37;
@@ -152,6 +153,10 @@ void Run(RenderDevice &device, uint32_t mode) {
   auto vb = Upload(device, vertices.data(), sizeof(vertices), RenderBufferFlag::VERTEX);
   const uint16_t indices[]{0,1,2,0,2,3};
   auto ib = Upload(device, indices, sizeof(indices), RenderBufferFlag::INDEX);
+  const std::array<Vertex,4> collapsed_vertices{};
+  const std::array<uint32_t,6> collapsed_indices{};
+  auto foreign_vb = stale == 2 ? Upload(device,collapsed_vertices.data(),sizeof(collapsed_vertices),RenderBufferFlag::VERTEX) : nullptr;
+  auto foreign_ib = stale == 3 ? Upload(device,collapsed_indices.data(),sizeof(collapsed_indices),RenderBufferFlag::INDEX) : nullptr;
   auto colour_desc = RenderTextureDesc::ColorTarget(size,size,RenderFormat::R32G32B32A32_FLOAT);
   colour_desc.arraySize = 2;
   auto colour = device.createTexture(colour_desc);
@@ -235,6 +240,15 @@ void Run(RenderDevice &device, uint32_t mode) {
   pipeline_desc.depthFunction = RenderComparisonFunction::LESS; pipeline_desc.cullMode = RenderCullMode::NONE;
   pipeline_desc.viewMask = 3;
   auto scene_pipeline = device.createGraphicsPipeline(pipeline_desc);
+  std::unique_ptr<RenderPipeline> foreign_pipeline;
+  if (stale == 1) {
+    auto foreign_desc = pipeline_desc;
+    foreign_desc.renderTargetBlend[0].renderTargetWriteMask = 0;
+    foreign_desc.depthWriteEnabled = false;
+    foreign_pipeline = device.createGraphicsPipeline(foreign_desc);
+    Need(foreign_pipeline && static_cast<VulkanGraphicsPipeline *>(foreign_pipeline.get())->vk,
+         "Handoff foreign pipeline");
+  }
   const auto &shadow_program = shadow_cutout && !shadow_untextured ? programs.shadow_cutout : programs.shadow;
   ApplyNativePipelineProgram(*shadow_program, pipeline_desc);
   pipeline_desc.viewMask = 0; pipeline_desc.renderTargetCount = 0;
@@ -300,7 +314,23 @@ void Run(RenderDevice &device, uint32_t mode) {
   bindings.set_count = 3;
   for (uint32_t n=1;n<3;++n) bindings.sets[n] = sets[n].get();
   Need(ApplyGraphicsBindings(*commands,bindings,binding_state), "Rigid scene bind");
+  // Model a previously bound immediate draw followed by foreign queue work.
+  // Change one physical input at a time without touching the logical views.
+  // Controls deliberately omit restoration and must produce blank pixels;
+  // restored cases use the production helper and the unchanged two-eye oracle.
   commands->setPipeline(scene_pipeline.get());
+  commands->setVertexBuffers(0,&vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
+  if (foreign_pipeline) commands->setPipeline(foreign_pipeline.get());
+  if (foreign_vb) {
+    const RenderVertexBufferView foreign_view({foreign_vb.get(),0},sizeof(collapsed_vertices));
+    commands->setVertexBuffers(0,&foreign_view,1,&slot);
+  }
+  if (foreign_ib) {
+    const RenderIndexBufferView foreign_view({foreign_ib.get(),0},sizeof(collapsed_indices),RenderFormat::R32_UINT);
+    commands->setIndexBuffer(&foreign_view);
+  }
+  if (restore) Need(ApplyImmediateGeometryBindings(*commands,scene_pipeline.get(),0,
+      {&vertex_view,1},{&slot,1},&index_view), "Immediate geometry handoff");
   commands->drawIndexedIndirect(indirect.get(),sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
   commands->setFramebuffer(nullptr);
   auto readback = device.createBuffer(RenderBufferDesc::ReadbackBuffer(2*colour_bytes+3*depth_bytes));
@@ -437,6 +467,11 @@ void Run(RenderDevice &device, uint32_t mode) {
       for (uint32_t c=0;c<4;++c)
         rgba[c] = accepted ? rgba[c]*(c == 3 ? 1.f : alpha)+background[c]*(1-alpha) : background[c];
     }
+    if (!restore) {
+      Need(stale && mode == 0,"Handoff control scope");
+      for (auto &channel : rgba) channel = 0;
+      accepted = false;
+    }
     const auto pixel=eye*size*size+y*size+x;
     for(uint32_t c=0;c<4;++c) {
       const float actual=pixels[pixel*4+c], error=std::abs(actual-rgba[c]);
@@ -459,10 +494,17 @@ void Run(RenderDevice &device, uint32_t mode) {
           "Solid, threshold-passing or complementary casters must occlude both eyes completely");
     }
   }
-  std::cout<<"PASS production native rigid shaders: mode="<<mode<<" eyes=2 pixels=128 max_error="<<maximum_error
+  std::cout<<"PASS production native rigid shaders: mode="<<mode<<" stale="<<stale<<" restored="<<restore
+           <<" eyes=2 pixels=128 max_error="<<maximum_error
            <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" shadow cutout="<<shadow_cutout
            <<"; cutout receiver lit/shadowed/filtered="<<lit_receivers<<'/'<<shadowed_receivers<<'/'<<filtered_receivers
            <<"; native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
 }
 }
-void CheckNativeRigid(plume::RenderDevice &device) { for(uint32_t mode=0;mode<46;++mode) Run(device,mode); }
+void CheckNativeRigid(plume::RenderDevice &device) {
+  for(uint32_t mode=0;mode<46;++mode) Run(device,mode);
+  for(uint32_t stale=1;stale<=3;++stale) {
+    Run(device,0,stale,false);
+    Run(device,0,stale,true);
+  }
+}
