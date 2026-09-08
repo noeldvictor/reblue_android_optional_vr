@@ -284,7 +284,7 @@ speedup remain unproven. Source-input imports, receiver descriptors and outgoing
 state remain; water setup is host code, but its draws are still a legacy family.
 [Writer-ordered connection and causal failure](research/20260908_0337_native-visual-inputs.md).
 
-**Native water queue/image handoff built; live admission still pending (host139):**
+**Native water queue and bottom-depth pass built; live admission pending (host141):**
 the existing native draw store/emitter now supports water's own instance format,
 six retained image/view owners, consecutive ordered instancing and fence
 retirement. Load-owned meshes supply tangent inputs and indexed wave bounds;
@@ -298,15 +298,20 @@ target/post/resolve owners directly; no duplicate GPU images or adapter-owned
 views are needed. The GPU fixture uses the real post-image pool and verifies
 that a queued snapshot reader prevents pool overwrite.
 
-Sixteen two-eye GPU cases pass using the production water packer/image binder,
-including producer retirement before drawing and owner release after the fence.
-The 55 rigid GPU regressions and CPU batch/scene-owner checks pass; GPU validation
-reports zero errors/warnings. **The game does not yet call the new water submission
-entry.** Its ordered material/image publication and family admission remain to
-be connected, so no additional live guest-rendering path is claimed removed.
-Authored water pixels, sequences, reloads, both-eye game coverage and speedup
-remain unqualified. [Queue ownership, tests and next connection](research/20260908_0509_native-water-queue.md).
-[Image handoff and current verification](research/20260908_0940_native-water-image-leases.md).
+The water-bottom pass now has a native depth/framebuffer/clear/publication path
+without console surface allocation or resolve. It retains the actual producer's
+world projection; camera fitting and caster/sampling adapters remain. Real D32
+sampling exposed a layered deferred-clear bug, now fixed in the Plume fork.
+
+Seventeen two-eye water GPU cases, 55 rigid cases, eight snapshot cases and CPU
+owner checks pass; GPU validation reports zero errors/warnings. Host141/run970
+passes the existing strict cold-field/reload checks, **but does not observe the
+new bottom pass**. **The game does not yet call the native water submission
+entry.** Ordered material/image publication and family admission remain to be
+connected. Authored water pixels, sequences, both-eye game coverage and speedup
+remain unqualified. [Queue ownership](research/20260908_0509_native-water-queue.md),
+[image handoff](research/20260908_0940_native-water-image-leases.md), and
+[bottom pass, backend fix and current verification](research/20260908_1031_native-water-bottom.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

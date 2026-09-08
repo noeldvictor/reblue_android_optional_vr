@@ -100,6 +100,25 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         self.assertIn("NativeImageLease::From(snapshot)", fixture)
         self.assertIn("Queued water prevents a new snapshot writer", fixture)
 
+    def test_bottom_pass_replaces_surface_allocation_and_console_resolve(self):
+        bridge = (ROOT / "src/gpu/scene/native_water_bottom_bridge.cpp").read_text()
+        for required in ("REX_HOOK_RAW(sub_82187878)", "REX_HOOK_RAW(sub_82187A00)",
+                         "HostTargetClass::WaterBottomDepth", "NativeSceneCommands::CreateDepthOnly",
+                         "FinishNativeWaterBottom", "ReadNativeWaterBottom", "Video::PublishNativeImage",
+                         "DrawQueueFlush", "RetainResourceAdapter", "LeaveNativePass"):
+            self.assertIn(required, bridge)
+        for forbidden in ("D3DDevice_", "hcgD3DCreateSurface", "bdSurfaceSetMSAA(", "bdDestroySurface(",
+                          "HostTargetDropLinks", "copyTexture", "ResolveGuestTexture", "SetTexture(9"):
+            self.assertNotIn(forbidden, bridge)
+        core = (ROOT / "src/gpu/scene/native_water_bottom.h").read_text()
+        for forbidden in ("PPCContext", "bd::mem", "sourceSurface", "GuestTexture", "copyTexture"):
+            self.assertNotIn(forbidden, core)
+        self.assertIn("camera->world_to_clip", core)
+        scene = (ROOT / "src/gpu/scene/native_scene_pass_bridge.cpp").read_text()
+        self.assertEqual(scene.count("ActiveNativeWaterBottomCommands(color, depth)"), 2)
+        water = (ROOT / "src/gpu/scene/native_water_scene.h").read_text()
+        self.assertIn("target(bottom,layers.z,true)", water)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -29,7 +29,7 @@ struct NativeWaterImages {
           *lease.image.layout == plume::RenderTextureLayout::SHADER_READ;
     };
     return target(planar,layers.x,false) && target(snapshot,layers.y,false) &&
-        target(bottom,layers.z,false) && target(shadow,1,true);
+        target(bottom,layers.z,true) && target(shadow,1,true);
   }
   const plume::RenderTexture *Image(uint32_t role) const {
     switch (role) {

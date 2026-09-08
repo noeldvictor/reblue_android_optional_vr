@@ -414,6 +414,20 @@ overwrite refusal. Host139 and371 Python checks pass. No live water admission
 or additional converted family is claimed.
 [Image-owner connection evidence](../research/20260908_0940_native-water-image-leases.md).
 
+Bottom-depth checkpoint (host141): complete begin/end hooks now reuse native
+depth, framebuffer, command, image-lease and fence owners, replacing the eligible
+pass's console surface create/clear/resolve/release lifecycle. The explicit
+WaterBottomDepth slot is not inferred from square dimensions or shared with sun
+shadows. Completion retains D32 depth plus its producing world projection;
+camera fit and caster/sampling adapters remain. Testing real depth instead of
+the fixture's previous HDR placeholder exposed Plume's cross-framebuffer deferred
+clear merge. Fork commit191c31c preserves the original framebuffer/view owner.
+17 two-eye water,55 rigid,8 snapshot GPU cases, CPU owner tests and372 Python
+checks pass. Host141/run970 passes strict mixed cold/reload regression, but has
+no observed bottom-pass invocation/allocation. It does not qualify this new pass
+in game or add a native water-family caller.
+[Bottom producer and causal backend evidence](../research/20260908_1031_native-water-bottom.md).
+
 Next connected work: publish completed water values and image owners from the
 ordered material writer and admit the family into the existing mixed scene
 consumer, calling `SubmitNativeWaterScenePackets`. Reuse the current
@@ -426,7 +440,13 @@ Publish completed material values with native instance/generation identity after
 the resource writer, not a draw-time descriptor lookup. The current import copies
 final parameter destinations; it is not yet installed in a frame-bounded owner.
 Supply the new typed image leases at the ordered material producer; the queue's
-image-owner mismatch is resolved. Keep producer command framebuffers/resolve
+image-owner mismatch is resolved. Use the completed bottom depth/projection
+pair, not a colour snapshot or a guessed later constant transform. Establish an
+authored bottom-active scenario or its scheduling gate before another live probe;
+unchanged bg41_01 retries add no evidence. Bump slot12, environment slot5,
+planar reflection, late per-primitive material writes and sampler publication
+still need native producer connections; ordinary sampler tracking covers only
+slots0..4. Keep producer command framebuffers/resolve
 owners alive through their fences too. Load-owned tangent
 and displacement metadata now exist; apply displaced bounds before live walk
 culling as well as queued visibility. Do not recreate these owners/helpers.

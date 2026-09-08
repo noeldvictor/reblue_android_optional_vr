@@ -7,6 +7,8 @@
 #include "gpu/scene/native_water_material_source.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_scene_snapshot.h"
+#include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/scene/native_water_bottom.h"
 #include "gpu/native_post_images.h"
 #include "gpu/draw_bindings.h"
 #include <plume_vulkan.h>
@@ -192,7 +194,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     auto &m = materials[i]; m.tint = {.2f+.2f*i,.3f,.4f,.4f+.2f*i};
     m.uv_scale = .2f; m.scroll_u = .3f; m.scroll_v = -.2f; m.phase = phase;
     m.reflection = mode == 2 ? WaterReflectionEnvironment : mode == 1 || mode == 6 || mode == 7 ? WaterReflectionPlanar : WaterReflectionNone;
-    m.refraction = mode == 3 || mode == 4; m.shore = mode == 4;
+    m.refraction = mode == 3 || mode == 4 || mode == 14; m.shore = mode == 4 || mode == 14;
     m.depth_opacity = 1; m.shininess = 8; m.highlight = mode == 5 || lit ? .2f : 0;
     m.reflection_distortion = mode == 6 ? .2f : 0;
     m.normal_blend = mode == 6 ? .5f : 0;
@@ -228,7 +230,13 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   auto indirect = Upload(device,&indexed,sizeof(indexed),RenderBufferFlag::INDIRECT);
   auto colour = MakeImage(device,2), depth = MakeImage(device,2,false,true);
   std::array<Image,6> images{MakeImage(device,1),MakeImage(device,2),Image{},
-      MakeImage(device,2),MakeImage(device,6,true),MakeImage(device,1,false,true)};
+      MakeImage(device,2,false,true),MakeImage(device,6,true),MakeImage(device,1,false,true)};
+  NativeSceneFramebufferStore bottom_store(1);
+  auto bottom_framebuffer = bottom_store.Acquire({NativeTargetImageHandle{},images[3].owner},nullptr,
+      [&](const auto &desc) { return device.createFramebuffer(desc); });
+  Need(bool(bottom_framebuffer),"Water native bottom framebuffer owner");
+  auto bottom_scope = NativeSceneCommands::CreateDepthOnly(images[3].owner,bottom_framebuffer->framebuffer.get());
+  Need(bool(bottom_scope),"Water depth-only bottom producer");
   // Same bounded owner/pool and typed view handoff as the live snapshot
   // producer. A queued reader must prevent pool overwrite, not just deletion.
   NativePostImagePool snapshot_pool(uint64_t(size)*size*2*8,1);
@@ -285,6 +293,17 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   for (uint32_t i = 0; i < 6; ++i) {
     if (i == 2) continue; // the real native scene snapshot produces this image
     auto &image = images[i];
+    if (i == 3) {
+      Need(!FinishNativeWaterBottom(*commands,*bottom_scope),"Bottom cannot publish before its pending clear");
+      bottom_scope->Bind(*commands);
+      Need(bottom_scope->ApplyClear(*commands),"Bottom scope owns its far clear even without casters");
+      if (mode != 14) for (uint32_t eye = 0; eye < 2; ++eye) {
+        commands->setFramebuffer(image.framebuffers[eye].get());
+        commands->clearDepthStencil(true,false,.75f+.125f*eye,0);
+      }
+      Need(FinishNativeWaterBottom(*commands,*bottom_scope),"Production bottom depth completion without resolve or copy");
+      continue;
+    }
     const auto layout = i == 5 ? RenderTextureLayout::DEPTH_WRITE : RenderTextureLayout::COLOR_WRITE;
     commands->barriers(RenderBarrierStage::GRAPHICS,RenderTextureBarrier(image.owner->image.get(),layout));
     image.owner->layout = layout;
@@ -295,7 +314,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
         // Exact binary16 source colours isolate the sampled-image route from
         // implementation-permitted clear/store rounding at format conversion.
         const auto value = i == 0 ? RenderColor(.5f,.5f,1,1) : i == 1 ? RenderColor(.25f+.25f*layer,.125f,.0625f,1) :
-            i == 3 ? RenderColor(.75f+.125f*layer,0,0,1) : RenderColor(.5f,.375f,.25f,1);
+            RenderColor(.5f,.375f,.25f,1);
         commands->clearColor(0,value,&full,1);
         if (mode == 6 && i == 0) {
           const RenderRect half(0,0,size/2,size);
@@ -342,6 +361,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   const std::weak_ptr<const NativeTextureGpu> weak_bump = bump;
   const std::weak_ptr<const NativePostImage> weak_snapshot = snapshot;
   geometry.reset(); bump.reset(); environment.reset(); snapshot.reset();
+  bottom_scope.reset(); bottom_framebuffer.reset();
   // Producer references retire now; framebuffer/view command resources from
   // the setup clears independently remain pinned until THEIR submission fence.
   for (auto &image : images) image.owner.reset();
@@ -366,6 +386,8 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     Need(items[1].Ready(17,1) && NativeRigidBatchLength(pointers,17,1) == 1,"Water ordered snapshot publication batch barrier");
     changed->images.bottom = {};
     Need(!items[1].Ready(17,1) && !PackNativeWaterBatch(pointers,packed,17,1),"Water missing native image owner refuses");
+    *changed = *saved.water; changed->images.bottom = saved.water->images.snapshot;
+    Need(!items[1].Ready(17,1),"Water bottom must be real depth, not a colour snapshot");
     *changed = *saved.water; changed->input.image_layers.y = 1;
     Need(!items[1].Ready(17,1),"Water declared image layers must match retained image");
     *changed = *saved.water;
@@ -439,6 +461,10 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   auto &native_fence = *static_cast<VulkanCommandFence *>(fence.get());
   Need(vkWaitForFences(native_fence.device->vk,1,&native_fence.vk,VK_TRUE,5'000'000'000ULL) == VK_SUCCESS,"Water fence timeout");
   queue->waitForCommandFence(fence.get());
+  bottom_store.MarkUnused(1); bottom_store.AfterFence(0);
+  Need(bottom_store.Stats().resident == 1,"Bottom producer framebuffer survives through its recorded fence");
+  bottom_store.AfterFence(1);
+  Need(bottom_store.Stats().resident == 0,"Bottom producer framebuffer retires after fence");
   for (auto &item : items) Need(item.output.Retire() && !item.output.Retire(),"Water exactly-once fence retirement");
   // Free descriptors before their owners. Real DrainSlot clears both only after
   // the fence; this fixture checks the same receipt/lease boundary, not a game run.
@@ -476,15 +502,18 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     const std::array<float,3> reflection = mode == 2 ? std::array{.5f,.375f,.25f} : std::array{.25f+.25f*eye,.125f,.0625f};
     const float snapshot[]{.125f,.25f+.25f*eye,.5f};
     if (mode == 1 || mode == 2) for (uint32_t c = 0; c < 3; ++c) expected[c] += .9f*fresnel*reflection[c];
-    if (mode == 3 || mode == 4) {
+    if (mode == 3 || mode == 4 || mode == 14) {
       for (uint32_t c = 0; c < 3; ++c) expected[c] = snapshot[c]+(expected[c]-snapshot[c])*m.tint.w;
       expected[3] = 1;
     }
-    if (mode == 4) {
+    if (mode == 4 || mode == 14) {
       // Eye1 bottom depth AND projected depth both differ by .125: opacity=.25.
-      const float tint[]{m.tint.x,m.tint.y,m.tint.z}, shallow_cube = .75f*.75f*.75f;
+      // Empty mode14 must sample this pass's far clear, never an old bottom.
+      const float opacity = mode == 14 ? 1.f-(.5f+.125f*eye) : .25f;
+      const float shallow = 1-opacity, shallow_cube = shallow*shallow*shallow;
+      const float tint[]{m.tint.x,m.tint.y,m.tint.z};
       for (uint32_t c = 0; c < 3; ++c)
-        expected[c] = .25f*expected[c]+.75f*(tint[c]+(1-tint[c])*shallow_cube)*snapshot[c];
+        expected[c] = opacity*expected[c]+shallow*(tint[c]+(1-tint[c])*shallow_cube)*snapshot[c];
     }
     if (mode == 5) {
       // Primary light is fully shadowed (.5 > .25); no secondary specular.
@@ -533,7 +562,7 @@ void CheckNativeWater(RenderDevice &device) {
   CheckImport();
   CheckWaveBounds();
   for (uint32_t mode = 0; mode < 6; ++mode) Run(device,mode);
-  for (uint32_t mode = 8; mode <= 13; ++mode) Run(device,mode);
+  for (uint32_t mode = 8; mode <= 14; ++mode) Run(device,mode);
   for (uint32_t mode : {6u,7u}) {
     const auto first = Run(device,mode,0), second = Run(device,mode,.37f);
     for (uint32_t eye = 0; eye < 2; ++eye) {

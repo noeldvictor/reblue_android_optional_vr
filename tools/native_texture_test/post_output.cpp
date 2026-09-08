@@ -9,6 +9,7 @@
 #include "gpu/scene/native_scene_resolves.h"
 #include "gpu/scene/native_scene_commands.h"
 #include "gpu/scene/native_scene_snapshot.h"
+#include "gpu/scene/native_water_bottom.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_deferred_queue.h"
@@ -566,6 +567,7 @@ void DepthOnlyCommands() {
     auto source = std::make_shared<NativeTargetImage>();
     source->shape = {1440, 1584, layers, RenderFormat::D32_FLOAT_S8_UINT, 1};
     source->image = std::make_unique<SceneSource>();
+    source->view = std::make_unique<RenderTextureView>();
     source->descriptor = 12;
     std::array<NativeTargetImageHandle, 2> pair{NativeTargetImageHandle{}, source};
     uint32_t created = 0;
@@ -602,6 +604,9 @@ void DepthOnlyCommands() {
     assert(scope && scope->ClearPending() && !scope->ColorReadImage());
     assert(scope->Matches(nullptr, source->image.get()) && !scope->Matches(source->image.get(), nullptr));
     SceneCommandRecorder recorder;
+    SnapshotRecorder bottom_commands;
+    assert(!FinishNativeWaterBottom(bottom_commands,*scope) && bottom_commands.events.empty());
+    assert(!ReadNativeWaterBottom(*scope,9,4));
     assert(scope->Bind(recorder) == 1 && scope->ApplyClear(recorder));
     assert((recorder.events == std::vector<char>{'b', 'd', 'f', 'z'}));
     assert(recorder.depth == 1.f && !recorder.stencil && !scope->ClearPending());
@@ -614,15 +619,39 @@ void DepthOnlyCommands() {
     assert(!CopySceneSnapshot(snapshot, *scope, source->Sampled()) && snapshot.events.empty());
     // End-of-pass publication borrows the actual native image/layout. Next
     // scope clears the reused image, while resize/retirement retain old readers.
-    NativeImageLease receipt{source, source->Sampled()};
+    NativeImageLease receipt = NativeImageLease::From(source);
     ImageLayoutRecord getter;
     getter.Bind(source->layout);
-    source->layout = RenderTextureLayout::SHADER_READ;
+    assert(FinishNativeWaterBottom(bottom_commands,*scope));
+    assert((bottom_commands.events == std::vector<char>{'e','b'}));
+    assert(bottom_commands.barriers_seen[0].texture == receipt.image.texture &&
+        bottom_commands.barriers_seen[0].layout == RenderTextureLayout::SHADER_READ);
+    assert(!bottom_commands.source && !bottom_commands.destination); // completion cannot copy
+    assert(!ReadNativeWaterBottom(*scope,9,4)); // image alone is not a projection producer
+    RenderTransformInputs camera;
+    camera.view = {1,0,0,0, 0,0,-1,0, 0,1,0,0, -3,-4,-5,1};
+    camera.projection = {2,0,0,0, 0,3,0,0, 0,0,.25f,0, 0,0,.5f,1};
+    scope->PublishCamera(camera,true,true,false,9,4);
+    auto bottom = ReadNativeWaterBottom(*scope,9,4);
+    assert(bottom && bottom->image == receipt && bottom->image.ArrayView() == source->view.get());
+    assert(bottom->world_to_bottom == MultiplyRenderMatrices(camera.view,camera.projection));
+    assert(bottom->world_to_bottom != camera.projection); // not view-to-bottom or uncomposed projection
+    assert(!ReadNativeWaterBottom(*scope,10,4) && !ReadNativeWaterBottom(*scope,9,3));
+    camera.view[12] = 42;
+    scope->PublishCamera(camera,true,false,false,9,4);
+    assert(ReadNativeWaterBottom(*scope,9,4)->world_to_bottom != bottom->world_to_bottom);
+    camera.view[0] = std::numeric_limits<float>::infinity();
+    scope->PublishCamera(camera,true,false,false,9,4);
+    assert(!ReadNativeWaterBottom(*scope,9,4));
+    bottom_commands.events.clear();
+    assert(FinishNativeWaterBottom(bottom_commands,*scope) &&
+        (bottom_commands.events == std::vector<char>{'e'})); // no redundant transition
     auto next = NativeSceneCommands::CreateDepthOnly(source, fb);
     recorder.events.clear();
     assert(next->Bind(recorder) == 1 && next->ApplyClear(recorder));
     assert((recorder.events == std::vector<char>{'b', 'f', 'z'}));
     assert(*receipt.image.layout == getter.Get() && getter.Get() == RenderTextureLayout::DEPTH_WRITE);
+    assert(!ReadNativeWaterBottom(*scope,9,4)); // rewritten or unqualified image cannot be consumed
     std::weak_ptr<const NativeTargetImage> weak = source;
     getter.Unbind(); source.reset(); pair = {}; scope.reset(); next.reset(); framebuffer.reset();
     store.MarkUnused(0); store.AfterFence(1);
@@ -630,6 +659,8 @@ void DepthOnlyCommands() {
     store.AfterFence(0);
     assert(!store.Stats().resident && !weak.expired() && receipt);
     receipt = {};
+    assert(!weak.expired() && bottom->image.ArrayView());
+    bottom.reset();
     assert(weak.expired());
   }
 }

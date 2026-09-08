@@ -29,6 +29,7 @@ enum class HostTargetClass : u8 {
   SceneDepth,
   ReflectionColor,
   ReflectionDepth,
+  WaterBottomDepth, // explicit producer only; never selected by square dimensions
   Count
 };
 

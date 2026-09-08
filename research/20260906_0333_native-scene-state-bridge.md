@@ -4651,3 +4651,49 @@ Selected fixture/log/EXE/PDB retained growth683,760B (~0.65MiB), needed for curr
 owner/fixture evidence. Ending free80,190,427,136B (~74.68GiB),2,719,744B below
 first reading; drive-wide activity is not all attributable to these outputs.
 Raw/image/OS diagnostic totals unchanged. No capture allowance reused or expanded.
+
+### Native water-bottom pass and framebuffer clear ownership (2026-09-08, sourcef22e607 dirty)
+
+Same cumulative exception/floor62,509,998,080B and all reserve/raw/image/log caps.
+First measured free80,187,990,016B; producer preflight80,190,988,288B. No new
+build tree, assets, cooking, shader regeneration, raw/image files or binary
+archive. CPU/GPU builds normally32MiB, final Plume build64 capped64MiB, tests16MiB,
+host192MiB; existing300s/30s timeouts and10MiB aggregate attachment logs remain.
+Implementation and causal failure evidence:20260908_1031_native-water-bottom.md.
+
+CPU58/output34, GPU64/water11/rigid21/snapshot20, host140/141 all terminal0;
+372 Python checks pass. Real D32 bottom sampling exposed the deferred-clear
+framebuffer/view ownership bug; Plume191c31c fixes it without oracle changes.
+Keep GPU62 compile failure and water10 causal failure text, as well as unresolved
+CPU29 timeout/build52 and prior game failures. Current17water/55rigid/8snapshot
+cases have validation0/0. Host141/run970/PID23820 terminal0, strict cold/reload
+chain passes with900 fresh scene/shadow emissions per epoch, but the new bottom
+pass was not observed. No native water game admission or pixel qualification.
+All producers terminal; original116B profile hash restored (see new report).
+
+First run970 preflight refused before profile mutation/launch: existing diagnostic
+inventory81,288,631B plus819,200B requested log cap exceeded75MiB by3,464,631B.
+Losslessly archived19 explicitly selected completed runtime logs817..911 (exact
+IDs and archive hash in new report),4,961,074B plaintext ->598,041B archive.
+Verified every entry length/SHA and source hash/path before removal. Net logical
+reclamation4,363,033B, counted once; exact text is recoverable from the zip.
+Immediate free80,185,847,808->80,190,246,912B: net4,399,104B physical interval
+gain (includes the archive); do not also credit the5,001,216B deletion interval.
+Resulting diagnostic inventory76,925,598B plus819,200B fit the unchanged cap.
+Real run970 used180s/800KiB/192MiB free-drop limits and no capture/perf/dump.
+
+Handoff read-only inventory: CPU fixture77,998,002B/132files, growth104,415B;
+GPU fixture18,685,835B/19files, growth456,080B; attachment logs360,520B/198files,
+growth47,701B. EXE/PDB combined growth119,296B. Selected build products/logs
+grow727,492B, retained for the connected owner/backend regression. New run970
+log496,521B; runtime logs/archive net shrink3,866,512B. Combined selected retention
+therefore shrinks3,139,020B; other host objects/metadata/source/Git are separate.
+Superseded small attachment logs were not removed again for the commit request.
+No unresolved failure, original game data, profile or protected capture deleted.
+
+Last measured free after the completed run80,189,005,824B (~74.68GiB),1,015,808B
+above the first reading. This drive-wide movement includes unrelated activity,
+not just attributed cleanup. Commit handoff reused evidence and did not start
+another producer or reset any budget. Next IDs: host142, game971, CPU59/output35,
+GPU65/water12/rigid22/snapshot21; another unchanged bottom-inactive boot is not
+useful evidence. Full goal remains active, including authored game stereo gates.

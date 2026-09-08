@@ -93,6 +93,8 @@ const char *HostTargetClassName(HostTargetClass cls) {
     return "reflection colour";
   case HostTargetClass::ReflectionDepth:
     return "reflection depth";
+  case HostTargetClass::WaterBottomDepth:
+    return "water bottom depth";
   default:
     return "none";
   }
@@ -188,9 +190,11 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
 }
 
 GuestTexture *HostTargetAcquireNative(HostTargetClass cls, const NativeTargetShape &shape) {
-  const bool depth = cls == HostTargetClass::SceneDepth || cls == HostTargetClass::Shadow;
+  const bool depth = cls == HostTargetClass::SceneDepth || cls == HostTargetClass::Shadow ||
+      cls == HostTargetClass::WaterBottomDepth;
   if ((cls != HostTargetClass::SceneColor && !depth) ||
-      (cls == HostTargetClass::Shadow && (shape.samples != 1 || shape.layers != 1)) ||
+      ((cls == HostTargetClass::Shadow || cls == HostTargetClass::WaterBottomDepth) &&
+       (shape.samples != 1 || shape.layers != 1)) ||
       shape.format != (depth ? plume::RenderFormat::D32_FLOAT_S8_UINT :
           plume::RenderFormat::R16G16B16A16_FLOAT) || !shape.Bytes(512ull << 20)) return nullptr;
   std::lock_guard lock(g_mutex);
