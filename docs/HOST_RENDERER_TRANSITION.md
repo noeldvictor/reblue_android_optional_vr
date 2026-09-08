@@ -326,13 +326,27 @@ Two changed C++ fixtures and353 Python checks pass; host130 links without guest
 objects. Existing55 two-eye shader cases are reused, not rerun or claimed as
 mixed-list integration. No new game run or image.
 
-Next: a bounded live admission/consumption check with the deferred opt-in must
-establish reachable ordinary callback/visual contracts and fresh staged/consumed
-counts. Preserve a concrete refusal and add its causal regression before retrying.
-Qualify actual mixed-order pixels once the existing image budget allows it; then
-retire the remaining visual adapter with the shared effect owners. Do not repeat
-the completed callback census or build a second renderer. Full native frame,
-authored-effect, scene/reload and both-eye acceptance remain open.
+Run966 now passes the full strict mono cold-field/title/reload text chain with
+the deferred opt-in. Cold1800..2100 stages/consumes10,815 native packets alongside
+5,570 legacy draws; reloaded4500..4800 stages/consumes3,825 alongside7,609 legacy
+draws, with no pending native packets in either sampled window. Generation93/
+instance144 retires, then207/388 supplies the new scene. The existing scene/caster/
+receiver/light/cutout and source/GPU regression checks pass independently in both
+epochs. Native scene GPU counters include direct and deferred instances; they
+are not per-deferred-family fence receipts. No pixels or speedup are claimed.
+`--rigid-deferred` now uses fresh mixed-consumer receipts and the existing
+consecutive-ready-window rules; it also checks both epochs with `--rigid-reload`.
+357 Python checks pass. Renderer sources/binary are unchanged from host130.
+
+Next: retire the remaining ordinary visual transition dependency as a connected
+owned effect-publication/consumer bundle, reusing `NativeReceiverPublication`,
+native blend/alpha and scene-light owners. Preserve the demonstrated late-read
+semantics and outgoing state for unmigrated visuals; do not simply skip setup or
+substitute cached shader state. Qualify actual mixed-order pixels once the image
+budget allows it. Do not repeat the passed cold-reachability probe or completed
+callback census, or build a second renderer. Full native frame, broader authored
+effects/scenes/reloads and both-eye acceptance remain open.
+[Native deferred live qualification and archive locations](../research/20260908_0225_native-deferred-live.md).
 [Sorted producer/consumer connection and evidence](../research/20260908_0206_native-deferred-connection.md).
 [Deferred contracts and pending runtime connection](../research/20260908_0109_deferred-packet-order.md).
 

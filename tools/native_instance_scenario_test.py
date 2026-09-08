@@ -5,6 +5,7 @@ from native_instance_scenario import verify_fog, verify_primitive_shader, verify
 from native_instance_scenario import verify_material_samplers, verify_light_selection, verify_shadow_images
 from native_instance_scenario import verify_rigid_shadow
 from native_instance_scenario import verify_rigid_scene
+from native_instance_scenario import verify_rigid_deferred
 from native_instance_scenario import verify_rigid_batches
 from native_instance_scenario import verify_rigid_hard_off
 from native_instance_scenario import split_rigid_reload
@@ -908,6 +909,59 @@ class RigidSceneScenarioTest(unittest.TestCase):
                     text.replace("node 64", "node 63"), "x" * (MAX_LOG_BYTES+1)):
             with self.assertRaises(ValueError):
                 verify_rigid_scene(bad)
+
+
+class RigidDeferredScenarioTest(unittest.TestCase):
+    @staticmethod
+    def host(entries, draws):
+        return (f"[host-consumer] lists {draws} entries {entries} replayed 0; direct draws {draws} shells 0 stencil 0; "
+                f"bridges visual 0 material {draws*2} state 0 world 0 resource 0 shader 0; fallback 0 refused 0")
+
+    def rows(self):
+        return [scenario()[0], "[native-material-context] frame 100 " + READY,
+                self.host(200, 100), "[native-deferred] frame 110 staged 100 consumed 100 pending 0;",
+                "[native-material-context] frame 400 " + READY,
+                self.host(400, 200), "[native-deferred] frame 410 staged 200 consumed 200 pending 0;"]
+
+    def test_fresh_mixed_production_not_a_pixel_claim(self):
+        self.assertEqual(verify_rigid_deferred("\n".join(self.rows())), dict(
+            first_frame=110, last_frame=410, staged_delta=100, consumed_delta=100,
+            pending=0, legacy_draws_delta=100, material_bridges_delta=200))
+
+    def test_startup_wrong_scene_stale_or_one_sided_work_is_pending(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
+                    text.replace("staged 200 consumed 200", "staged 100 consumed 100"),
+                    text.replace(self.host(400, 200), self.host(400, 100)),
+                    "\n".join(self.rows()[:4])):
+            with self.assertRaises(Pending): verify_rigid_deferred(bad)
+
+    def test_counter_refusal_and_late_failures_are_not_hidden(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("consumed 200", "consumed 201"), text.replace("frame 410", "frame 399"),
+                    text.replace("staged 200 consumed 200", "staged 99 consumed 99"),
+                    text.replace("fallback 0", "fallback 1"), text.replace("refused 0", "refused 1"),
+                    text.replace("pending 0;", "pending 5141;"), text + "\n[error] failure",
+                    text + "\n[native-material-texture-mismatch] failure", "x" * (MAX_LOG_BYTES+1),
+                    text.replace(self.host(400,200), ""), text.replace("staged 200", "staged invalid"),
+                    text.replace("context] frame 400", "context]")):
+            with self.assertRaises(ValueError): verify_rigid_deferred(bad)
+
+    def test_reload_requires_both_independent_epochs(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        names = ("verify", "verify_texture_tables", "verify_vertex_inputs", "verify_movement",
+                 "verify_canonical_geometry", "verify_shadow_policies", "verify_material_textures",
+                 "verify_primitive_policies", "verify_lit_shading", "verify_draw_bindings", "verify_model_nodes",
+                 "verify_object_inputs", "verify_selected_lights", "verify_light_selection", "verify_shadow_images",
+                 "verify_rigid_shadow", "verify_rigid_scene", "verify_rigid_batches", "verify_rigid_hard_off",
+                 "verify_fog", "verify_primitive_shader", "verify_lighting_pass", "verify_material_features", "verify_material_samplers")
+        good = "\n".join(self.rows())
+        with ExitStack() as stack:
+            for name in names: stack.enter_context(patch.object(module, name))
+            module.verify_rigid_epoch(good, rigid_deferred=True)
+            with self.assertRaises(Pending): module.verify_rigid_epoch("", rigid_deferred=True)
 
 
 class RigidBatchScenarioTest(unittest.TestCase):

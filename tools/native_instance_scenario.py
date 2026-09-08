@@ -557,6 +557,50 @@ def verify_rigid_scene(text):
     return result
 
 
+def verify_rigid_deferred(text):
+    """Fresh mixed consumer reachability; pixels and deferred-specific GPU retirement remain separate."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("native deferred diagnostic exceeds 400 KiB")
+    if re.search(r"\[(?:error|critical)\]|\[native-[^\]]*-mismatch\]|\[shutdown\]", text):
+        raise ValueError("runtime failure before native deferred qualification")
+    native = re.compile(r"\[native-deferred\] frame (\d+) staged (\d+) consumed (\d+) pending (\d+);")
+    legacy = re.compile(r"\[host-consumer\] lists (\d+) entries (\d+) replayed \d+; direct draws (\d+) shells \d+ stencil \d+; "
+                        r"bridges visual \d+ material (\d+) .*; fallback (\d+) refused (\d+)")
+    contexts, metrics = [], []
+    last_host, last_native_line, context_frame = None, -1, None
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+            match = re.search(r"\[native-material-context\] frame (\d+) ", line)
+            context_frame = int(match[1]) if match else None
+        host = legacy.search(line)
+        if host:
+            values = tuple(map(int, host.groups()))
+            if values[-2:] != (0, 0):
+                raise ValueError("mixed deferred consumer fell back or refused")
+            last_host = index, values[:4]
+        match = native.search(line)
+        if "[native-deferred]" not in line:
+            continue
+        if not match or last_host is None or last_host[0] <= last_native_line:
+            raise ValueError("native deferred receipt lacks its matching mixed consumer report")
+        values = tuple(map(int, match.groups())) + last_host[1]
+        if (values[1] != values[2] + values[3] or values[3] > 5140 or
+                values[2] > values[5] or values[6] > values[5] or
+                (contexts and (context_frame is None or values[0] < context_frame)) or
+                (metrics and (values[0] <= metrics[-1][1][0] or any(
+                    values[i] < metrics[-1][1][i] for i in (1, 2, 4, 5, 6, 7))))):
+            raise ValueError("native deferred stale frame or counter conservation failure")
+        metrics.append((index, values))
+        last_native_line = index
+    a, b = recent_field_samples(contexts, metrics)
+    if a[3] or b[3] or any(b[i] - a[i] < 32 for i in (1, 2, 6, 7)):
+        raise Pending("need fresh native and legacy consumption in consecutive ready-field windows")
+    return dict(first_frame=a[0], last_frame=b[0], staged_delta=b[1]-a[1],
+                consumed_delta=b[2]-a[2], pending=b[3], legacy_draws_delta=b[6]-a[6],
+                material_bridges_delta=b[7]-a[7])
+
+
 def verify_rigid_batches(text):
     """Native instance/indirect emissions; zero merged instances is explicit, not coverage of merging."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -906,7 +950,8 @@ def verify_cutout_family(text):
             for i, name in enumerate(("submitted", "emitted", "retired", "textured_emitted", "textured_retired"))}
 
 
-def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False, cutout_family=False):
+def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False, cutout_family=False,
+                       rigid_deferred=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -925,6 +970,8 @@ def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_fa
         verify_caster_family(text)
     if cutout_family:
         verify_cutout_family(text)
+    if rigid_deferred:
+        verify_rigid_deferred(text)
 
 
 def main():
@@ -950,6 +997,7 @@ def main():
     parser.add_argument("--shadow-images", action="store_true")
     parser.add_argument("--rigid-shadow", action="store_true")
     parser.add_argument("--rigid-scene", action="store_true")
+    parser.add_argument("--rigid-deferred", action="store_true", help="fresh owned sorted packets and mixed legacy consumption; pixels separately required")
     parser.add_argument("--rigid-batches", action="store_true")
     parser.add_argument("--rigid-hard-off", action="store_true")
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
@@ -1003,8 +1051,8 @@ def main():
             return 0
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family)
-            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -1023,7 +1071,8 @@ def main():
         selection = verify_light_selection(text) if args.light_selection else None
         shadow_images = verify_shadow_images(text) if args.shadow_images else None
         rigid_shadow = verify_rigid_shadow(text) if args.rigid_shadow else None
-        rigid_scene = verify_rigid_scene(text) if args.rigid_scene else None
+        rigid_scene = verify_rigid_scene(text) if args.rigid_scene or args.rigid_deferred else None
+        rigid_deferred = verify_rigid_deferred(text) if args.rigid_deferred else None
         rigid_batches = verify_rigid_batches(text) if args.rigid_batches else None
         rigid_hard_off = verify_rigid_hard_off(text) if args.rigid_hard_off else None
         receiver_setup = verify_receiver_setup(text) if args.receiver_setup else None
@@ -1084,6 +1133,8 @@ def main():
         print("PASS: post-event direct rigid shadows " + ", ".join(f"{k}={v}" for k, v in rigid_shadow.items()))
     if rigid_scene is not None:
         print("PASS: post-event direct rigid scene " + ", ".join(f"{k}={v}" for k, v in rigid_scene.items()))
+    if rigid_deferred is not None:
+        print("PASS: post-event mixed native deferred consumer (pixels separately required) " + ", ".join(f"{k}={v}" for k, v in rigid_deferred.items()))
     if rigid_batches is not None:
         print("PASS: post-event native rigid batches " + ", ".join(f"{k}={v}" for k, v in rigid_batches.items()))
     if rigid_hard_off is not None:

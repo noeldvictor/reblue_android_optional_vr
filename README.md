@@ -241,11 +241,19 @@ per-entry material callbacks, resource/world/constant imports and D3D draws.
 Lights resolve at actual submission; blend and receiver colour come from native
 publications after the remaining visual transitions. The live callback contract,
 queue capacity, frame and single-consumption rules are checked explicitly.
-Two changed C++ fixtures,353 Python checks and the host build pass. This route
-is opt-in (`bd_native_rigid_deferred`), with live mixed-list/pixel qualification
-still pending. Visual-transition and outgoing compatibility adapters remain;
+Two changed C++ fixtures and the host build pass. **Host130/run966 now passes
+the strict cold-field and real title/reload checks with this route enabled.**
+Independent300-frame windows stage and consume10,815 native sorted packets in
+the cold field and3,825 after reload, alongside continuing legacy draws. Old
+generation93/instance144 retires; the new field uses207/388. These are repeated
+packet visits, not unique assets or deferred-specific GPU retirement counts.
+The reusable scenario guard passes357 Python tests and rejects stale/one-sided
+windows, counter drift, fallback and runtime failures. The route remains opt-in
+(`bd_native_rigid_deferred`): mixed-order game pixels and both eyes are still
+unqualified. Visual-transition and outgoing compatibility adapters remain;
 this is not a complete host frame or a measured speedup.
 [Connection, callback evidence and next acceptance gate](research/20260908_0206_native-deferred-connection.md).
+[Live cold/reload evidence and retained logs](research/20260908_0225_native-deferred-live.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

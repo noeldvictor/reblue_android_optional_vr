@@ -4320,3 +4320,45 @@ After cleanup free80,508,788,736 B, down2,506,752 B from producer preflight. Thi
 is drive-wide movement, not all attributed task storage. No profile mutation;
 SHA256 remains2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
 All owned jobs terminal; no duplicate producer or image export was launched.
+
+### Native deferred live continuation (2026-09-08)
+
+Previous checkpoint made implementation progress; current source starts0e67545
+clean. No producer was live. First measured free80,507,265,024 B. Original3 GiB
+exception/floor62,509,998,080 B and all raw/image limits remain unchanged.
+Diagnostic preflight78,451,663 B left only191,537 B below75 MiB, insufficient
+for the400 KiB cold-log reservation; no profile change or renderer was launched.
+
+Archived completed962..964 logs under a bounded2 MiB analysis-overlap reservation
+inside the existing25 MiB analysis/polling reserve. Input1,575,997 B became
+`retained-native-runtime-962-964.zip`,236,981 B; all three expanded SHA256 values
+were verified before removing plaintext. Full evidence is recoverable. Logical
+saving1,339,016 B; immediate free80,510,533,632->80,511,877,120 B (physical gain
+1,343,488 B). Hashes and locations are in `20260908_0225_native-deferred-live.md`.
+The latest964 entry was temporarily restored solely to prevent reuse of its log
+sequence number, then removed after965 existed. No extra cleanup credit is taken
+for that temporary copy. All pixels/raw payloads remain untouched.
+
+Run965/PID28816/session53891 terminal0 (75 s/400 KiB caps), log254,875 B. Run966/
+PID35492/session44373 terminal0 (180 s/800 KiB caps), log505,061 B. Both reuse
+unchanged host130 and enforce the original cumulative75 MiB diagnostic stop,
+192 MiB free-drop and reserve, with captures/CSV/dumps/cooking off. Before966,
+diagnostics77,367,522 B left1,275,678 B below stop, fitting its819,200 B reservation;
+free80,509,247,488 B. No runtime cache/hlsl/perf files were created or modified
+after965 start. No C++/GPU build, fixture growth, new raw or image output.
+
+965 passes the cold field;966 passes strict independent cold/reloaded text epochs,
+including native sorted consumption, existing source/GPU regression retirement,
+receiver/lighting/caster/cutout checks.357 Python checks pass. No pixel, full-frame
+or stereo acceptance is inferred. Both jobs terminal; original116 B profile
+restored, SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+
+After966 replaced the cold proof, removed965's254,875 B plaintext success log
+once. Its exact raw text is retired; small results/hash/procedure are recorded.
+Immediate free80,507,211,776->80,507,469,824 B (258,048 B physical gain). New logs
+total759,936 B before retirement; final run-log/archive scope is833,955 B smaller
+than the continuation's initial state. Current966, all unresolved failure logs
+(some in validated archives), distinct GPU proofs, user data and captures remain.
+Post-cleanup free80,507,469,824 B,204,800 B above the first reading; this drive-wide
+movement is not the logical cleanup saving. Source/Git and unrelated activity
+remain separate. Per-image budget question is still unanswered; no export tried.
