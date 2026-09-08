@@ -268,7 +268,7 @@ unqualified; no speedup is claimed. In host132, authored-input sidecars, outgoin
 and legacy-opened scopes remain; the route is still opt-in.
 [Connected effects, contracts and verification](research/20260908_0251_native-deferred-effects.md).
 
-**Host134 built; writer-ordered input validation pending:** deferred packets
+**Host134/run969 pass writer-ordered input cold/reload checks:** deferred packets
 now use native instance/generation identities instead of a per-entry guest-address
 sidecar. The existing instance index publishes bounded blend/class values at the
 late list handoff; receiver publications use the same native keys. Run968 exposed
@@ -276,9 +276,12 @@ a rejected water resource callback before field readiness. The existing water
 writer now republishes the native inputs after its complete effects, preserving
 late indirect writes instead of freezing the batch. Native omitted callbacks
 still require no-ops; unknown writers still refuse.32 CPU tests,364 Python checks
-and the incremental host build pass. Host132/run967 remain the last passing game
-run, not evidence for this correction. Fresh cold/reload consumption and pixels
-remain open; source-input imports, receiver descriptors and outgoing state remain.
+and the incremental host build pass. Run969 independently passes both field
+epochs:10,865/3,053 native packet reads with175/139 completed-writer refreshes,
+zero pending native packets and correct source/GPU retirement. No new crash dump
+or captures; the profile is restored. Pixels/full-frame/both-eye acceptance and
+speedup remain unproven. Source-input imports, receiver descriptors and outgoing
+state remain; water setup is host code, but its draws are still a legacy family.
 [Writer-ordered connection and causal failure](research/20260908_0337_native-visual-inputs.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and

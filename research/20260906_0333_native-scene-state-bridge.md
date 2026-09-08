@@ -4476,3 +4476,22 @@ Ending free80,251,723,776 B (~74.74 GiB),236,699,648 B below first reading.
 Scoped producer files do not explain most of that drive-wide change; host/source/
 Git and unrelated system activity are separate, not claimed as cleanup savings.
 All producers terminal; fresh writer-ordered cold/reload and pixel gates pending.
+
+Run969/PID35028/session53430 terminal0,03:58:48..04:00:53. Source0784d47 clean,
+unchanged host134. Full strict cold/reload chain plus writer-refresh gate passes
+independently in both epochs:10,865/3,053 native reads and175/139 refreshes, zero
+native pending, with old93/144 retired before new207/434. Exact receipts and
+hashes are in the visual-input report. No new raw/image/cache/hlsl/perf or OS dump;
+profile restored to the same116 B/hash. Log511,707 B under800 KiB/180 s and192 MiB
+free-drop; cumulative75 MiB stop now also includes run968's82,998 B OS metadata.
+
+After replacement passed, retired967 plaintext509,208 B after exact hash check.
+Its full text is gone, results/hash/procedure remain. Failed968 log, symbolized
+cause/OS metadata,959's distinct merging proof and all pixels/raw/failure evidence
+remain. Immediate free80,248,643,584->80,249,155,584 B (512,000 B physical gain).
+Success-log retention grows2,499 B; this continuation's selected fixture/build/
+runtime/OS-metadata retention grows217,901 B. Total logical removal77,563,926 B,
+counted once. Latest free80,248,889,344 B (~74.74 GiB),239,534,080 B below first
+reading; most drive-wide movement remains outside attributed producer files.
+No producer live. Full native-frame, pixel/sequence/both-eye and Quest gates remain
+open; no speedup claim and no change to the unanswered image-budget request.

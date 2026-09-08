@@ -105,3 +105,57 @@ above. Full minidump memory is no longer retained. Immediate free
 run log and82,998 B OS Report.wer remain; the runner now counts the latter in its
 unchanged cumulative diagnostic ceiling. Scoped runtime cache/hlsl/perf checks
 show no files created/modified since run start. No new raw or image payloads.
+
+## Connected cold/reload verification: run969
+
+Source0784d47 clean; unchanged host134 EXE/PDB hashes above. Existing capture-free
+mono strict chain, same recipe as run967 plus `-DeferredInputsVerify`: native
+model/material/geometry/instance/table/pulling, movement, canonical/shadow/material/
+primitive policy, lighting/fog/features/samplers, direct scene/shadow/batching,
+hard-off, receiver, scene lights, caster/cutout families, rigid deferred/effects,
+and same-process reload. `--deferred-inputs` requires completed-writer refreshes
+as well as initial native batches; no readiness or comparison threshold relaxed.
+
+PID35028/session53430 terminal0,03:58:48..04:00:53 under180 s/800 KiB/192 MiB
+free-drop, original cumulative/reserve bounds. All22 settings applied, captures/
+CSV/dumps/cooking off. No new runtime cache/hlsl/perf files or OS crash dump;
+original profile restored byte-exact to the recorded hash.364 Python checks and
+CPU36 remain the checks for this unchanged source. Both log epochs independently
+pass `verify_rigid_epoch(..., True, True, True, True, True, True, True)`.
+
+| Fresh deferred window | Cold1800..2100 | Reload4500..4800 |
+| --- | ---: | ---: |
+| Native packets staged/consumed/effect reads | 10,865 | 3,053 |
+| Native visual begin/end pairs | 3,356 | 223 |
+| Initial native input batches | 300 | 300 |
+| Native visual identities published | 959 | 322 |
+| Completed-writer refreshes | 175 | 139 |
+| Pending native packets | 0 | 0 |
+| Continuing legacy draws | 5,619 | 5,351 |
+| Legacy material bridge calls | 11,238 | 10,702 |
+
+Old model generation93/instance144 retires; title is reached and new207/434 owns
+the reloaded field. Final frame4800:63,858 native packets consumed,16,390 balanced
+native visual scopes,2,915 input batches/6,022 visual publications/988 writer
+refreshes. This removes the per-entry source-address sidecar from the exercised
+native consumer without freezing intervening water writes. The field does not
+prove that an actual game allocation aliases class storage; that case is the
+focused CPU regression. The runtime proves the real writer/consumer connection.
+
+Reload aggregate scene GPU window:9,687 submitted,8,882 emitted/fence-retired,
+835 culled/retired-culled,18 pending and9,717 resource retirements. These combine
+direct/deferred work, not per-deferred-family fence evidence. Scene cutouts emit/
+retire7,318 textured primitives; textured shadow cutouts300. Wider shadow casters
+submit/emit33,034 from15,354 nodes, including4,771 multi-node visits. Merged-batch
+delta0; no speedup claim. Water remains a legacy draw family with a host setup
+writer; source imports, receiver descriptors and outgoing compatibility remain.
+No pixels, complete native frame, broader scene/effect sequences or both-eye
+qualification are inferred. Quest2 optimization remains behind the desktop gate.
+
+Retained `out/build/win-amd64-release/logs/reblue_969.log`,511,707 B, SHA256
+`4A2A903E51029E0E4EC016DF70D4A76010BBEFF8F77985892CA2772FF0EEADAE`.
+After replacement passed, retired run967's509,208 B plaintext success log after
+hash verification against the earlier effects report. Its full text is gone;
+small results/hash/procedure remain. Run968 failure, its symbolized cause/OS
+metadata, distinct959 merging proof and all raw/pixel/failure evidence remain.
+Replacing967 with969 grows runtime success-log retention only2,499 B.

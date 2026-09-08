@@ -370,13 +370,24 @@ after all effects, including indirect parameter aliases. Native scopes retain
 no source identity; unknown resource writers and failed refresh still terminate.
 Deferred C++ failures now log and use the existing fatal shutdown rather than
 creating an unhandled-exception dump.32 CPU tests,364 Python checks and host134
-pass; fresh runtime qualification is pending. Host132/run967 remain the preceding
-passing binary/evidence. Run968 and its symbolized cause remain failure evidence.
+pass. Run969 now passes strict independent cold/title/reload epochs, including
+fresh initial publications AND completed-writer refreshes: cold1800..2100 consumes
+10,865 native packets with300 batches/959 visual publications/175 refreshes;
+reload4500..4800 consumes3,053 with300/322/139. Native pending0, visual scopes
+balanced, old93/144 retires before new207/434. Other receiver/light/caster/cutout
+and source/GPU gates pass. No new crash dump/capture; profile restored. Run968
+and its symbolized cause remain failure evidence; no pixel/speedup claim.
 
-Next: require fresh late-input publication AND completed-writer refresh receipts
-in both cold/reload epochs using the existing mixed-consumer gate. Do not freeze late values or
-weaken the unknown-writer refusal to pass. Receiver descriptors, source-input
-imports, outgoing legacy state and legacy-opened scopes remain adapters. Qualify mixed-order
+Next connected family: native water material parameters/images/geometry feeding
+an actual native shader and the existing ordered scene queue. Reuse the current
+water update/refraction setup, instance/model/mesh owners and native scene-image
+publications. Remove this family's per-entry legacy material/resource execution,
+not just another callback helper; preserve authored updates, reflections,
+refraction, blend/depth and snapshot order. Exit through production CPU/GPU
+fixtures plus fresh water consumption/retirement and mixed cold/reload checks.
+Do not freeze late values or weaken unknown-writer refusal. Receiver descriptors,
+source-input imports, outgoing legacy state and legacy-opened scopes remain
+adapters in the broader scene. Qualify mixed-order
 pixels once the image budget allows it, while continuing independent native
 ownership work. Do not repeat the callback census or build a second renderer.
 Full native frame, broader authored effects/scenes/reloads and both-eye acceptance
@@ -431,7 +442,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    scene-shaded objects, culling/occlusion and real multi-instance groups. The
    opaque caster family now handles whole multi-primitive nodes without material
    ID or scene texture-layer restrictions; its submission, actual emission and
-   fence gates pass in both reload epochs. Skin/wind, phase0 cutout casting, scene deferred and
+   fence gates pass in both reload epochs. Skin/wind, phase0 cutout casting, specialized scene deferred and
    texture-dependent effect participation remain explicit unsupported families.
    The new ordinary0..3-layer shader, independent third UV owner and whole-node
    scene submission and ordered light inheritance are implemented. Host110/run948
