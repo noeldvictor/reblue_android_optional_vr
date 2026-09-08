@@ -5,20 +5,21 @@
  */
 #pragma once
 #include "gpu/scene/native_transform.h"
+#include "gpu/scene/native_bounds.h"
 #include <algorithm>
 #include <unordered_map>
 
 namespace bd::gpu {
 struct NativeOcclusionIdentity {
   uint64_t instance = 0, generation = 0;
-  uint32_t node = 0;
+  uint32_t node = 0, primitive = 0;
   bool operator==(const NativeOcclusionIdentity &) const = default;
   explicit operator bool() const { return instance && generation; }
 };
 struct NativeOcclusionIdentityHash {
   size_t operator()(const NativeOcclusionIdentity &id) const {
     auto value = id.instance ^ (id.generation + 0x9e3779b97f4a7c15ull + (id.instance << 6) + (id.instance >> 2));
-    return std::hash<uint64_t>{}(value ^ id.node);
+    return std::hash<uint64_t>{}(value ^ (uint64_t(id.node) << 32) ^ id.primitive);
   }
 };
 struct NativeOcclusionScope {
@@ -31,30 +32,38 @@ struct NativeOcclusionView {
   NativeOcclusionScope scope;
   uint32_t frame = 0;
 };
-// Exactly 80 bytes, shared with native_occ_proxy_vs: four dot-product rows and a
-// WORLD-space cube. No translated constants, descriptor offsets or source VAs.
+// Exactly 96 bytes: four dot-product rows and a WORLD-space box. No translated
+// constants, descriptor offsets, model radius scale or source addresses.
 struct NativeOcclusionPacket {
   std::array<float, 16> world_to_clip{};
-  std::array<float, 4> sphere{};
+  std::array<float, 4> center{}, extent{};
   bool operator==(const NativeOcclusionPacket &) const = default;
 };
-static_assert(sizeof(NativeOcclusionPacket) == 80);
+static_assert(sizeof(NativeOcclusionPacket) == 96);
 inline std::optional<NativeOcclusionPacket> PrepareNativeOcclusion(
-    const scene::RenderCamera &camera, const std::array<float, 4> &sphere) {
-  for (auto value : sphere) if (!std::isfinite(value)) return {};
-  if (sphere[3] <= 0) return {};
-  NativeOcclusionPacket result{scene::TransposeRenderMatrix(camera.world_to_clip), sphere};
-  result.sphere[3] *= 1.15f;
-  if (!std::isfinite(result.sphere[3])) return {};
+    const scene::RenderCamera &camera, const scene::NativeBounds &bounds) {
+  if (!bounds.Valid()) return {};
+  NativeOcclusionPacket result{scene::TransposeRenderMatrix(camera.world_to_clip)};
+  for (unsigned axis = 0; axis < 3; ++axis) {
+    result.center[axis] = float((double(bounds.min[axis])+bounds.max[axis])*0.5);
+    const double half = (std::max)(double(bounds.max[axis])-result.center[axis],
+        double(result.center[axis])-bounds.min[axis]);
+    result.extent[axis] = std::nextafter(float((std::max)(half*1.15,1e-5)), std::numeric_limits<float>::infinity());
+    if (!std::isfinite(result.extent[axis])) return {};
+  }
   for (auto value : result.world_to_clip) if (!std::isfinite(value)) return {};
-  // The entire inflated cube must be in front of the eye and near plane.
+  // The entire inflated box must be in front of the eye and near plane.
   // Testing in homogeneous world-to-clip space works for translated/rotated
   // cameras; length(world_position) incorrectly treats the world origin as eye.
   for (uint32_t row : {2u, 3u}) {
     const auto *p = result.world_to_clip.data() + row * 4;
-    const double center = double(p[0])*sphere[0] + double(p[1])*sphere[1] + double(p[2])*sphere[2] + p[3];
-    const double extent = double(result.sphere[3]) * (std::abs(p[0])+std::abs(p[1])+std::abs(p[2]));
-    if (!(center-extent > 1e-5)) return {};
+    double center = p[3], extent = 0, magnitude = std::abs(double(p[3]));
+    for (unsigned axis = 0; axis < 3; ++axis) {
+      center += double(p[axis])*result.center[axis];
+      extent += std::abs(double(p[axis]))*result.extent[axis];
+      magnitude += std::abs(double(p[axis]))*(std::abs(double(result.center[axis]))+result.extent[axis]);
+    }
+    if (!(center-extent-8*std::numeric_limits<float>::epsilon()*magnitude > 1e-5)) return {};
   }
   return result;
 }
@@ -88,7 +97,7 @@ public:
     if (!last_.frame || current.identity != last_.identity) return D::NoHistory;
     if (current.scope != last_.scope) return D::ChangedDepth;
     if (current.packet.world_to_clip != last_.packet.world_to_clip) return D::ChangedCamera;
-    if (current.packet.sphere != last_.packet.sphere) return D::ChangedBounds;
+    if (current.packet.center != last_.packet.center || current.packet.extent != last_.packet.extent) return D::ChangedBounds;
     if (current.frame <= last_.frame || current.frame-last_.frame > 3) return D::Stale;
     return zeros_ >= 2 ? D::Occluded : zeros_ ? D::Warming : D::Visible;
   }
@@ -114,12 +123,12 @@ public:
     }
   }
   NativeOcclusionDecision Request(NativeOcclusionIdentity identity,
-      const std::optional<NativeOcclusionView> &view, const std::optional<std::array<float, 4>> &sphere) {
+      const std::optional<NativeOcclusionView> &view, const std::optional<scene::NativeBounds> &bounds) {
     using D = NativeOcclusionDecision;
     auto it = current_.find(identity);
     const bool valid_view = identity && view && frame_ && view->frame == frame_ &&
         view->scope.depth && view->scope.width && view->scope.height && view->scope.samples;
-    const auto packet = valid_view && sphere ? PrepareNativeOcclusion(view->camera, *sphere) : std::nullopt;
+    const auto packet = valid_view && bounds ? PrepareNativeOcclusion(view->camera, *bounds) : std::nullopt;
     if (!packet) {
       if (it != current_.end()) it->second.frame = 0;
       return valid_view ? D::InvalidBounds : D::InvalidView;

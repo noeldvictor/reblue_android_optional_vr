@@ -11,6 +11,7 @@
 #include <cstdint>
 #include "plume_render_interface.h"
 #include "gpu/scene/native_vertex_input.h"
+#include "gpu/scene/native_bounds.h"
 
 namespace bd::gpu {
 struct GuestBuffer;
@@ -39,6 +40,7 @@ struct NativeGeometry {
   // independently of the temporary source-buffer/declaration lookup.
   uint64_t id = 0, layout = 0;
   bool canonical_vertices = false;
+  std::optional<NativeBounds> bounds; // Derived from persisted indexed positions, never mapped GPU memory.
   NativeVertexInputHandle vertex_input;
   // The production native scene/shadow signature, resolved from the asset at
   // upload/load time. Null means the explicit rigid inputs are unavailable;

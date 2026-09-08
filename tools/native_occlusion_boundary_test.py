@@ -35,17 +35,25 @@ class NativeOcclusionBoundaryTest(unittest.TestCase):
         self.assertLess(light, siblings)
         self.assertLess(siblings, query)
         self.assertLess(query, draw)
-        self.assertIn("!pending.empty() && OcclusionCullRequest", source)
+        self.assertIn("std::erase_if(pending", source)
+        self.assertIn("node, entry.primitive}, occlusion_view, entry.bounds", source)
         self.assertNotIn("OcclusionCullRequest", (ROOT / "src/gpu/hooks/draw.cpp").read_text())
 
     def test_owned_bounds_and_current_view_feed_queries(self):
         source = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("const auto world_bounds = native_pose && bounds", source)
-        self.assertIn("std::array<float, 4>{out[0], out[1], out[2], radius}", source)
-        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy, world_bounds)", source)
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy)", source)
+        self.assertNotIn("world_bounds", source)
         self.assertNotIn("OcclusionCullNote", source)
         self.assertNotIn("FindNativePassOcclusionView", source)
         self.assertNotIn("r_near", source)
+
+    def test_bounds_come_from_indexed_cpu_asset_and_exact_draw_transform(self):
+        mesh = (ROOT / "src/gpu/scene/native_mesh.cpp").read_text()
+        self.assertLess(mesh.index("BuildNativeMeshBounds(data)"), mesh.index("chunk.buffer->map()"))
+        self.assertIn("result->bounds = bounds", mesh)
+        draw = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        self.assertIn("TransformNativeBounds(*geometry->bounds,std::bit_cast<RenderMatrix>(plan.object.world))", draw)
+        self.assertIn("plan.primitive = packet.primitive", (ROOT / "src/gpu/scene/native_rigid_scene.h").read_text())
 
     def test_empty_pass_does_not_create_pipeline_or_switch_bindings(self):
         source = (ROOT / "src/gpu/occlusion_cull.cpp").read_text().split("void OcclusionCullEmit", 1)[1]

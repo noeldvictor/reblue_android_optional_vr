@@ -3680,3 +3680,38 @@ other host objects/CMake/source/Git are not allocated in that subtotal. Last fre
 81,282,560,000 B is16,826,368 B below this continuation's start, a drive-wide
 change not wholly attributable to the subtotal. All limits and the original
 floor remain intact; no owned producer remains.
+
+### Indexed native bounds continuation (2026-09-07)
+
+Starting free81,254,711,296 B; unchanged cumulative3 GiB allowance and
+62,509,998,080 B floor. No native file migration/recook: derive indexed bounds
+from the persisted v2 positions before GPU upload; retain only bounded per-mesh
+metadata. Mesh tree preflight1,490,087 B/30 files. Fixture free-drop32 MiB, host
+build192 MiB,300 s supervision and10 MiB aggregate build logs. No raw allowance.
+
+Mesh12/PID34340 is a compile failure from Windows max macro in the new test;
+corrected locally before retry, not a runtime failure. Mesh13/PID36308 and
+mesh CPU11/PID27688 pass (0.12/0.14 s). Output40/PID29528 and CPU23/PID23180
+pass (0.36/0.38 s). GPU42/PID22756 recompiles the96-byte box-query shader;
+occlusion5/PID31916 passes all8 indexed-bounds/transform/query cases1.09/1.11 s,
+validation0/0, no raw.327 Python checks pass. Host120 will link the connected
+primitive consumer with the same bounded wrapper; no guest object rebuild.
+
+Host120/PID33752/session92497 terminates0,38 host steps/codegen0 written, no
+guest objects. Before the next image, inspected the old940 mono reload JPEG and
+verified its hash against1140 evidence; its generic field/reload sanity purpose
+is superseded by accepted945 (also inspected/hash checked), which includes the
+selected reload regression. Retired only940's124,696 B JPEG; original pixels
+are no longer on disk, findings/hash remain in1140. This updates the historical
+"keep940" designation;945 remains the accepted baseline and956 the tree-gap
+evidence. Immediate drive gain126,976 B is not isolated from concurrent activity.
+Image archive is now10,313,144 B;110 KiB replacement fits below10 MiB. No raw
+capture or prior cleanup credited. Normal profiles/game data/failure evidence
+unchanged. Existing supervisor now routes an explicit OcclusionInspect JPEG
+inside the qualified run, before shutdown, with the same cap/strict gates.
+
+Run960 planned: full strict cold/reload chain, Count0, one110 KiB JPEG,300 s,
+800 KiB runtime log,192 MiB free-drop,75 MiB diagnostic overlap/original floor.
+Question: do exact per-primitive native boxes qualify for queries and suppress
+hidden native draws, with fresh scene/reload and inspected mono pixels? Camera
+history checks stay exact; failure to cull is not permission to loosen them.

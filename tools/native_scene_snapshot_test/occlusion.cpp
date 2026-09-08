@@ -5,7 +5,9 @@
  */
 #include "gpu/native_occlusion_program.h"
 #include "gpu/scene/native_scene_commands.h"
+#include "gpu/scene/native_mesh_data.h"
 #include <plume_vulkan.h>
+#include <bit>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -76,14 +78,32 @@ void Run(RenderDevice &device, uint32_t samples, bool rotated) {
   Need(view && view->scope.depth == 2 && view->scope.samples == samples, "Owned occlusion view");
   NativeOcclusionTracker tracker;
   tracker.Begin(10);
-  std::array<std::array<float,4>,3> spheres;
+  NativeMeshData mesh;
+  mesh.attributes = {{MeshSemantic::Position,0,0}}; mesh.layout = NativeMeshLayoutId(mesh.attributes);
+  mesh.indices = {0,1,2,0,2,3,4,5,6,4,6,7};
+  mesh.streams.push_back({0,16,std::vector<uint8_t>(8*16)});
+  for (unsigned corner=0;corner<8;++corner) {
+    // Wide/shallow native geometry: isotropic radius must not replace its axes.
+    const std::array<float,4> p{(corner&1) ? .15f : -.15f,(corner&2) ? .15f : -.15f,(corner&4) ? .02f : -.02f,1};
+    for (unsigned axis=0;axis<4;++axis) {
+      const auto bits = std::bit_cast<uint32_t>(p[axis]);
+      for (unsigned byte=0;byte<4;++byte) mesh.streams[0].bytes[corner*16+axis*4+byte] = uint8_t(bits >> (8*byte));
+    }
+  }
+  const auto local_bounds = BuildNativeMeshBounds(mesh);
+  Need(bool(local_bounds),"Production indexed native bounds");
+  std::array<NativeBounds,3> bounds;
   std::array<NativeOcclusionObservation,3> queries;
   for (uint32_t i=0;i<queries.size();++i) {
     const float z = i == 0 ? .25f : i == 1 ? .75f : .5f;
-    spheres[i] = rotated ? std::array<float,4>{100+z,200,300,.15f} : std::array<float,4>{100,200,300+z,.15f};
-    Need(tracker.Request({12,34,i},view,spheres[i]) == NativeOcclusionDecision::NoHistory, "First native request stays visible");
+    const RenderMatrix world = rotated
+        ? RenderMatrix{0,0,-1,0, 0,1,0,0, 1,0,0,0, 100+z,200,300,1}
+        : RenderMatrix{1,0,0,0, 0,1,0,0, 0,0,1,0, 100,200,300+z,1};
+    const auto transformed = TransformNativeBounds(*local_bounds,world);
+    Need(bool(transformed),"Production transformed native bounds"); bounds[i] = *transformed;
+    Need(tracker.Request({12,34,5,i},view,bounds[i]) == NativeOcclusionDecision::NoHistory, "First native request stays visible");
   }
-  tracker.Queries(*view,[&](const auto &query) { queries.at(query.identity.node) = query; });
+  tracker.Queries(*view,[&](const auto &query) { queries.at(query.identity.primitive) = query; });
   cmd->begin(); cmd->resetQueryPool(pool.get(),0,3);
   scene->Bind(*cmd); Need(scene->ApplyClear(*cmd), "Occlusion first clear");
   cmd->setViewports(RenderViewport(0,0,size,size)); cmd->setScissors(RenderRect(0,0,size,size));
@@ -149,9 +169,9 @@ void Run(RenderDevice &device, uint32_t samples, bool rotated) {
   // warm up first, then be culled while front/intersecting consumers remain.
   auto next_view = *view; next_view.frame = 11; tracker.Begin(11);
   for (uint32_t i=0;i<queries.size();++i)
-    Need(tracker.Request({12,34,i},next_view,spheres[i]) ==
+    Need(tracker.Request({12,34,5,i},next_view,bounds[i]) ==
         (i == 1 ? NativeOcclusionDecision::Warming : NativeOcclusionDecision::Visible), "One zero cannot cull");
-  tracker.Queries(next_view,[&](const auto &query) { queries.at(query.identity.node) = query; });
+  tracker.Queries(next_view,[&](const auto &query) { queries.at(query.identity.primitive) = query; });
   auto next_cmd = queue->createCommandList(); auto next_fence = device.createCommandFence();
   next_cmd->begin(); next_cmd->resetQueryPool(pool.get(),0,3); scene->Bind(*next_cmd);
   next_cmd->setViewports(RenderViewport(0,0,size,size)); next_cmd->setScissors(RenderRect(0,0,size,size));
@@ -170,7 +190,7 @@ void Run(RenderDevice &device, uint32_t samples, bool rotated) {
   for (uint32_t i=0;i<queries.size();++i) tracker.Collect(queries[i],pool->getResults()[i] == 0);
   next_view.frame = 12; tracker.Begin(12);
   for (uint32_t i=0;i<queries.size();++i)
-    Need(tracker.Request({12,34,i},next_view,spheres[i]) ==
+    Need(tracker.Request({12,34,5,i},next_view,bounds[i]) ==
         (i == 1 ? NativeOcclusionDecision::Occluded : NativeOcclusionDecision::Visible), "Fenced native consumer culling decision");
   uint32_t refresh = 0; tracker.Queries(next_view,[&](const auto &) { ++refresh; });
   Need(refresh == 3,"Culled native consumer still requests a visibility refresh");

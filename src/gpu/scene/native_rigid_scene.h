@@ -37,6 +37,7 @@ struct NativeRigidScenePlan {
   std::optional<NativeSceneLightTicket> light_ticket;
   BlendState blend;
   bool alpha_to_coverage = false;
+  uint32_t primitive = 0;
 };
 // Transitional object producer: resolves source bindings before returning the
 // retained, address-free plan. It never interprets/captures/replays the node.
@@ -149,6 +150,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     return refuse("unsupported native cutout comparison");
   NativeRigidScenePlan plan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
       packet.policy.cull, packet.policy.direct};
+  plan.primitive = packet.primitive;
   if (packet.policy.alpha_test) {
     plan.blend = cutout->blend;
     plan.alpha_to_coverage = cutout->alpha_to_coverage;

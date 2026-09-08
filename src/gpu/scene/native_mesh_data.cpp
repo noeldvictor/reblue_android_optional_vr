@@ -150,6 +150,28 @@ bool ValidateNativeMesh(const NativeMeshData &mesh) {
   return true;
 }
 
+std::optional<NativeBounds> BuildNativeMeshBounds(const NativeMeshData &mesh) {
+  if (mesh.attributes.empty() || !ValidateNativeMesh(mesh)) return {};
+  const auto position = std::find_if(mesh.attributes.begin(), mesh.attributes.end(), [](const auto &attribute) {
+    return attribute.semantic == MeshSemantic::Position && attribute.index == 0;
+  });
+  if (position == mesh.attributes.end()) return {};
+  NativeBounds result;
+  result.min.fill(std::numeric_limits<float>::infinity());
+  result.max.fill(-std::numeric_limits<float>::infinity());
+  const auto &stream = mesh.streams[0];
+  for (const auto index : mesh.indices) {
+    const uint64_t vertex = uint64_t(int64_t(index)+mesh.base_vertex);
+    Reader reader{std::span(stream.bytes).subspan(size_t(vertex*stream.stride+position->offset),12)};
+    for (unsigned axis = 0; axis < 3; ++axis) {
+      const float value = std::bit_cast<float>(uint32_t(reader.Get()));
+      result.min[axis] = (std::min)(result.min[axis],value);
+      result.max[axis] = (std::max)(result.max[axis],value);
+    }
+  }
+  return result.Valid() ? std::optional(result) : std::nullopt;
+}
+
 bool EncodeNativeMesh(const NativeMeshData &mesh, std::vector<uint8_t> &file) {
   file.clear();
   if (!ValidateNativeMesh(mesh))

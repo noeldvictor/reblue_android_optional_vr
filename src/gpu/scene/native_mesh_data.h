@@ -5,6 +5,7 @@
  * @license   BSD 3-Clause License
  */
 #pragma once
+#include "gpu/scene/native_bounds.h"
 
 #include <cstdint>
 #include <span>
@@ -50,6 +51,9 @@ struct NativeMeshData {
 
 constexpr uint64_t kNativeMeshMaxBytes = 64ull << 20;
 bool ValidateNativeMesh(const NativeMeshData &mesh);
+// Derive once from checked v2 indexed positions, including signed base vertex.
+// Reuses persisted bytes/identity; v1 has no native position contract and refuses.
+std::optional<NativeBounds> BuildNativeMeshBounds(const NativeMeshData &mesh);
 // Stable identity of a valid self-describing payload; zero rejects v1/invalid.
 uint64_t NativeMeshContentId(const NativeMeshData &mesh);
 bool EncodeNativeMesh(const NativeMeshData &mesh, std::vector<uint8_t> &file);

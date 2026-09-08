@@ -63,7 +63,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_direct_scene_has_a_live_producer_and_an_emission_gate(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy, world_bounds)", walk)
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy)", walk)
         for required in ("PrepareNativeRigidSceneForObject(pose, node, refusal)",
                          "shape->layers == 1", "first.albedo[layer]", "first.shadow->view.get()",
                          "ResolveSamplerLocked(", "item->input = {plan.object,plan.pass}", "store.scene_retired",

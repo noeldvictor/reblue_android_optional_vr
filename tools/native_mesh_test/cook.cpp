@@ -61,7 +61,69 @@ void RepairChecksum(std::vector<uint8_t> &file) {
 }
 } // namespace
 
+static void TestMeshBounds() {
+  NativeMeshData mesh;
+  mesh.attributes = {{MeshSemantic::Position,0,0}};
+  mesh.layout = NativeMeshLayoutId(mesh.attributes);
+  mesh.base_vertex = -5; mesh.indices = {8,6,7};
+  mesh.streams.push_back({0,16,std::vector<uint8_t>(5*16)});
+  const std::array<std::array<float,3>,5> points{{{1e10f,1e10f,1e10f},
+      {-2,1,4},{3,-5,6},{0,2,4},{-1e10f,-1e10f,-1e10f}}};
+  for (unsigned n=0;n<points.size();++n) {
+    for (unsigned axis=0;axis<3;++axis)
+      Word(mesh.streams[0].bytes,n*16+axis*4,std::bit_cast<uint32_t>(points[n][axis]));
+    Word(mesh.streams[0].bytes,n*16+12,std::bit_cast<uint32_t>(99.f)); // rigid VS uses xyz, w=1
+  }
+  const auto bounds = BuildNativeMeshBounds(mesh);
+  Check(bounds && *bounds == NativeBounds{{-2,-5,4},{3,2,6}}, "indexed bounds ignore unused vertices and position w");
+  std::vector<uint8_t> file, second_file;
+  Check(EncodeNativeMesh(mesh,file), "bounds fixture persisted v2");
+  const auto id = NativeMeshContentId(mesh);
+  mesh = {};
+  Check(DecodeNativeMesh(file,mesh) && BuildNativeMeshBounds(mesh) == bounds && NativeMeshContentId(mesh) == id,
+      "source-destroyed bounds reconstructed from unchanged asset identity");
+  Check(EncodeNativeMesh(mesh,second_file) && file == second_file,"derived bounds do not create a new file format/cache");
+  auto positive_base = mesh; positive_base.base_vertex = 1; positive_base.indices = {2,0,1};
+  Check(BuildNativeMeshBounds(positive_base) == bounds,"positive base and permuted indices");
+  auto flat = mesh; flat.indices = {6,6,6};
+  Check(BuildNativeMeshBounds(flat) == std::optional(NativeBounds{{-2,1,4},{-2,1,4}}),"degenerate/flat indexed bounds");
+  auto invalid = mesh; invalid.base_vertex = -9;
+  Check(!BuildNativeMeshBounds(invalid),"negative effective index refuses bounds");
+  invalid = mesh; invalid.indices[0] = UINT32_MAX;
+  Check(!BuildNativeMeshBounds(invalid),"out-of-range effective index refuses bounds");
+  invalid = mesh; invalid.attributes.clear();
+  Check(!BuildNativeMeshBounds(invalid),"packed v1 has no guessed native position");
+  invalid = mesh; Word(invalid.streams[0].bytes,16,0x7fc00000);
+  Check(!BuildNativeMeshBounds(invalid),"nonfinite native geometry refuses bounds");
+  for (const auto &world : std::array<std::array<float,16>,3>{{
+      {0,0,2,0, 0,3,0,0, -4,0,0,0, 100,200,300,1},
+      {-2,1,0,0, .5f,3,-.75f,0, 1,0,4,0, -100,40,-60,1},
+      {1,1,0,0, 1,-1,0,0, 0,0,1,0, 1e8f,-1e8f,0,1}}}) {
+    const auto transformed = TransformNativeBounds(*bounds,world);
+    Check(bool(transformed),"affine native bounds transform");
+    for (unsigned corner=0;corner<8;++corner) {
+      const float x = (corner&1) ? bounds->max[0] : bounds->min[0];
+      const float y = (corner&2) ? bounds->max[1] : bounds->min[1];
+      const float z = (corner&4) ? bounds->max[2] : bounds->min[2];
+      for (unsigned axis=0;axis<3;++axis) {
+        const float value = x*world[axis]+y*world[4+axis]+z*world[8+axis]+world[12+axis];
+        Check(transformed->min[axis] <= value && value <= transformed->max[axis],
+            "rotated/reflected/sheared/scaled FP32 corners remain enclosed");
+      }
+    }
+  }
+  std::array<float,16> invalid_world{};
+  Check(!TransformNativeBounds(*bounds,invalid_world),"non-affine matrix refuses");
+  invalid_world = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+  invalid_world[0] = std::numeric_limits<float>::infinity();
+  Check(!TransformNativeBounds(*bounds,invalid_world),"nonfinite transform refuses");
+  invalid_world[0] = (std::numeric_limits<float>::max)();
+  Check(!TransformNativeBounds(*bounds,invalid_world),"overflowing transform refuses");
+  std::cout << "native bounds: indexed positions, persistence, signed base, affine containment and hostile inputs passed\n";
+}
+
 void TestMeshCook() {
+  TestMeshBounds();
   const VertexShaderDecode decode{1, 1, 0, 0, 0, 0, 1};
   NativeMeshData cooked;
   std::vector<uint8_t> file;

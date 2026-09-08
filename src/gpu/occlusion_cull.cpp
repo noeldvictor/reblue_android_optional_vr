@@ -113,12 +113,12 @@ void OcclusionCullCollect(u32 slot) {
   }
 }
 bool OcclusionCullRequest(NativeOcclusionIdentity identity,
-    const std::optional<NativeOcclusionView> &view, const std::optional<std::array<float, 4>> &sphere) {
+    const std::optional<NativeOcclusionView> &view, const std::optional<scene::NativeBounds> &bounds) {
   auto &o = Get();
   std::lock_guard lock(o.mutex);
   if (o.active >= kNumFrames || !REXCVAR_GET(bd_occlusion_cull)) return false;
   ++o.requested;
-  const auto decision = o.tracker.Request(identity, view, sphere);
+  const auto decision = o.tracker.Request(identity, view, bounds);
   ++o.decisions[size_t(decision)];
   const bool culled = decision == NativeOcclusionDecision::Occluded;
   o.skipped += culled;

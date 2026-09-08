@@ -354,10 +354,6 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             }
           }
           if (visible) {
-            // Owned world bounds travel with the node to its actual consumer.
-            // Legacy-only/suppressed nodes must not spend native query capacity.
-            const auto world_bounds = native_pose && bounds
-                ? std::optional(std::array<float, 4>{out[0], out[1], out[2], radius}) : std::nullopt;
             if (bd::mem::try_load<u32>(kRenderViewIdVa) == 1) {
               const u32 visual = bd::mem::try_field<u32>(ctx_va, offsetof(GuestTraverseCtx, visual));
               const u32 table = bd::mem::try_field<u32>(visual, kVisualNodeDrawCounts);
@@ -372,7 +368,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             ctx.r6.u64 = ctx_va;
             if (!(view_id == 1 && instance_pose &&
                   SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)) &&
-                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index, shadow_policy, world_bounds)))
+                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index, shadow_policy)))
               bdSceneNodeDrawSingle(ctx, base);
             // Diagnostic only: per-node light callbacks publish during the draw.
             if (instance_pose && REXCVAR_GET(bd_native_materials_verify))

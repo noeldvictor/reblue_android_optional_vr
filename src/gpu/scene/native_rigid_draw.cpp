@@ -201,8 +201,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   return true;
 }
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
-                            const std::optional<PrimitivePolicyInputs> &inputs,
-                            const std::optional<std::array<float, 4>> &world_bounds) {
+                            const std::optional<PrimitivePolicyInputs> &inputs) {
   if (!NativeRigidSceneEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
@@ -235,7 +234,12 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   auto &store = *s.native_rigid_draws;
   auto &records = store.records[Video::CurrentFrameSlot()];
   require(records.size() <= 4096 && plans->size() <= 4096-records.size(), "native draw retention capacity reached");
-  struct Pending { QueuedDraw draw; std::shared_ptr<NativeRigidBatchItem> item; };
+  struct Pending {
+    QueuedDraw draw;
+    std::shared_ptr<NativeRigidBatchItem> item;
+    uint32_t primitive;
+    std::optional<NativeBounds> bounds;
+  };
   std::vector<Pending> pending;
   pending.reserve(plans->size());
   // Preflight the complete node, including every pipeline and sampled owner,
@@ -299,14 +303,17 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     item->model_generation = pose.model_generation; item->instance = pose.instance;
     item->regression = geometry->id == 0x258694267A8DBAEEull;
     item->albedo = plan.albedo; item->shadow = plan.shadow;
-    pending.push_back({std::move(draw),std::move(item)});
+    const auto bounds = geometry->bounds
+        ? TransformNativeBounds(*geometry->bounds,std::bit_cast<RenderMatrix>(plan.object.world)) : std::nullopt;
+    pending.push_back({std::move(draw),std::move(item),plan.primitive,bounds});
   }
   store.scene_suppressed += plans->size()-pending.size();
   // Every authored state/light effect and every sibling preflight happens first.
   // Query history can omit GPU work, never the ordered producer side effects.
   const auto occlusion_view = commands->OcclusionView(FrameStatFrameCount());
-  if (!pending.empty() && OcclusionCullRequest({pose.instance, pose.model_generation, node}, occlusion_view, world_bounds))
-    return true;
+  std::erase_if(pending, [&](const Pending &entry) {
+    return OcclusionCullRequest({pose.instance, pose.model_generation, node, entry.primitive}, occlusion_view, entry.bounds);
+  });
   if (!pending.empty() && !s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands); s.draw_framebuffer_bound = true;

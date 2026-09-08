@@ -1,6 +1,6 @@
-// Owned world-space cube queried against the native scene depth attachment.
-// The 80-byte push packet has no translated shader or constant-buffer ABI.
-struct OcclusionPacket { float4 world_to_clip[4]; float4 sphere; };
+// Owned world-space box queried against the native scene depth attachment.
+// The 96-byte push packet has no translated shader or constant-buffer ABI.
+struct OcclusionPacket { float4 world_to_clip[4]; float4 center; float4 extent; };
 [[vk::push_constant]] ConstantBuffer<OcclusionPacket> query : register(b0, space0);
 
 static const float3 kCubeCorners[8] = {
@@ -15,8 +15,7 @@ static const uint kCubeIndices[36] = {
 void main(in uint vertexId : SV_VertexID,
           out float4 oPos : SV_Position)
 {
-    const float4 sphere = query.sphere;
-    const float3 corner = sphere.xyz + kCubeCorners[kCubeIndices[vertexId % 36u]] * sphere.w;
+    const float3 corner = query.center.xyz + kCubeCorners[kCubeIndices[vertexId % 36u]] * query.extent.xyz;
     const float4 p = float4(corner, 1.0);
     oPos.x = dot(query.world_to_clip[0], p);
     oPos.y = dot(query.world_to_clip[1], p);

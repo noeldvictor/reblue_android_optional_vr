@@ -82,6 +82,8 @@ u32 Align(u32 n) { return (n + 15u) & ~15u; }
 
 std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &data, u64 key,
                                           NativeVertexInputHandle vertex_input) {
+  const auto bounds = BuildNativeMeshBounds(data); // CPU payload, before map/upload.
+  if (!data.attributes.empty() && !bounds) return {};
   u32 bytes = Align(u32(data.indices.size() * 4));
   for (const auto &stream : data.streams)
     bytes += Align(u32(stream.bytes.size()));
@@ -111,6 +113,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   result->id = key;
   result->layout = data.layout;
   result->canonical_vertices = !data.attributes.empty();
+  result->bounds = bounds;
   result->vertex_input = std::move(vertex_input);
   result->rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs);
   result->layered_rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs, true);
