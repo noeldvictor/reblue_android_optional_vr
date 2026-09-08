@@ -557,7 +557,7 @@ def verify_rigid_scene(text):
     return result
 
 
-def verify_rigid_deferred(text, require_effects=False):
+def verify_rigid_deferred(text, require_effects=False, require_inputs=False):
     """Fresh mixed consumer reachability; pixels and deferred-specific GPU retirement remain separate."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
         raise ValueError("native deferred diagnostic exceeds 400 KiB")
@@ -565,6 +565,9 @@ def verify_rigid_deferred(text, require_effects=False):
         raise ValueError("runtime failure before native deferred qualification")
     native = re.compile(r"\[native-deferred\] frame (\d+) staged (\d+) consumed (\d+) pending (\d+);")
     effect = re.compile(r"\[native-deferred-effects\] frame (\d+) begins (\d+) ends (\d+) reads (\d+);")
+    inputs = re.compile(r"\[native-deferred-inputs\] frame (\d+) batches (\d+) visuals (\d+) refreshes (\d+);")
+    require_effects = require_effects or require_inputs
+    receipt_size = 14 if require_inputs else 11 if require_effects else 8
     legacy = re.compile(r"\[host-consumer\] lists (\d+) entries (\d+) replayed \d+; direct draws (\d+) shells \d+ stencil \d+; "
                         r"bridges visual \d+ material (\d+) .*; fallback (\d+) refused (\d+)")
     contexts, metrics = [], []
@@ -580,6 +583,23 @@ def verify_rigid_deferred(text, require_effects=False):
             if values[-2:] != (0, 0):
                 raise ValueError("mixed deferred consumer fell back or refused")
             last_host = index, values[:4]
+        if require_inputs and "[native-deferred-inputs]" in line:
+            match = inputs.search(line)
+            if not match or not metrics or len(metrics[-1][1]) != 11:
+                raise ValueError("native visual inputs lack their paired deferred/effect receipt")
+            values = tuple(map(int, match.groups()))
+            current = metrics[-1][1]
+            previous = metrics[-2][1][11:14] if len(metrics) > 1 else (0, 0, 0)
+            batches, visuals, refreshes = values[1:]
+            batch_delta, visual_delta = batches - previous[0], visuals - previous[1]
+            if (values[0] != current[0] or not 0 <= batches <= visuals <= current[2] or
+                    batches > current[4] or batch_delta < 0 or refreshes < previous[2] or
+                    (refreshes and not batches) or
+                    not batch_delta <= visual_delta <= 4096 * batch_delta or
+                    bool(visuals) != bool(current[2])):
+                raise ValueError("native visual input frame, bounds or publication conservation failure")
+            metrics[-1] = (index, current + values[1:])
+            continue
         if require_effects and "[native-deferred-effects]" in line:
             match = effect.search(line)
             if not match or not metrics or len(metrics[-1][1]) != 8:
@@ -597,8 +617,8 @@ def verify_rigid_deferred(text, require_effects=False):
             continue
         if not match or last_host is None or last_host[0] <= last_native_line:
             raise ValueError("native deferred receipt lacks its matching mixed consumer report")
-        if require_effects and metrics and len(metrics[-1][1]) != 11:
-            raise ValueError("native deferred receipt missing visual-effect publication")
+        if metrics and len(metrics[-1][1]) != receipt_size:
+            raise ValueError("native deferred receipt missing its visual publication")
         values = tuple(map(int, match.groups())) + last_host[1]
         if (values[1] != values[2] + values[3] or values[3] > 5140 or
                 values[2] > values[5] or values[6] > values[5] or
@@ -608,8 +628,8 @@ def verify_rigid_deferred(text, require_effects=False):
             raise ValueError("native deferred stale frame or counter conservation failure")
         metrics.append((index, values))
         last_native_line = index
-    if require_effects and metrics and len(metrics[-1][1]) != 11:
-        raise Pending("waiting for the matching native visual-effect receipt")
+    if metrics and len(metrics[-1][1]) != receipt_size:
+        raise Pending("waiting for the matching native visual publication receipt")
     a, b = recent_field_samples(contexts, metrics)
     if a[3] or b[3] or any(b[i] - a[i] < 32 for i in (1, 2, 6, 7)):
         raise Pending("need fresh native and legacy consumption in consecutive ready-field windows")
@@ -620,6 +640,10 @@ def verify_rigid_deferred(text, require_effects=False):
         if any(b[i]-a[i] < 32 for i in (8,9,10)):
             raise Pending("need fresh paired native visual scopes and owned effect consumption")
         result.update(visual_begins_delta=b[8]-a[8], visual_ends_delta=b[9]-a[9], effects_delta=b[10]-a[10])
+    if require_inputs:
+        if any(b[i]-a[i] < 32 for i in (11,12,13)):
+            raise Pending("need fresh native input batches, visual identities and completed-writer refreshes")
+        result.update(input_batches_delta=b[11]-a[11], input_visuals_delta=b[12]-a[12], input_refreshes_delta=b[13]-a[13])
     return result
 
 
@@ -973,7 +997,7 @@ def verify_cutout_family(text):
 
 
 def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False, cutout_family=False,
-                       rigid_deferred=False, deferred_effects=False):
+                       rigid_deferred=False, deferred_effects=False, deferred_inputs=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -992,8 +1016,8 @@ def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_fa
         verify_caster_family(text)
     if cutout_family:
         verify_cutout_family(text)
-    if rigid_deferred or deferred_effects:
-        verify_rigid_deferred(text, require_effects=deferred_effects)
+    if rigid_deferred or deferred_effects or deferred_inputs:
+        verify_rigid_deferred(text, require_effects=deferred_effects, require_inputs=deferred_inputs)
 
 
 def main():
@@ -1021,6 +1045,7 @@ def main():
     parser.add_argument("--rigid-scene", action="store_true")
     parser.add_argument("--rigid-deferred", action="store_true", help="fresh owned sorted packets and mixed legacy consumption; pixels separately required")
     parser.add_argument("--deferred-effects", action="store_true", help="also require paired native visual scopes and fresh owned effect reads")
+    parser.add_argument("--deferred-inputs", action="store_true", help="also require bounded late native-identity input publications paired with native scopes")
     parser.add_argument("--rigid-batches", action="store_true")
     parser.add_argument("--rigid-hard-off", action="store_true")
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
@@ -1074,8 +1099,8 @@ def main():
             return 0
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects)
-            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -1094,8 +1119,8 @@ def main():
         selection = verify_light_selection(text) if args.light_selection else None
         shadow_images = verify_shadow_images(text) if args.shadow_images else None
         rigid_shadow = verify_rigid_shadow(text) if args.rigid_shadow else None
-        rigid_scene = verify_rigid_scene(text) if args.rigid_scene or args.rigid_deferred or args.deferred_effects else None
-        rigid_deferred = verify_rigid_deferred(text, require_effects=args.deferred_effects) if args.rigid_deferred or args.deferred_effects else None
+        rigid_scene = verify_rigid_scene(text) if args.rigid_scene or args.rigid_deferred or args.deferred_effects or args.deferred_inputs else None
+        rigid_deferred = verify_rigid_deferred(text, require_effects=args.deferred_effects, require_inputs=args.deferred_inputs) if args.rigid_deferred or args.deferred_effects or args.deferred_inputs else None
         rigid_batches = verify_rigid_batches(text) if args.rigid_batches else None
         rigid_hard_off = verify_rigid_hard_off(text) if args.rigid_hard_off else None
         receiver_setup = verify_receiver_setup(text) if args.receiver_setup else None

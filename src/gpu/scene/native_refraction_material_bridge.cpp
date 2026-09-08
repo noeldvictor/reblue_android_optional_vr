@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_refraction_material.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/refraction_material_import.h"
 #include "gpu/scene/shader_parameter_import.h"
 #include "gpu/native_texture_mirror.h"
@@ -183,5 +184,11 @@ void Prepare(PPCContext &ctx, uint8_t *base, bool water) {
 }
 } // namespace
 } // namespace bd::gpu::scene
-REX_HOOK_RAW(sub_82454720) { bd::gpu::scene::Prepare(ctx, base, true); }
-REX_HOOK_RAW(sub_82455150) { bd::gpu::scene::Prepare(ctx, base, false); }
+REX_HOOK_RAW(sub_82454720) {
+  bd::gpu::scene::Prepare(ctx, base, true);
+  bd::gpu::scene::RefreshNativeVisualInputsAfterWriter();
+}
+REX_HOOK_RAW(sub_82455150) {
+  bd::gpu::scene::Prepare(ctx, base, false);
+  bd::gpu::scene::RefreshNativeVisualInputsAfterWriter();
+}

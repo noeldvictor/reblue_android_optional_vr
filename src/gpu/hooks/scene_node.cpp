@@ -35,6 +35,7 @@
 #include <atomic>
 #include <cstring>
 #include <string>
+#include <exception>
 
 #include <fmt/format.h>
 #include <xxhash.h>
@@ -46,6 +47,8 @@
 
 #include "core/logging.h"
 #include "core/memory_helpers.h"
+#include "core/shutdown.h"
+#include "core/threading.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/deferred_consumer.h"
 #include "gpu/scene/host_draw.h"
@@ -347,10 +350,20 @@ bool bdRenderListEntryHook(PPCRegister &r31, PPCRegister &r23) {
 void bd::gpu::scene::CloseDeferredCompatibilityCapture() { CloseListCapture(); }
 
 REX_HOOK_RAW(sub_8227F360) {
-  if (!REXCVAR_GET(bd_native_deferred_consumer) ||
-      !bd::gpu::scene::ConsumeDeferredList(ctx, base)) {
-    bd::gpu::scene::RecordDeferredConsumerFallback();
-    __imp__sub_8227F360(ctx, base);
+  try {
+    if (!REXCVAR_GET(bd_native_deferred_consumer) ||
+        !bd::gpu::scene::ConsumeDeferredList(ctx, base)) {
+      bd::gpu::scene::RecordDeferredConsumerFallback();
+      __imp__sub_8227F360(ctx, base);
+    }
+    CloseListCapture();
+  } catch (const std::exception &error) {
+    // Never resume or replay partially accepted work. Preserve the cause in the
+    // bounded log and use the existing fatal shutdown, not an unhandled exception
+    // that silently creates a large Windows crash dump outside the run budget.
+    BD_ERROR("[native-deferred] terminal failure: {}", error.what());
+    rex::FlushLogging();
+    bd::RequestShutdown(bd::ShutdownReason::Fatal, 1);
+    bd::TerminateProcessNow(1);
   }
-  CloseListCapture();
 }

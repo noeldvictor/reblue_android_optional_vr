@@ -8,8 +8,11 @@
 #include "gpu/scene/deferred_entry_bridge.h"
 #include "gpu/scene/deferred_work.h"
 #include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/native_refraction_material.h"
+#include "gpu/scene/refraction_material_import.h"
 #include "gpu/scene/deferred_visual_import.h"
 #include <array>
+#include <bit>
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
@@ -120,6 +123,14 @@ void TestCallbackContract() {
   assert(!CheckDeferredVisualResource(visual,read));
   assert(!ReadNativeDeferredVisualInputs({1,2},visual,read));
   words[0x4020] = 0x820DFA50; words[visual+1864] = 5;
+  // Run968's water vtable8208D52C has these live methods. It is a known
+  // executing writer, never a no-op that native model preparation may omit.
+  words[0x4020] = 0x82454720; words[0x4024] = 0x824548A8;
+  assert(CheckDeferredBatchResource(visual,read));
+  assert(!CheckDeferredVisualResource(visual,read) && !CheckNativeDeferredContract(visual,read));
+  words[0x4024] = 0x820DFA50; assert(!CheckDeferredBatchResource(visual,read));
+  words[0x4020] = 0x12345678; assert(!CheckDeferredBatchResource(visual,read));
+  words[0x4020] = 0x820DFA50;
   const auto valid = words;
   for (const auto &[address,value] : std::array<std::pair<uint64_t,uint32_t>,12>{{
       {registry+8,1}, {0x1000,shader}, {0x2000,0x82174270},
@@ -134,6 +145,43 @@ void TestCallbackContract() {
   words = valid; words[registry+20] = 1; words[0x3000] = shader;
   assert(CheckNativeDeferredContract(visual,read) == 5); // optional features removed
   assert(!CheckNativeDeferredContract(0,read));
+}
+
+void TestWaterWriterPublication() {
+  std::unordered_map<uint64_t,uint32_t> words;
+  constexpr uint32_t water = 0x1000, visual = 0x4000, descriptor = 0x9000;
+  words[water+5052] = 0; words[water+5056] = 0; words[water+5044] = descriptor;
+  // The existing water destination decoder permits this indirect alias. Its
+  // write must update the publication, not be hidden by a batch-start freeze.
+  words[descriptor+12] = visual+3132; words[visual+3132] = 17;
+  const auto read = [&](uint64_t address) -> std::optional<uint32_t> {
+    const auto it = words.find(address); return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  const auto destination = ReadWaterFactorDestination(water, read);
+  assert(destination && *destination == visual+3132);
+  NativeVisualPublication publication;
+  const NativeVisualIdentity identity{1,2};
+  assert(publication.Publish(3, {{identity, NativeVisualBlend::Alpha, words[visual+3132]}}));
+  const auto retained = publication.Read(identity,3);
+  struct Water {
+    uint32_t &factor;
+    bool finished = false;
+    void PublishSceneFactor() { factor = std::bit_cast<uint32_t>(WaterSceneFactor(true, true, 2)); }
+    void FlushWaterParameters(uint32_t index) {
+      if (index) factor = std::bit_cast<uint32_t>(ClampWaterHighlight(std::bit_cast<float>(factor)));
+    }
+    void EnableSourceAlphaBlending() {}
+    void EnableDepthTest() {}
+    void BindPlanarReflection() {}
+    void BindSceneImage() {}
+    bool WantsSnapshot() { return true; }
+    void Snapshot() { finished = true; }
+  } adapter{words[*destination]};
+  PrepareWaterMaterial(adapter);
+  assert(adapter.finished && words[visual+3132] == std::bit_cast<uint32_t>(1.f));
+  assert(publication.Read(identity,3)->diffuse_class == 17);
+  assert(publication.Publish(3, {{identity, NativeVisualBlend::Alpha, words[visual+3132]}}));
+  assert(publication.Read(identity,3)->diffuse_class == std::bit_cast<uint32_t>(1.f) && retained->diffuse_class == 17);
 }
 
 void TestNativeVisualPublication() {
@@ -326,6 +374,7 @@ void TestDepth() {
 }
 
 int main() {
+  TestWaterWriterPublication();
   TestNativeVisualPublication();
   TestOrdinaryVisualExports();
   TestCallbackContract();

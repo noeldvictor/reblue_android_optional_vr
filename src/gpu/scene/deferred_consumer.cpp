@@ -92,7 +92,7 @@ thread_local Stats stats;
 thread_local NativeDeferredQueue native_queue;
 thread_local uint64_t native_staged = 0, native_consumed = 0;
 thread_local uint64_t native_visual_begins = 0, native_visual_ends = 0, native_effect_reads = 0;
-thread_local uint64_t native_input_batches = 0, native_input_visuals = 0;
+thread_local uint64_t native_input_batches = 0, native_input_visuals = 0, native_input_refreshes = 0;
 void Report() {
   const auto frame = FrameStatFrameCount();
   if (frame - stats.frame < 300)
@@ -111,8 +111,8 @@ void Report() {
       frame, native_staged, native_consumed, native_queue.Entries().size());
   BD_INFO("[native-deferred-effects] frame {} begins {} ends {} reads {}; ordinary native scopes dispatch no guest callbacks",
       frame, native_visual_begins, native_visual_ends, native_effect_reads);
-  BD_INFO("[native-deferred-inputs] frame {} batches {} visuals {}; native instance identities and late batch values, no per-entry source sidecar",
-      frame, native_input_batches, native_input_visuals);
+  BD_INFO("[native-deferred-inputs] frame {} batches {} visuals {} refreshes {}; native instance identities and writer-ordered values, no per-entry source sidecar",
+      frame, native_input_batches, native_input_visuals, native_input_refreshes);
 }
 uint8_t *Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address > UINT32_MAX || bytes > UINT32_MAX ||
@@ -544,21 +544,27 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   }
   if (HasNativeDeferredScene() && (!NativeRigidDeferredEnabled() || !NativeListMode()))
     throw std::runtime_error("Native deferred pass changed before consumption");
-  NativeVisualPublication visual_inputs;
+  NativeVisualInputScope visual_inputs;
   if (HasNativeDeferredScene()) {
-    // All walk-time writers have finished. Known effect callbacks leave these
-    // authored values alone; arbitrary legacy resource callbacks are not allowed
-    // to invalidate this handoff. Dynamic receiver/light/device outputs stay late.
-    for (const auto &entry : entries)
-      if (!CheckDeferredVisualResource(Read<uint32_t>(entry.address + 272), CheckedWord))
+    // All walk-time writers have finished. Known later material writers refresh
+    // this scoped publication at their producer boundary; unknown ones refuse.
+    // Dynamic receiver/light/device outputs still resolve at their own producers.
+    for (const auto &entry : entries) {
+      const auto visual = Read<uint32_t>(entry.address + 272);
+      if (!CheckDeferredBatchResource(visual, CheckedWord)) {
+        const auto table = CheckedWord(visual);
+        BD_ERROR("[native-deferred] unknown batch resource visual {:08X} table {:08X} begin {:08X} end {:08X}",
+            visual, table.value_or(0), table ? CheckedWord(uint64_t(*table) + 32).value_or(0) : 0,
+            table ? CheckedWord(uint64_t(*table) + 36).value_or(0) : 0);
         throw std::runtime_error("Unknown legacy resource writer inside native deferred batch");
+      }
+    }
     std::vector<NativeVisualIdentity> requested;
     for (const auto &entry : native_queue.Entries())
       requested.push_back({entry.submission.instance, entry.submission.model_generation});
     std::sort(requested.begin(), requested.end());
     requested.erase(std::unique(requested.begin(), requested.end()), requested.end());
-    std::vector<NativeVisualInputs> inputs;
-    if (!CollectNativeVisualInputs(requested, inputs) || !visual_inputs.Publish(FrameStatFrameCount(), std::move(inputs)))
+    if (!visual_inputs.Begin(requested, FrameStatFrameCount()))
       throw std::runtime_error("Native deferred authored batch handoff unavailable");
     ++native_input_batches; native_input_visuals += requested.size();
   }
@@ -731,6 +737,7 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   std::memset(bd::mem::at<uint8_t>(pool), 0, kDeferredEntryBytes);
   ResetDeferredDepthImports();
   if (!native_queue.EndDrain()) throw std::runtime_error("Native deferred packets were not fully consumed");
+  native_input_refreshes += visual_inputs.Refreshes();
   if (!depth_write)
     bridge.State(48, 1);
   bridge.State(60, 0);

@@ -268,14 +268,18 @@ unqualified; no speedup is claimed. In host132, authored-input sidecars, outgoin
 and legacy-opened scopes remain; the route is still opt-in.
 [Connected effects, contracts and verification](research/20260908_0251_native-deferred-effects.md).
 
-**New source checkpoint; host build/live validation pending:** deferred packets
+**Host134 built; writer-ordered input validation pending:** deferred packets
 now use native instance/generation identities instead of a per-entry guest-address
 sidecar. The existing instance index publishes bounded blend/class values at the
-late list handoff; receiver publications use the same native keys. Two rebuilt
-C++ fixtures,32 CPU tests and361 Python checks pass. Host132/run967 above remain
-the last tested game binary/run, not evidence for this change. Mixed legacy
-callback ordering, fresh cold/reload consumption and pixels still need validation;
-source-input imports, receiver descriptors and outgoing legacy state remain.
+late list handoff; receiver publications use the same native keys. Run968 exposed
+a rejected water resource callback before field readiness. The existing water
+writer now republishes the native inputs after its complete effects, preserving
+late indirect writes instead of freezing the batch. Native omitted callbacks
+still require no-ops; unknown writers still refuse.32 CPU tests,364 Python checks
+and the incremental host build pass. Host132/run967 remain the last passing game
+run, not evidence for this correction. Fresh cold/reload consumption and pixels
+remain open; source-input imports, receiver descriptors and outgoing state remain.
+[Writer-ordered connection and causal failure](research/20260908_0337_native-visual-inputs.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

@@ -305,12 +305,12 @@ class NativeRigidBoundaryTest(unittest.TestCase):
                           "FindNativeVisualIdentity", "CheckNativeDeferredContract"):
             self.assertNotIn(forbidden, branch)
         for required in ("MergeDeferredWork(legacy_depths, insertions, merged)", "CloseDeferredCompatibilityCapture()",
-                         "CollectNativeVisualInputs(requested, inputs)", "visual_inputs.Read(identity, FrameStatFrameCount())",
-                         "CheckDeferredVisualResource(Read<uint32_t>(entry.address + 272), CheckedWord)", "native_queue.EndDrain()"):
+                         "visual_inputs.Begin(requested, FrameStatFrameCount())", "visual_inputs.Read(identity, FrameStatFrameCount())",
+                         "CheckDeferredBatchResource(visual, CheckedWord)", "native_queue.EndDrain()"):
             self.assertIn(required, source)
         self.assertNotIn("native_visuals", source)
         self.assertNotIn("VisualTransition", source)
-        self.assertLess(source.index("CollectNativeVisualInputs(requested, inputs)"), source.index("native_queue.BeginDrain("))
+        self.assertLess(source.index("visual_inputs.Begin(requested, FrameStatFrameCount())"), source.index("native_queue.BeginDrain("))
         queue = (ROOT / "src/gpu/scene/native_deferred_queue.h").read_text()
         for forbidden in ("NodeTag", "visual", "bd::mem::", "816", "DeferredEntryRecipe"):
             self.assertNotIn(forbidden, queue)
@@ -352,6 +352,24 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("Adapter adapter{kPrimary, 0, stack, identity}", native)
         for forbidden in ("FindNativeVisualIdentity", "visual +", "visual)+", "uint32_t visual"):
             self.assertNotIn(forbidden, native)
+
+    def test_known_writers_republish_after_completion_and_failures_do_not_resume(self):
+        water = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
+        for symbol, mode in (("sub_82454720", "true"), ("sub_82455150", "false")):
+            hook = water.split(f"REX_HOOK_RAW({symbol}) {{", 1)[1].split("\n}", 1)[0]
+            self.assertLess(hook.index(f"Prepare(ctx, base, {mode})"), hook.index("RefreshNativeVisualInputsAfterWriter()"))
+        bridge = (ROOT / "src/gpu/scene/native_instance_bridge.cpp").read_text()
+        refresh = bridge.split("void RefreshNativeVisualInputsAfterWriter() {", 1)[1].split("bool CollectNativeVisualInputs(", 1)[0]
+        for required in ("if (!active_visual_inputs) return", "scope.frame_ != FrameStatFrameCount()",
+                         "CollectNativeVisualInputs(scope.requested_, inputs)", "scope.inputs_.Publish(", "throw std::runtime_error"):
+            self.assertIn(required, refresh)
+        self.assertIn("if (active_visual_inputs == this) active_visual_inputs = nullptr", bridge)
+        hook = (ROOT / "src/gpu/hooks/scene_node.cpp").read_text().split("REX_HOOK_RAW(sub_8227F360)", 1)[1]
+        failure = hook.split("catch (const std::exception &error)", 1)[1]
+        for required in ("BD_ERROR(", "rex::FlushLogging()", "ShutdownReason::Fatal, 1", "TerminateProcessNow(1)"):
+            self.assertIn(required, failure)
+        for forbidden in ("__imp__", "RecordDeferredConsumerFallback", "return true", "return false"):
+            self.assertNotIn(forbidden, failure)
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()

@@ -152,6 +152,29 @@ NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual) {
   return it == store.sources.end() ? NativeVisualIdentity{} :
       NativeVisualIdentity{it->second.instance, it->second.model_generation};
 }
+namespace {
+thread_local NativeVisualInputScope *active_visual_inputs = nullptr;
+}
+NativeVisualInputScope::~NativeVisualInputScope() {
+  if (active_visual_inputs == this) active_visual_inputs = nullptr;
+}
+bool NativeVisualInputScope::Begin(std::span<const NativeVisualIdentity> requested, uint32_t frame) {
+  if (active_visual_inputs) return false;
+  std::vector<NativeVisualInputs> inputs;
+  if (!CollectNativeVisualInputs(requested, inputs) || !inputs_.Publish(frame, std::move(inputs))) return false;
+  requested_.assign(requested.begin(), requested.end());
+  frame_ = frame; refreshes_ = 0; active_visual_inputs = this;
+  return true;
+}
+void RefreshNativeVisualInputsAfterWriter() {
+  if (!active_visual_inputs) return;
+  auto &scope = *active_visual_inputs;
+  std::vector<NativeVisualInputs> inputs;
+  if (scope.frame_ != FrameStatFrameCount() || !CollectNativeVisualInputs(scope.requested_, inputs) ||
+      !scope.inputs_.Publish(scope.frame_, std::move(inputs)))
+    throw std::runtime_error("Native deferred authored input refresh unavailable");
+  ++scope.refreshes_;
+}
 bool CollectNativeVisualInputs(std::span<const NativeVisualIdentity> requested,
     std::vector<NativeVisualInputs> &out) {
   out.clear();

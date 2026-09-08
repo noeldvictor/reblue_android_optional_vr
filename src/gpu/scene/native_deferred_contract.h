@@ -49,15 +49,23 @@ bool CheckNativeDeferredRegistry(Read read) {
   }
   return true;
 }
-// Intervening legacy model resource callbacks must not be arbitrary writers of
-// another queued visual's authored inputs. Known participant callbacks only
-// change effect/device/selection state, whose late producers remain active.
+// Only these resource callbacks may be OMITTED by native model consumption.
 template <class Read>
 bool CheckDeferredVisualResource(uint32_t visual, Read read) {
   if (!visual) return true;
   const auto table = read(visual);
   return table && *table && read(uint64_t(*table) + 32) == 0x820DFA50 &&
       read(uint64_t(*table) + 36) == 0x820DFA50;
+}
+// Water resource callbacks still EXECUTE for the legacy draw. Their whole-function
+// producer refreshes the active native input publication after all writes,
+// including indirect parameter aliases. Other unknown writers remain refused.
+template <class Read>
+bool CheckDeferredBatchResource(uint32_t visual, Read read) {
+  if (CheckDeferredVisualResource(visual, read)) return true;
+  const auto table = visual ? read(visual) : std::nullopt;
+  return table && *table && read(uint64_t(*table) + 32) == 0x82454720 &&
+      read(uint64_t(*table) + 36) == 0x824548A8;
 }
 template <class Read>
 std::optional<uint32_t> CheckNativeDeferredContract(uint32_t visual, Read read) {

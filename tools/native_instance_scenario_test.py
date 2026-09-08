@@ -943,6 +943,47 @@ class RigidDeferredScenarioTest(unittest.TestCase):
         with self.assertRaises(Pending):
             verify_rigid_deferred(self.effect_text().rsplit("\n",1)[0], require_effects=True)
 
+    def input_text(self):
+        return self.effect_text().replace(
+            "ends 50 reads 100;", "ends 50 reads 100;\n[native-deferred-inputs] frame 110 batches 40 visuals 80 refreshes 40;").replace(
+            "ends 90 reads 200;", "ends 90 reads 200;\n[native-deferred-inputs] frame 410 batches 80 visuals 160 refreshes 80;")
+
+    def test_native_inputs_require_fresh_paired_bounded_publications(self):
+        text = self.input_text()
+        result = verify_rigid_deferred(text, require_inputs=True)
+        self.assertEqual((result["input_batches_delta"], result["input_visuals_delta"], result["effects_delta"], result["input_refreshes_delta"]), (40,80,100,40))
+        for bad in (text.rsplit("\n", 1)[0], text.replace("batches 80 visuals 160", "batches 40 visuals 80"),
+                    text.replace("refreshes 80", "refreshes 40")):
+            with self.assertRaises(Pending): verify_rigid_deferred(bad, require_inputs=True)
+        # Old binaries and independently passing effect counters cannot prove
+        # the newly connected native-identity handoff, even in a ready field.
+        with self.assertRaises(ValueError): verify_rigid_deferred(self.effect_text(), require_inputs=True)
+        self.assertEqual(verify_rigid_deferred(text, require_effects=True), verify_rigid_deferred(self.effect_text(), require_effects=True))
+
+    def test_bad_native_input_publications_cannot_qualify(self):
+        text = self.input_text()
+        final = "[native-deferred-inputs] frame 410 batches 80 visuals 160 refreshes 80;"
+        for bad in (text.replace("inputs] frame 410", "inputs] frame 409"),
+                    text.replace("batches 80 visuals 160", "batches 80 visuals 201"),
+                    text.replace("batches 80 visuals 160", "batches 161 visuals 160"),
+                    text.replace("batches 80 visuals 160", "batches 39 visuals 160"),
+                    text.replace("batches 80 visuals 160", "batches 80 visuals 79"),
+                    text.replace("batches 80 visuals 160", "batches 40 visuals 160"),
+                    text.replace("batches 80", "batches invalid"),
+                    text.replace("refreshes 80", "refreshes 39"),
+                    text.replace(" refreshes 80", ""),
+                    text.replace("batches 40 visuals 80", "batches 0 visuals 0"),
+                    text + "\n" + final, final + "\n" + text,
+                    text.replace("batches 40 visuals 80", "batches 0 visuals 80")):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError): verify_rigid_deferred(bad, require_inputs=True)
+        # The per-batch 4096 limit applies even when cumulative consumption is
+        # much larger; extra copies of a publication are not new native work.
+        bad = text.replace("staged 200 consumed 200", "staged 10000 consumed 10000").replace(
+            "reads 200;", "reads 10000;").replace(self.host(400,200), self.host(20000,200)).replace(
+            "batches 80 visuals 160", "batches 41 visuals 4177")
+        with self.assertRaises(ValueError): verify_rigid_deferred(bad, require_inputs=True)
+
     def test_missing_mismatched_or_unbalanced_effects_are_not_qualified(self):
         text = self.effect_text()
         final = "[native-deferred-effects] frame 410 begins 90 ends 90 reads 200;"
@@ -990,6 +1031,8 @@ class RigidDeferredScenarioTest(unittest.TestCase):
             with self.assertRaises(Pending): module.verify_rigid_epoch("", rigid_deferred=True)
             module.verify_rigid_epoch(self.effect_text(), deferred_effects=True)
             with self.assertRaises(ValueError): module.verify_rigid_epoch(good, deferred_effects=True)
+            module.verify_rigid_epoch(self.input_text(), deferred_inputs=True)
+            with self.assertRaises(ValueError): module.verify_rigid_epoch(self.effect_text(), deferred_inputs=True)
 
 
 class RigidBatchScenarioTest(unittest.TestCase):

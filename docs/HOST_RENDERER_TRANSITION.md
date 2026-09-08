@@ -362,13 +362,19 @@ after scene preparation and before list drain. Receiver publication/read uses
 the same native keys; dynamic receiver colour, blend/alpha and lights stay late.
 Source retirement before this handoff refuses; retained values cannot alias a
 reused generation. Unknown legacy resource callbacks inside the batch refuse.
-Two rebuilt C++ fixtures,32 CPU tests and361 Python checks pass. No host rebuild
-or live run yet; host132/run967 remain the prior binary/evidence. This is an
-intermediate connection, not runtime-qualified sidecar retirement.
+Host133 builds, but run968 fails at the first water resource callback before
+field readiness. Dump/source analysis identifies82454720/824548A8, not an
+arbitrary writer. Host134 separates native no-op omission from executing water
+callbacks: the existing whole-function writer republishes native input values
+after all effects, including indirect parameter aliases. Native scopes retain
+no source identity; unknown resource writers and failed refresh still terminate.
+Deferred C++ failures now log and use the existing fatal shutdown rather than
+creating an unhandled-exception dump.32 CPU tests,364 Python checks and host134
+pass; fresh runtime qualification is pending. Host132/run967 remain the preceding
+passing binary/evidence. Run968 and its symbolized cause remain failure evidence.
 
-Next: finish mixed legacy hook/callback ordering validation, compile the host
-connection and require fresh late-input publication receipts in both cold/reload
-epochs using the existing mixed-consumer gate. Do not freeze late values or
+Next: require fresh late-input publication AND completed-writer refresh receipts
+in both cold/reload epochs using the existing mixed-consumer gate. Do not freeze late values or
 weaken the unknown-writer refusal to pass. Receiver descriptors, source-input
 imports, outgoing legacy state and legacy-opened scopes remain adapters. Qualify mixed-order
 pixels once the image budget allows it, while continuing independent native
@@ -376,6 +382,7 @@ ownership work. Do not repeat the callback census or build a second renderer.
 Full native frame, broader authored effects/scenes/reloads and both-eye acceptance
 remain open.
 [Native effect scope connection and verification](../research/20260908_0251_native-deferred-effects.md).
+[Writer-ordered native inputs and causal failure](../research/20260908_0337_native-visual-inputs.md).
 [Native deferred live qualification and archive locations](../research/20260908_0225_native-deferred-live.md).
 [Sorted producer/consumer connection and evidence](../research/20260908_0206_native-deferred-connection.md).
 [Deferred contracts and pending runtime connection](../research/20260908_0109_deferred-packet-order.md).

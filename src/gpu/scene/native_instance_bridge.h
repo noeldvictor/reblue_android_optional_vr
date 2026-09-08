@@ -14,10 +14,30 @@ struct NativeLightSourceBinding;
 // Source identity lookup only at compatibility/producer boundaries. Native
 // deferred entries and their consumer never resolve an instance back to a VA.
 NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual);
-// Late batch handoff after authored scene preparation, before mixed consumption.
+// Late handoff after authored scene preparation and known later writers.
 // Uses the existing bounded instance index; no source address survives in output.
 bool CollectNativeVisualInputs(std::span<const NativeVisualIdentity> requested,
     std::vector<NativeVisualInputs> &out);
+// One render-thread publication scope, reusing the existing instance index.
+// Known authored writers republish after their complete side effects. Native
+// consumers read immutable values without source identity/field lookups.
+class NativeVisualInputScope {
+public:
+  NativeVisualInputScope() = default;
+  NativeVisualInputScope(const NativeVisualInputScope &) = delete;
+  NativeVisualInputScope &operator=(const NativeVisualInputScope &) = delete;
+  ~NativeVisualInputScope();
+  bool Begin(std::span<const NativeVisualIdentity> requested, uint32_t frame);
+  auto Read(NativeVisualIdentity identity, uint32_t frame) const { return inputs_.Read(identity, frame); }
+  uint64_t Refreshes() const { return refreshes_; }
+private:
+  friend void RefreshNativeVisualInputsAfterWriter();
+  NativeVisualPublication inputs_;
+  std::vector<NativeVisualIdentity> requested_;
+  uint32_t frame_ = 0;
+  uint64_t refreshes_ = 0;
+};
+void RefreshNativeVisualInputsAfterWriter();
 // Called only at the synchronized game/render handoff, after completed poses.
 // Reuses the existing source index; returned bindings contain native IDs only.
 bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out,

@@ -4440,3 +4440,39 @@ unchanged; selected fixture/log growth470,036 B. Net drive-wide free change
 -4,591,616 B includes source/Git and unrelated activity, not just fixture growth.
 Ending free about74.96 GiB; no producers remain. Runtime callback/order and
 cold/reload/pixel qualification remain pending as recorded in the active queue.
+
+### Writer-ordered visual input integration (2026-09-08)
+
+First free80,488,423,424 B. Original cumulative3 GiB exception and floor unchanged;
+no live producer at start. Host133/PID38216/session26287 terminal0,3154 B logs,
+codegen0 written/no guest objects. Run968/PID23728/session19334 fails before field
+readiness (03:37:22..03:37:50); log85,004 B. Profile restored byte-exact. No raw,
+image, cooking or runtime cache/hlsl/perf output. Full causal evidence and hashes
+are in `20260908_0337_native-visual-inputs.md`.
+
+Unplanned Windows WER minidump77,048,323 B and Report.wer82,998 B exceeded the
+diagnostic ceiling; no budget reset/exception was inferred. Installed cdb with
+local symbols identified an uncaught deferred resource-writer refusal at the
+water vtable. After retaining exact cause, stack/source/vtable provenance and
+hashes, removed only run23728's diagnosed dump. Immediate free
+80,176,091,136->80,253,140,992 B,77,049,856 B physical gain. Complete dump memory
+is retired; failed log and OS metadata remain. The runner counts that metadata
+in the original ceiling. Known deferred C++ failures now flush their cause and
+use existing fatal shutdown, not unhandled-exception WER production.
+
+Deferred5/PID38392, CPU36/PID19872 and host134/PID27788 terminal0 under32 MiB
+fixture/192 MiB host free-drop,300 s/30 s test bounds and10 MiB logs.32 CPU tests
+pass in7.65 s;364 Python checks pass. One changed fixture rebuilt; no new GPU
+fixtures/shaders. Host134 builds the source correction, not yet runtime qualified.
+Texture fixture77,361,247 B/132 files, up45,311 B this continuation. New build logs
+8,484 B. After replacement passed, removed six superseded success files:
+host132/deferred4/CPU35 stdout/stderr,6,395 B; immediate free
+80,251,715,584->80,251,723,776 B (8,192 B physical gain). Host133 failure-related
+build log remains. Final275,555 B/166 build logs, net2,089 B. Selected fixture/
+build-log/runtime-failure/OS-metadata retained growth215,402 B. Total logical
+removal77,054,718 B counted once, including the diagnosed dump.
+
+Ending free80,251,723,776 B (~74.74 GiB),236,699,648 B below first reading.
+Scoped producer files do not explain most of that drive-wide change; host/source/
+Git and unrelated system activity are separate, not claimed as cleanup savings.
+All producers terminal; fresh writer-ordered cold/reload and pixel gates pending.
