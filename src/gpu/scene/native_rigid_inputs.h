@@ -7,6 +7,7 @@
 #ifdef __cplusplus
 #include "gpu/scene/native_transform.h"
 #include "gpu/scene/native_lit_shading.h"
+#include "gpu/scene/native_toon_surface.h"
 #include <cstddef>
 #include <cstdint>
 #include <bit>
@@ -35,7 +36,8 @@ struct RigidFogGPU {
   RigidUint4 mode; // disabled, radial, blend, reserved zero
 };
 static const RigidUInt RigidAlbedo = 1, RigidVertexColour = 2, RigidDiffuse = 4,
-                  RigidSpecular = 8, RigidReceiveShadow = 16, RigidFogEnabled = 32, RigidCutout = 64;
+                  RigidSpecular = 8, RigidReceiveShadow = 16, RigidFogEnabled = 32, RigidCutout = 64,
+                  RigidToon = 128, RigidIgnoreTextureAlpha = 256;
 static const RigidUInt RigidCutoutGE = 0, RigidCutoutNever = 1, RigidCutoutLess = 2,
     RigidCutoutEqual = 3, RigidCutoutLE = 4, RigidCutoutGreater = 5, RigidCutoutNE = 6, RigidCutoutAlways = 7;
 // Native material semantics, not translated specialization bits. Ordered NE
@@ -61,6 +63,9 @@ struct NativeRigidObjectGPU {
   RigidFloat4 uv_scale_offset; // named UV scale.xy + offset.zw
   RigidFloat4 detail_uv_scale_offset[2];
   RigidUint4 flags; // x flags above; y layers (0..3); z cutoff compare; w float cutoff bits
+  // Optional family payload. Ordinary/shadow shaders ignore these zeroed values.
+  RigidFloat4 toon_diffuse_scale, toon_diffuse_add, toon_ambient_scale, toon_ambient_add;
+  RigidFloat4 texture_colours[3];
 };
 struct NativeRigidPassGPU {
   RigidMatrix world_to_clip[2], world_to_shadow;
@@ -78,17 +83,19 @@ struct NativeRigidInstanceGPU {
 
 #ifdef __cplusplus
 static_assert(sizeof(RigidLightGPU) == 64 && sizeof(RigidFogGPU) == 64);
-static_assert(sizeof(NativeRigidObjectGPU) == 208 && alignof(NativeRigidObjectGPU) == 16);
+static_assert(sizeof(NativeRigidObjectGPU) == 320 && alignof(NativeRigidObjectGPU) == 16);
 static_assert(offsetof(NativeRigidObjectGPU, normal_rows) == 64);
 static_assert(offsetof(NativeRigidObjectGPU, diffuse) == 112);
 static_assert(offsetof(NativeRigidObjectGPU, detail_uv_scale_offset) == 160);
 static_assert(offsetof(NativeRigidObjectGPU, flags) == 192);
+static_assert(offsetof(NativeRigidObjectGPU, toon_diffuse_scale) == 208);
+static_assert(offsetof(NativeRigidObjectGPU, texture_colours) == 272);
 static_assert(sizeof(NativeRigidPassGPU) == 608 && alignof(NativeRigidPassGPU) == 16);
 static_assert(offsetof(NativeRigidPassGPU, cameras) == 192);
 static_assert(offsetof(NativeRigidPassGPU, lights) == 288);
 static_assert(offsetof(NativeRigidPassGPU, fog) == 480);
-static_assert(sizeof(NativeRigidInstanceGPU) == 816 && alignof(NativeRigidInstanceGPU) == 16);
-static_assert(offsetof(NativeRigidInstanceGPU, pass_data) == 208);
+static_assert(sizeof(NativeRigidInstanceGPU) == 928 && alignof(NativeRigidInstanceGPU) == 16);
+static_assert(offsetof(NativeRigidInstanceGPU, pass_data) == 320);
 static_assert(std::is_trivially_copyable_v<NativeRigidInstanceGPU>);
 static_assert(std::is_trivially_copyable_v<NativeRigidObjectGPU> &&
               std::is_trivially_copyable_v<NativeRigidPassGPU>);
@@ -104,6 +111,22 @@ inline bool RigidFinite(RigidFloat4 value) {
 }
 inline bool RigidFinite(const RigidMatrix &matrix) {
   for (const auto &row : matrix.rows) if (!RigidFinite(row)) return false;
+  return true;
+}
+inline bool SetRigidToonSurface(NativeRigidObjectGPU &object, const NativeToonSurface &surface) {
+  const auto pack = [](const LightingVector &v) { return RigidFloat4{v[0],v[1],v[2],v[3]}; };
+  const auto diffuse_scale = pack(surface.diffuse_scale), diffuse_add = pack(surface.diffuse_add);
+  const auto ambient_scale = pack(surface.ambient_scale), ambient_add = pack(surface.ambient_add);
+  if (!RigidFinite(diffuse_scale) || !RigidFinite(diffuse_add) ||
+      !RigidFinite(ambient_scale) || !RigidFinite(ambient_add) || object.flags.y > 3) return false;
+  for (uint32_t n = 0; n < object.flags.y; ++n)
+    if (!RigidFinite(pack(surface.texture_colours[n]))) return false;
+  object.toon_diffuse_scale = diffuse_scale; object.toon_diffuse_add = diffuse_add;
+  object.toon_ambient_scale = ambient_scale; object.toon_ambient_add = ambient_add;
+  for (uint32_t n = 0; n < 3; ++n)
+    object.texture_colours[n] = n < object.flags.y ? pack(surface.texture_colours[n]) : RigidFloat4{};
+  object.flags.x = (object.flags.x | RigidToon) & ~RigidIgnoreTextureAlpha;
+  if (surface.ignore_texture_alpha) object.flags.x |= RigidIgnoreTextureAlpha;
   return true;
 }
 inline bool SetRigidCutout(NativeRigidObjectGPU &object, uint32_t reference, uint32_t comparison) {

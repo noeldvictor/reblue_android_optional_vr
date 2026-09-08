@@ -225,6 +225,25 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("program.ranges.size() > 4096", policy)
         self.assertIn("if (!inputs) return {}", policy)
 
+    def test_toon_surface_uses_owned_inputs_and_shared_consumers(self):
+        packet = (ROOT / "src/gpu/scene/native_object_primitive.h").read_text()
+        self.assertIn("std::optional<NativeToonSurface> toon", packet)
+        scene = (ROOT / "src/gpu/scene/native_rigid_scene.h").read_text()
+        self.assertIn("toon != packet.toon.has_value()", scene)
+        self.assertIn("SetRigidToonSurface(*object,*packet.toon)", scene)
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_ps.hlsl").read_text()
+        for text in ("ComposeToonSurface", "AdjustToonAmbient", "AdjustToonLight", "max(10.f,object_data.specular.w)",
+                     "object_data.texture_colours[2]", "RigidIgnoreTextureAlpha"):
+            self.assertIn(text, shader)
+        # Live admission intentionally stays closed until an exact authored
+        # Toon input producer supplies this API. No shader-register fallback.
+        bridge = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        self.assertIn("scope->policy_inputs->technique != 0", bridge)
+        for path in ("native_toon_surface.h", "native_toon_shading.h"):
+            text = (ROOT / "src/gpu/scene" / path).read_text()
+            for forbidden in ("g_PSC", "g_VSC", "BD_SHARED", "BOOL_BIT", "bd::mem::", "PPCContext"):
+                self.assertNotIn(forbidden, text)
+
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
         paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h",
@@ -290,7 +309,11 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         for required in ("object_data.flags.y > 2", "fragment.uv.x < 0", "fragment.uv.z < 0",
                          "fragment.secondary_uv.x < 0", "texture_colour.rgb = lerp", "texture_colour * object_data.diffuse"):
             self.assertIn(required, shader)
-        self.assertNotIn("texture_colour.a =", shader)
+        # Only the explicitly owned Toon ignore-alpha policy may replace base
+        # alpha. Detail layering and the ordinary family must still preserve it.
+        alpha_override = "if (toon && (flags & RigidIgnoreTextureAlpha)) texture_colour.a = 1;"
+        self.assertIn(alpha_override, shader)
+        self.assertNotIn("texture_colour.a =", shader.replace(alpha_override, ""))
         vertex = (ROOT / "src/gpu/scene/native_rigid_vertex.h").read_text()
         self.assertIn("vertex.uv.zw", vertex)
         self.assertIn("vertex.secondary_uv.xy", vertex)

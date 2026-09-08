@@ -1195,6 +1195,46 @@ void RigidScenePacket() {
   assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo[0] == albedo);
   auto good = packet;
   {
+    // An explicit family must have owned Toon values, not whichever registers
+    // or another material's settings survived. Ordinary remains unchanged.
+    packet.surface = NativeSceneSurface::Toon;
+    assert(!build());
+    NativeToonSurface toon;
+    toon.diffuse_scale = {.8f,.9f,1.2f,0}; toon.diffuse_add = {.1f,.2f,.3f,0};
+    toon.ambient_scale = {1.1f,.8f,.7f,0}; toon.ambient_add = {.03f,.02f,.01f,0};
+    toon.texture_colours = {{{.7f,.8f,.9f,1},{1,1,1,.5f},{1,1,1,.3f}}};
+    toon.ignore_texture_alpha = true;
+    packet.toon = toon;
+    packet.features->specular = false;
+    packet.material_values[1] = {.1f,.2f,.3f,-5};
+    auto toon_plan = build(); assert(toon_plan);
+    assert(toon_plan->object.specular.w == 10 && toon_plan->object.specular.x == .1f);
+    assert((toon_plan->object.flags.x & (RigidToon | RigidIgnoreTextureAlpha)) == (RigidToon | RigidIgnoreTextureAlpha));
+    assert(!(toon_plan->object.flags.x & RigidSpecular)); // Toon does not consume this flag.
+    assert(toon_plan->object.texture_colours[0].x == .7f && toon_plan->object.texture_colours[1].x == 0);
+    packet.material_mask = 1; assert(!build()); packet.material_mask = 3;
+    packet.surface = NativeSceneSurface::Ordinary; assert(!build());
+    packet.surface = NativeSceneSurface(9); assert(!build()); packet.surface = NativeSceneSurface::Toon;
+    for (uint32_t fault = 0; fault < 5; ++fault) {
+      packet.toon = toon;
+      auto &value = *packet.toon;
+      auto &channel = fault == 0 ? value.diffuse_scale[0] : fault == 1 ? value.diffuse_add[1] :
+          fault == 2 ? value.ambient_scale[2] : fault == 3 ? value.ambient_add[3] : value.texture_colours[0][3];
+      channel = std::numeric_limits<float>::quiet_NaN();
+      assert(!build());
+      auto packed = toon_plan->object;
+      assert(!SetRigidToonSurface(packed,value));
+      assert(!std::memcmp(&packed,&toon_plan->object,sizeof(packed))); // Failed late lane is transactional.
+    }
+    packet.toon = toon; packet.toon->texture_colours[2][0] = std::numeric_limits<float>::infinity();
+    assert(build()); // Unused layers are not shader dependencies.
+    packet.toon->ignore_texture_alpha = false;
+    assert(!(build()->object.flags.x & RigidIgnoreTextureAlpha));
+    packet.toon->diffuse_add[0] = .9f;
+    assert(toon_plan->object.toon_diffuse_add.x == .1f && build()->object.toon_diffuse_add.x == .9f);
+    packet = good;
+  }
+  {
     // The ordinary scene plan must retain exact model/pose ownership through
     // deferred staging and the shared skin batch, not a borrowed render scope.
     auto skin_geometry = std::make_shared<NativeGeometry>(*geometry);
@@ -1236,6 +1276,17 @@ void RigidScenePacket() {
     assert(retained && retained->geometry == skin_geometry && retained->skin_pose == skinned.pose &&
         retained->skin_bounds && retained->skin_bounds->min[0] < 6 && retained->skin_bounds->max[0] > 8 &&
         std::bit_cast<RenderMatrix>(retained->object.world) == identity);
+    // The exact same geometry, animated bounds, pose and frame-fenced batch
+    // carry Toon values. No second skin renderer or bone-register upload.
+    skinned.surface = NativeSceneSurface::Toon;
+    assert(!prepare());
+    skinned.toon = NativeToonSurface{};
+    skinned.toon->diffuse_scale = skinned.toon->ambient_scale = {1,1,1,0};
+    skinned.toon->texture_colours[0] = {1,1,1,1};
+    auto toon_retained = prepare();
+    assert(toon_retained && toon_retained->skin_pose == retained->skin_pose &&
+        toon_retained->geometry == retained->geometry && (toon_retained->object.flags.x & RigidToon));
+    skinned.surface = NativeSceneSurface::Ordinary; skinned.toon.reset();
     auto pose = skinned.pose;
     skinned.pose.reset(); assert(!prepare()); skinned.pose = pose;
     auto wrong_pose = std::make_shared<NativeInstancePose>(*pose); wrong_pose->model_generation++;

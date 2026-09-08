@@ -113,10 +113,13 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     if (refusal) *refusal = reason;
     return {};
   };
-  // Object colour always modulates the result, but specular values are consumed
-  // only when the owned material/pass feature enables them. Reflection values
-  // may be present without being used by this shader. No exact-mask restriction.
-  const uint32_t required_material = 1u | (packet.features && packet.features->specular ? 2u : 0u);
+  // Object colour always modulates the result. Ordinary specular is conditional;
+  // Toon always consumes it. Unused reflection values may still be present.
+  // No exact-mask restriction.
+  const bool toon = packet.surface == NativeSceneSurface::Toon;
+  if ((packet.surface != NativeSceneSurface::Ordinary && !toon) || toon != packet.toon.has_value())
+    return refuse("native surface family or Toon inputs unavailable");
+  const uint32_t required_material = 1u | (toon || (packet.features && packet.features->specular) ? 2u : 0u);
   if ((packet.material_mask & required_material) != required_material)
     return refuse("active diffuse/specular material values unavailable");
   if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
@@ -183,9 +186,13 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   // Skin matrices already map joint-local vertices to world; no second object
   // transform or unused inverse-transpose requirement survives this boundary.
   const RenderMatrix identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+  auto specular = toon || packet.features->specular ? vector(packet.material_values[1]) : RigidFloat4{};
+  if (toon && std::isfinite(specular.w)) specular.w = (std::max)(10.f,specular.w);
   auto object = BuildRigidObject(skinned ? identity : packet.world, vector(packet.material_values[0]),
-      packet.features->specular ? vector(packet.material_values[1]) : RigidFloat4{}, offset(uv[0],uv[1]), flags,
+      specular, offset(uv[0],uv[1]), flags,
       {offset(uv[2],uv[3]), offset(uv2[0],uv2[1])}, layers ? layers-1 : 0);
+  if (toon && (!object || !SetRigidToonSurface(*object,*packet.toon)))
+    return refuse("nonfinite native Toon material inputs");
   NativeRigidPassInputs inputs;
   // Initial acceptance is a mono scene; the backend refuses a layered target.
   // Per-eye cameras must be explicitly produced before enabling this in XR.

@@ -42,7 +42,8 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
   return result;
 }
 void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true,
-         uint32_t deferred = 0, uint32_t skin = 0, bool skin_scene = false) {
+         uint32_t deferred = 0, uint32_t skin = 0, bool skin_scene = false, uint32_t toon_variant = 0) {
+  Need(!toon_variant || (mode <= 22 && !stale && toon_variant <= 5), "Toon surface fixture scope");
   Need(!deferred || (mode == 19 && !stale && restore), "Deferred ordering fixture scope");
   Need(!skin_scene || (skin && mode <= 22),"Skin scene fixture scope");
   Need(!skin || (skin <= 3 && (skin_scene || mode == 1 || mode == 4 || mode >= 37) && !stale && !deferred),"Skin caster fixture scope");
@@ -148,6 +149,33 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
       data.uv_scale_offset = {.5f,.5f,.5f+.5f*n,.5f};
     }
     if (mode == 45) std::swap(shadow_instances[0],shadow_instances[1]);
+  }
+  std::array<NativeToonSurface,2> toon_inputs{};
+  for (uint32_t n = 0; n < instance_count && toon_variant; ++n) {
+    // One shared program/batch can carry ordinary and Toon materials without
+    // changing pipeline state. The second instance must not borrow the first.
+    if (toon_variant == 5 && n == 0) continue;
+    auto &toon = toon_inputs[n];
+    toon.diffuse_scale = {.8f+.3f*n,1.2f,.7f,0};
+    toon.diffuse_add = {.02f,.04f+.03f*n,.01f,0};
+    toon.ambient_scale = {1.3f,.6f,.9f,0}; toon.ambient_add = {.03f,.06f,.01f+.04f*n,0};
+    toon.texture_colours = {{{.7f,1.1f,.9f,1}, {1.2f,.4f,.8f,.7f}, {.6f,.9f,1.3f,.4f}}};
+    if (toon_variant == 2) {
+      // Negative, zero and HDR response channels must retain abs/power
+      // semantics; a saturate or ordinary shadow-strength rewrite cannot pass.
+      toon.diffuse_scale = {}; toon.diffuse_add = {};
+      toon.ambient_scale = {}; toon.ambient_add = {-.6f,0,1.4f,0};
+    }
+    toon.ignore_texture_alpha = toon_variant == 3;
+    auto &object_data = scene_instances[n].object_data;
+    if (toon_variant == 4) object_data.flags.x &= ~(RigidDiffuse | RigidSpecular);
+    if (n) object_data.specular.w = 21;
+    Need(SetRigidToonSurface(object_data,toon), "Production Toon input pack");
+  }
+  if (toon_variant && deferred) {
+    toon_inputs[1] = toon_inputs[0];
+    scene_instances[1].object_data.specular.w = scene_instances[0].object_data.specular.w;
+    Need(SetRigidToonSurface(scene_instances[1].object_data,toon_inputs[0]), "Deferred Toon input pack");
   }
   const auto alignment = static_cast<VulkanDevice &>(device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment;
   const auto placement = PlanNativeRigidStorage(instance_count,uint32_t(alignment));
@@ -518,6 +546,8 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     const uint32_t n = instanced && x >= size/2 ? 1 : 0;
     const auto &reference = references[n];
     const auto &object_reference = scene_instances[n].object_data;
+    const bool toon = toon_variant && !(toon_variant == 5 && n == 0);
+    const auto &toon_reference = toon_inputs[n];
     const auto &matrix = object_reference.world.rows;
     const float world_z = .5f+matrix[3].z;
     const LitVector position=LitVec(2*(x+.5f)/size-1-(eye?.0625f:0),1-2*(y+.5f)/size,world_z);
@@ -531,6 +561,10 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     float texture_alpha=second?right_alpha:1.f;
     if (asset_x*.5f+base_uv.z < 0) { texture=LitVec(0,0,0); texture_alpha=0; }
     if (!object_reference.flags.y) { texture=LitVec(1,1,1); texture_alpha=1; }
+    else if (toon) {
+      const auto &tint = toon_reference.texture_colours[0];
+      texture = LitMultiply(texture,LitVec(tint[0],tint[1],tint[2])); texture_alpha *= tint[3];
+    }
     // Independent scalar oracle for UV-channel mapping, mirror/wrap addressing,
     // negative-U sentinels and ordered RGB overlays. Base alpha is never blended.
     for (uint32_t layer=1;layer<object_reference.flags.y;++layer) {
@@ -543,11 +577,16 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
         const float repeat=value-2*std::floor(value/2);
         return repeat <= 1 ? repeat : 2-repeat;
       };
-      const auto &detail=detail_colours[layer-1][(address(u)>=.5f?1:0)+(address(v)>=.5f?2:0)];
+      auto detail=detail_colours[layer-1][(address(u)>=.5f?1:0)+(address(v)>=.5f?2:0)];
+      if (toon) {
+        const auto &tint = toon_reference.texture_colours[layer];
+        detail = {detail.x*tint[0],detail.y*tint[1],detail.z*tint[2],detail.w*tint[3]};
+      }
       texture.x += (detail.x-texture.x)*detail.w;
       texture.y += (detail.y-texture.y)*detail.w;
       texture.z += (detail.z-texture.z)*detail.w;
     }
+    if (toon && toon_reference.ignore_texture_alpha) texture_alpha = 1;
     const auto &diffuse = object_reference.diffuse;
     float visibility = mode==1||(instanced&&!shadow_cutout)?0.f:1.f;
     if (cutout_receiver) {
@@ -573,8 +612,36 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     LitSurface surface{LitMultiply(texture,LitVec(.8f*diffuse.x,.6f*diffuse.y,.4f*diffuse.z)),LitVec(.1f,.2f,.15f),
       LitVec(.2f,.15f,.1f),LitVec(.15f,.2f,.1f),.5f,visibility,true,true};
     LitResponse response[3];
-    for (uint32_t light=0;light<3;++light) response[light]=EvaluateLitLight(reference.lights[light],position,normal,view,8);
+    for (uint32_t light=0;light<3;++light) response[light]=EvaluateLitLight(reference.lights[light],position,normal,view,
+        toon ? (std::max)(10.f,object_reference.specular.w) : 8.f);
     auto expected=ComposeLitSurface(surface,reference.lights[0],reference.lights[1],reference.lights[2],response[0],response[1],response[2]);
+    if (toon) {
+      // Independent scalar/double oracle: do not call ComposeToonSurface,
+      // ToonDiffuseChannel or AdjustToonAmbient/Light from the production code.
+      const float albedo[]{surface.albedo.x,surface.albedo.y,surface.albedo.z};
+      const float ambient[]{.2f,.15f,.1f}, shadow_colour[]{.15f,.2f,.1f};
+      const float specular[]{.1f,.2f,.15f}, highlight_tint[]{1.05f,.97f,1.27f};
+      float channels[3];
+      for (uint32_t channel = 0; channel < 3; ++channel) {
+        double diffuse[3], highlight = 0, total = 0;
+        for (uint32_t light = 0; light < 3; ++light) {
+          const auto &colour = reference.lights[light].colour;
+          const float component = channel == 0 ? colour.x : channel == 1 ? colour.y : colour.z;
+          const double adjusted = component*toon_reference.diffuse_scale[channel]+toon_reference.diffuse_add[channel];
+          diffuse[light] = adjusted*response[light].diffuse; total += diffuse[light];
+          highlight += adjusted*response[light].specular*(light == 0 ? visibility : 1.f);
+        }
+        double result = albedo[channel];
+        if (toon_variant != 4) {
+          const double a = std::clamp(1.1*ambient[channel],0.,1.)*toon_reference.ambient_scale[channel]+toon_reference.ambient_add[channel];
+          const double response = std::pow(std::abs(a+.65*(.9*total+.1*a)-
+              .65*(.9*diffuse[0]+.1*a)*(1-visibility)*shadow_colour[channel]),.9);
+          result = (result+std::pow(result*(1-response),2))*response;
+        }
+        channels[channel] = float(result+highlight*specular[channel]*highlight_tint[channel]);
+      }
+      expected = LitVec(channels[0],channels[1],channels[2]);
+    }
     if(mode>=2) for(const auto &fog:reference.fog) expected=ApplyLitFog(expected,position,camera,fog);
     expected=LitScale(LitAdd(expected,LitVec(reference.colour_grade.x,.02f,.03f)),.9f);
     float rgba[]{expected.x,expected.y,expected.z,diffuse.w*.5f*texture_alpha};
@@ -637,7 +704,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     }
   }
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" stale="<<stale<<" restored="<<restore<<" deferred="<<deferred
-           <<" skin="<<skin<<" skin-scene="<<skin_scene<<" eyes=2 pixels=128 max_error="<<maximum_error
+           <<" skin="<<skin<<" skin-scene="<<skin_scene<<" toon="<<toon_variant<<" eyes=2 pixels=128 max_error="<<maximum_error
            <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" shadow cutout="<<shadow_cutout
            <<"; cutout receiver lit/shadowed/filtered="<<lit_receivers<<'/'<<shadowed_receivers<<'/'<<filtered_receivers
            <<"; native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
@@ -654,4 +721,10 @@ void CheckNativeRigid(plume::RenderDevice &device) {
     for (uint32_t mode : {1u,4u,37u,38u,39u,41u,42u,43u,44u,45u}) Run(device,mode,0,true,0,skin);
   for(uint32_t skin=1;skin<=3;++skin)
     for(uint32_t mode=0;mode<=22;++mode) Run(device,mode,0,true,0,skin,true);
+  for (uint32_t skin = 0; skin <= 3; ++skin) {
+    for (uint32_t mode = 0; mode <= 22; ++mode) Run(device,mode,0,true,0,skin,skin != 0,1);
+    for (uint32_t variant = 2; variant <= 5; ++variant)
+      for (uint32_t mode : {1u,4u,10u,19u,20u,22u}) Run(device,mode,0,true,0,skin,skin != 0,variant);
+  }
+  for (uint32_t deferred = 1; deferred <= 3; ++deferred) Run(device,19,0,true,deferred,0,false,1);
 }

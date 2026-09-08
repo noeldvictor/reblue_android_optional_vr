@@ -1,6 +1,7 @@
-// Native zero-to-three-layer rigid family. Normal maps, reflections, wind, skin
-// and sorted/translucent recipes require their own explicit eligibility.
+// Native ordinary/Toon zero-to-three-layer surfaces share rigid and skin inputs.
+// Normal maps, reflections, wind and specialized passes need explicit owners.
 #include "src/gpu/scene/native_rigid_shader.h"
+#include "src/gpu/scene/native_toon_shading.h"
 // The native texture uploader and native target owner publish array views even
 // for mono images. Both eyes sample layer zero of this ordinary material and
 // the shared sun shadow; SV_ViewID selects cameras, not these image layers.
@@ -34,45 +35,64 @@ float4 main(RigidFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
   const NativeRigidObjectGPU object_data = rigid_instances[fragment.instance].object_data;
   const NativeRigidPassGPU pass_data = rigid_instances[fragment.instance].pass_data;
   const uint flags = object_data.flags.x;
+  const bool toon = (flags & RigidToon) != 0;
   float4 texture_colour = 1;
   if (object_data.flags.y > 0) {
-    const float4 base = albedo_image.Sample(albedo_sampler, float3(fragment.uv.xy, 0));
+    float4 base = albedo_image.Sample(albedo_sampler, float3(fragment.uv.xy, 0));
+    if (toon) base *= object_data.texture_colours[0];
     // Negative U is an authored absent-layer sentinel, independent of sampler
     // addressing. Reflective families have a different fallback and are refused.
     texture_colour = fragment.uv.x < 0 ? 0 : base;
     if (object_data.flags.y > 1) {
       float4 detail = detail1_image.Sample(detail1_sampler, float3(fragment.uv.zw, 0));
+      if (toon) detail *= object_data.texture_colours[1];
       if (fragment.uv.z < 0) detail = 0;
       texture_colour.rgb = lerp(texture_colour.rgb, detail.rgb, detail.a);
     }
     if (object_data.flags.y > 2) {
       float4 detail = detail2_image.Sample(detail2_sampler, float3(fragment.secondary_uv, 0));
+      if (toon) detail *= object_data.texture_colours[2];
       if (fragment.secondary_uv.x < 0) detail = 0;
       texture_colour.rgb = lerp(texture_colour.rgb, detail.rgb, detail.a);
     }
   }
+  if (toon && (flags & RigidIgnoreTextureAlpha)) texture_colour.a = 1;
   const float4 albedo = texture_colour * object_data.diffuse * fragment.colour;
   if ((flags & RigidCutout) && !RigidCutoutPasses(object_data.flags.z, albedo.a, asfloat(object_data.flags.w))) discard;
   const float3 normal = normalize(fragment.normal);
   const LitVector position = RigidVector(fragment.world);
   const LitVector camera = RigidVector(pass_data.cameras[eye].xyz);
   const LitVector view = LitNormalize(LitSubtract(camera, position));
-  const LitLight light0 = RigidLight(pass_data.lights[0]);
-  const LitLight light1 = RigidLight(pass_data.lights[1]);
-  const LitLight light2 = RigidLight(pass_data.lights[2]);
+  LitLight light0 = RigidLight(pass_data.lights[0]);
+  LitLight light1 = RigidLight(pass_data.lights[1]);
+  LitLight light2 = RigidLight(pass_data.lights[2]);
+  ToonLightAdjustment adjustment;
+  adjustment.diffuse_scale = RigidVector(object_data.toon_diffuse_scale.xyz);
+  adjustment.diffuse_add = RigidVector(object_data.toon_diffuse_add.xyz);
+  adjustment.ambient_scale = RigidVector(object_data.toon_ambient_scale.xyz);
+  adjustment.ambient_add = RigidVector(object_data.toon_ambient_add.xyz);
+  if (toon) {
+    light0 = AdjustToonLight(light0, adjustment);
+    light1 = AdjustToonLight(light1, adjustment);
+    light2 = AdjustToonLight(light2, adjustment);
+  }
   const LitVector n = RigidVector(normal);
-  const LitResponse a = EvaluateLitLight(light0, position, n, view, object_data.specular.w);
-  const LitResponse b = EvaluateLitLight(light1, position, n, view, object_data.specular.w);
-  const LitResponse c = EvaluateLitLight(light2, position, n, view, object_data.specular.w);
+  const float shininess = toon ? max(10.f,object_data.specular.w) : object_data.specular.w;
+  const LitResponse a = EvaluateLitLight(light0, position, n, view, shininess);
+  const LitResponse b = EvaluateLitLight(light1, position, n, view, shininess);
+  const LitResponse c = EvaluateLitLight(light2, position, n, view, shininess);
   LitSurface surface;
   surface.albedo = RigidVector(albedo.rgb); surface.specular = RigidVector(object_data.specular.rgb);
   surface.ambient = RigidVector(pass_data.ambient.rgb);
+  if (toon) surface.ambient = AdjustToonAmbient(surface.ambient, adjustment);
   surface.shadow_colour = RigidVector(pass_data.shadow_colour_strength.rgb);
   surface.shadow_strength = pass_data.shadow_colour_strength.w;
   surface.shadow_visibility = RigidShadow(fragment.world, normal, object_data, pass_data);
   surface.diffuse_enabled = (flags & RigidDiffuse) != 0;
   surface.specular_enabled = (flags & RigidSpecular) != 0;
-  LitVector colour = ComposeLitSurface(surface, light0, light1, light2, a, b, c);
+  LitVector colour;
+  if (toon) colour = ComposeToonSurface(surface, light0, light1, light2, a, b, c);
+  else colour = ComposeLitSurface(surface, light0, light1, light2, a, b, c);
   if (flags & RigidFogEnabled) {
     colour = ApplyLitFog(colour, position, camera, RigidFog(pass_data.fog[0]));
     colour = ApplyLitFog(colour, position, camera, RigidFog(pass_data.fog[1]));

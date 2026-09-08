@@ -5383,3 +5383,47 @@ ending429920374+410272B. Image aggregate10408682B/12files,77078B headroom.
 No owned producer remains. Keep host161/output72/CPU47/GPU72/rigid27, mesh18/16;
 current969 and image are new integration/visual-limit evidence. Historical
 host159/run984 is no longer the latest full strict run. No new raw approval.
+
+### 2026-09-08 Toon surface consumer (after d7cae75)
+
+Previous continuation made progress: native skin scene consumption/reload evidence
+and pushed d7cae75. At12:37:12 preflight free78770884608B, no renderer/compiler/test
+producer remains. Earlier unrelated ninja20700 was observed12:34 and is now gone;
+it was not stopped. Same cumulative limits/floor62509998080B. No guest/codegen
+inputs, assets, caches, profiles or raw/image outputs changed. Initial retained
+fixture sizes: texture82900615B/132files, GPU20052610B/19files; prior host161 and
+runtime969/image remain the live baseline. Drive-wide use since prior ending is
+not assigned to this source-only work.
+
+This bundle connects explicit owned Toon surface inputs to native rigid/skin
+plans, shared instanced GPU shading and fences, without a second renderer or
+register-file API. The live technique1 producer remains closed until its exact
+light/ambient adjustments, texture multipliers and ignore-alpha/lattice contract
+are owned; no guessed white/default values or inherited shader rows. Planned
+output73/CPU48 (32/8MiB free-drop), GPU73/rigid28 (64/32MiB), host162 (192MiB),
+one producer at a time, existing300s build/30s CTest/10MiB log supervisor.
+Expected selected retained growth below2MiB; actual overlap enforced by wrappers.
+Keep passing fixtures until replacement passes, then retire their obsolete logs.
+No live game run or capture until the missing producer is actually connected.
+
+Actual output73/PID25660 and CPU48/PID28192 pass (0.56s test); GPU73/PID35736
+rejected HLSL struct conditional, GPU74/PID35852 rejected fixture Windows max
+macro. Both corrected, unchanged eligibility/tolerances. GPU75/PID35196/session93552
+passed, binary written12:41:44; rigid28/PID24556 completed12:42:07 with345 cases,
+191 new Toon/mixed cases,5.72s, validation0/0. Host162/PID37484/session19043
+passed, codegen0written/no guest objects.388 Python checks pass. All handles
+terminal, no runtime/profile/image/raw producer. Full identities/limits in
+20260908_1237_native-toon-surface.md; live technique1 still unconnected.
+
+Removed16 exact superseded attachment logs: output72/CPU47/GPU71/GPU72/
+rigid27/GPU73/GPU74/host161 stdout+stderr. Their replacement passes and the two
+resolved compile failures are recorded above. Logical66495B reclaimed; measured
+free78760628224->78760706048B (+77824B). No game logs, assets, profiles, images,
+active trees or unresolved failures removed; do not recredit prior cleanup.
+Final12:46:21 free78760706048B,10178560B less than12:37 preflight drive-wide.
+Selected retained texture82988826B (+88211), GPU20177662B (+125052),
+EXE49085952B (+7680), PDB111755264B (+8192), attachment logs408056B/194files
+(+66082 after cleanup): net+295217B. Retain current CPU73/48/GPU75/28/host162
+for new surface/ABI evidence; other objects/shader headers/source/Git/driver/
+system activity separate. No raw/image growth or budget reset. Prior host161
+runtime969 remains the live evidence, not restamped as a run ofhost162.

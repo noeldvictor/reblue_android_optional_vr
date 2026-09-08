@@ -8,6 +8,7 @@
 #include "gpu/scene/native_selected_lights.h"
 #include "gpu/scene/native_fog.h"
 #include "gpu/scene/native_lighting.h"
+#include "gpu/scene/native_toon_surface.h"
 
 namespace bd::gpu::scene {
 // Own every resource/value needed after the publication scope ends. Image
@@ -31,6 +32,8 @@ template <class Image> struct NativeObjectPrimitive {
   NativeShadowPolicy receiver_shadow = NativeShadowPolicy::Unknown;
   std::array<float, 4> material_values[3]{};
   uint32_t material_mask = 0;
+  NativeSceneSurface surface = NativeSceneSurface::Ordinary;
+  std::optional<NativeToonSurface> toon;
 };
 
 template <class Image>

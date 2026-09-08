@@ -707,6 +707,17 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    unchanged code to turn zero post-event scene emissions into a passing gate.
    Preserve all existing visual failures and the complete desktop acceptance.
    No full character/frame completion or speedup is established.
+   **Native Toon surface consumer (host162):** explicit owned light/ambient
+   adjustments, texture tints and alpha policy now feed scene plans and the
+   shared rigid/skin GPU program. CPU48 passes; GPU28 passes345 cases including
+   191 added Toon/mixed cases, validation0/0;388 Python checks pass. The live
+   technique1 producer/admission is still closed: next identify and publish its
+   actual authored inputs and lattice eligibility, then admit the complete
+   classified node and require fresh post-event scene/reload/pixel evidence.
+   Do not infer live conversion from fixtures, import shader rows or guess the
+   missing adjustments. Host161/run969 remains the last live strict regression;
+   host162 has not been run in-game.
+   [Native Toon contract, evidence and exact remaining producer](../research/20260908_1237_native-toon-surface.md).
    [Scene connection and verification](../research/20260908_1210_native-skin-scene-shading.md).
    [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).
    [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).
