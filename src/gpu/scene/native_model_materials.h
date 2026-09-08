@@ -7,6 +7,7 @@
 #pragma once
 
 #include "gpu/scene/native_material_library.h"
+#include "gpu/scene/native_skeleton.h"
 #include <atomic>
 #include <unordered_set>
 
@@ -93,6 +94,7 @@ public:
   uint64_t Generation() const { return generation_; }
   const NativeModelMaterialProgram *FindNode(uint32_t matrix_index) const;
   size_t Nodes() const { return nodes_.size(); }
+  std::span<const NativeSkeletonJoint> Skeleton() const { return skeleton_; }
   NativeModelRenderData(const NativeModelRenderData &) = delete;
   NativeModelRenderData &operator=(const NativeModelRenderData &) = delete;
 private:
@@ -101,6 +103,7 @@ private:
   struct Node { uint32_t matrix_index; const NativeModelMaterialProgram *program; };
   uint64_t generation_ = 0;
   std::vector<Node> nodes_;
+  std::vector<NativeSkeletonJoint> skeleton_;
 };
 using NativeModelRenderHandle = std::shared_ptr<const NativeModelRenderData>;
 
@@ -150,7 +153,8 @@ public:
   explicit ModelMaterialRegistry(size_t max_bytes = kMaxBytes,
                                  size_t max_models = 4096);
   bool Publish(uint32_t source_model, std::vector<ModelMaterialImport> meshes,
-               std::span<const ModelNodeSourceBinding> nodes = {});
+               std::span<const ModelNodeSourceBinding> nodes = {},
+               std::vector<NativeSkeletonJoint> skeleton = {});
   void Retire(uint32_t source_model);
   std::shared_ptr<const ModelMaterialImport> Find(
       uint32_t source_model, uint32_t source_mesh);
@@ -165,7 +169,7 @@ public:
   // allowance. Shared material assets and geometry have their own library/GPU
   // arena budgets; retired geometry currently remains in the bounded GPU cache.
   static size_t RetainedBytes(std::span<const ModelMaterialImport> meshes,
-                              size_t mesh_capacity, size_t node_capacity = 0);
+                              size_t mesh_capacity, size_t node_capacity = 0, size_t joint_capacity = 0);
 
 private:
   struct Accounting {

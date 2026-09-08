@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_instance_source.h"
+#include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_scene_lights_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_rigid_route.h"
@@ -26,6 +27,8 @@
 
 REXCVAR_DEFINE_BOOL(bd_native_instances, true, kCvarGroup,
     "Producer-owned instance poses for native traversal and draw transforms.");
+REXCVAR_DEFINE_BOOL(bd_native_skeleton, false, kCvarGroup,
+    "Host evaluation of load-owned ordinary skinned skeletons. Pending desktop qualification; native_materials_verify compares the original.");
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
 REXCVAR_DECLARE(bool, bd_native_rigid_scene);
 REXCVAR_DECLARE(bool, bd_native_rigid_shadow);
@@ -33,6 +36,7 @@ REXCVAR_DECLARE(bool, bd_host_walk);
 REXCVAR_DEFINE_BOOL(bd_native_rigid_hard_off, false, kCvarGroup,
     "Require load-owned rigid routing before culling and reject selected-family legacy entry in every view. Requires both native rigid paths.");
 REX_EXTERN(__imp__bdVisualObjectInitBones);
+REX_EXTERN(__imp__bdBoneInitSkinned);
 REX_EXTERN(__imp__sub_82140DF8);
 REX_EXTERN(__imp__sub_8213F5E8);
 
@@ -45,6 +49,7 @@ struct Store {
   std::unordered_map<uint32_t, instance_source::Binding> sources;
   uint64_t imports = 0, refused = 0, reads = 0, unavailable = 0, checked = 0, wrong = 0;
   uint64_t handoffs = 0, handoff_missing = 0;
+  uint64_t skeleton_updates = 0, skeleton_published = 0, skeleton_unavailable = 0, skeleton_checks = 0, skeleton_wrong = 0;
   uint32_t miss_examples = 0;
   uint32_t drift_examples = 0;
   uint32_t frame = 0;
@@ -77,7 +82,80 @@ void Report(Store &store) {
   if (stats.render_reads)
     BD_INFO("[native-render-poses] frame {} reads {} blends {} reused {} snapped {} refused {}; immutable whole-pose interpolation, no guest scratch",
         frame, stats.render_reads, stats.render_blends, stats.render_reused, stats.render_snaps, stats.render_refused);
+  if (REXCVAR_GET(bd_native_skeleton))
+    BD_INFO("[native-skeleton] frame {} evaluated {} update poses {} unavailable {}; checked {} wrong {}; ordinary skinned hierarchy, curve/late-writer/copy adapters remain",
+        frame, store.skeleton_updates, store.skeleton_published, store.skeleton_unavailable, store.skeleton_checks, store.skeleton_wrong);
   store.frame = frame;
+}
+struct SkeletonEvaluationScope;
+thread_local SkeletonEvaluationScope *active_skeleton_evaluation = nullptr;
+struct SkeletonEvaluationScope {
+  uint32_t visual;
+  SkeletonEvaluationScope *previous;
+  NativeModelRenderHandle model;
+  std::vector<RenderMatrix> pose;
+  explicit SkeletonEvaluationScope(uint32_t source_visual)
+      : visual(source_visual), previous(active_skeleton_evaluation) { active_skeleton_evaluation = this; }
+  ~SkeletonEvaluationScope() { active_skeleton_evaluation = previous; }
+};
+bool EvaluateOwnedBones(PPCContext &ctx, uint8_t *base) {
+  auto *scope = active_skeleton_evaluation;
+  if (!scope || !rex::system::XThread::GetCurrentThread()) return false;
+  const auto publication = instance_source::ReadPublication(
+      scope->visual, rex::system::XThread::GetCurrentThreadId(), Word);
+  const auto excluded_child = Word(0x82DC99DC); // source's optional child-walk stop node
+  if (!publication || publication->lane != 0 || publication->graph != ctx.r4.u32 ||
+      publication->palette != ctx.r3.u32 || !excluded_child || *excluded_child) return false;
+  const auto model = FindLoadedNativeModel(publication->graph);
+  if (!model || model->Skeleton().empty() || model->Skeleton().size() != publication->count ||
+      !Range(publication->palette, uint64_t(publication->count)*sizeof(RenderMatrix))) return false;
+  const auto channels = skeleton_source::ReadChannels(ctx.r5.u32, publication->count, Word);
+  if (!channels) return false;
+  // bdBoneInitSkinned receives its root by value: r6..r10 plus caller+88..111.
+  RenderMatrix root;
+  const std::array<uint64_t,5> pairs{ctx.r6.u64,ctx.r7.u64,ctx.r8.u64,ctx.r9.u64,ctx.r10.u64};
+  for (size_t n=0; n<pairs.size(); ++n) {
+    root[n*2] = std::bit_cast<float>(uint32_t(pairs[n]>>32));
+    root[n*2+1] = std::bit_cast<float>(uint32_t(pairs[n]));
+  }
+  std::array<float,6> tail;
+  if (!skeleton_source::Floats(uint64_t(ctx.r1.u32)+88,tail,Word)) return false;
+  std::copy(tail.begin(),tail.end(),root.begin()+10);
+  std::vector<RenderMatrix> pose;
+  if (!EvaluateNativeSkeleton(model->Skeleton(),*channels,root,pose)) return false;
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    __imp__bdBoneInitSkinned(ctx,base);
+    const auto *original = bd::mem::at<const be_f32>(publication->palette);
+    bool same = true;
+    for (size_t n=0; n<pose.size(); ++n) for (size_t c=0; c<16; ++c) {
+      const float expected = original[n*16+c], actual = pose[n][c];
+      same &= std::isfinite(expected) && std::abs(actual-expected) <= 1e-4f*std::max(1.0f,std::abs(expected));
+    }
+    auto &store = Instances(); std::lock_guard lock(store.mutex);
+    ++store.skeleton_checks;
+    if (!same) {
+      ++store.skeleton_wrong;
+      BD_ERROR("[native-skeleton-drift] visual {:08X} model {}: evaluated pose differs from original; no replacement/fallback", scope->visual,model->Generation());
+      throw std::runtime_error("Native skeleton source comparison failed");
+    }
+  }
+  // Outgoing adapter for collision/effects and still-unconverted late writers.
+  // The evaluated values also enter the native update owner, never a draw cache.
+  auto *output = bd::mem::at<be_f32>(publication->palette);
+  for (size_t n=0; n<pose.size(); ++n) for (size_t c=0; c<16; ++c) output[n*16+c] = pose[n][c];
+  scope->model = model; scope->pose = std::move(pose);
+  auto &store = Instances(); std::lock_guard lock(store.mutex);
+  ++store.skeleton_updates;
+  return true;
+}
+void PublishEvaluatedPose(const SkeletonEvaluationScope &scope) {
+  if (!scope.model || scope.pose.empty()) return;
+  auto &store = Instances(); std::lock_guard lock(store.mutex);
+  const auto found = store.sources.find(scope.visual);
+  if (found == store.sources.end() || found->second.model_generation != scope.model->Generation() ||
+      !store.instances.Publish(found->second.instance,0,scope.pose))
+    throw std::runtime_error("Native evaluated update pose publication refused");
+  ++store.skeleton_published;
 }
 void Retire(uint32_t visual) {
   auto &store = Instances();
@@ -373,15 +451,28 @@ void RequireNativeRigidLegacyNode(uint32_t context, uint32_t mesh) {
 
 REX_HOOK_RAW(bdVisualObjectInitBones) {
   const uint32_t visual = ctx.r3.u32;
+  bd::gpu::scene::SkeletonEvaluationScope evaluation(visual);
   __imp__bdVisualObjectInitBones(ctx, base);
   if (!REXCVAR_GET(bd_native_instances)) {
     bd::gpu::scene::Retire(visual); return;
   }
-  try { bd::gpu::scene::Attach(visual); }
+  try {
+    bd::gpu::scene::Attach(visual);
+    bd::gpu::scene::PublishEvaluatedPose(evaluation);
+  }
   catch (const std::exception &error) {
     bd::gpu::scene::Retire(visual);
     BD_WARN("[native-instances] producer publication failed: {}", error.what());
   }
+}
+
+REX_HOOK_RAW(bdBoneInitSkinned) {
+  if (REXCVAR_GET(bd_native_instances) && REXCVAR_GET(bd_native_skeleton)) {
+    if (bd::gpu::scene::EvaluateOwnedBones(ctx,base)) return;
+    auto &store = bd::gpu::scene::Instances(); std::lock_guard lock(store.mutex);
+    ++store.skeleton_unavailable;
+  }
+  __imp__bdBoneInitSkinned(ctx,base);
 }
 
 REX_HOOK_RAW(sub_82140DF8) {

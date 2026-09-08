@@ -1,0 +1,80 @@
+/**
+ * @brief Checked load/update adapters for native skeletal evaluation.
+ * @copyright Copyright (c) 2026 reblue contributors
+ * @license BSD 3-Clause, see LICENSE
+ */
+#pragma once
+#include "gpu/scene/native_skeleton.h"
+#include <bit>
+#include <tuple>
+#include <unordered_set>
+
+namespace bd::gpu::scene::skeleton_source {
+template <size_t N, class ReadWord>
+bool Floats(uint64_t address, std::array<float,N> &out, ReadWord &&read) {
+  for (size_t n=0; n<N; ++n) {
+    const auto word = read(address + n*4);
+    if (!word) return false;
+    out[n] = std::bit_cast<float>(*word);
+    if (!std::isfinite(out[n])) return false;
+  }
+  return true;
+}
+
+// NodeProcess copies the 80-byte base or 104-byte extended node, then relocates
+// +56/+60. bdAnimBoneEvaluate reads these same authored TRS/pre/post fields.
+// Camera-facing nodes need a separate owned view contract, never identity math.
+template <class ReadWord>
+std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, ReadWord &&read) {
+  struct Pending { uint32_t source, parent; };
+  std::vector<Pending> pending;
+  std::vector<NativeSkeletonJoint> joints;
+  std::unordered_set<uint32_t> visited;
+  if (root) pending.push_back({root,kNativeSkeletonRoot});
+  while (!pending.empty()) {
+    const auto item = pending.back(); pending.pop_back();
+    if (joints.size() >= kMaxNativeJoints || !visited.insert(item.source).second) return {};
+    const uint64_t source = item.source;
+    const auto index = read(source), flags = read(source+8), child = read(source+56), sibling = read(source+60);
+    if (!index || !flags || !child || !sibling || *index >= kMaxNativeJoints || (*flags & 0x00600000)) return {};
+    NativeSkeletonJoint joint; joint.pose_index = *index; joint.parent = item.parent;
+    joint.inherit_parent_scale = (*flags & 0x40) != 0;
+    if ((*flags & 1) && !Floats(source+16,joint.translation,read)) return {};
+    if ((*flags & 8) && !Floats(source+44,joint.scale,read)) return {};
+    for (const auto [flag,offset,matrix] : std::array{
+        std::tuple{4u,28u,&joint.rotation}, std::tuple{16u,80u,&joint.before_rotation},
+        std::tuple{32u,92u,&joint.after_rotation}}) {
+      if (!(*flags & flag)) continue;
+      JointVector radians;
+      if (!Floats(source+offset,radians,read)) return {};
+      *matrix = JointEulerRotation(radians);
+    }
+    const auto parent = static_cast<uint32_t>(joints.size());
+    joints.push_back(joint);
+    if (*sibling) pending.push_back({*sibling,item.parent});
+    if (*child) pending.push_back({*child,parent});
+  }
+  if (!ValidNativeSkeleton(joints)) return {};
+  return joints;
+}
+
+// bdAnimBoneEvaluate indexes the 48-byte authored channel record by model-local
+// joint ID. Only enabled values are read; inactive bytes are not a native input.
+template <class ReadWord>
+std::optional<std::vector<NativeJointChannels>> ReadChannels(uint32_t source, size_t count, ReadWord &&read) {
+  if (!source || !count || count > kMaxNativeJoints || uint64_t(source)+count*48 > uint64_t(UINT32_MAX)+1) return {};
+  std::vector<NativeJointChannels> channels(count);
+  for (size_t n=0; n<count; ++n) {
+    const uint64_t address = uint64_t(source)+n*48;
+    const auto flags = read(address);
+    if (!flags) return {};
+    auto &channel = channels[n];
+    channel.translated = (*flags & 1) != 0; channel.rotated = (*flags & 2) != 0;
+    channel.scaled = (*flags & 4) != 0; channel.reset_parent = (*flags & 64) != 0;
+    if ((channel.translated && !Floats(address+8,channel.translation,read)) ||
+        (channel.rotated && !Floats(address+20,channel.rotation,read)) ||
+        (channel.scaled && !Floats(address+36,channel.scale,read))) return {};
+  }
+  return channels;
+}
+} // namespace bd::gpu::scene::skeleton_source

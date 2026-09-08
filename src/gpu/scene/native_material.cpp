@@ -10,6 +10,7 @@
 #include "gpu/scene/native_rigid_lifecycle_bridge.h"
 #include "gpu/scene/native_model_geometry_source.h"
 #include "gpu/scene/native_model_shadow_source.h"
+#include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_mesh.h"
@@ -247,7 +248,15 @@ bool PublishModelMaterials(uint32_t graph) {
                             ModelMaterialRegistry::kMaxBytes)
       return false;
   }
-  return Models().Publish(graph, std::move(meshes), node_bindings);
+  auto skeleton = skeleton_source::ReadSkeleton(uint32_t(*root), [](uint64_t address) -> std::optional<uint32_t> {
+    if ((address & 3) || address > UINT32_MAX-3) return {};
+    const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
+    return word ? std::optional(uint32_t(*word)) : std::nullopt;
+  });
+  // Unconverted camera-facing/sparse skeletons do not invalidate independently
+  // owned geometry. An empty skeleton cannot enter the native evaluator.
+  return Models().Publish(graph, std::move(meshes), node_bindings,
+      skeleton ? std::move(*skeleton) : std::vector<NativeSkeletonJoint>{});
 }
 
 std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {

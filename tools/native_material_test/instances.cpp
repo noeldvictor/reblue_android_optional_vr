@@ -1,6 +1,7 @@
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_instance_source.h"
 #include "gpu/scene/native_object_primitive.h"
+#include "gpu/scene/native_skeleton_source.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -185,10 +186,128 @@ void TestRenderPoses() {
   bounded.Retire(bounded_id); endpoint.reset(); recovered.reset();
   Require(bounded.Stats().bytes == 0, "bounded render history and outputs release once");
 }
+
+void TestSkeleton() {
+  auto near = [](float a, float b) { return std::abs(a-b) < 2e-5f; };
+  // Independent scalar spelling of the source's reversed-lane sign/dot
+  // construction (82283A10..82283ADC), not the production quaternion helper.
+  auto source_append = [](JointQuaternion old, JointQuaternion axis) {
+    const std::array<float,4> b{old[3],old[2],old[1],old[0]}, a{axis[3],axis[2],axis[1],axis[0]};
+    return JointQuaternion{
+        a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0],
+        a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],
+        a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],
+        a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3]};
+  };
+  for (int n=1; n<41; ++n) {
+    const JointVector angles{n*.013f,-n*.017f,n*.023f};
+    auto q = source_append({0,0,std::sin(angles[2]/2),std::cos(angles[2]/2)},
+                           {0,std::sin(angles[1]/2),0,std::cos(angles[1]/2)});
+    q = source_append(q,{std::sin(angles[0]/2),0,0,std::cos(angles[0]/2)});
+    const auto expected = JointRotation(q), actual = JointEulerRotation(angles);
+    for (size_t c=0; c<16; ++c) Require(near(actual[c],expected[c]), "source Euler append order, off-axis radians");
+  }
+  constexpr float half_pi = 1.5707963267948966f;
+  const auto turn = JointEulerRotation({0,0,half_pi});
+  Require(near(turn[0],0) && near(turn[1],1) && near(turn[4],-1), "row-vector positive Z rotation");
+
+  std::unordered_map<uint64_t,uint32_t> words;
+  auto put = [&](uint64_t p, JointVector v) { for (float f : v) { words[p] = std::bit_cast<uint32_t>(f); p += 4; } };
+  auto read = [&](uint64_t p) -> std::optional<uint32_t> {
+    if ((p&3) || p > UINT32_MAX-3) return {};
+    const auto found = words.find(p);
+    return found == words.end() ? std::nullopt : std::optional(found->second);
+  };
+  // Reordered IDs, a child and a root sibling: parent ordinals are not pose IDs.
+  for (uint32_t p : {0x1000,0x2000,0x3000}) {
+    words[p+8] = 1|8; words[p+56] = words[p+60] = 0;
+    put(p+16,{0,0,0}); put(p+44,{1,1,1});
+  }
+  words[0x1000] = 2; words[0x1038] = 0x2000; words[0x103c] = 0x3000;
+  words[0x2000] = 0; words[0x3000] = 1;
+  put(0x1010,{5,0,0}); put(0x102c,{2,3,4}); put(0x2010,{1,2,3}); put(0x202c,{5,1,1});
+  auto skeleton = skeleton_source::ReadSkeleton(0x1000,read);
+  Require(skeleton && skeleton->size() == 3 && (*skeleton)[1].parent == 0 &&
+          (*skeleton)[2].parent == kNativeSkeletonRoot, "load-owned topology preserves child and root sibling");
+  std::vector<NativeJointChannels> channels(3);
+  std::vector<RenderMatrix> pose;
+  Require(EvaluateNativeSkeleton(*skeleton,channels,World(10),pose), "whole native hierarchy evaluation");
+  Require(pose[2][12] == 15 && pose[2][0] == 2 && pose[0][12] == 17 && pose[0][13] == 6 &&
+          pose[0][14] == 12 && pose[0][0] == 5 && pose[1][12] == 10,
+          "parent scale affects child translation but not compensated child basis or root siblings");
+  (*skeleton)[1].inherit_parent_scale = true;
+  Require(EvaluateNativeSkeleton(*skeleton,channels,World(10),pose) && pose[0][0] == 10 && pose[0][5] == 3,
+          "explicit inherited scale affects the full child linear transform");
+  (*skeleton)[1].inherit_parent_scale = false; channels[0].reset_parent = true;
+  Require(EvaluateNativeSkeleton(*skeleton,channels,World(10),pose) && pose[0][12] == 2 && pose[0][13] == 6,
+          "reset parent still applies separately passed parent scale");
+  channels[0] = {}; channels[2].translated = channels[2].scaled = true;
+  channels[2].translation = {1,0,0}; channels[2].scale = {3,2,1};
+  Require(EvaluateNativeSkeleton(*skeleton,channels,World(10),pose) && pose[0][12] == 14 && pose[0][13] == 4,
+          "fresh authored channel overrides replace load-owned defaults");
+  auto before = pose;
+  channels[2].translation[0] = std::numeric_limits<float>::infinity();
+  Require(!EvaluateNativeSkeleton(*skeleton,channels,World(10),pose) && pose == before,
+          "invalid channel refuses whole pose without partial output");
+  channels[2] = {};
+  auto bad = *skeleton; bad[1].parent = 2;
+  Require(!EvaluateNativeSkeleton(bad,channels,World(10),pose) && pose == before, "forward/cyclic native parent refuses");
+  bad = *skeleton; bad[1].pose_index = 2;
+  Require(!ValidNativeSkeleton(bad), "duplicate native pose identity refuses");
+  bad = *skeleton; bad[1].pose_index = 3;
+  Require(!ValidNativeSkeleton(bad), "sparse or out-of-range native pose identity refuses");
+  words[0x2038] = 0x1000;
+  Require(!skeleton_source::ReadSkeleton(0x1000,read), "source cycle is bounded and refused");
+  words[0x2038] = 0; words[0x2008] |= 0x200000;
+  Require(!skeleton_source::ReadSkeleton(0x1000,read), "camera-facing bones require a real owned view contract");
+  words[0x2008] = 1|8; words[0x1008] |= 16|32;
+  put(0x1050,{0,0,half_pi}); put(0x105c,{0,0,-half_pi});
+  const auto extended = skeleton_source::ReadSkeleton(0x1000,read);
+  Require(extended && near((*extended)[0].before_rotation[1],1) && near((*extended)[0].after_rotation[1],-1),
+          "104-byte authored pre/post rotations import as radians, not degrees");
+
+  words[0x4000] = 1|2|4|64; put(0x4008,{3,4,5}); put(0x4024,{2,2,2});
+  put(0x4014,{0,0,0}); words[0x4020] = std::bit_cast<uint32_t>(1.0f);
+  const auto dynamic = skeleton_source::ReadChannels(0x4000,1,read);
+  Require(dynamic && (*dynamic)[0].reset_parent && (*dynamic)[0].rotation[3] == 1 &&
+          (*dynamic)[0].translation[1] == 4 && (*dynamic)[0].scale[2] == 2, "48-byte channel layout is independent of native representation");
+  words[0x4000] = 0; words.erase(0x4008);
+  Require(bool(skeleton_source::ReadChannels(0x4000,1,read)), "inactive authored bytes are never imported");
+  Require(!skeleton_source::ReadChannels(0xfffffff0,1,read), "channel range overflow refuses");
+  words.clear(); // all subsequent work must survive complete source destruction
+
+  ModelMaterialRegistry models;
+  Require(models.Publish(51,{}, {},*skeleton), "skeleton shares the load-owned model and budget");
+  auto model = models.FindModel(51);
+  Require(model && model->Skeleton().size() == 3, "model holds the native hierarchy");
+  Require(EvaluateNativeSkeleton(model->Skeleton(),channels,World(10),pose), "evaluate without any remaining source bytes");
+  NativeInstanceRegistry instances;
+  const auto id = instances.Create(model->Generation(),model);
+  Require(instances.Publish(id,0,pose) && instances.Transfer(id,0,1,pose.size()) && instances.ObserveRenderTick(id,1,true),
+          "evaluated native values feed existing instance handoff and render owner");
+  auto completed = instances.Read(id,1);
+  models.Retire(51); model.reset();
+  Require(models.Stats().bytes > 0 && completed->model->Skeleton().size() == 3,
+          "queued/native pose pins exactly its skeletal model after source retirement");
+  channels[2].translated = true; channels[2].translation = {5.5f,0,0};
+  Require(EvaluateNativeSkeleton(completed->model->Skeleton(),channels,World(10),pose) &&
+          instances.Publish(id,0,pose) && instances.Transfer(id,0,1,pose.size()) && instances.ObserveRenderTick(id,2,true),
+          "next owned evaluation advances existing timed pose history");
+  auto current = instances.Read(id,1), render = instances.ReadRender(current,{2,2,.5f,true});
+  Require(render && render->transforms[2][12] == 15.25f && completed->transforms[2][12] == 15,
+          "native skeletal output reaches immutable render interpolation without guest scratch");
+  instances.Retire(id); completed.reset(); current.reset(); render.reset();
+  Require(models.Stats().bytes == 0 && instances.Stats().bytes == 0, "model and pose lifetime accounting releases once");
+  const auto required = ModelMaterialRegistry::RetainedBytes({},0,0,skeleton->size());
+  ModelMaterialRegistry too_small(required-1);
+  Require(!too_small.Publish(51,{}, {},*skeleton) && too_small.Stats().bytes == 0,
+          "skeletal vector residency cannot escape existing aggregate model budget");
+}
 }
 void TestNativeInstances() {
   TestSourceHandoff();
   TestRenderPoses();
+  TestSkeleton();
   NativeInstanceRegistry registry;
   Require(!registry.Create(0), "instance needs a published native model generation");
   const auto first = registry.Create(100), second = registry.Create(100);

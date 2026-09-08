@@ -5723,3 +5723,36 @@ no reblue renderer remains, and our two small text logs account for none of the
 GiB-scale decline. Further output-producing reblue work needs fresh stable-space
 checks; no new job is queued by this handoff. Source/Git edits are separate.
 See20260908_1505_native-render-pose-live.md for exact live gates and limitations.
+
+### 2026-09-08 15:32 opt-in native skeleton source checkpoint
+
+The owner's commit/push request checkpoints the connected ordinary-skinned
+hierarchy work; it does not resume a game/capture matrix. Load-owned model joints,
+checked update-time channels and native whole-pose evaluation now feed the
+existing instance update owner. The original completed/late-writer handoff remains.
+`bd_native_skeleton` defaults false. Host integration compilation, original/live
+comparison, animated pixels and unsupported camera-facing/sparse/secondary/
+unskinned routes remain pending; host165/run973 is NOT skeleton evidence.
+
+394 artifact-free Python guards pass. Existing material fixture build45/PID35812
+passes six incremental edges, then CPU43/PID31520 passes native_material_data in
+0.13s (CTest0.14s). No guest build, renderer, shader, profile change or capture.
+Fixture executable713216B SHA256
+F345D6B1D2FDC877885B1637492BDAF916C0015D389B76471E04228E0ADA3E92.
+Fixtures cover radians/quaternion order, parent-scale compensation, root siblings,
+channel overrides, rejection, source destruction, model/pose lifetime and budget.
+
+Same cumulative ledger/floor62509998080B and aggregate limits; no reset.
+15:30:26 free63963115520B, stable against the prior15:22 sample; no observed
+compiler/game producer. Reused material tree with64MiB build/8MiB test free-drop
+guards,300s supervisor/30s CTest timeout and10MiB aggregate log cap. Build45 free
+63962955776->63962796032B; CPU43 free63962566656->63962497024B. Both terminal0.
+Fixture tree8729343B (+183337B). New logs2437B; after both pass, removed only four
+superseded material44/CPU42 stdout/stderr logs (3559B), preserving current45/43,
+all host/runtime evidence and unresolved failures. Old textual logs are no longer
+retained; equivalent fixture checks are rerunnable and old outcomes remain above.
+Cleanup measured63962214400->63962222592B (+8192B); aggregate logs408375B/198.
+Selected retained growth182215B for updated fixture artifacts and current logs.
+Ending measured free63962222592B (~59.57GiB), net decline892928B from15:30:26;
+drive-wide activity is not attributed to selected files. Source/Git bytes are
+separate. No assets, saves, profiles, build trees, images or raw evidence removed.
