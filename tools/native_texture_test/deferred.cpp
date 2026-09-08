@@ -128,6 +128,22 @@ void TestCallbackContract() {
   words[0x4020] = 0x82454720; words[0x4024] = 0x824548A8;
   assert(CheckDeferredBatchResource(visual,read));
   assert(!CheckDeferredVisualResource(visual,read) && !CheckNativeDeferredContract(visual,read));
+  words[registry+36] = 0; words[lights+4] = words[shader+4] = 0x00010000; // visual active, model idle
+  for (uint32_t technique = 0; technique < 32; ++technique) {
+    const bool accepted = technique == 2 || (technique >= 4 && technique <= 12) || technique == 14;
+    assert(CheckNativeWaterModelContract(visual,technique,read) == accepted);
+  }
+  assert(!CheckNativeWaterModelContract(visual,UINT32_MAX,read));
+  const auto water_valid = words;
+  for (const auto &[address,value] : std::array<std::pair<uint64_t,uint32_t>,7>{{
+      {registry+36,visual}, {lights+4,0x01010000}, {shader+4,0x01010000},
+      {0x2000,0}, {0x2100,0}, {0x4020,0x820DFA50}, {0x4024,0x820DFA50}}}) {
+    words = water_valid; words[address] = value;
+    assert(!CheckNativeWaterModelContract(visual,8,read));
+  }
+  words = water_valid; words.erase(lights+4);
+  assert(!CheckNativeWaterModelContract(visual,8,read));
+  words = water_valid;
   words[0x4024] = 0x820DFA50; assert(!CheckDeferredBatchResource(visual,read));
   words[0x4020] = 0x12345678; assert(!CheckDeferredBatchResource(visual,read));
   words[0x4020] = 0x820DFA50;
@@ -145,6 +161,41 @@ void TestCallbackContract() {
   words = valid; words[registry+20] = 1; words[0x3000] = shader;
   assert(CheckNativeDeferredContract(visual,read) == 5); // optional features removed
   assert(!CheckNativeDeferredContract(0,read));
+}
+
+void TestDirectWaterConsumption() {
+  struct Port {
+    std::vector<uint32_t> events;
+    uint32_t fail = 0, value = 17, published = 0, submitted = 0, commits = 0;
+    bool ready = true, snapshot = false;
+    void Event(uint32_t event) { events.push_back(event); if (event == fail) throw event; }
+    bool BeginLights() { Event(1); if (!ready) return false; value = 2; ++commits; return true; }
+    void PublishModelFlags() { Event(2); assert(value == 2); value = 3; }
+    void PublishSceneFactor() { Event(3); assert(value == 3); value = 4; }
+    void FlushWaterParameters(uint32_t index) { Event(4+index); value += index+1; }
+    void EnableSourceAlphaBlending() { Event(6); }
+    void EnableDepthTest() { Event(7); }
+    void BindPlanarReflection() { Event(8); }
+    void BindSceneImage() { Event(9); snapshot = true; }
+    bool WantsSnapshot() { Event(10); return snapshot; } // late, not admission-time value
+    void Snapshot() { Event(11); value = 19; }
+    void PublishWaterOutput() { Event(12); published = value; }
+    void SubmitWater() { Event(13); submitted = published; }
+    void ExportDepthIntent() { Event(14); assert(submitted == 19); }
+    void FinishWater() { Event(15); value = 23; }
+  } port;
+  assert(ConsumeNativeWaterMaterial(port));
+  assert(port.commits == 1 && port.published == 19 && port.submitted == 19 && port.value == 23);
+  assert(port.events == (std::vector<uint32_t>{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}));
+  Port refused; refused.ready = false;
+  assert(!ConsumeNativeWaterMaterial(refused) && refused.commits == 0 && refused.value == 17);
+  assert(refused.events == (std::vector<uint32_t>{1}));
+  for (uint32_t fail = 1; fail <= 15; ++fail) {
+    Port broken; broken.fail = fail;
+    try { ConsumeNativeWaterMaterial(broken); assert(false); } catch (uint32_t event) { assert(event == fail); }
+    assert(broken.events.size() == fail && broken.events.back() == fail);
+    assert(broken.commits == uint32_t(fail > 1)); // no callback replay or repeated light commit
+  }
 }
 
 void TestWaterWriterPublication() {
@@ -374,6 +425,7 @@ void TestDepth() {
 }
 
 int main() {
+  TestDirectWaterConsumption();
   TestWaterWriterPublication();
   TestNativeVisualPublication();
   TestOrdinaryVisualExports();

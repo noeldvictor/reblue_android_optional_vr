@@ -57,14 +57,28 @@ bool CheckDeferredVisualResource(uint32_t visual, Read read) {
   return table && *table && read(uint64_t(*table) + 32) == 0x820DFA50 &&
       read(uint64_t(*table) + 36) == 0x820DFA50;
 }
-// Water resource callbacks still EXECUTE at ordered material begin. Their native
-// producer publishes water inputs for admitted native draws and refreshes other
+// The water writer must still run at ordered material begin, either directly or
+// through its remaining compatibility callback. It publishes water inputs and refreshes other
 // active visual inputs after all writes, including aliases. Unknown writers refuse.
 template <class Read>
 bool IsDeferredWaterResource(uint32_t visual, Read read) {
   const auto table = visual ? read(visual) : std::nullopt;
   return table && *table && read(uint64_t(*table) + 32) == 0x82454720 &&
       read(uint64_t(*table) + 36) == 0x824548A8;
+}
+// sub_82174270, phase3: these techniques only export input flags and select a
+// translated shader. The native water program owns shader selection instead.
+// Other techniques have different writes/suppression and are not interchangeable.
+constexpr bool NativeWaterModelShaderOnly(uint32_t technique) {
+  return technique == 2 || (technique >= 4 && technique <= 12) || technique == 14;
+}
+template <class Read>
+bool CheckNativeWaterModelContract(uint32_t visual, uint32_t technique, Read read) {
+  constexpr uint32_t registry = (uint32_t(-32030) << 16) - 31132;
+  const auto lights_active = read(0x82E246F4 + 4), shader_active = read(0x82783A58 + 4);
+  return NativeWaterModelShaderOnly(technique) && IsDeferredWaterResource(visual, read) &&
+      CheckNativeDeferredRegistry(read) && read(registry + 36) == 0 &&
+      lights_active && !(*lights_active >> 24) && shader_active && !(*shader_active >> 24);
 }
 template <class Read>
 bool CheckDeferredBatchResource(uint32_t visual, Read read) {

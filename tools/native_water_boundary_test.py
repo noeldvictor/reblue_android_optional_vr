@@ -90,19 +90,31 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         submit = bridge.split("bool NativeWaterMaterialScope::Submit", 1)[1]
         self.assertNotIn("ReadNativeWaterMaterial", submit)
         for required in ("publication_.Read", "FindNativeInstancePose", "FindLoadedNativeModelNodeImport",
-                         "FindCompletedNativeWaterBottom", "ResolveNativeSceneLights", "CommitNativeSceneLights",
+                         "FindCompletedNativeWaterBottom", "pass.lights = lights_",
                          "commands->WritesImage", "SubmitNativeWaterScenePackets"):
             self.assertIn(required, submit)
         consumer = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
         start = consumer.index("NativeWaterMaterialScope water(")
         section = consumer[start:]
-        self.assertLess(section.index("bridge.Material(36"), section.index("water.Submit"))
-        self.assertLess(section.index("water.Submit"), section.index("BindEntry("))
+        self.assertLess(section.index("water.Draw"), section.index("bridge.Material(36"))
+        self.assertLess(section.index("water.Draw"), section.index("BindEntry("))
         self.assertIn("if (item.native || water_entry) CloseDeferredCompatibilityCapture()", consumer)
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
         self.assertIn("if (late_water_bounds)", walk)
         self.assertIn("if (have_eye && !late_water_bounds)", walk)
         self.assertIn("if (have_light && !late_water_bounds)", walk)
+
+    def test_direct_water_has_single_ordered_light_commit_and_no_material_dispatch(self):
+        bridge = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
+        direct = bridge.split("bool NativeWaterMaterialScope::Draw(", 1)[1].split("void NativeWaterMaterialScope::Publish(", 1)[0]
+        for required in ("CheckNativeWaterModelContract", "ResolveNativeSceneLights", "CommitNativeSceneLights",
+                         "ConsumeNativeWaterMaterial", "RefreshNativeVisualInputsAfterWriter", "Video::SetTexture(7,nullptr)"):
+            self.assertIn(required, direct)
+        for forbidden in ("__imp__", "function_dispatcher", "sub_82174270(", "sub_82286228(", "sub_82454720(", "sub_824548A8("):
+            self.assertNotIn(forbidden, direct)
+        submit = bridge.split("bool NativeWaterMaterialScope::Submit(", 1)[1]
+        self.assertNotIn("CommitNativeSceneLights", submit)
+        self.assertNotIn("ResolveNativeSceneLights", submit)
 
     def test_native_water_preserves_sorted_alpha_and_coverage(self):
         native = (ROOT / "src/gpu/scene/native_water_inputs.h").read_text()

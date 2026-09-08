@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_water_scene.h"
 #include "gpu/scene/native_visual_inputs.h"
+#include "gpu/scene/native_selected_lights.h"
 
 namespace bd::gpu::scene {
 struct NativeWaterMaterialOutput {
@@ -37,12 +38,14 @@ public:
   ~NativeWaterMaterialScope();
   NativeWaterMaterialScope(const NativeWaterMaterialScope &) = delete;
   NativeWaterMaterialScope &operator=(const NativeWaterMaterialScope &) = delete;
-  bool Submit(uint32_t entry, uint32_t stack, bool stencil_pending);
+  bool Draw(uint32_t stack, uint8_t *base, bool stencil_pending, int32_t &depth_write);
   // Producer-only source equality; no address enters the publication or queue.
   void Publish(uint32_t visual, std::optional<NativeWaterMaterialOutput> output);
 private:
+  bool Submit(bool stencil_pending);
   uint32_t entry_ = 0, visual_ = 0, frame_ = 0;
   NativeVisualIdentity identity_;
   NativeWaterMaterialPublication publication_;
+  NativeSelectedLights lights_{};
 };
 } // namespace bd::gpu::scene

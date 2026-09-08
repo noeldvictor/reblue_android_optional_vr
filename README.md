@@ -58,24 +58,26 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest connected checkpoint (2026-09-08, host144/run972):** real game water now
-submits owned material/image packets to the native Vulkan queue, bypassing legacy
-vertex/index/constant binding and translated drawing for admitted entries. Cold and
-reloaded field checks pass; the last sample records 3,179 submissions, 3,084 emissions,
-93 culled and 3,177 fence-retired packets, with no water admission refusals. These are
-repeated draws, not unique converted assets. CPU ownership checks, 20 two-eye water
-GPU cases and the existing rigid/snapshot regressions pass. Sorted alpha testing and
-wave-expanded queue bounds are connected. Material/visual callbacks, the source list
-and image-getter imports remain temporary adapters; game water/reflection pixels,
-HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
-[Water connection, verification and remaining work](research/20260908_1146_native-water-draw.md).
+**Latest connected checkpoint (2026-09-08, host145/run973):** admitted game water
+now bypasses per-entry model/resource callbacks and translated shader selection,
+as well as legacy geometry binding/drawing. Owned lights participate before the
+ordered water writer; its completed values/images feed the existing native Vulkan
+queue. CPU lifecycle tests, 376 source/scenario checks and strict desktop cold/reload
+checks pass. The last sample records 3,159 balanced direct material begin/end pairs,
+3,071 emitted draws and 3,157 fence-retired packets, with zero admission refusals.
+These are repeated draws, not unique assets or a speedup measurement. The unchanged
+20-case two-eye GPU water fixture remains the shader evidence, not game-stereo proof.
+Visual callbacks, source-list construction, parameter/state exports and image getters
+remain adapters. Game water/reflection pixels, HDR art parity and authored
+shore/refraction/stereo coverage are still unqualified.
+[Direct material connection and remaining work](research/20260908_1212_native-water-material.md).
 
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native
 rigid rendering covers one scene object and a wider shadow-caster family. New
-multi-primitive scene shading now runs in the field, but its reload/pixel acceptance
-is not complete. No complete
+multi-primitive scene shading and water pass targeted cold/reload checks, but
+scene-wide pixel and stereo acceptance remain incomplete. No complete
 host-only frame or whole native game scene has passed the full acceptance gate.
 The foundations below are reusable, but remaining work spans scenery/material
 families, characters/skinning, effects/UI, frame/pass ownership, asset streaming
@@ -293,10 +295,11 @@ epochs:10,865/3,053 native packet reads with175/139 completed-writer refreshes,
 zero pending native packets and correct source/GPU retirement. No new crash dump
 or captures; the profile is restored. Pixels/full-frame/both-eye acceptance and
 speedup remain unproven. Source-input imports, receiver descriptors and outgoing
-state remain; water setup is host code, but its draws are still a legacy family.
+state remain. Water was still a legacy draw family at that checkpoint; the current
+native draw/material connection is described above.
 [Writer-ordered connection and causal failure](research/20260908_0337_native-visual-inputs.md).
 
-**Native water queue and bottom-depth pass built; live admission pending (host141):**
+**Native water queue and bottom-depth foundation:**
 the existing native draw store/emitter now supports water's own instance format,
 six retained image/view owners, consecutive ordered instancing and fence
 retirement. Load-owned meshes supply tangent inputs and indexed wave bounds;
@@ -315,13 +318,11 @@ without console surface allocation or resolve. It retains the actual producer's
 world projection; camera fitting and caster/sampling adapters remain. Real D32
 sampling exposed a layered deferred-clear bug, now fixed in the Plume fork.
 
-Seventeen two-eye water GPU cases, 55 rigid cases, eight snapshot cases and CPU
-owner checks pass; GPU validation reports zero errors/warnings. Host141/run970
-passes the existing strict cold-field/reload checks, **but does not observe the
-new bottom pass**. **The game does not yet call the native water submission
-entry.** Ordered material/image publication and family admission remain to be
-connected. Authored water pixels, sequences, both-eye game coverage and speedup
-remain unqualified. [Queue ownership](research/20260908_0509_native-water-queue.md),
+The latest shader evidence covers 20 two-eye water cases, 55 rigid cases and eight
+snapshot cases, with zero GPU validation errors/warnings. Game water now reaches
+this queue, but the tested field has not exercised the authored bottom/snapshot
+path. Authored water pixels, sequences, both-eye game coverage and speedup remain
+unqualified. [Queue ownership](research/20260908_0509_native-water-queue.md),
 [image handoff](research/20260908_0940_native-water-image-leases.md), and
 [bottom pass, backend fix and current verification](research/20260908_1031_native-water-bottom.md).
 

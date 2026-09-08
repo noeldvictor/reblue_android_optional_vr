@@ -30,4 +30,17 @@ template <class Adapter> void PrepareRefractionMaterial(Adapter &adapter) {
   adapter.FlushRefractionParameters();
   adapter.Snapshot();
 }
+// Direct native model consumption. Lights participate BEFORE the water writer;
+// its final values may alias outgoing light/flag parameter destinations. Once
+// lights commit, failures are terminal: never replay callbacks after side effects.
+template <class Adapter> bool ConsumeNativeWaterMaterial(Adapter &adapter) {
+  if (!adapter.BeginLights()) return false;
+  adapter.PublishModelFlags();
+  PrepareWaterMaterial(adapter);
+  adapter.PublishWaterOutput();
+  adapter.SubmitWater();
+  adapter.ExportDepthIntent();
+  adapter.FinishWater();
+  return true;
+}
 } // namespace bd::gpu::scene

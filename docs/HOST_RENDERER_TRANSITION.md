@@ -473,8 +473,28 @@ and retirement. The new generation starts with every preceding water packet reti
 No new images/raws: this is live draw/lifetime evidence, not game-pixel or HDR art
 qualification. [Implementation, failure correction and evidence](../research/20260908_1146_native-water-draw.md).
 
-Next connected work: remove water's remaining per-entry material/resource and
-visual callback execution and source-list construction. Reuse the now-connected
+Direct water material connection (2026-09-08, host145/run973): admitted main-view
+entries now call the native producer/queue without model/resource callback dispatch
+or translated shader selection. Owned light tickets commit once BEFORE the water
+writer, preserving late aliased parameters instead of exporting lights again after
+the writer. Completed output refresh, native submission, outgoing depth intent and
+slot7/12/optional13 cleanup remain ordered. Model registry state stays idle; native
+draws do not fake active participants. Changed/unknown model contracts refuse before
+effects; lost late ownership is terminal, never a partially replaced replay.
+
+The existing deferred CPU fixture tests the production lifecycle, all admitted
+technique branches, dirty/unknown registry refusal, late snapshot selection and
+failure at every stage.376 Python checks and the host build pass. Run973 passes the
+strict mixed cold/reload chain, including neighboring legacy inputs/light checks:
+last sample3159 balanced direct begin/end pairs,3159 submissions,3071 emissions,
+86 culled,3157 retired, no admission refusals. Cold1551..1851 and reload3948..4248
+both have300 new begin/end/submission/retirement pairs; emissions293/300. Old water
+generation94 fully retires before208's first submission. Unchanged GPU shader/backend
+evidence is reused; no new game pixels/HDR/stereo or bottom/snapshot qualification.
+[Direct material source contracts and evidence](../research/20260908_1212_native-water-material.md).
+
+Next connected work: remove water's remaining visual callback execution and
+source-list construction, including per-entry sampler/world/state dispatch. Reuse the now-connected
 publication/queue, water update/refraction setup and existing instance/model owners.
 Replace the temporary sorted-entry, source feature and getter imports with native
 producer inputs while preserving late aliases, Bind/Keep and snapshot ordering;

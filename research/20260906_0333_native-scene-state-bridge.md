@@ -4805,3 +4805,51 @@ drive change as task-owned output or cleanup. All producers terminal, profile
 restored. Next IDs CPU62/output38,GPU68/water15/rigid24/snapshot23,host145/game973.
 Next remove water's remaining material/visual/list adapters and qualify authored
 image-role/game-pixel cases, not another unchanged admission-only run.
+
+### Direct water material consumption (2026-09-08, source4c23030 plus edits)
+
+Same cumulative3GiB exception/floor62,509,998,080B and all reserve/diagnostic/log/
+raw/image caps; no reset. First free80,140,918,784B, pre-build80,140,828,672B.
+No live renderer/build/compiler/test producer found. CPU tree78,238,320B/132files,
+GPU tree19,063,572B/19files match previous retained products. Reuse configured
+trees; no assets/cooking/downloads/raw/images or binary copies.376 artifact-free
+Python checks pass. New direct material lifecycle removes model/resource callbacks
+and shader selection, commits owned lights before the late water writer, and
+keeps ordered outgoing depth/texture cleanup. Native shaders/backend unchanged.
+
+Planned bounded producers: deferred CPU build6/test1,32MiB/16MiB free-drop and
+300s/30s timeouts; host145192MiB/300s,10MiB aggregate attachment logs. Run973 only
+after these checks pass,180s/800KiB/192MiB, captures/perf/dumps disabled and exact
+profile restoration. Purpose: verify direct material begin/end and fresh native
+water consumption plus strict neighboring mixed/reload checks after callback
+removal, not another unchanged bottom-inactive boot. Existing GPU/pixel evidence
+is reused for unchanged shader/backend; new game pixel/stereo gates remain open.
+Retain new evidence through replacement validation, then remove only superseded
+successful logs; all unresolved failures and protected raw/image evidence remain.
+
+Completed deferred build6/PID36620 and test1/PID37200 exit0; host145/PID35064/
+session91407 exit0, codegen0 writes/deletions and no guest objects. Run973/PID32068/
+session54385 exit0 at08:11:24Eastern after128s; strict cold/reload chain passed,
+all22 settings audited,0 raws, original116B profile hash exactly restored.3159
+balanced direct water materials,3071 emissions and3157 retirements with0 admission
+refusals; neighboring legacy checks pass. No new shader/game pixel evidence or
+bottom/snapshot/stereo qualification. Detailed source/evidence/hashes are in
+20260908_1212_native-water-material.md. All producers terminal.
+
+Removed six explicit superseded successful build logs (host143/144, deferred5,
+both streams),3958B, and hash-verified run972541835B after973 replaced its strict
+purposes.7files545793B logical; immediate free80142864384->80143417344B,552960B
+interval gain, counted once. Full old text retired; dated reports and hashes
+remain. Keep current host145/deferred6+test1, CPU61+test37, GPU67/water14 and all
+unresolved CPU/GPU/game failures, historical archive and protected raw/image sets.
+
+CPU tree78316360B/132files (+78040), GPU19063572B/19files unchanged. EXE48958464/
+PDB111083520B (+30208 combined); attachment logs298633B/186files:4054B new minus
+3958B removed=96B growth. Run973529864B replaces541835B,11971B shrink. Selected
+retained growth96373B, needed for current runtime/lifecycle evidence. Firstfree
+80140918784 -> post-cleanup80143417344B (~74.64GiB),2498560B drive-wide gain;
+other host objects/metadata/Git/system activity are separate, not cleanup credit.
+No new cache/perf files found in scoped run outputs. No exception expanded.
+Next host146/game974, deferred7/test2; other fixture IDs unchanged from above.
+Continue visual/list producer ownership and authored image-role/pixel coverage;
+do not repeat the unchanged material-only or bottom-inactive probe.

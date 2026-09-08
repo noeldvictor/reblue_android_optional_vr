@@ -51,6 +51,7 @@ struct Stats {
   uint64_t parameters = 0, state_adapters = 0, bindings = 0, null_bindings = 0, snapshots = 0, clamped = 0;
   uint64_t debug_bindings = 0;
   uint64_t water_candidates = 0, water_consumed = 0, water_unavailable = 0;
+  uint64_t direct_materials = 0, direct_ends = 0;
   uint32_t water_refusal_frame = 0;
   uint32_t frame = 0;
   bool reported = false;
@@ -69,8 +70,11 @@ void Report() {
   stats.frame = frame;
   stats.reported = true;
   if (stats.water_candidates)
-    BD_INFO("[native-water-admission] candidates {} consumed {} unavailable {}; sorted material/visual adapters remain",
+    BD_INFO("[native-water-admission] candidates {} consumed {} unavailable {}; sorted source/visual adapters remain",
         stats.water_candidates,stats.water_consumed,stats.water_unavailable);
+  if (stats.direct_materials)
+    BD_INFO("[native-water-material] direct begin {} end {}; no model/resource callbacks or translated shader selection; outgoing state/parameter adapters remain",
+        stats.direct_materials,stats.direct_ends);
 }
 bool Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address > UINT32_MAX || bytes > UINT32_MAX ||
@@ -232,13 +236,82 @@ void Prepare(PPCContext &ctx, uint8_t *base, bool water) {
 
 NativeWaterMaterialScope::NativeWaterMaterialScope(uint32_t entry, uint32_t visual, NativeVisualIdentity identity) {
   if (!entry || !identity || !NativeRigidSceneEnabled() || !IsDeferredWaterResource(visual, Word)) return;
-  if (water_output) throw std::runtime_error("Nested native water material publication");
   entry_ = entry; visual_ = visual; identity_ = identity; frame_ = FrameStatFrameCount();
-  water_output = this;
   ++stats.water_candidates;
 }
 NativeWaterMaterialScope::~NativeWaterMaterialScope() {
   if (water_output == this) water_output = nullptr;
+}
+bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_pending, int32_t &depth_write) {
+  if (!identity_) return false;
+  PPCContext context{};
+  context.r1.u64 = stack; context.r3.u64 = visual_;
+  constexpr uint32_t engine = (uint32_t(-32034) << 16) - 19936;
+  const auto unavailable = [&] {
+    ++stats.water_unavailable;
+    if (stats.water_unavailable == 1 || FrameStatFrameCount()-stats.water_refusal_frame >= 300) {
+      BD_INFO("[native-water-admission] unavailable before material: technique {} instance {} generation {} frame {}",
+          Word(uint64_t(entry_)+248).value_or(~0u),identity_.instance,identity_.model_generation,frame_);
+      stats.water_refusal_frame = FrameStatFrameCount();
+    }
+    return false;
+  };
+  if (!REXCVAR_GET(bd_native_scene_textures) || stencil_pending || Word(kPhase) != 3 ||
+      !Range(entry_,816) || !Word(engine+16) ||
+      !CheckNativeWaterModelContract(visual_,ReadWord(uint64_t(entry_)+248),Word) || !Ready(context,true))
+    return unavailable();
+  const auto lighting = FindNativeLightingPass(3);
+  const auto node = ReadWord(uint64_t(entry_)+252);
+  const auto recipe = lighting ? CaptureNativeSceneLights(identity_.instance,identity_.model_generation,node,lighting->inputs) : std::nullopt;
+  const auto ticket = recipe ? ResolveNativeSceneLights(*recipe) : std::nullopt;
+  if (!ticket) return unavailable();
+  if (water_output) throw std::runtime_error("Nested native water material publication");
+  water_output = this;
+  lights_ = ticket->lights; // copied once, not resolved/committed again after the writer
+  struct DirectAdapter : Adapter {
+    NativeWaterMaterialScope &scope;
+    const NativeSceneLightTicket &ticket;
+    int32_t &depth_write;
+    DirectAdapter(PPCContext &ctx, uint8_t *memory, NativeWaterMaterialScope &owner,
+                  const NativeSceneLightTicket &lights, int32_t &depth)
+        : Adapter(ctx,memory,true), scope(owner), ticket(lights), depth_write(depth) {}
+    bool BeginLights() { return CommitNativeSceneLights(ticket,uint32_t(saved_stack)); }
+    void PublishModelFlags() {
+      // Re-read after the light exporter, which can alias source parameters.
+      Check(CheckNativeWaterModelContract(material,ReadWord(uint64_t(scope.entry_)+248),Word));
+      bd::mem::store<uint32_t>(engine+16,ReadWord(uint64_t(scope.entry_)+240));
+      PPCContext preflight{};
+      preflight.r3.u64 = material; preflight.r1.u64 = saved_stack;
+      Check(Ready(preflight,true)); // never fall back after the first light publication
+    }
+    void PublishWaterOutput() {
+      const auto values = ReadNativeWaterMaterial(material,Word);
+      Check(bool(values)); output.material = *values;
+      scope.Publish(material,std::move(output));
+      RefreshNativeVisualInputsAfterWriter();
+      ++stats.water; ++stats.direct_materials;
+    }
+    void SubmitWater() {
+      if (!scope.Submit(false)) throw std::runtime_error("Native water lost an owned input after material participation");
+    }
+    void ExportDepthIntent() {
+      if (ReadWord(uint64_t(material)+3000) == 8) bd::mem::store<uint8_t>(scope.entry_+295,0);
+      const int32_t next = bd::mem::load<int8_t>(scope.entry_+295);
+      if (next != depth_write) { depth_write = next; State(48,uint32_t(next)); }
+    }
+    void FinishWater() {
+      // Original resource end is only these unbindings. Native packets already
+      // retain their own leases; registry active bytes/resource stay idle.
+      Video::SetTexture(7,nullptr); Video::SetTexture(12,nullptr);
+      if (WantsSnapshot()) Video::SetTexture(13,nullptr);
+      ++stats.direct_ends;
+    }
+  } adapter(context,base,*this,*ticket,depth_write);
+  const bool consumed = ConsumeNativeWaterMaterial(adapter);
+  water_output = nullptr;
+  if (!consumed) return unavailable();
+  Report();
+  return true;
 }
 void NativeWaterMaterialScope::Publish(uint32_t visual, std::optional<NativeWaterMaterialOutput> output) {
   publication_.Reset();
@@ -253,8 +326,9 @@ void NativeWaterMaterialScope::Publish(uint32_t visual, std::optional<NativeWate
   }
   publication_.Publish(identity_, frame_, std::move(*output));
 }
-bool NativeWaterMaterialScope::Submit(uint32_t entry, uint32_t stack, bool stencil_pending) {
+bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
   if (!identity_) return false;
+  const auto entry = entry_;
   const auto refuse = [&](const char *reason) {
     ++stats.water_unavailable;
     if (stats.water_unavailable == 1 || FrameStatFrameCount()-stats.water_refusal_frame >= 300) {
@@ -335,10 +409,7 @@ bool NativeWaterMaterialScope::Submit(uint32_t entry, uint32_t stack, bool stenc
   pass.shadow_filter = {lighting->inputs.shadow_bias,.4f*lighting->inputs.shadow_bias,
       .65f/float(receiver->image->shape.width),0};
   pass.fog = *fog;
-  const auto recipe = CaptureNativeSceneLights(identity_.instance,identity_.model_generation,node,lighting->inputs);
-  const auto ticket = recipe ? ResolveNativeSceneLights(*recipe) : std::nullopt;
-  if (!ticket) return refuse("ordered native light ticket");
-  pass.lights = ticket->lights;
+  pass.lights = lights_;
   const auto receive = bd::mem::load<uint8_t>(entry+295);
   if (receive > 1 || program.shadow_policies[*primitive] == NativeShadowPolicy::Unknown) return refuse("owned shadow participation");
   const uint32_t flags = (features->diffuse ? WaterDiffuse : 0) | (features->fog ? WaterFog : 0) |
@@ -380,7 +451,6 @@ bool NativeWaterMaterialScope::Submit(uint32_t entry, uint32_t stack, bool stenc
     for (uint32_t role=0; role<6; ++role)
       if (commands->WritesImage(plan.images.Image(role))) return refuse("sampled water image aliases active attachment");
   }
-  if (!CommitNativeSceneLights(*ticket,stack)) throw std::runtime_error("Native water light publication changed");
   NativeWaterSceneSubmission submission{identity_.instance,identity_.model_generation,frame_};
   submission.plans.push_back(std::move(plan));
   if (!SubmitNativeWaterScenePackets(std::move(submission))) throw std::runtime_error("Native water packet submission failed");
