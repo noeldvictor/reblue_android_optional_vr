@@ -52,9 +52,29 @@ public:
     }
     NativeSceneCommands result;
     result.sources_ = sources;
+    result.color_ = NativeImageLease::From(sources[0]);
+    result.color_shape_ = color;
     result.framebuffer_ = framebuffer;
     result.resolved_ = resolved;
     result.clear_ = clear;
+    return result;
+  }
+  // Render directly into an exclusive native HDR pool lease (reflection),
+  // retaining the same colour owner that later sampling receives. No extra copy.
+  static std::optional<NativeSceneCommands> CreateLeasedColor(const NativeImageLease &color,
+      const NativeTargetImageHandle &depth, plume::RenderFramebuffer *framebuffer, const NativeSceneClear &clear) {
+    if (!color.ArrayView() || !depth || !depth->Sampled() || !framebuffer ||
+        !depth->shape.Bytes(512ull<<20) || color.image.format != plume::RenderFormat::R16G16B16A16_FLOAT ||
+        depth->shape.format != plume::RenderFormat::D32_FLOAT_S8_UINT || depth->shape.samples != 1 ||
+        !color.Fits(depth->shape.width,depth->shape.height,depth->shape.layers) ||
+        color.image.texture == depth->image.get() || color.image.layout == &depth->layout ||
+        framebuffer->getWidth() != color.image.width || framebuffer->getHeight() != color.image.height ||
+        !std::isfinite(clear.depth) || clear.depth < 0 || clear.depth > 1) return {};
+    for (float channel : clear.color.rgba) if (!std::isfinite(channel)) return {};
+    NativeSceneCommands result;
+    result.sources_[1] = depth; result.color_ = color;
+    result.color_shape_ = NativeTargetShape{color.image.width,color.image.height,color.image.layers,color.image.format,1};
+    result.framebuffer_ = framebuffer; result.clear_ = clear;
     return result;
   }
   static std::optional<NativeSceneCommands> CreateDepthOnly(
@@ -71,7 +91,7 @@ public:
     return result;
   }
   bool Matches(const plume::RenderTexture *color, const plume::RenderTexture *depth) const {
-    return sources_[1] && (sources_[0] ? sources_[0]->image.get() : nullptr) == color &&
+    return sources_[1] && color_.image.texture == color &&
         sources_[1]->image.get() == depth;
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
@@ -79,12 +99,13 @@ public:
   // safe to sample merely because it is different from the multisample source.
   bool WritesImage(const plume::RenderTexture *image) const {
     if (!image) return false;
+    if (color_.image.texture == image) return true;
     for (uint32_t role = 0; role < 2; ++role)
       if ((sources_[role] && sources_[role]->image.get() == image) || resolved_[role].texture == image) return true;
     return false;
   }
   NativeTargetImageHandle DepthOwner() const { return sources_[1]; }
-  const NativeTargetShape *ColorShape() const { return sources_[0] ? &sources_[0]->shape : nullptr; }
+  const NativeTargetShape *ColorShape() const { return color_shape_ ? &*color_shape_ : nullptr; }
   bool ClearPending() const { return clear_.has_value(); }
   std::optional<NativeOcclusionView> OcclusionView(uint32_t frame) const {
     const auto camera = Camera(frame, 3);
@@ -106,7 +127,7 @@ public:
   // Read only after ending this scope's active render pass. For MSAA this is
   // the ordinary attachment-resolve destination, never the multisample source.
   SampledImage ColorReadImage() const {
-    return resolved_[0].texture ? resolved_[0] : sources_[0] ? sources_[0]->Sampled() : SampledImage{};
+    return resolved_[0].texture ? resolved_[0] : color_.image;
   }
 
   // Caller flushes outgoing draws before any transition. A resumed pass reuses
@@ -116,9 +137,9 @@ public:
     std::array<plume::RenderTexture *, 2> fresh{};
     uint32_t count = 0;
     for (uint32_t i = 0; i < 4; ++i) {
-      if (i < 2 && !sources_[i]) continue;
-      auto *image = i < 2 ? sources_[i]->image.get() : resolved_[i - 2].texture;
-      auto *layout = i < 2 ? &sources_[i]->layout : resolved_[i - 2].layout;
+      if ((i == 0 && !color_.image.texture) || (i == 1 && !sources_[1])) continue;
+      auto *image = i == 0 ? color_.image.texture : i == 1 ? sources_[1]->image.get() : resolved_[i - 2].texture;
+      auto *layout = i == 0 ? color_.image.layout : i == 1 ? &sources_[1]->layout : resolved_[i - 2].layout;
       if (!image) continue;
       const auto wanted = i % 2 ? plume::RenderTextureLayout::DEPTH_WRITE : plume::RenderTextureLayout::COLOR_WRITE;
       if (i < 2 && *layout == plume::RenderTextureLayout::UNKNOWN) fresh[i] = image;
@@ -134,13 +155,15 @@ public:
   }
   template <typename Commands> bool ApplyClear(Commands &commands) {
     if (!clear_) return false;
-    if (sources_[0]) commands.clearColor(0, clear_->color);
+    if (color_.image.texture) commands.clearColor(0, clear_->color);
     commands.clearDepthStencil(true, true, clear_->depth, clear_->stencil);
     clear_.reset();
     return true;
   }
 private:
   std::array<NativeTargetImageHandle, 2> sources_;
+  NativeImageLease color_;
+  std::optional<NativeTargetShape> color_shape_;
   plume::RenderFramebuffer *framebuffer_ = nullptr;
   std::array<SampledImage, 2> resolved_;
   std::optional<NativeSceneClear> clear_;

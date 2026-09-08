@@ -58,6 +58,13 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
+**Latest source checkpoint (2026-09-08), verification pending:** planar reflection
+begin/end hooks now render into an exclusive native HDR image lease, reuse native
+depth/framebuffer owners and publish that same image without a console resolve.
+Authored camera/extent/getter and legacy draw adapters remain; the game still has
+no native water-queue caller. This checkpoint has not been built or run and does
+not supersede the tested binaries or acceptance evidence below.
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

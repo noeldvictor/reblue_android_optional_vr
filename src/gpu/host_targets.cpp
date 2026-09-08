@@ -191,9 +191,10 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
 
 GuestTexture *HostTargetAcquireNative(HostTargetClass cls, const NativeTargetShape &shape) {
   const bool depth = cls == HostTargetClass::SceneDepth || cls == HostTargetClass::Shadow ||
-      cls == HostTargetClass::WaterBottomDepth;
+      cls == HostTargetClass::WaterBottomDepth || cls == HostTargetClass::ReflectionDepth;
+  const bool reflection = cls == HostTargetClass::ReflectionDepth;
   if ((cls != HostTargetClass::SceneColor && !depth) ||
-      ((cls == HostTargetClass::Shadow || cls == HostTargetClass::WaterBottomDepth) &&
+      ((cls == HostTargetClass::Shadow || cls == HostTargetClass::WaterBottomDepth || reflection) &&
        (shape.samples != 1 || shape.layers != 1)) ||
       shape.format != (depth ? plume::RenderFormat::D32_FLOAT_S8_UINT :
           plume::RenderFormat::R16G16B16A16_FLOAT) || !shape.Bytes(512ull << 20)) return nullptr;
@@ -252,6 +253,21 @@ void HostTargetReleased(GuestTexture *target) {
   if (!target)
     return;
   target->hostTargetLive = false;
+}
+
+GuestTexture *CreateNativeColorAttachmentAdapter(const NativeImageLease &image) {
+  if (!image.ArrayView() || image.image.format != plume::RenderFormat::R16G16B16A16_FLOAT) return nullptr;
+  auto *target = HostResourceHeap::Alloc<GuestTexture>(ResourceType::RenderTarget);
+  if (!target) return nullptr;
+  target->nativeImage = image; target->texture = image.image.texture;
+  target->width = image.image.width; target->height = image.image.height; target->layers = image.image.layers;
+  target->format = image.image.format; target->sampleCount = 1; target->mipLevels = 1;
+  target->guestFormat = static_cast<u32>(D3DFormat::kA16B16G16R16FAlt);
+  target->viewDimension = plume::RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  target->textureViewOf = target->texture; target->textureViewLayers = target->layers;
+  target->descriptorIndex = image.image.descriptor_index; target->layout.Bind(*image.image.layout);
+  InitResourceHeader(target->x360.as_surface.resource,D3DResourceType::kSurface);
+  return target; // ephemeral header only; native pool and framebuffer own GPU lifetime
 }
 
 u64 HostTargetImageIdentity(GuestTexture *target) {

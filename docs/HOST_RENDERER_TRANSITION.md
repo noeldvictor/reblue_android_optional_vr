@@ -428,6 +428,23 @@ no observed bottom-pass invocation/allocation. It does not qualify this new pass
 in game or add a native water-family caller.
 [Bottom producer and causal backend evidence](../research/20260908_1031_native-water-bottom.md).
 
+Planar-reflection source checkpoint (2026-09-08; build/runtime verification
+pending): `native_reflection_pass_bridge.cpp` replaces eligible begin/end
+attachment/clear/completion work with an exclusive HDR lease from the existing
+post-image pool and a native ReflectionDepth target. The existing framebuffer
+and command owners now accept leased colour attachments, retaining them through
+fences; completion publishes the exact rendered image without a copy or console
+resolve. Active reflection scopes also expose the existing native snapshot path.
+The CPU fixture is wired to exercise mono/layered clear/completion, output identity
+and refusal to reuse an image while framebuffer or sampled readers retain it;
+it has not yet been built or executed. Source-only validation: 372 Python
+boundary/scenario checks and `git diff --check` pass. Next verification: shared scene-command
+CPU regressions (including MSAA), reflection-producing water GPU cases, host link
+and fresh live reflection/snapshot consumption with mixed-order pixel review.
+Authored camera calculation, extent/getter update and legacy draws remain adapters.
+This does not add a game caller to the native water queue, qualify HDR art parity
+or restamp host141/run970 as evidence for the new source.
+
 Next connected work: publish completed water values and image owners from the
 ordered material writer and admit the family into the existing mixed scene
 consumer, calling `SubmitNativeWaterScenePackets`. Reuse the current

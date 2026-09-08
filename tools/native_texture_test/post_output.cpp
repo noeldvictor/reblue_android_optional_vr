@@ -10,6 +10,7 @@
 #include "gpu/scene/native_scene_commands.h"
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_water_bottom.h"
+#include "gpu/scene/native_reflection_pass.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_deferred_queue.h"
@@ -662,6 +663,65 @@ void DepthOnlyCommands() {
     assert(!weak.expired() && bottom->image.ArrayView());
     bottom.reset();
     assert(weak.expired());
+  }
+}
+void ReflectionCommands() {
+  using namespace bd::gpu::scene;
+  for (uint32_t layers : {1u,2u}) {
+    NativePostImagePool pool(1440ull*1584*layers*8,1);
+    const auto make = [&] {
+      auto image = std::make_shared<NativePostImage>();
+      image->recipe = {1440,1584,layers}; image->image = std::make_unique<SceneSource>();
+      image->view = std::make_unique<RenderTextureView>(); image->descriptor = 27;
+      return image;
+    };
+    auto color = pool.Acquire({1440,1584,layers},make);
+    auto lease = NativeImageLease::From(color);
+    auto depth = std::make_shared<NativeTargetImage>();
+    depth->shape = {1440,1584,layers,RenderFormat::D32_FLOAT_S8_UINT,1};
+    depth->image = std::make_unique<SceneSource>(); depth->descriptor = 28;
+    NativeSceneFramebufferStore store(2);
+    auto framebuffer = store.AcquireLeasedColor(lease,depth,[&](const RenderFramebufferDesc &desc) {
+      assert(desc.colorAttachmentsCount == 1 && desc.colorAttachments[0] == lease.image.texture &&
+          desc.depthAttachment == depth->image.get() && desc.viewMask == (layers == 2 ? 3u : 0u));
+      return std::make_unique<OutputFramebuffer>();
+    });
+    assert(framebuffer && framebuffer->Matches(lease.image.texture,depth->image.get()));
+    const NativeSceneClear clear{{.125f,.25f,.5f,1},1,0};
+    auto scope = NativeSceneCommands::CreateLeasedColor(lease,depth,framebuffer->framebuffer.get(),clear);
+    assert(scope && scope->WritesImage(lease.image.texture) && scope->Matches(lease.image.texture,depth->image.get()));
+    SnapshotRecorder completion;
+    assert(!FinishNativeReflection(completion,*scope,lease) && completion.events.empty());
+    SceneCommandRecorder writes;
+    assert(scope->Bind(writes) == 2 && scope->ApplyClear(writes));
+    assert((writes.events == std::vector<char>{'b','d','d','f','c','z'}));
+    assert(FinishNativeReflection(completion,*scope,lease));
+    assert((completion.events == std::vector<char>{'e','b'}) && !completion.source && !completion.destination);
+    assert(*lease.image.layout == RenderTextureLayout::SHADER_READ);
+    completion.events.clear();
+    assert(FinishNativeReflection(completion,*scope,lease) && (completion.events == std::vector<char>{'e'}));
+    for (uint32_t field=0; field<6; ++field) {
+      auto bad = lease;
+      if (field == 0) ++bad.image.width;
+      if (field == 1) ++bad.image.descriptor_index;
+      if (field == 2) bad.image.texture = depth->image.get();
+      if (field == 3) bad.image.layout = &depth->layout;
+      if (field == 4) bad.image.samples = 2;
+      if (field == 5) bad = {lease.owner,lease.image}; // no owned sampling view
+      completion.events.clear();
+      assert(!FinishNativeReflection(completion,*scope,bad) && completion.events.empty());
+    }
+    assert(!NativeSceneCommands::CreateLeasedColor({},depth,framebuffer->framebuffer.get(),clear));
+    const auto prior = lease.image.texture;
+    color.reset(); scope.reset(); framebuffer.reset();
+    assert(!pool.Acquire({1440,1584,layers},make)); // later plane cannot overwrite sampled output
+    store.MarkUnused(1); store.AfterFence(0);
+    assert(store.Stats().resident == 1 && lease.image.texture == prior);
+    store.AfterFence(1); assert(!store.Stats().resident);
+    assert(!pool.Acquire({1440,1584,layers},make)); // final output reader still owns it
+    lease = {};
+    auto reused = pool.Acquire({1440,1584,layers},make);
+    assert(reused && reused->image.get() == prior); // reuse only after both owners release
   }
 }
 void CameraAndRigidCaster() {
@@ -1756,6 +1816,7 @@ int main() {
   TypedImageLeases();
   SceneFramebufferOwnership();
   DepthOnlyCommands();
+  ReflectionCommands();
   CameraAndRigidCaster();
   RigidHardOffRouting();
   RigidLifecycle();

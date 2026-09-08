@@ -21,6 +21,7 @@ namespace bd::gpu {
 struct GuestTexture;
 struct VideoState;
 struct NativeTargetShape;
+struct NativeImageLease;
 
 enum class HostTargetClass : u8 {
   None = 0,
@@ -50,6 +51,9 @@ GuestTexture *HostTargetAcquire(HostTargetClass cls, u32 width, u32 height,
 // Explicit native scene recipe. Allocates the image in the native store, then
 // creates only the temporary header required by unconverted binding consumers.
 GuestTexture *HostTargetAcquireNative(HostTargetClass cls, const NativeTargetShape &shape);
+// Header-only attachment for an exclusive native HDR pool image; never pooled
+// as a console surface. Release through the existing resource adapter lifetime.
+GuestTexture *CreateNativeColorAttachmentAdapter(const NativeImageLease &image);
 
 // The guest released its handle: the target stays, the handle can be handed
 // out again.

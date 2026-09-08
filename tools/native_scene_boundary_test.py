@@ -177,7 +177,9 @@ class NativeSceneBoundaryTest(unittest.TestCase):
         self.assertIn("FencedAssetCache<NativeSceneFramebuffer>", owner)
         self.assertLess(owner.index("std::array<NativeTargetImageHandle, 2> sources"),
                         owner.index("std::unique_ptr<plume::RenderFramebuffer> framebuffer"))
-        self.assertIn("owner->sources == sources && owner->density_map == density_map", owner)
+        self.assertIn("owner->sources == sources && owner->color == color && owner->density_map == density_map", owner)
+        self.assertLess(owner.index("NativeImageLease color"),
+                        owner.index("std::unique_ptr<plume::RenderFramebuffer> framebuffer"))
         self.assertIn("AcquireNativeSceneFramebuffer({color->nativeTarget, depth->nativeTarget}, density_map)", self.bridge)
         frame = (root / "src/gpu/frame_ring.cpp").read_text(encoding="utf-8")
         self.assertLess(frame.index("scene::DrainNativeSceneFramebuffersLocked(s, slot)"),

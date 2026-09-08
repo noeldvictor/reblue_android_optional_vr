@@ -6,6 +6,7 @@
  */
 #include "gpu/scene/native_scene_pass.h"
 #include "gpu/scene/native_water_bottom.h"
+#include "gpu/scene/native_reflection_pass.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_scene_framebuffer.h"
 #include "gpu/scene/scene_precision_import.h"
@@ -464,6 +465,7 @@ plume::RenderFramebuffer *ActiveNativeSceneFramebuffer(plume::RenderTexture *col
                                                       plume::RenderTexture *depth) {
   if (auto *shadow = ActiveNativeShadowFramebuffer(color, depth)) return shadow;
   if (auto *bottom = ActiveNativeWaterBottomCommands(color, depth)) return bottom->Framebuffer();
+  if (auto *reflection = ActiveNativeReflectionCommands(color, depth)) return reflection->Framebuffer();
   if (const auto *resolved = ActiveNativeSceneResolves(color, depth))
     return resolved->framebuffer.get();
   if (scenes.empty()) return nullptr;
@@ -475,6 +477,7 @@ plume::RenderFramebuffer *ActiveNativeSceneFramebuffer(plume::RenderTexture *col
 NativeSceneCommands *ActiveNativeSceneCommands(plume::RenderTexture *color, plume::RenderTexture *depth) {
   if (auto *shadow = ActiveNativeShadowCommands(color, depth)) return shadow;
   if (auto *bottom = ActiveNativeWaterBottomCommands(color, depth)) return bottom;
+  if (auto *reflection = ActiveNativeReflectionCommands(color, depth)) return reflection;
   if (scenes.empty() || !scenes.back().commands) return nullptr;
   auto &commands = *scenes.back().commands;
   return commands.Matches(color, depth) ? &commands : nullptr;

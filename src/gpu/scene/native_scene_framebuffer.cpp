@@ -29,6 +29,15 @@ NativeSceneFramebufferHandle AcquireNativeSceneFramebuffer(
 void DrainNativeSceneFramebuffersLocked(VideoState &s, uint32_t slot) {
   if (s.native_scene_framebuffers) s.native_scene_framebuffers->AfterFence(slot);
 }
+NativeSceneFramebufferHandle AcquireNativeLeasedColorFramebuffer(
+    const NativeImageLease &color, const NativeTargetImageHandle &depth) {
+  auto &s = state(); std::lock_guard lock(s.mutex);
+  if (!s.ready || s.shutting_down.load() || !depth ||
+      (depth->shape.layers == 2 && !s.device->getCapabilities().multiview)) return {};
+  if (!s.native_scene_framebuffers) s.native_scene_framebuffers = std::make_shared<NativeSceneFramebufferStore>();
+  return s.native_scene_framebuffers->AcquireLeasedColor(color,depth,
+      [&](const auto &desc) { return s.device->createFramebuffer(desc); });
+}
 void MarkUnusedNativeSceneFramebuffersLocked(VideoState &s, uint32_t slot) {
   if (s.native_scene_framebuffers) s.native_scene_framebuffers->MarkUnused(slot);
 }
