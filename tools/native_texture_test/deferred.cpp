@@ -17,6 +17,42 @@
 
 using namespace bd::gpu::scene;
 
+void TestMixedOrder() {
+  const std::array<float,3> compatibility{10,30,20};
+  const std::array<DeferredInsertion,4> native{{{30,0},{20,1},{30,1},{20,3}}};
+  std::vector<DeferredSelection> merged;
+  assert(MergeDeferredWork(compatibility,native,merged));
+  const std::array<uint32_t,7> submitted{100,0,101,102,1,2,103};
+  for (size_t i=0;i<merged.size();++i)
+    assert(merged[i].index + (merged[i].native ? 100 : 0) == submitted[i]);
+  std::vector<DeferredSortItem> order;
+  for (uint32_t i=0;i<merged.size();++i) {
+    const auto &entry=merged[i];
+    order.push_back({entry.native ? native[entry.index].depth : compatibility[entry.index],i});
+  }
+  assert(OrderDeferredWork(order));
+  const std::array<uint32_t,7> sorted{100,102,1,101,2,103,0};
+  for (size_t i=0;i<order.size();++i) {
+    const auto entry=merged[order[i].payload];
+    assert(entry.index + (entry.native ? 100 : 0) == sorted[i]);
+  }
+  const auto unchanged = merged;
+  const auto refuses = [&](std::span<const DeferredInsertion> values,size_t limit=5140) {
+    assert(!MergeDeferredWork(compatibility,values,merged,limit));
+    assert(merged.size()==unchanged.size());
+    for (size_t i=0;i<merged.size();++i)
+      assert(merged[i].native==unchanged[i].native && merged[i].index==unchanged[i].index);
+  };
+  auto bad=native; bad[1].preceding=4; refuses(bad);
+  bad=native; bad[2].preceding=0; refuses(bad);
+  bad=native; bad[0].depth=std::numeric_limits<float>::quiet_NaN(); refuses(bad);
+  refuses(native,6);
+  assert(MergeDeferredWork({},std::array<DeferredInsertion,2>{{{1,0},{2,0}}},merged));
+  assert(merged.size()==2 && merged[0].native && merged[1].native);
+  assert(MergeDeferredWork(compatibility,{},merged) && merged.size()==3 && !merged[0].native);
+  assert(MergeDeferredWork({},{},merged) && merged.empty());
+}
+
 void TestDepth() {
   const DeferredMatrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
   DeferredDepthRecipe bounds;
@@ -138,6 +174,7 @@ void TestDepth() {
 }
 
 int main() {
+  TestMixedOrder();
   TestDepth();
   std::array items{DeferredSortItem{2, 0}, DeferredSortItem{-1, 1},
                    DeferredSortItem{2, 2}, DeferredSortItem{7, 3}};

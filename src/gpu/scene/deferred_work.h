@@ -20,6 +20,32 @@ struct DeferredSortItem {
   uint32_t payload = 0;
 };
 
+// A native packet remembers how many compatibility entries preceded it, not
+// their addresses. This permits one stable order while the old producer retires.
+struct DeferredInsertion { float depth = 0; uint32_t preceding = 0; };
+struct DeferredSelection { uint32_t index = 0; bool native = false; };
+inline bool MergeDeferredWork(std::span<const float> compatibility,
+    std::span<const DeferredInsertion> native, std::vector<DeferredSelection> &out,
+    size_t limit = 5140) {
+  if (compatibility.size() > limit || native.size() > limit - compatibility.size()) return false;
+  uint32_t previous = 0;
+  for (const auto &entry : native) {
+    if (entry.preceding < previous || entry.preceding > compatibility.size() ||
+        !std::isfinite(entry.depth)) return false;
+    previous = entry.preceding;
+  }
+  std::vector<DeferredSelection> merged;
+  merged.reserve(compatibility.size() + native.size());
+  uint32_t cursor = 0;
+  for (uint32_t i = 0; i <= compatibility.size(); ++i) {
+    while (cursor < native.size() && native[cursor].preceding == i)
+      merged.push_back({cursor++,true});
+    if (i < compatibility.size()) merged.push_back({i,false});
+  }
+  out = std::move(merged);
+  return true;
+}
+
 // Back-to-front, with deterministic submission order for equal depths. Reject
 // invalid keys before changing the caller's order (NaN is not a comparator).
 inline bool OrderDeferredWork(std::span<DeferredSortItem> items) {

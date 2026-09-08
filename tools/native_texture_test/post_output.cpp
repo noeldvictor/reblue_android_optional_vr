@@ -1003,6 +1003,35 @@ void RigidScenePacket() {
   }
   packet = good;
   {
+    const auto saved_bounds = program.bounds;
+    program.bounds = std::array<float,4>{0,0,-10,2};
+    packet.policy.direct = false; packet.policy.deferred = packet.policy.alpha_test = true;
+    NativeRigidCutoutInputs cutout{128,RigidCutoutAlways,false,{}};
+    cutout.blend.alphaBlendEnable = true;
+    NativeRigidDeferredInputs deferred;
+    const auto prepare = [&] { return PrepareNativeRigidScene(program,packet,receiver,nullptr,cutout,deferred); };
+    auto sorted = prepare();
+    assert(sorted && sorted->draw && sorted->deferred && sorted->depth_write && sorted->depth == 8);
+    assert(sorted->object.flags.z == RigidCutoutGE); // sorted pass owns comparison
+    packet.world[14] = -5;
+    assert(prepare()->depth == 13 && sorted->depth == 8);
+    packet.camera->view[14] = 7;
+    assert(prepare()->depth == 6);
+    deferred = {true,-123};
+    program.bounds.reset();
+    assert(prepare()->depth == -123);
+    packet.policy.shadow_allowed = false;
+    assert(!prepare()); // no depth write uses real bounds, not the fixed key
+    program.bounds = std::array<float,4>{0,0,-10,2};
+    auto no_depth_write = prepare();
+    assert(no_depth_write && !no_depth_write->depth_write && no_depth_write->depth == 6);
+    packet.camera->view[0] = std::numeric_limits<float>::quiet_NaN();
+    assert(!prepare());
+    packet = good;
+    program.bounds = saved_bounds;
+    assert(sorted->geometry == geometry && sorted->albedo[0] == albedo && sorted->depth == 8);
+  }
+  {
     packet.policy.alpha_test = true;
     NativeRigidCutoutInputs cutout{128,RigidCutoutGE,true,{}};
     cutout.blend.alphaBlendEnable = true;
@@ -1087,6 +1116,10 @@ void RigidScenePacket() {
   program.policy_steps.clear();
   program.policy_steps.push_back({PrimitivePolicyOperation::Alpha,1,0}); program.ranges[1].policy_step_end = 1;
   assert(classify() == NativeRigidCasterRoute::Legacy); // Unsupported sibling cannot be omitted.
+  assert(PrepareNativeRigidSceneAdmission(program,scene_policy,true).route == NativeRigidCasterRoute::Native);
+  scene_policy.pass_mode = 2;
+  assert(PrepareNativeRigidSceneAdmission(program,scene_policy,true).route == NativeRigidCasterRoute::Legacy);
+  scene_policy.pass_mode = 0;
   program.policy_steps.clear(); program.ranges.resize(1); program.geometries.resize(1); program.materials.resize(1);
   packet = good;
   const std::weak_ptr<NativeTextureGpu> retired_detail1 = detail1, retired_detail2 = detail2;

@@ -28,7 +28,9 @@ inline bool ComposeMaterialAlphaReferences(std::span<const NativeMaterialRange> 
     // A suppressed sorted primitive still resolves the sorted default before
     // skipping its draw. Do not infer this from the emitted/deferred counts.
     if (!*current) current = policies[n].sorted ? inputs.sorted_reference : inputs.direct_reference;
-    values.push_back(inputs.object_reference.value_or(*current));
+    // Sorted entries copy the running reference before the direct-only object
+    // override setter (822809A4..D0); do not apply that setter to a list packet.
+    values.push_back(policies[n].deferred ? *current : inputs.object_reference.value_or(*current));
   }
   out = std::move(values);
   return true;

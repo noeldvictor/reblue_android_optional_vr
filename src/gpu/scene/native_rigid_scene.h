@@ -11,6 +11,7 @@
 #include "gpu/scene/native_scene_lights.h"
 #include "gpu/native_target_images.h"
 #include "gpu/scene/native_blend.h"
+#include "gpu/scene/deferred_depth.h"
 
 namespace bd::gpu::scene {
 struct NativeRigidReceiver {
@@ -38,7 +39,10 @@ struct NativeRigidScenePlan {
   BlendState blend;
   bool alpha_to_coverage = false;
   uint32_t primitive = 0;
+  bool deferred = false, depth_write = true;
+  float depth = 0;
 };
+struct NativeRigidDeferredInputs { bool fixed = false; float fixed_depth = 0; };
 // Transitional object producer: resolves source bindings before returning the
 // retained, address-free plan. It never interprets/captures/replays the node.
 std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject(
@@ -48,8 +52,9 @@ bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans);
 // from authored recipes, before a missing pose/texture can choose legacy drawing.
 inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
     const NativeModelMaterialProgram &program,
-    const std::optional<PrimitivePolicyInputs> &inputs) {
-  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true);
+    const std::optional<PrimitivePolicyInputs> &inputs, bool deferred = false) {
+  const bool ordinary_deferred = deferred && inputs && inputs->phase == 0 && inputs->pass_mode == 0;
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, ordinary_deferred);
   if (admission.route != NativeRigidCasterRoute::Native) return admission;
   const auto unsupported = SelectedNativeRigidShadow(program)
       ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
@@ -68,7 +73,8 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     const NativeModelMaterialProgram &program,
     const NativeObjectPrimitive<NativeTextureBinding> &packet,
     const NativeRigidReceiver &receiver, const char **refusal = nullptr,
-    std::optional<NativeRigidCutoutInputs> cutout = {}) {
+    std::optional<NativeRigidCutoutInputs> cutout = {},
+    std::optional<NativeRigidDeferredInputs> deferred = {}) {
   const auto refuse = [&](const char *reason) -> std::optional<NativeRigidScenePlan> {
     if (refusal) *refusal = reason;
     return {};
@@ -88,7 +94,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       packet.shader.texture_layers > 3 || !packet.shader.vertex_colour ||
       !packet.features || packet.features->reflection || packet.features->normal_mapping ||
       !packet.lights || !packet.fog || !packet.camera || !packet.lighting ||
-      !packet.policy.routing_known || packet.policy.deferred ||
+      !packet.policy.routing_known || (packet.policy.deferred && (!deferred || !packet.policy.alpha_test)) ||
       !packet.textures.owns_uv ||
       packet.receiver_shadow == NativeShadowPolicy::Unknown) return refuse("native primitive owners or shader features unavailable");
   if (packet.policy.alpha_test && (!cutout || !cutout->blend.alphaBlendEnable))
@@ -154,6 +160,26 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   if (packet.policy.alpha_test) {
     plan.blend = cutout->blend;
     plan.alpha_to_coverage = cutout->alpha_to_coverage;
+  }
+  if (packet.policy.deferred) {
+    // The ordinary sorted pass establishes GE, independent of the preceding
+    // direct draw's comparison. Its saved shadow participation is also its
+    // depth-write byte; world bounds supply the original far-extent sort key.
+    DeferredDepthRecipe recipe;
+    if (deferred->fixed && packet.policy.shadow_allowed) {
+      recipe.kind = DeferredDepthRecipe::Kind::Fixed;
+      recipe.fixed_depth = deferred->fixed_depth;
+    } else {
+      if (!program.bounds) return refuse("owned deferred model bounds unavailable");
+      recipe.centre = {(*program.bounds)[0],(*program.bounds)[1],(*program.bounds)[2]};
+      recipe.radius = (*program.bounds)[3];
+    }
+    const auto depth = EvaluateDeferredDepth(recipe,packet.world,packet.camera->view);
+    if (!depth || !SetRigidCutout(plan.object,cutout->reference,RigidCutoutGE))
+      return refuse("native deferred depth or cutoff unavailable");
+    plan.deferred = plan.draw = true;
+    plan.depth_write = packet.policy.shadow_allowed;
+    plan.depth = *depth;
   }
   return plan;
 }
