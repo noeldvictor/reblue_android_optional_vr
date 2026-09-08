@@ -166,10 +166,12 @@ void CheckPixels(RenderDevice &device, uint32_t layers, uint32_t samples) {
 }
 } // namespace
 void CheckNativeRigid(RenderDevice &device);
+void CheckNativeOcclusion(RenderDevice &device);
 int main(int argc, char **argv) {
   try {
     const bool rigid = argc == 2 && std::strcmp(argv[1], "--rigid") == 0;
-    Require(argc == 1 || rigid, "Only --rigid is supported; no raw capture mode");
+    const bool occlusion = argc == 2 && std::strcmp(argv[1], "--occlusion") == 0;
+    Require(argc == 1 || rigid || occlusion, "Only --rigid or --occlusion is supported; no raw capture mode");
     VulkanInterfaceOptions options;
     options.extraInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     VkValidationFeatureEnableEXT sync = VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
@@ -214,6 +216,7 @@ int main(int argc, char **argv) {
           (caps.depthAttachmentResolveModes & (1u << uint32_t(RenderResolveMode::MIN))), "Required native features missing");
       std::cout << "GPU=" << native->physicalDeviceProperties.deviceName << "; images=8x8; raw bytes=0\n";
       if (rigid) CheckNativeRigid(*device);
+      else if (occlusion) CheckNativeOcclusion(*device);
       else for (uint32_t samples : {1u, 2u, 4u, 8u}) {
         const auto &limits = native->physicalDeviceProperties.limits;
         if (!(limits.framebufferColorSampleCounts & limits.framebufferDepthSampleCounts &

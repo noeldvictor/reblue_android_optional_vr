@@ -27,6 +27,7 @@ struct NativeTargetShape {
   }
 };
 struct NativeTargetImage {
+  uint64_t identity = 0; // Native allocation generation, never a source address.
   NativeTargetShape shape;
   // Descriptor invalidation precedes view destruction, then image destruction.
   std::unique_ptr<plume::RenderTexture> image;

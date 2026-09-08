@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/native_target_images.h"
+#include "gpu/native_occlusion.h"
 #include "gpu/scene/native_transform.h"
 #include <array>
 #include <cmath>
@@ -76,6 +77,13 @@ public:
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
   const NativeTargetShape *ColorShape() const { return sources_[0] ? &sources_[0]->shape : nullptr; }
   bool ClearPending() const { return clear_.has_value(); }
+  std::optional<NativeOcclusionView> OcclusionView(uint32_t frame) const {
+    const auto camera = Camera(frame, 3);
+    const auto *shape = ColorShape();
+    if (!camera || !shape || shape->layers != 1 || !sources_[1]->identity) return {};
+    return NativeOcclusionView{*camera,
+        {sources_[1]->identity, shape->width, shape->height, shape->samples}, frame};
+  }
   void PublishCamera(const RenderTransformInputs &inputs, bool view_changed, bool projection_changed,
                      bool suppressed, uint32_t frame, uint32_t view) {
     if (frame != camera_frame_ || view != camera_view_) camera_.Reset();

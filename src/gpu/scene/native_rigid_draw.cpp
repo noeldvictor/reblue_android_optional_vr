@@ -13,6 +13,7 @@
 #include "gpu/device.h"
 #include "gpu/draw_queue.h"
 #include "gpu/frame_stats.h"
+#include "gpu/occlusion_cull.h"
 #include "gpu/host_upload.h"
 #include "gpu/sampler_cache.h"
 #include "gpu/pipeline/pipeline_cache.h"
@@ -300,6 +301,11 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     pending.push_back({std::move(draw),std::move(item)});
   }
   store.scene_suppressed += plans->size()-pending.size();
+  // Every authored state/light effect and every sibling preflight happens first.
+  // Query history can omit GPU work, never the ordered producer side effects.
+  const auto occlusion_view = commands->OcclusionView(FrameStatFrameCount());
+  if (occlusion_view && OcclusionCullOccluded({pose.instance, pose.model_generation, node}, *occlusion_view))
+    return true;
   if (!pending.empty() && !s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands); s.draw_framebuffer_bound = true;

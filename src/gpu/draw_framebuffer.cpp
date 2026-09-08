@@ -13,7 +13,6 @@
 #include "gpu/draw_queue.h"
 #include "gpu/draw_intent.h"
 #include "gpu/format.h"
-#include "gpu/occlusion_cull.h"
 #include "gpu/frame.h"
 #include "gpu/host_targets.h"
 #include "gpu/scene/native_scene_result_bridge.h"
@@ -636,11 +635,6 @@ bool Video::BindDrawFramebufferLocked() {
   // shadow clear as a zero-draw pass ahead of them (traced 2026-09-02).
   if (s.plume_framebuffer_bound) {
     bd::gpu::DrawQueueFlushAt(s.command_list, BD_FLUSH_SITE);
-    // The scene pass ends here: its opaque draws are in the list, its
-    // depth is complete, and the occlusion proxies draw against it before
-    // the framebuffer changes (gpu/occlusion_cull.h).
-    if (s.bound_fb_rt && s.bound_fb_ds && s.bound_fb_rt->width >= 512)
-      OcclusionCullEmit(s);
   }
   // The pass is about to end regardless, so any barrier issued here is free.
   if (REXCVAR_GET(bd_barrier_hoist))

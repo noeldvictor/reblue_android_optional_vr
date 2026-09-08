@@ -65,11 +65,15 @@ if(TARGET native_scene_snapshot_test)
         "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_rigid_shadow_cutout_ps.hlsl.spirv.h")
     add_dependencies(native_scene_snapshot_test native_rigid_shader_headers)
 endif()
-# The occlusion proxy (gpu/occlusion_cull.cpp): a cube per node under a query.
-reblue_host_shader(occ_proxy_vs vs_6_1 -D REBLUE_RECOMP)
+# Native depth-query shaders shared by runtime and the GPU fixture.
 reblue_host_shader(occ_proxy_ps ps_6_0)
-# Separate native push-packet ABI; the legacy emitter still uses occ_proxy_vs.
 reblue_host_shader(native_occ_proxy_vs vs_6_1)
+if(TARGET native_scene_snapshot_test)
+    add_custom_target(native_occlusion_shader_headers DEPENDS
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_occ_proxy_vs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/occ_proxy_ps.hlsl.spirv.h")
+    add_dependencies(native_scene_snapshot_test native_occlusion_shader_headers)
+endif()
 reblue_host_shader(bd_normal_wind_lit ps_6_1 -D REBLUE_RECOMP)
 # The host-owned post chain (gpu/post_chain.cpp): downsample, separable blur
 # and bright mask, producing the guest's pyramid textures without the tile.

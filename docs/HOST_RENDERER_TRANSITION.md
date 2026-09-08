@@ -119,20 +119,28 @@ a matched-state correctness question rather than retrying for nicer framing.
 Keep948/941 failures and host107/run945's last accepted pixels unchanged.
 [Corrected contract, current live proof and pixel question](../research/20260907_1927_corrected-shadow-coverage.md).
 
-Occlusion source checkpoint (not runtime-connected): native scene-end currently
-flushes and finishes its owned attachments without calling `OcclusionCullEmit`;
-the only emitter call remains in legacy framebuffer switching. The new owned
-identity/history, world-space near-plane guard and 80-byte push-packet pipeline
-are therefore groundwork, not functioning native scene occlusion or a fix for
-run956's tree gaps. The native shader has a separate name so the still-active
-legacy emitter retains its existing binding contract. Next: connect bounded
-observations, query submission before native depth retirement, fence collection
-and native draw consumers; verify camera/generation changes and actual GPU query
-results. The 320 existing Python source/scenario checks and syntax-only checks of
-both new headers pass; these do not exercise the new history or GPU program.
-Stereo queries, C++ behavior tests, full C++/shader builds, GPU and live gates
-remain pending. No build, game run, capture or retained diagnostic was produced.
-Host116/run956 and host107/run945 retain their existing evidence/limitations.
+Host118/run958 connects native scene-depth queries and fence collection to owned
+node observations and the native rigid draw consumer. The translated query
+shader/upload, guessed target trigger and source-address draw filter are removed.
+Plume2d206ee fixes deferred render-pass query ordering. A failed first live run957
+also exposed the outgoing descriptor handoff; the production binding scope now
+restores its explicit resume snapshot, tested with a real dynamic descriptor
+consumer before the successful retry. Query inputs remain fully native; the
+outgoing compatibility handoff is still needed by unmigrated consumers.
+
+325 Python checks, C++ history/geometry contracts and eight Vulkan query/pixel
+cases pass. Run958 passes the full strict cold/reload chain with generation93
+retired before206. Its last query sample has450,896 submitted /450,679 collected,
+101,924 zero results but **zero native draw skips**. This proves real query
+execution, not useful culling or speedup. Next: distinguish queries for nodes
+with no native consumer from camera/bounds/depth/history refusal; query only
+eligible native consumers, then prove actual skipped draws with controlled
+visibility and pixels. Do not weaken camera/generation safety to inflate skips.
+Stereo queries remain unqualified. The attempted JPEG found the renderer already
+terminal; no image was written. The image archive has only47,920 B headroom below
+10 MiB, so a new110 KiB image needs identified superseded-image cleanup first.
+Keep957 failure evidence,956 tree-gap evidence,945 accepted pixels and948/941.
+[Native occlusion connection and exact evidence](../research/20260907_2007_native-occlusion.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 

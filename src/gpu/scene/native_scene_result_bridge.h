@@ -63,6 +63,7 @@ void PublishNativePassCamera(const RenderTransformInputs &inputs, bool view_chan
                             bool projection_changed, bool suppressed);
 void InvalidateNativePassCamera();
 std::optional<RenderCamera> FindNativePassCamera(uint32_t render_view);
+std::optional<NativeOcclusionView> FindNativePassOcclusionView();
 struct CompletedNativeShadow {
   NativeTargetImageHandle image;
   RenderCamera camera;

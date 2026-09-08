@@ -23,6 +23,7 @@
 #include <cassert>
 #include "refraction_material_cases.h"
 #include "water_update_cases.h"
+#include "native_occlusion_cases.h"
 using namespace bd::gpu;
 using namespace plume;
 
@@ -1386,6 +1387,7 @@ void SceneCommands() {
 }
 } // namespace
 int main() {
+  native_occlusion_tests::Run();
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   SceneFramebufferOwnership();
   DepthOnlyCommands();

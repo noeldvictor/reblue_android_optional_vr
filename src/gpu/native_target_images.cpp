@@ -13,9 +13,10 @@
 
 namespace bd::gpu {
 namespace {
-NativeTargetImageHandle Create(VideoState &s, const NativeTargetShape &shape) {
+NativeTargetImageHandle Create(VideoState &s, uint64_t identity, const NativeTargetShape &shape) {
   auto result = std::make_shared<NativeTargetImage>();
   result->shape = shape;
+  result->identity = identity;
   const bool depth = shape.format == plume::RenderFormat::D32_FLOAT_S8_UINT;
   auto desc = depth ? plume::RenderTextureDesc::DepthTarget(shape.width, shape.height, shape.format)
       : plume::RenderTextureDesc::ColorTarget(shape.width, shape.height, shape.format);
@@ -49,7 +50,7 @@ NativeTargetImageHandle AcquireNativeTargetImage(uint64_t identity, const Native
       (shape.layers == 2 && !s.device->getCapabilities().multiview) ||
       !(s.device->getSampleCountsSupported(shape.format) & shape.samples)) return {};
   if (!s.native_target_images) s.native_target_images = std::make_shared<NativeTargetImageStore>();
-  auto result = s.native_target_images->Acquire(identity, shape, [&] { return Create(s, shape); });
+  auto result = s.native_target_images->Acquire(identity, shape, [&] { return Create(s, identity, shape); });
   const auto stats = s.native_target_images->Stats();
   if (!result || stats.created + stats.reused == 1 || (stats.created + stats.reused) % 600 == 0)
     BD_INFO("[native-target-images] {} created {} reused {} retired {} resident {} payload bytes; "

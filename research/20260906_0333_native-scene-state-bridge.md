@@ -3571,3 +3571,73 @@ old shader header-31,075. Material/texture trees unchanged this continuation;
 GPU10,659,026 B/10files, logs201,025 B/136. Other objects/CMake/source/Git not
 allocated. Ending free81,856,401,408 B, drive-wide loss5,091,328 B since first;
 not wholly task-attributed. Original3 GiB exception/floor unchanged.
+
+## 2026-09-07 owned occlusion connection (same allowance)
+
+The previous turn made progress:98a49f3 preserved the new source and restored the
+legacy shader ABI before its requested push. It did not qualify runtime changes.
+This continuation connects owned node observations -> native depth queries ->
+fence history -> native rigid consumers, removing the old translated query block
+and address-keyed draw filter. First measured free81,584,267,264 B. Reuse the
+existing texture and GPU fixture trees; output38/CPU21 and GPU37/occlusion1 are
+the next bounded attempts,32 MiB peak/free-drop each,300 s supervisor and10 MiB
+aggregate build logs. New text <=64 KiB; no raw/perf/cache/dump/cook outputs.
+After fixtures, host117 may use192 MiB peak with the unchanged62,509,998,080 B
+floor. No guest rebuild or game launch in this preflight. Retain945 accepted
+pixels and956 tree-gap image/log plus948/941 failures. Prior cleanup is not
+credited again; replace only superseded attempt logs after verification.
+
+Output38/CPU21 pass (0.40/0.43 s). GPU37/38 compile; the first query fixture
+exposes a real Plume deferred-pass query begin/end mismatch and an invalid
+combined depth/stencil fixture readback. Plume now starts the pass before an
+occlusion query and fails visible on unavailable reads; the fixture copies only
+depth. GPU39 and occlusion2 pass all8 cases (1.09/1.10 s), validation0/0, no raw.
+325 Python checks pass. Host117/PID28944/session67898 terminates0:36 host build
+steps, codegen0 written, no guest objects. Plume2d206ee is pushed before parent.
+Next changed-code observation: run957, existing full strict cold/reload flags,
+Count0/no images,300 s,800 KiB log,192 MiB free-drop,75 MiB diagnostic overlap
+and unchanged original floor. It must show fresh native query emission/collection
+and whether native draw skips advance; prior renderer gates alone do not prove
+occlusion. No speedup or pixel acceptance from this text run. Preserve956/945.
+
+Run957/PID3732/session47473 is terminal failure: access violation in descriptor
+binding during loading. Its87,567 B log and host117 symbolization are preserved
+in the2007 report. Profile restored exactly; no new raw/image output. The query
+layout had escaped into the following descriptor consumer. The production
+binding scope now restores an explicit resume snapshot; GPU40/occlusion3 adds
+that real three-offset consumer and passes8 cases1.31/1.32 s, validation0/0.
+Host118/PID22648 links0 without guest objects. Run958 is the next causal attempt,
+with identical300 s/800 KiB/192 MiB/75 MiB/original-floor limits and no images.
+Removed12 superseded output37/CPU20/GPU36..38/occlusion2 log files,6,198 logical B;
+the failure log and current tests remain. No prior cleanup is credited again.
+
+Run958/PID36336/session19501 terminates0 after the complete strict cold/reload
+chain; generation93 fully retires before206. Latest native query sample4674 has
+450,896 emitted,450,679 collected,101,924 zero results and0 native draw skips.
+Queries are live; useful culling, performance and game pixels remain unqualified.
+Both effective settings and exact profile restoration were checked. See2007
+report for hashes, epoch counters and next eligibility/refusal decision.
+
+A separately requested JPEG was not produced: the already-owned renderer had
+terminated. The existing image inventory is10,437,840 B (only47,920 B free below
+10 MiB), so the proposed110 KiB reservation cannot fit without superseded-image
+cleanup. No image/raw archive growth or producer restart. Preserve945/956 images.
+
+After verifying the native replacement and confirming no source/CMake/Ninja
+consumer, removed the obsolete generated occ_proxy_vs SPIR-V header20,425 B.
+Total cleanup this continuation:13 files/26,623 logical B. These superseded logs
+and old generated header are reproducible from recorded commands/source history;
+957 failure87,567 B and958 current query/reload501,130 B remain deliberately.
+Immediate drive gains were12,288 B (logs) and20,480 B (header), not isolated from
+other volume activity. Nothing from earlier cleanup is credited again.
+
+Current texture fixture tree72,119,840 B/129 files (+1,478,351 B); GPU fixture
+11,651,129 B/12 (+992,103); build logs217,514 B/146 (+16,489); exe/PDB+6,144/
+188,416 B. Together with the588,697 B new run logs and removed20,425 B header,
+the counted retained net is+3,249,775 B: new production/CPU/GPU coverage and
+distinct current/failure evidence, not duplicate captures. Other host/Plume
+objects, CMake, source and Git are not allocated in that subtotal. Last measured
+free81,313,525,760 B is270,741,504 B below this continuation's first reading,
+a drive-wide change not wholly attributable to the~3.10 MiB subtotal. No owned
+producer remains, no fresh raw/perf/cache/dump/cook output was found, profile
+restored exactly. Original3 GiB allowance/floor and all protected evidence remain.

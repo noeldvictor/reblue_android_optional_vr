@@ -53,6 +53,7 @@
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_rigid_route_bridge.h"
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
@@ -150,6 +151,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
   // (gpu/occlusion_cull.h).
   const bool occlusion = REXCVAR_GET(bd_occlusion_cull) &&
                          bd::mem::try_load<u32>(kRenderViewIdVa) == 3;
+  const auto occlusion_view = occlusion ? FindNativePassOcclusionView() : std::nullopt;
   RenderFrustum frustum;
   const auto &planes = frustum.planes;
   if (host_cull) {
@@ -360,26 +362,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
               visible = ctx.r3.s32 != 0;
             }
           }
-          if (visible && occlusion) {
-            // A sphere that holds the camera (the terrain, the sky dome)
-            // has its proxy clipped by the near plane and would read as
-            // occluded; it is never tested. The centre is camera-relative.
-            const f64 d2 = f64(out[0]) * out[0] + f64(out[1]) * out[1] +
-                           f64(out[2]) * out[2];
-            const f64 r_near = f64(radius) * 1.3 + 8.0;
-            // The draw is still dispatched: the node's texture and constant
-            // bindings must happen for the nodes after it, which inherit
-            // them; the queue drops an occluded node's draw instead
-            // (hooks/draw.cpp), keyed as the dispatch tag sees it.
-            if (d2 > r_near * r_near) {
-              static u32 told = 0;
-              if (told++ < 3)
-                BD_INFO("[occ] walk key {:016X} (matrix {:08X} mesh {:08X})",
-                        (u64(matrix) << 32) | u64(mesh), matrix, mesh);
-              bd::gpu::OcclusionCullNote((u64(matrix) << 32) | u64(mesh), out,
-                                         radius);
-            }
-          }
+          if (visible && occlusion && native_pose && bounds)
+            bd::gpu::OcclusionCullNote({instance_pose->instance, instance_pose->model_generation, index},
+                occlusion_view, {out[0], out[1], out[2], radius});
           if (visible) {
             if (bd::mem::try_load<u32>(kRenderViewIdVa) == 1) {
               const u32 visual = bd::mem::try_field<u32>(ctx_va, offsetof(GuestTraverseCtx, visual));

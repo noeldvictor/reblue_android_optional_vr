@@ -143,13 +143,15 @@ No speedup claim; real batches are still singletons.
 [Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
 [Corrected contract, live reload and open pixel issue](research/20260907_1927_corrected-shadow-coverage.md).
 
-Native occlusion is still unconnected: native scene-end does not issue the
-existing legacy-path queries. A source-only checkpoint adds owned query inputs,
-conservative history and a separate native push-packet shader/pipeline, leaving
-the current shader interface intact. The 320 existing Python checks and new
-header syntax checks pass; runtime wiring, C++ behavior tests, shader builds and
-GPU/live verification remain pending. This does not fix or explain the tree gaps.
-See the [active queue](docs/HOST_RENDERER_TRANSITION.md#active-work-queue).
+**Native occlusion queries now run against owned scene depth.** Host118/run958
+passes the full cold/reload checks after fixing query render-pass ordering and
+the outgoing descriptor handoff. The old translated query shader/upload and
+address-keyed draw filter are removed. Eight real Vulkan query/pixel cases,
+C++ history contracts and 325 Python checks pass. The latest live sample has
+450,896 queries and 450,679 collected results, but **zero native draw skips**:
+effective culling and any speedup remain unproved. No new game image was captured;
+the tree gaps, stereo culling and full desktop acceptance remain open.
+[Occlusion implementation, evidence and next decision](research/20260907_2007_native-occlusion.md).
 
 The handoff-owned lighting publication contains 2,898 node bindings; these are
 not all verified native scene draws. Skin/deformation, phase0 cutout casting,
