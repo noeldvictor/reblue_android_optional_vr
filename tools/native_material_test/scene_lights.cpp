@@ -1,6 +1,7 @@
 #include "gpu/scene/native_scene_lights_source.h"
 #include "gpu/scene/native_selected_lights_source.h"
 #include "gpu/scene/native_rigid_inputs.h"
+#include "gpu/scene/deferred_work.h"
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -67,6 +68,32 @@ void TestNativeSceneLights() {
       return ordered.Prepare(7,ordered.Update(7),11,93,node,view);
     };
     Require(!next(3), "initial Keep has no guessed dark/default seed");
+    const auto delayed_keep = ordered.Capture(7,ordered.Update(7),11,93,3,0);
+    const auto delayed_bind = ordered.Capture(7,ordered.Update(7),11,93,20,0);
+    const auto delayed_dark = ordered.Capture(7,ordered.Update(7),11,93,20,3);
+    Require(delayed_keep && !delayed_keep->bind && delayed_bind && delayed_bind->bind &&
+        delayed_dark && !ordered.Resolve(7,*delayed_keep),
+        "capture an authored Keep without prematurely resolving inherited values");
+    // Submission is Keep, Bind, dark Bind. Final sorted order is dark, Bind,
+    // Keep. A producer-time ticket or inherited value would give the wrong light.
+    const std::array recipes{*delayed_keep,*delayed_bind,*delayed_dark};
+    std::array order{DeferredSortItem{1,0},DeferredSortItem{2,1},DeferredSortItem{3,2}};
+    Require(OrderDeferredWork(order), "native deferred light order");
+    std::array<NativeSceneLightTicket,3> emitted;
+    for (size_t n=0;n<order.size();++n) {
+      const auto ticket = ordered.Resolve(7,recipes[order[n].payload]);
+      Require(ticket && ordered.Commit(7,*ticket), "resolve and commit at final draw position");
+      emitted[n] = *ticket;
+    }
+    Require(emitted[0].lights[0].kind == LitDisabled && emitted[2].inherited &&
+        emitted[2].lights[0].colour.x == .25f &&
+        SameNativeSelectedLights(emitted[1].lights,emitted[2].lights),
+        "sorted Keep consumes the immediately preceding bound values");
+    Require(!ordered.Commit(7,emitted[0]) && !ordered.Resolve(8,*delayed_bind),
+        "captured actions do not authorize stale tickets or another frame");
+    ordered.InvalidateInherited();
+    Require(!ordered.Resolve(7,*delayed_keep) && ordered.Resolve(7,*delayed_bind),
+        "unowned late writer invalidates Keep without invalidating owned explicit values");
     const auto prepared = next(20);
     Require(prepared && !prepared->inherited && !next(3), "preflight/culled or suppressed work does not bind lights");
     Require(ordered.Commit(7,*prepared), "actual bound draw commits copied native values");
@@ -106,6 +133,9 @@ void TestNativeSceneLights() {
     authored.lights[0].value->colour.x = .8f;
     Require(ordered.Publish(8,authored,{{13,207,0,std::nullopt},{13,207,1,*input}}),
         "next handoff retires all previous source/model keys");
+    Require(!ordered.Resolve(8,*delayed_bind) && !ordered.Resolve(8,*delayed_keep) &&
+        delayed_bind->bind->at(0).colour.x == .25f,
+        "handoff invalidates queued action eligibility without changing copied values");
     const auto inherited = ordered.Prepare(8,ordered.Update(8),13,207,0,0);
     Require(inherited && inherited->lights[0].colour.x == .25f &&
         !ordered.Commit(8,*keep), "handoff retains copied values, not stale ticket eligibility");

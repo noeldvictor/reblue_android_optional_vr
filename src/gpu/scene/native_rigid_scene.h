@@ -152,7 +152,8 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   inputs.lights = *packet.lights; inputs.fog = *packet.fog;
   const auto pass = BuildRigidPass(inputs);
   if (!object || !pass) return refuse("nonfinite native object/pass GPU inputs");
-  if (packet.policy.alpha_test && !SetRigidCutout(*object, cutout->reference, cutout->comparison))
+  if (packet.policy.alpha_test && !SetRigidCutout(*object, cutout->reference,
+      packet.policy.deferred ? RigidCutoutGE : cutout->comparison))
     return refuse("unsupported native cutout comparison");
   NativeRigidScenePlan plan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
       packet.policy.cull, packet.policy.direct};
@@ -175,8 +176,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       recipe.radius = (*program.bounds)[3];
     }
     const auto depth = EvaluateDeferredDepth(recipe,packet.world,packet.camera->view);
-    if (!depth || !SetRigidCutout(plan.object,cutout->reference,RigidCutoutGE))
-      return refuse("native deferred depth or cutoff unavailable");
+    if (!depth) return refuse("native deferred depth unavailable");
     plan.deferred = plan.draw = true;
     plan.depth_write = packet.policy.shadow_allowed;
     plan.depth = *depth;

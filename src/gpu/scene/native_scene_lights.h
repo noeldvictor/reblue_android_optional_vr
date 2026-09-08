@@ -45,6 +45,12 @@ struct NativeSceneLightTicket {
   uint64_t update = 0, revision = 0;
   bool inherited = false;
 };
+// Capture the authored action before sorting; resolve Keep only at the draw's
+// final position. No object/source keys or speculative order revision survive.
+struct NativeSceneLightRecipe {
+  std::optional<NativeSelectedLights> bind;
+  uint64_t update = 0;
+};
 
 inline std::optional<NativeSceneLightSelection> SelectNativeSceneLights(
     const NativeSceneLightSet &scene, const NativeObjectLightInputs &object, uint32_t light_view) {
@@ -113,17 +119,26 @@ public:
     if (it == objects_.end() || it->Key() != key) return {};
     return it->inputs ? SelectNativeSceneLights(lights_, *it->inputs, light_view) : std::nullopt;
   }
-  std::optional<NativeSceneLightTicket> Prepare(uint32_t frame, uint64_t update,
+  std::optional<NativeSceneLightRecipe> Capture(uint32_t frame, uint64_t update,
       uint64_t instance, uint64_t model_generation, uint32_t node, uint32_t light_view) const {
     if (!update || Update(frame) != update || light_view >= 16 || revision_ == UINT64_MAX) return {};
     const auto key = std::tuple(instance, model_generation, node);
     const auto it = std::lower_bound(objects_.begin(), objects_.end(), key,
         [](const auto &binding, const auto &value) { return binding.Key() < value; });
     if (it == objects_.end() || it->Key() != key) return {};
-    if (!it->inputs)
-      return inherited_ ? std::optional(NativeSceneLightTicket{*inherited_,update,revision_,true}) : std::nullopt;
+    if (!it->inputs) return NativeSceneLightRecipe{std::nullopt,update};
     const auto selected = SelectNativeSceneLights(lights_, *it->inputs, light_view);
-    return selected ? std::optional(NativeSceneLightTicket{selected->lights,update,revision_,false}) : std::nullopt;
+    return selected ? std::optional(NativeSceneLightRecipe{selected->lights,update}) : std::nullopt;
+  }
+  std::optional<NativeSceneLightTicket> Resolve(uint32_t frame, const NativeSceneLightRecipe &recipe) const {
+    if (!recipe.update || Update(frame) != recipe.update || revision_ == UINT64_MAX) return {};
+    const auto &lights = recipe.bind ? recipe.bind : inherited_;
+    return lights ? std::optional(NativeSceneLightTicket{*lights,recipe.update,revision_,!recipe.bind}) : std::nullopt;
+  }
+  std::optional<NativeSceneLightTicket> Prepare(uint32_t frame, uint64_t update,
+      uint64_t instance, uint64_t model_generation, uint32_t node, uint32_t light_view) const {
+    const auto recipe = Capture(frame,update,instance,model_generation,node,light_view);
+    return recipe ? Resolve(frame,*recipe) : std::nullopt;
   }
   bool CanCommit(uint32_t frame, const NativeSceneLightTicket &ticket) const {
     return ticket.update && Update(frame) == ticket.update && ticket.revision == revision_ && revision_ != UINT64_MAX;

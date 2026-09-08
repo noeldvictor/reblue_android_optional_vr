@@ -8,6 +8,7 @@
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/draw_bindings.h"
 #include "gpu/draw_geometry_bindings.h"
+#include "gpu/scene/deferred_work.h"
 #include <plume_vulkan.h>
 #include <cstring>
 #include <iostream>
@@ -40,7 +41,9 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
   Need(vmaFlushAllocation(native->device->allocator, native->allocation, 0, VK_WHOLE_SIZE) == VK_SUCCESS, "Rigid upload flush");
   return result;
 }
-void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true) {
+void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true,
+         uint32_t deferred = 0) {
+  Need(!deferred || (mode == 19 && !stale && restore), "Deferred ordering fixture scope");
   const bool cutout = (mode >= 12 && mode < 23) || mode == 40, untextured = mode == 10 || mode == 21;
   const bool shadow_cutout = mode >= 23, shadow_untextured = mode == 31 || mode == 36 || mode == 38;
   const bool cutout_receiver = mode >= 37;
@@ -86,7 +89,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   pass.fog[0] = {LitVec(0,0,0), LitVec(0,0,1), LitVec(.2f,.4f,.6f), 0,8,.3f,mode < 2,mode == 2,LitFogBlend};
   pass.fog[1] = {LitVec(0,0,0), LitVec(1,0,0), LitVec(.1f,.2f,.1f), -2,2,.2f,mode < 2,false,LitFogAdd};
   const auto packed_pass = BuildRigidPass(pass); Need(bool(packed_pass), "Native rigid pass inputs");
-  const uint32_t instance_count = instanced ? 2 : 1;
+  const uint32_t instance_count = instanced || deferred ? 2 : 1;
   std::array<NativeRigidInstanceGPU,2> scene_instances, shadow_instances;
   std::array<NativeRigidPassInputs,2> references{pass,pass};
   scene_instances[0] = {*object,*packed_pass}; shadow_instances[0] = {*caster,*packed_pass};
@@ -105,7 +108,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     transform[14] -= .25f;
     shadow_instances[n] = {*BuildRigidObject(transform,{1,1,1,1},{0,0,0,8},{1,1,0,0},0),scene_instances[n].pass_data};
   }
-  if (cutout) for (uint32_t n=0;n<instance_count;++n) {
+  if (cutout) for (uint32_t n=0;n<(deferred ? 1 : instance_count);++n) {
     // Exact alpha=1/.5 boundaries after vertex/object/base multiplication.
     // Detail image alpha must affect RGB only. Distinct per-instance references
     // catch accidentally batch-wide cutoffs in the real indirect draw.
@@ -113,6 +116,14 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     data.diffuse.w = 2.f;
     Need(SetRigidCutout(data, mode == 20 && n ? 128 : mode == 22 || mode == 40 ? 64 : 255,
         mode < 20 ? mode-12 : RigidCutoutGE), "Rigid cutout pack");
+  }
+  if (deferred) {
+    // Coincident surfaces isolate order from geometry/lighting. The second
+    // material has half the RGB gain and alpha, so reversing source-over draws
+    // changes both-eye colour even though the depth values are identical.
+    scene_instances[1] = scene_instances[0]; shadow_instances[1] = shadow_instances[0];
+    scene_instances[1].pass_data.colour_grade.w *= .5f;
+    scene_instances[1].object_data.diffuse.w *= .5f;
   }
   if (shadow_cutout) for (uint32_t n=0;n<instance_count;++n) {
     // Poison irrelevant scene alpha/comparison inputs: none may change fixed
@@ -236,8 +247,9 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   pipeline_desc.renderTargetCount = 1; pipeline_desc.renderTargetFormat[0] = colour_desc.format;
   pipeline_desc.renderTargetBlend[0] = cutout ? RenderBlendDesc::AlphaBlend() : RenderBlendDesc::Copy();
   pipeline_desc.depthTargetFormat = RenderFormat::D32_FLOAT;
-  pipeline_desc.depthEnabled = pipeline_desc.depthWriteEnabled = true;
-  pipeline_desc.depthFunction = RenderComparisonFunction::LESS; pipeline_desc.cullMode = RenderCullMode::NONE;
+  pipeline_desc.depthEnabled = true; pipeline_desc.depthWriteEnabled = deferred != 3;
+  pipeline_desc.depthFunction = deferred ? RenderComparisonFunction::LESS_EQUAL : RenderComparisonFunction::LESS;
+  pipeline_desc.cullMode = RenderCullMode::NONE;
   pipeline_desc.viewMask = 3;
   auto scene_pipeline = device.createGraphicsPipeline(pipeline_desc);
   std::unique_ptr<RenderPipeline> foreign_pipeline;
@@ -253,11 +265,12 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   ApplyNativePipelineProgram(*shadow_program, pipeline_desc);
   pipeline_desc.viewMask = 0; pipeline_desc.renderTargetCount = 0;
   pipeline_desc.depthTargetFormat = depth_desc.format;
+  pipeline_desc.depthWriteEnabled = true; pipeline_desc.depthFunction = RenderComparisonFunction::LESS;
   auto shadow_pipeline = device.createGraphicsPipeline(pipeline_desc);
   Need(scene_pipeline && static_cast<VulkanGraphicsPipeline *>(scene_pipeline.get())->vk &&
        shadow_pipeline && static_cast<VulkanGraphicsPipeline *>(shadow_pipeline.get())->vk, "Rigid native pipelines");
   const NativeRigidIndexedCommand indirect_command{6,instance_count,0,0,0};
-  const std::array<NativeRigidIndexedCommand,2> indirect_commands{{{},indirect_command}};
+  const std::array<NativeRigidIndexedCommand,4> indirect_commands{{{},indirect_command,{6,1,0,0,0},{6,1,0,0,1}}};
   auto indirect = Upload(device,indirect_commands.data(),sizeof(indirect_commands),RenderBufferFlag::INDIRECT);
   auto queue = device.createCommandQueue(RenderCommandListType::DIRECT);
   auto commands = queue->createCommandList(); auto fence = device.createCommandFence();
@@ -331,7 +344,22 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   }
   if (restore) Need(ApplyImmediateGeometryBindings(*commands,scene_pipeline.get(),0,
       {&vertex_view,1},{&slot,1},&index_view), "Immediate geometry handoff");
-  commands->drawIndexedIndirect(indirect.get(),sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
+  if (deferred) {
+    const std::array<float,1> compatibility{20};
+    const std::array<DeferredInsertion,1> native{{{10,0}}};
+    std::vector<DeferredSelection> merged;
+    Need(MergeDeferredWork(compatibility,native,merged), "Mixed deferred sequence");
+    std::vector<DeferredSortItem> order;
+    for (uint32_t n=0;n<merged.size();++n) {
+      const auto entry = merged[n];
+      order.push_back({entry.native ? native[entry.index].depth : compatibility[entry.index],n});
+    }
+    if (deferred != 2) Need(OrderDeferredWork(order), "Mixed deferred back-to-front order");
+    for (const auto entry : order) {
+      const uint32_t instance = merged[entry.payload].native ? 1 : 0;
+      commands->drawIndexedIndirect(indirect.get(),(2+instance)*sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
+    }
+  } else commands->drawIndexedIndirect(indirect.get(),sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
   commands->setFramebuffer(nullptr);
   auto readback = device.createBuffer(RenderBufferDesc::ReadbackBuffer(2*colour_bytes+3*depth_bytes));
   Need(bool(readback), "Rigid readback");
@@ -450,7 +478,20 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     expected=LitScale(LitAdd(expected,LitVec(reference.colour_grade.x,.02f,.03f)),.9f);
     float rgba[]{expected.x,expected.y,expected.z,diffuse.w*.5f*texture_alpha};
     bool accepted = true;
-    if (cutout) {
+    if (deferred) {
+      // Independent expected order: sorted far object0 then near object1;
+      // unsorted control object1 then object0. Neither uses the production sort.
+      const float alpha = rgba[3];
+      const std::array<float,4> source{rgba[0],rgba[1],rgba[2],rgba[3]};
+      std::copy(std::begin(background),std::end(background),std::begin(rgba));
+      for (uint32_t step=0;step<2;++step) {
+        const uint32_t object_index = deferred == 2 ? 1-step : step;
+        const float gain = object_index ? .5f : 1.f, opacity = alpha*gain;
+        for (uint32_t c=0;c<4;++c)
+          rgba[c] = source[c]*gain*(c == 3 ? 1.f : opacity)+rgba[c]*(1-opacity);
+      }
+      Need(std::abs(source[0]*alpha*alpha*.25f) > .0001f, "Order control must have distinguishable pixels");
+    } else if (cutout) {
       const float threshold = mode == 20 && n ? 128.f/255 : mode == 22 || mode == 40 ? 64.f/255 : 1.f;
       const float alpha = rgba[3];
       // Independent oracle, not the production shader predicate or flags.
@@ -481,7 +522,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
       }
       maximum_error=(std::max)(maximum_error,error);
     }
-    Need(std::abs(pixels[2*colour_bytes/4+pixel]-(accepted ? world_z*(eye?.5f:1.f) : 1.f))<1e-5f,"Rigid per-eye depth mismatch");
+    Need(std::abs(pixels[2*colour_bytes/4+pixel]-(accepted && deferred != 3 ? world_z*(eye?.5f:1.f) : 1.f))<1e-5f,"Rigid per-eye depth mismatch");
     Need(std::abs(pixels[(2*colour_bytes+2*depth_bytes)/4+y*size+x]-caster_depth(x))<1e-5f,"Rigid caster depth mismatch");
   }
   readback->unmap();
@@ -494,7 +535,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
           "Solid, threshold-passing or complementary casters must occlude both eyes completely");
     }
   }
-  std::cout<<"PASS production native rigid shaders: mode="<<mode<<" stale="<<stale<<" restored="<<restore
+  std::cout<<"PASS production native rigid shaders: mode="<<mode<<" stale="<<stale<<" restored="<<restore<<" deferred="<<deferred
            <<" eyes=2 pixels=128 max_error="<<maximum_error
            <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" shadow cutout="<<shadow_cutout
            <<"; cutout receiver lit/shadowed/filtered="<<lit_receivers<<'/'<<shadowed_receivers<<'/'<<filtered_receivers
@@ -507,4 +548,5 @@ void CheckNativeRigid(plume::RenderDevice &device) {
     Run(device,0,stale,false);
     Run(device,0,stale,true);
   }
+  for(uint32_t deferred=1;deferred<=3;++deferred) Run(device,19,0,true,deferred);
 }

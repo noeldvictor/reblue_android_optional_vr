@@ -283,6 +283,26 @@ caused962. Continue scene ownership using the same native consumers while the
 bounded post-gamma observation awaits its budget; preserve all final gates.
 [Implementation and causal regression evidence](../research/20260908_0033_immediate-geometry-bindings.md).
 
+Host128 validates the source-only deferred groundwork committed in8d6f4e4,
+plus independent sorted cutoff handling and delayed Bind/Keep light recipes.
+The existing direct lighting path now shares capture/resolve; inherited values
+are resolved at actual draw order, not frozen during speculative preparation.
+Three C++ fixtures and351 Python checks pass. GPU rigid17 passes55 two-eye
+cases (1.33 s, validation0/0), including overlapping source-over draws driven by
+mixed-order metadata, an unsorted control and depth-write-off. These use native
+production shaders, not actual compatibility shaders or the live deferred list.
+Host128 links without guest objects; no game run or image was produced.
+
+The remaining connection is `PrepareNativeRigidSceneForObject` -> sorted native
+payloads in `ConsumeDeferredList` -> existing queue/fence ownership. Default scene
+admission still excludes deferred work. Do not flip it on using walk-time light
+tickets: actual list callbacks are `sub_8221D530`/`sub_8221D548`, dispatching the
+effect-participant chain and resource begin/end, not just `sub_82174270`'s shader
+choice. Account for those late outputs and authored participation before replacing
+them. Use the recovered callback map and new causal fixtures, not another whole
+source audit or unchanged live probe. Full native frame/game/stereo gates remain.
+[Deferred contracts and pending runtime connection](../research/20260908_0109_deferred-packet-order.md).
+
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB
 run960 image was not produced. Preserve960's timeout evidence along with957/948/941.

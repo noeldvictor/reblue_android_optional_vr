@@ -212,6 +212,18 @@ The desktop build passes without guest object compilation. Live game acceptance
 is still pending; this is not a proven fix for the earlier title-logo/tree gaps.
 [Handoff contract, causal fixtures and remaining gates](research/20260908_0033_immediate-geometry-bindings.md).
 
+**Host128 builds the deferred-packet groundwork; live connection is still pending.**
+Native plans now retain sorted depth, cutoff and depth-write policy; mixed-order
+metadata preserves submission ties. Lighting captures an owned Bind/Keep action
+and resolves inherited values at the final draw position. The existing direct
+lighting path shares that implementation. Three C++ fixtures,351 Python checks
+and55 two-eye GPU cases pass, including overlapping blend-order controls.
+The live deferred producer/consumer still uses the compatibility list: its
+participant callbacks and late material/pass updates must be accounted for before
+native submission is enabled. No new guest path removal or game-pixel acceptance
+is claimed by this checkpoint.
+[Deferred contracts, validation and the remaining connection](research/20260908_0109_deferred-packet-order.md).
+
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded
 300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with

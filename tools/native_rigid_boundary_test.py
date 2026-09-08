@@ -213,7 +213,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_gpu_fixture_uses_production_programs_and_real_pixels(self):
         text = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()
         for required in ("CreateNativeRigidPrograms(device, input)", "ApplyGraphicsBindings(",
-                         "ApplyNativePipelineProgram(", "drawIndexedIndirect(", "instance_count = instanced ? 2 : 1", "vkWaitForFences(",
+                         "ApplyNativePipelineProgram(", "drawIndexedIndirect(", "instance_count = instanced || deferred ? 2 : 1", "vkWaitForFences(",
                          "Rigid colour mismatch", "Rigid per-eye depth mismatch", "Rigid caster depth mismatch"):
             self.assertIn(required, text)
         self.assertNotIn("ofstream", text)

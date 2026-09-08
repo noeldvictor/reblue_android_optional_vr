@@ -4216,3 +4216,41 @@ larger for the new executable/object and causal test coverage. No raw/cook/perf/
 image output. Measured free79,935,156,224 B after cleanup, down954,368 B from
 preflight; host/link/source/Git and unrelated drive activity are separate from
 the selected diagnostic scopes and logical cleanup. Live acceptance remains open.
+
+### Deferred packet/light-order continuation (2026-09-08)
+
+Previous turn made progress by pushing8d6f4e4 as an explicitly unconnected source
+checkpoint. First measured free79,931,392,000 B; no owned build/test/game process
+was live. Reused the original3 GiB exception/floor62,509,998,080 B and existing
+fixture trees, not a new allowance. The local supervisor gained only explicit
+deferred build/CTest target routing. Every fixture job used32 MiB free-drop,
+300 s supervisor/30 s CTest and10 MiB cumulative build-log caps; estimated new
+retained fixture data below2 MiB, logs below128 KiB. Host128 used192 MiB free-drop
+and the same automatic unexpected-guest-object stop. No game/raw/image/cook/perf
+producer was launched, and the per-image budget question remains unanswered.
+
+All jobs completed0: deferred build1/CPU1, output build48/CPU31, material builds39
+and40/CPU37 and38, GPU build50/rigid17, host128. Exact PIDs/contracts/hashes are in
+`20260908_0109_deferred-packet-order.md`. Three CPU fixtures,351 Python checks and
+55 two-eye GPU cases pass, validation0/0. Host128 is8d6f4e426 dirty, codegen0
+written/1 module up to date and no guest object compilation. The producer/consumer
+native deferred connection and live/pixel qualification remain pending.
+
+After replacement validation, removed18 explicitly resolved superseded success
+logs: output47/CPU30, material38/39 and CPU36/37, GPU49/rigid16 and host127,
+stdout/stderr pairs.26,887 logical B removed once; logs are reproducible, replacement
+proof retained. No unresolved failure, distinct GPU test, owner data or capture
+was deleted. New logs30,324 B; ending aggregate271,558 B/166 files, net3,437 B
+growth. Texture fixture74,477,093 B/132 files (up372,990 B); GPU fixture15,272,322 B/
+17 files (up244,400 B). Those two fixture/log scopes grew620,827 B for retained
+executables/objects and causal regressions. Material fixture ends8,359,739 B/41
+files; its pre-first-build size was not separately sampled, so no exact full-turn
+delta is attributed to it. Host outputs/objects and source/Git are separate.
+
+Cleanup free79,931,994,112 B,601,112 B above this continuation's initial reading;
+drive-wide activity is not claimed as cleanup savings. The immediate pre/post
+cleanup readings differed20,480 B; logical bytes and physical free-space movement
+are deliberately separate. All owned producers terminal; owner profile unchanged
+at SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+The10,303,111 B image archive and252,177,116,500 B protected raw inventory receive
+no new files and no new cleanup credit. Preserve all outstanding runtime gates.

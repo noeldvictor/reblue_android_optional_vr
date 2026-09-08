@@ -136,6 +136,14 @@ void TestNativePrimitivePolicies() {
     alpha.object_reference = 0;
     Require(ComposeMaterialAlphaReferences(ranges,values,alpha,references) &&
         references == std::vector<uint32_t>(7,0), "explicit zero object override is not pass default");
+    inputs.pass_mode = 0;
+    Require(compose() && values[0].deferred && values[5].deferred && values[1].direct,
+        "ordinary pass emits sorted entries and direct siblings");
+    Require(ComposeMaterialAlphaReferences(ranges,values,alpha,references) &&
+        references == std::vector<uint32_t>{128,0,0,0,0,128,0},
+        "deferred cutoff copy precedes direct-only object override");
+    inputs.pass_mode = 3;
+    Require(compose(), "restore suppressed cutoff fixture");
     alpha.object_reference.reset(); alpha.direct_reference = alpha.sorted_reference = 0;
     Require(ComposeMaterialAlphaReferences(ranges,values,alpha,references) &&
         references == std::vector<uint32_t>{0,0,0,192,0,0,0}, "zero pass defaults remain unresolved until next primitive");

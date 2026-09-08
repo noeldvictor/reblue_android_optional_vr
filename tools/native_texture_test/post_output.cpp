@@ -1013,6 +1013,8 @@ void RigidScenePacket() {
     auto sorted = prepare();
     assert(sorted && sorted->draw && sorted->deferred && sorted->depth_write && sorted->depth == 8);
     assert(sorted->object.flags.z == RigidCutoutGE); // sorted pass owns comparison
+    cutout.comparison = UINT32_MAX; // unrelated preceding comparison is not consumed
+    assert(prepare() && prepare()->object.flags.z == RigidCutoutGE);
     packet.world[14] = -5;
     assert(prepare()->depth == 13 && sorted->depth == 8);
     packet.camera->view[14] = 7;

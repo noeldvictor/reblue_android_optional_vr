@@ -27,7 +27,8 @@ struct DeferredSelection { uint32_t index = 0; bool native = false; };
 inline bool MergeDeferredWork(std::span<const float> compatibility,
     std::span<const DeferredInsertion> native, std::vector<DeferredSelection> &out,
     size_t limit = 5140) {
-  if (compatibility.size() > limit || native.size() > limit - compatibility.size()) return false;
+  if (compatibility.size() >= UINT32_MAX || native.size() >= UINT32_MAX ||
+      compatibility.size() > limit || native.size() > limit - compatibility.size()) return false;
   uint32_t previous = 0;
   for (const auto &entry : native) {
     if (entry.preceding < previous || entry.preceding > compatibility.size() ||
