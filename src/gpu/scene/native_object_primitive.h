@@ -36,6 +36,20 @@ template <class Image> struct NativeObjectPrimitive {
   std::optional<NativeToonSurface> toon;
 };
 
+// Complete the render-pose handoff before scene plans capture world matrices,
+// skin palettes, animated bounds or deferred depth. The raw authored packet
+// remains useful to compatibility verification; never mutate its pose storage.
+template <class Image>
+bool BindNativeRenderPose(NativeObjectPrimitive<Image> &packet,
+                         std::shared_ptr<const NativeInstancePose> rendered) {
+  if (!packet.pose || !rendered || rendered->instance != packet.pose->instance ||
+      rendered->model_generation != packet.pose->model_generation || rendered->model != packet.pose->model ||
+      rendered->transforms.size() != packet.pose->transforms.size() || packet.node >= rendered->transforms.size()) return false;
+  packet.world = rendered->transforms[packet.node];
+  packet.pose = std::move(rendered);
+  return true;
+}
+
 template <class Image>
 std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
     std::shared_ptr<const NativeInstancePose> pose, uint32_t node, uint32_t primitive,

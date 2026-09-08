@@ -15,6 +15,7 @@
 #include "core/logging.h"
 #include "core/memory_helpers.h"
 #include "core/settings.h"
+#include "engine/frame_clock.h"
 #include "gpu/frame_stats.h"
 #include <algorithm>
 #include <stdexcept>
@@ -47,6 +48,7 @@ struct Store {
   uint32_t miss_examples = 0;
   uint32_t drift_examples = 0;
   uint32_t frame = 0;
+  std::optional<NativePosePhase> render_phase;
 };
 Store &Instances() { static Store result; return result; }
 bool Range(uint64_t address, uint64_t bytes) {
@@ -72,6 +74,9 @@ void Report(Store &store) {
       stats.created, stats.retired, stats.indexed, stats.bytes, stats.published,
       stats.reused, store.imports, store.refused + stats.refused, store.reads,
       store.unavailable, store.checked, store.wrong, store.handoffs, store.handoff_missing);
+  if (stats.render_reads)
+    BD_INFO("[native-render-poses] frame {} reads {} blends {} reused {} snapped {} refused {}; immutable whole-pose interpolation, no guest scratch",
+        frame, stats.render_reads, stats.render_blends, stats.render_reused, stats.render_snaps, stats.render_refused);
   store.frame = frame;
 }
 void Retire(uint32_t visual) {
@@ -137,6 +142,8 @@ void Handoff(uint32_t container) {
   }
   const bool transferred = instance_source::PublishCompletedTransfer(
       store.instances, it->second, transfer, completed);
+  if (transferred)
+    store.instances.ObserveRenderTick(it->second.instance, bd::engine::TickCount(), bd::engine::InterpolationActive());
   ++store.imports;
   if (!transferred) ++store.refused;
   ++(transferred ? store.handoffs : store.handoff_missing);
@@ -277,6 +284,20 @@ std::shared_ptr<const NativeInstancePose> FindNativeInstancePose(
   ++(pose ? store.reads : store.unavailable);
   Report(store);
   return pose;
+}
+
+std::shared_ptr<const NativeInstancePose> ResolveNativeRenderPose(const NativeInstancePose &completed) {
+  auto &store = Instances();
+  std::lock_guard lock(store.mutex);
+  const auto source = store.instances.Read(completed.instance, 1);
+  if (source.get() != &completed) return {};
+  const auto frame = FrameStatFrameCount();
+  // Freeze one host phase across all instances and scene/shadow views of a
+  // rendered frame. Authored endpoints still advance only at their handoff.
+  if (!store.render_phase || store.render_phase->frame != frame)
+    store.render_phase = NativePosePhase{bd::engine::TickCount(), frame,
+        bd::engine::Alpha(), bd::engine::InterpolationActive()};
+  return store.instances.ReadRender(source, *store.render_phase);
 }
 
 bool CopyNativeInstanceWorld(const NodeTag &tag, float out[16]) {

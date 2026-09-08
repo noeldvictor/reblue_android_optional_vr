@@ -101,6 +101,14 @@ completion is claimed.
 [Scene connection and its verification limits](research/20260908_1210_native-skin-scene-shading.md).
 [Connection, live evidence and remaining gates](research/20260908_1143_native-skinned-shadow-consumer.md).
 
+**Render-pose source checkpoint (2026-09-08):** timed, immutable poses now connect
+the existing instance owner to native culling, scene/shadow packets and retained
+skin palettes, without guest interpolation scratch. Raw completed poses remain
+separate for compatibility checks. C++ regression cases are added but **not yet
+built or run**; the host build and unlocked-FPS live/pixel verification are pending.
+The host164/run971 evidence above predates this change. Original animation
+evaluation, conditional source-palette copying and secondary palettes remain.
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

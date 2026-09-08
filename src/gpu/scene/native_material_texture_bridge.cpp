@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_material_texture_bridge.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_toon_source.h"
 #include "gpu/scene/native_material_alpha_source.h"
@@ -264,12 +265,15 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
   refusal = "live receiver visibility unavailable";
   const auto visibility = ImportNodeShadowInputs(tag);
   if (!visibility) return {};
+  refusal = "native render pose unavailable";
+  const auto render_pose = ResolveNativeRenderPose(pose);
+  if (!render_pose) return {};
   std::vector<NativeRigidScenePlan> result;
   result.reserve(program->ranges.size());
   for (uint32_t primitive = 0; primitive < program->ranges.size(); ++primitive) {
     refusal = "owned ordinary scene packet or lighting pass unavailable";
     auto packet = FindNativeObjectPrimitive(pose, node, primitive);
-    if (!packet || !packet->lighting) return {};
+    if (!packet || !BindNativeRenderPose(*packet, render_pose) || !packet->lighting) return {};
     refusal = "owned scene/object lighting publication unavailable";
     const auto lights = CaptureNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
     if (!lights) return {};
@@ -473,7 +477,9 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
     }
   }
   refusal = "shadow canonical geometry, matrices or sampled image contract unavailable";
-  auto plans = PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts,skin ? &pose : nullptr,policies);
+  const auto render_pose = ResolveNativeRenderPose(pose);
+  if (!render_pose) { refusal = "native shadow render pose unavailable"; return {}; }
+  auto plans = PrepareNativeRigidShadow(*program, render_pose->transforms[node], *scope->policy_inputs, camera, cutouts,skin ? render_pose.get() : nullptr,policies);
   if (!plans) for (size_t n=0;n<std::min<size_t>(8,cutouts.size());++n) {
     const auto &geometry = program->geometries[n];
     const auto &cutout = cutouts[n];

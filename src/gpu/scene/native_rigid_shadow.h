@@ -123,12 +123,13 @@ std::span<const NativePrimitivePolicy> FindNativeShadowPoliciesForObject(
     const NativeInstancePose &pose, uint32_t node, const PrimitivePolicyInputs &inputs);
 inline std::optional<NativeBounds> NativeSkinCasterBounds(const NativeModelMaterialProgram &program,
     const NativeInstancePose &pose, uint32_t node) {
-  if (node >= pose.transforms.size() || program.skin_geometries.size() != program.ranges.size() ||
+  if (node >= pose.transforms.size() ||
       program.geometries.size() != program.ranges.size()) return {};
   std::optional<NativeBounds> result;
   for (size_t n = 0; n < program.ranges.size(); ++n) {
     if (!program.ranges[n].shader.vertex_bones) return {};
     const bool skin = *program.ranges[n].shader.vertex_bones != 0;
+    if (skin && program.skin_geometries.size() != program.ranges.size()) return {};
     const auto &geometry = skin ? program.skin_geometries[n] : program.geometries[n];
     if (!geometry) return {};
     const auto bounds = skin ? TransformNativeSkinBounds(geometry->skin_bounds,pose.transforms) :

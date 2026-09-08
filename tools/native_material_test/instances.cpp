@@ -1,5 +1,6 @@
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_instance_source.h"
+#include "gpu/scene/native_object_primitive.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -86,9 +87,108 @@ void TestSourceHandoff() {
   pose.reset();
   Require(registry.Stats().bytes == 0, "handoff leases retire once, without duplicate accounting");
 }
+
+void TestRenderPoses() {
+  NativeInstanceRegistry registry;
+  const auto id = registry.Create(41);
+  std::vector<RenderMatrix> matrices{World(0), World(.25f)};
+  const auto publish = [&](uint64_t tick, bool active = true) {
+    Require(registry.Publish(id, 0, matrices) && registry.Transfer(id, 0, 1, matrices.size()) &&
+            registry.ObserveRenderTick(id, tick, active), "completed render tick publication");
+    return registry.Read(id, 1);
+  };
+  auto first = publish(10);
+  Require(registry.ReadRender(first, {10,100,.5f,true}) == first, "first pose snaps without invented history");
+  matrices[0] = World(1); matrices[1] = World(1.25f);
+  auto current = publish(11);
+  const NativePosePhase phase{11,101,.25f,true};
+  auto quarter = registry.ReadRender(current, phase);
+  Require(quarter && quarter != current && quarter->transforms[0][12] == .25f &&
+          quarter->transforms[1][12] == .5f, "whole native pose interpolates the completed endpoints");
+  const auto bytes = registry.Stats().bytes;
+  Require(registry.ReadRender(current, phase) == quarter && registry.Stats().bytes == bytes,
+          "culling and both draw views reuse exactly one frame pose");
+  Require(!registry.ReadRender(current, {11,101,.75f,true}) &&
+          !registry.ReadRender(current, {11,100,.25f,true}), "conflicting or older frame request refuses");
+  auto later = registry.ReadRender(current, {11,102,.75f,true});
+  Require(later && later->transforms[0][12] == .75f && quarter->transforms[0][12] == .25f &&
+          registry.Read(id,1)->transforms[0][12] == 1, "render phases never mutate source comparison or pinned poses");
+  NativeObjectPrimitive<int> packet; packet.pose = current; packet.node = 1; packet.world = matrices[1];
+  Require(BindNativeRenderPose(packet, quarter) && packet.pose == quarter && packet.world[12] == .5f,
+          "production packet binds matching rigid world and skin pose before planning");
+  auto foreign = std::make_shared<NativeInstancePose>(*quarter); ++foreign->instance;
+  Require(!BindNativeRenderPose(packet, foreign) && packet.pose == quarter, "foreign render pose cannot replace a packet");
+  foreign = std::make_shared<NativeInstancePose>(*quarter); ++foreign->model_generation;
+  Require(!BindNativeRenderPose(packet, foreign), "render packet generation must match");
+  foreign = std::make_shared<NativeInstancePose>(*quarter); foreign->transforms.pop_back();
+  Require(!BindNativeRenderPose(packet, foreign), "incomplete render pose cannot bind a packet");
+  foreign = std::make_shared<NativeInstancePose>(*current);
+  Require(!registry.ReadRender(foreign, {11,103,.5f,true}), "matching IDs do not impersonate the exact completed publication");
+  matrices[0] = World(1.5f); matrices[1] = World(1.75f);
+  current = publish(11); // another completed writer in the SAME logic tick
+  auto late = registry.ReadRender(current, {11,103,.5f,true});
+  Require(late && late->transforms[0][12] == .75f,
+          "same-tick late writes replace current without advancing previous");
+  Require(registry.ObserveRenderTick(id,11,true) && registry.ReadRender(current,{11,103,.5f,true}) == late,
+          "repeated unchanged handoff preserves the frame lease");
+  current = publish(12);
+  Require(registry.ReadRender(current,{12,104,.5f,true}) == current, "unchanged tick endpoints share storage");
+  matrices[0] = World(1.75f); current = publish(14);
+  Require(registry.ReadRender(current,{14,105,.5f,true}) == current, "skipped ticks snap rather than borrow stale history");
+  matrices[0] = World(2); current = publish(15);
+  Require(registry.ReadRender(current,{15,106,.5f,true})->transforms[0][12] == 1.875f, "contiguous history recovers");
+  matrices[0] = World(2.25f); current = publish(13);
+  Require(registry.ReadRender(current,{13,107,.5f,true}) == current, "clock rewind snaps");
+  current = publish(13,false);
+  Require(registry.ReadRender(current,{13,108,0,false}) == current, "disabled interpolation uses current authored pose");
+  matrices[0] = World(2.5f); current = publish(14);
+  Require(registry.ReadRender(current,{14,109,.5f,true}) == current, "re-enable does not interpolate across a coupled event");
+  matrices[0] = World(20); current = publish(15);
+  Require(registry.ReadRender(current,{15,110,.5f,true}) == current, "teleport snaps the whole pose");
+  matrices[0] = World(20.25f); matrices[1][15] = 2; current = publish(16);
+  Require(registry.ReadRender(current,{16,111,.5f,true}) == current, "nonaffine endpoint is never blended");
+  Require(!registry.ReadRender(current,{16,112,std::numeric_limits<float>::quiet_NaN(),true}) &&
+          !registry.ReadRender(current,{16,112,-.1f,true}) && !registry.ReadRender(current,{16,112,1.1f,true}),
+          "invalid render phase refuses");
+  Require(registry.ReadRender(current,{16,112,0,true}) == current &&
+          registry.ReadRender(current,{16,113,1,true}) == current, "existing alpha-zero and completed-phase contract");
+  registry.Invalidate(id,1);
+  Require(!registry.ReadRender(current,{16,114,.5f,true}), "invalidated render publication cannot retain a current interpolation");
+  Require(packet.pose->transforms[0][12] == .25f, "queued pose remains immutable after invalidation");
+  registry.Retire(id);
+  Require(!registry.ReadRender(current,{16,115,.5f,true}) && registry.Stats().bytes > 0,
+          "retired in-flight render poses stay charged but cannot be rediscovered");
+  packet.pose.reset(); first.reset(); current.reset(); quarter.reset(); later.reset(); late.reset(); foreign.reset();
+  Require(registry.Stats().bytes == 0, "source, history and render leases retire without duplicate accounting");
+
+  NativeInstanceRegistry probe;
+  const auto probe_id = probe.Create(1);
+  auto value = World(0);
+  Require(probe.Publish(probe_id,0,{&value,1}), "render budget probe");
+  const auto pose_bytes = probe.Stats().bytes - NativeInstanceRegistry::kEntryBytes;
+  NativeInstanceRegistry bounded(NativeInstanceRegistry::kEntryBytes + 3*pose_bytes);
+  const auto bounded_id = bounded.Create(1);
+  Require(bounded.Publish(bounded_id,0,{&value,1}) && bounded.Transfer(bounded_id,0,1,1) &&
+          bounded.ObserveRenderTick(bounded_id,1,true), "bounded first render endpoint");
+  value = World(1);
+  Require(bounded.Publish(bounded_id,0,{&value,1}) && bounded.Transfer(bounded_id,0,1,1) &&
+          bounded.ObserveRenderTick(bounded_id,2,true), "bounded second render endpoint");
+  auto endpoint = bounded.Read(bounded_id,1);
+  auto pinned = bounded.ReadRender(endpoint,{2,2,.5f,true});
+  Require(pinned && bounded.Stats().bytes == NativeInstanceRegistry::kEntryBytes + 3*pose_bytes,
+          "history plus rendered result fits the exact shared byte cap");
+  Require(!bounded.ReadRender(endpoint,{2,3,.75f,true}) && pinned->transforms[0][12] == .5f,
+          "pinned frame overlap refuses instead of exceeding budget or mutating a GPU lease");
+  pinned.reset();
+  auto recovered = bounded.ReadRender(endpoint,{2,3,.75f,true});
+  Require(recovered && recovered->transforms[0][12] == .75f, "render budget recovers after actual reader release");
+  bounded.Retire(bounded_id); endpoint.reset(); recovered.reset();
+  Require(bounded.Stats().bytes == 0, "bounded render history and outputs release once");
+}
 }
 void TestNativeInstances() {
   TestSourceHandoff();
+  TestRenderPoses();
   NativeInstanceRegistry registry;
   Require(!registry.Create(0), "instance needs a published native model generation");
   const auto first = registry.Create(100), second = registry.Create(100);

@@ -129,6 +129,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
       LoadF32(ctx_va + offsetof(GuestTraverseCtx, radiusScale));
   const auto instance_pose = FindNativeInstancePose(
       bd::mem::try_load<u32>(ctx_va), bd::mem::try_load<u32>(ctx_va + 4), palette);
+  std::shared_ptr<const NativeInstancePose> render_pose;
   const auto route_model = LoadNativeRigidRouteModel(ctx_va);
   NativeObjectTextureScope textures(ctx_va, instance_pose, ctx.r1.u32);
 
@@ -264,6 +265,20 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           float c[3];
           const bool native_pose = instance_pose && index < instance_pose->transforms.size();
           const auto *program = native_pose ? FindNativeInstanceNode(*instance_pose, index) : nullptr;
+          // Only admitted native consumers use the render-time endpoint. The
+          // unconverted walk and its source comparisons keep the completed pose.
+          const bool native_render_node = program &&
+              ((view_id == 3 && NativeRigidSceneEnabled() &&
+                FindNativeSceneAdmissionForObject(*instance_pose,index,shadow_policy).route == NativeRigidCasterRoute::Native) ||
+               (view_id == 1 && NativeRigidShadowEnabled() &&
+                PrepareNativeRigidShadowAdmission(*program,shadow_policy,NativeSkinShadowEnabled(),
+                    NativeSkinShadowEnabled() && shadow_policy && (shadow_policy->technique == 1 || shadow_policy->texture_effects)
+                        ? FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)
+                        : std::span<const NativePrimitivePolicy>{}).route == NativeRigidCasterRoute::Native));
+          if (native_render_node && !render_pose) {
+            render_pose = ResolveNativeRenderPose(*instance_pose);
+            if (!render_pose) throw std::runtime_error("Native culling has no owned render pose");
+          }
           const auto *bounds = program && program->bounds ? &*program->bounds : nullptr;
           const bool verify_bounds = bounds && REXCVAR_GET(bd_native_materials_verify);
           const auto *mp = native_pose ? nullptr : bd::mem::try_at<const be_u32>(matrix);
@@ -280,7 +295,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             }
           }
           for (u32 i = 0; i < 16; ++i) {
-            if (native_pose) { m[i] = instance_pose->transforms[index][i]; continue; }
+            if (native_pose) {
+              m[i] = (native_render_node ? render_pose : instance_pose)->transforms[index][i]; continue;
+            }
             const u32 bits = static_cast<u32>(mp[i]);
             std::memcpy(&m[i], &bits, sizeof(float));
           }
@@ -293,17 +310,12 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           for (u32 k = 0; k < 3; ++k)
             out[k] = m[12 + k] + c[0] * m[k] + c[1] * m[4 + k] + c[2] * m[8 + k];
           float radius = radius_scale * (bounds ? (*bounds)[3] : LoadF32(mesh + offsetof(GuestMesh, radius)));
-          if (program &&
+          if (native_render_node && (render_pose != instance_pose ||
               std::any_of(program->ranges.begin(),program->ranges.end(),[](const auto &range) {
                 return range.shader.vertex_bones && *range.shader.vertex_bones;
-              }) && ((view_id == 3 && NativeSkinSceneEnabled() &&
-                  FindNativeSceneAdmissionForObject(*instance_pose,index,shadow_policy).route == NativeRigidCasterRoute::Native) ||
-                (view_id == 1 && NativeSkinShadowEnabled() && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true,
-                  shadow_policy && (shadow_policy->technique == 1 || shadow_policy->texture_effects)
-                      ? FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)
-                      : std::span<const NativePrimitivePolicy>{}).route == NativeRigidCasterRoute::Native))) {
-            const auto animated = NativeSkinCasterBounds(*program,*instance_pose,index);
-            if (!animated) throw std::runtime_error("Native skin caster has no owned animated bounds");
+              }))) {
+            const auto animated = NativeSkinCasterBounds(*program,*render_pose,index);
+            if (!animated) throw std::runtime_error("Native node has no owned render-pose bounds");
             double squared = 0;
             for (uint32_t axis = 0; axis < 3; ++axis) {
               out[axis] = float((double(animated->min[axis])+animated->max[axis])*.5);

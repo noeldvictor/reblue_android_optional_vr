@@ -3,6 +3,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_rigid_batch.h"
@@ -154,11 +155,13 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   const auto camera = FindNativePassCamera(1);
   Require(camera.has_value(), "fresh shadow pass camera unavailable");
   Require(node < pose.transforms.size(), "native caster transform unavailable");
+  const auto render_pose = ResolveNativeRenderPose(pose);
+  Require(render_pose && node < render_pose->transforms.size(), "native caster render pose unavailable");
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });
   const char *refusal = "whole-node caster resources or matrices unavailable";
   const auto plans = (cutouts || !policies.empty()) ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal, skin)
-      : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera, {}, skin ? &pose : nullptr);
+      : PrepareNativeRigidShadow(*model, render_pose->transforms[node], *inputs, *camera, {}, skin ? render_pose.get() : nullptr);
   if (!plans) BD_ERROR("[native-shadow-packet] instance {} generation {} node {} phase {} cutouts {} ranges {}; {}",
       pose.instance, pose.model_generation, node, inputs->phase, cutouts, model->ranges.size(), refusal);
   Require(plans.has_value(), refusal);
@@ -227,7 +230,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     Require(draw.bindings.Valid(), "invalid native descriptor contract");
     auto item = std::make_shared<NativeRigidBatchItem>();
     item->geometry = geometry; item->input = {plan.object,plan.pass};
-    if (geometry->skin_influences) { item->skin_pose = owned_pose; item->world_bounds = plan.skin_bounds; }
+    if (geometry->skin_influences) { item->skin_pose = render_pose; item->world_bounds = plan.skin_bounds; }
     item->albedo[0] = plan.albedo;
     if (plan.albedo) {
       Require(plan.sampler.has_value(), "native cutout sampler unavailable");

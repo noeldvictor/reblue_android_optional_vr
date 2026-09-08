@@ -47,5 +47,8 @@ bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out,
     std::vector<NativeLightSourceBinding> &sources, size_t &unavailable);
 std::shared_ptr<const NativeInstancePose> FindNativeInstancePose(
     uint32_t visual, uint32_t graph, uint32_t palette);
+// Render-only view of an exact completed native publication. No source lookup,
+// scratch palette or shader-register upload; culling and packets share a lease.
+std::shared_ptr<const NativeInstancePose> ResolveNativeRenderPose(const NativeInstancePose &completed);
 bool CopyNativeInstanceWorld(const NodeTag &tag, float out[16]);
 } // namespace bd::gpu::scene

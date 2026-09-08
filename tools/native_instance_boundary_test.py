@@ -38,7 +38,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
     def test_model_lease_is_attached_before_pose_and_used_without_source_lookup(self):
         self.assertIn("FindLoadedNativeModel(graph)", self.bridge)
         self.assertIn("store.instances.Create(generation, model)", self.bridge)
-        self.assertIn("owner->pose.model = it->second.model", self.core)
+        self.assertIn("slot = OwnPose(id, it->second, transforms)", self.core)
+        self.assertIn("owner->pose.model = entry.model", self.core)
         lookup = self.core.split("FindNativeInstanceNode(", 1)[1]
         for forbidden in ("bd::mem", "NodeTag", "source_mesh", "LoadedNativeModelGeneration"):
             self.assertNotIn(forbidden, lookup)

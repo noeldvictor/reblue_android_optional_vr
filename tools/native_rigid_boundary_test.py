@@ -23,7 +23,10 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("object_data.world", shader)
         self.assertNotIn("object_data.normal_rows", shader)
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("view_id == 3 && NativeSkinSceneEnabled()", walk)
+        self.assertIn("view_id == 3 && NativeRigidSceneEnabled()", walk)
+        self.assertIn("FindNativeSceneAdmissionForObject(*instance_pose,index,shadow_policy)", walk)
+        bridge = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        self.assertIn("PrepareNativeRigidSceneAdmission(*program,inputs,NativeRigidDeferredEnabled(),NativeSkinSceneEnabled()", bridge)
 
     def test_receiver_is_native_and_draw_consumes_a_retained_packet(self):
         source = (ROOT / "src/gpu/scene/native_shadow_receiver_bridge.cpp").read_text()
@@ -266,7 +269,8 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("request.skin = &*range.skin", load)
         self.assertIn("program.skin_geometries[i] = ImportNativeMesh(request)", load)
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
-        for required in ("CreateNativeSkinShadowProgram(", "item->skin_pose = owned_pose",
+        for required in ("CreateNativeSkinShadowProgram(", "item->skin_pose = render_pose",
+                         "const auto render_pose = ResolveNativeRenderPose(pose)",
                          "PlanNativeSkinPalette(", "pose->transforms.data()",
                          "NativeRigidDescriptorSchema schema(bool(first.skin_pose))"):
             self.assertIn(required, direct)
@@ -277,7 +281,9 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("object_data.world", shader)
         self.assertNotIn("exMatrix", shader)
         bridge = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
-        self.assertIn("camera, cutouts,skin ? &pose : nullptr", bridge)
+        self.assertIn("camera, cutouts,skin ? render_pose.get() : nullptr", bridge)
+        self.assertIn("BindNativeRenderPose(*packet, render_pose)", bridge)
+        self.assertIn("NativeSkinCasterBounds(*program,*render_pose,index)", walk)
         self.assertIn("*scope->policy_inputs != inputs", bridge)
         self.assertIn("FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)", walk)
         self.assertIn("FindNativeShadowPoliciesForObject(pose,node,*inputs)", direct)
