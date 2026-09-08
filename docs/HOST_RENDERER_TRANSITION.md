@@ -787,6 +787,18 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    palettes/completed source copy, unsupported bone routes and full desktop
    sequence/both-eye gates remain. No speedup/full host frame or Quest claim.
    [Skeleton contract, live scopes and preserved failures](../research/20260908_1544_native-skeleton-evaluation.md).
+   **Keyed clip ownership prerequisite (CPU-only):** `native_animation_source.h`
+   imports relocated type2 T/R/S keys into immutable `NativeAnimationClip`, with
+   dense model-local joints, seconds, exact turn fractions and capacity bounds.
+   Material49/CPU47 verifies source destruction -> sampling -> existing hierarchy
+   evaluation -> completed instance publication/retirement. An independent384-case
+   packed-angle regression exposed/fixed half-turn arc reversal before runtime
+   wiring. Types0/1/3, weighted/subtree/layer application, slot clocks and loaded
+   clip residency/lifetime binding remain. No additional guest execution is yet
+   removed. Next connect the verified loader/slot contracts to existing owners,
+   replacing whole channel production with original comparison; do not add a
+   per-draw or per-tick source-key cache. Host167 and its live gates are unchanged.
+   [Recovered clip/loader contracts and prerequisite tests](../research/20260908_1612_native-animation-clips.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass
    scheduling and presentation. Remove guest rendering, register/resource

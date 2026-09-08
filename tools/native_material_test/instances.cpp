@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 using namespace bd::gpu::scene;
+void TestAnimationClips();
 namespace {
 void Require(bool valid, const char *message) {
   if (!valid) throw std::runtime_error(message);
@@ -348,6 +349,7 @@ void TestNativeInstances() {
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();
+  TestAnimationClips();
   NativeInstanceRegistry registry;
   Require(!registry.Create(0), "instance needs a published native model generation");
   const auto first = registry.Create(100), second = registry.Create(100);

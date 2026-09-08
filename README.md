@@ -130,6 +130,12 @@ integration acceptance. Animation curves, special bones, late writers, source
 palette adapters and motion/both-eye pixels remain; normal defaults stay unchanged.
 [Contract, scoped live evidence and remaining failures](research/20260908_1544_native-skeleton-evaluation.md).
 
+Keyed animation clips now have a bounded native importer/sampler feeding the same
+channel, skeleton and instance types in CPU tests, including source destruction
+and angular-wrap regressions. **Runtime clip loading, slot/layer integration and
+guest-sampler replacement are still pending**; this does not change host167's
+live status. [Clip contract and tests](research/20260908_1612_native-animation-clips.md).
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

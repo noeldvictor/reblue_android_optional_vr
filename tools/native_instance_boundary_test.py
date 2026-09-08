@@ -15,6 +15,18 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.source = (root / "src/gpu/scene/native_instance_source.h").read_text(encoding="utf-8")
         cls.skeleton = (root / "src/gpu/scene/native_skeleton.h").read_text(encoding="utf-8")
         cls.loader = (root / "src/gpu/scene/native_material.cpp").read_text(encoding="utf-8")
+        cls.animation = (root / "src/gpu/scene/native_animation_clip.h").read_text(encoding="utf-8")
+        cls.animation_test = (root / "tools/native_material_test/animation.cpp").read_text(encoding="utf-8")
+
+    def test_animation_sampler_owns_keys_and_reuses_existing_channel_and_pose_types(self):
+        for forbidden in ("PPCContext", "REX_", "bd::mem", "ReadWord", "name_hash", "NodeTag", "ofstream"):
+            self.assertNotIn(forbidden, self.animation)
+        self.assertIn("std::vector<NativeAnimationTrack> tracks_", self.animation)
+        self.assertIn("std::vector<NativeJointChannels> &out", self.animation)
+        self.assertIn("RetainedBytes()", self.animation)
+        self.assertLess(self.animation_test.index("source.words.clear()"), self.animation_test.index("lease->Sample("))
+        self.assertIn("EvaluateNativeSkeleton(skeleton,channels,root,pose)", self.animation_test)
+        self.assertIn("registry.Publish(instance,0,pose)", self.animation_test)
 
     def test_palette_container_matches_both_original_producer_and_release(self):
         self.assertIn("kVisualBoneContainer = 0xA48", self.layout)

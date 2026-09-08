@@ -5868,3 +5868,64 @@ Exact owner profile hash verified again; no observed renderer/compiler/test
 producer. No next run queued. Keep975 timing/field-exit failure, archived974
 accounting failure and all prior visual evidence. Research/active queue/README
 record scoped progress and pending full reload/motion/both-eye/Quest gates.
+
+### 2026-09-08 keyed animation ownership after2e7745f
+
+Previous implementation goal turn is progress (native skeleton integration);
+the intervening push-only request leaves all eight commits local because the
+reviewer rejected the external upload. Its specific approval is still pending;
+automatic goal continuation is not that approval. No push retry in this bundle.
+Source work traces skeletal clip loading/sampling, not D2 UI curves. Plan an
+owned keyed-clip importer/sampler feeding existing channels, skeleton evaluator
+and instance ownership in the existing CPU fixture. Runtime load/slot binding,
+layer blending and sampler replacement remain pending, not a full conversion.
+
+16:12:15 free63913181184B; no observed game/compiler/test producer. Existing
+material tree8756401B/41 and aggregate build logs409004B/200. Same cumulative
+floor62509998080B, 3GiB owner exception, 100MiB diagnostics/10MiB build logs;
+runtime diagnostics77202335B and images10434657B/13 unchanged. New raw/image0.
+Reuse material47/CPU45 under64/8MiB free-drop and300s guards. Estimate <8MiB
+incremental fixture peak (one new test translation unit, link overlap) and
+<16KiB logs; keep46/44 until replacement passes. No host build, game, new tree,
+cache, asset file or capture is needed for this source/CPU-only prerequisite.
+Two scalar constants were decoded in memory from the owned XEX; no decrypted
+image/session key was written or printed. Builds run only after source checks.
+
+Material47/PID28364 terminal0:16:19:44 free63906963456->63906693120B;
+onlyanimation/instances fixture objects and link (CMake regenerated this same
+tree after adding the test source). CPU45/PID35028 terminal0 at16:20:28,
+free63889944576->63889940480B,0.13s test/0.15s CTest. Initial CPU behavior passed.
+Independent source-unit angular checks were added before any runtime wiring:
+material48/PID35884 terminal0,free63886479360->63886458880B;
+CPU46/PID37604 terminal failure8 (supervisor tool exits1),free63886393344->
+63886389248B,0.04s test. Cause: early float-radians conversion reverses some
+exact half-turn arcs. Preserve48/46 text; native turn fractions fix the cause,
+not the comparator. All retries share the same64/8MiB guards and cumulative cap.
+
+Material49/PID35528 terminal0 at16:23:26,free63886266368B unchanged;
+CPU47/PID26460 terminal0 at16:23:49,free63889575936->63889571840B,
+0.12s test/0.14s CTest.384 independent half-turn/adjacent spans and the complete
+existing material/instance suite pass.403 artifact-free Python checks pass in
+0.246s; git diff whitespace check passes. EXE785408B SHA256
+FA8102E7F2BDF31E8A240A249E83DF37BA923D4C277FDAC050C6D6A4CC5932CF.
+Material tree9043673B/43, +287272B vs16:12:15. No host/shader/guest build or game
+run: host167's binary and preserved full-reload/pixel failures are unchanged.
+
+Removed exactly8 superseded logs (material46/CPU44 and material47/CPU45 stdout/
+stderr), only after49/47 passed:4485B logical. Current49/47 and causal48/46
+failure logs stay. Those deleted logs are reproducible from tests; prior result
+summaries remain. No raw, image, game data, profile, build tree or failure
+evidence was deleted. Volume free changed63886540800->63886024704B during this
+small cleanup (-516096B), so no positive measured net reclaim is claimed amid
+other drive activity. Do not credit earlier cleanup again. Remaining build
+logs410557B/204, +1553B vs this turn's snapshot; selected retained output growth
+288825B (~282KiB) is the current fixture and its bounded current/failure logs.
+Source/Git/other disk activity is separate. Profile SHA remains
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0;
+all six owned build/test handles are terminal, no next producer queued.
+
+16:28:06 closing pre-commit free63883071488B (~59.50GiB),30109696B below the
+16:12:15 snapshot (~28.72MiB drive-wide use). This is not all attributable to
+the288825B selected retained output growth. No measured positive cleanup credit,
+no extra capture allowance and no pending live producer. README/active queue
+and the clip contract record the CPU-only scope and pending runtime producer.
