@@ -96,7 +96,17 @@ template <class Read>
 std::optional<NativeVisualInputs> ReadNativeDeferredVisualInputs(
     NativeVisualIdentity identity, uint32_t visual, Read read) {
   if (!identity) return {};
-  const auto mode = CheckNativeDeferredContract(visual, read);
+  auto mode = CheckNativeDeferredContract(visual, read);
+  // Sorted visual begin has extra=1: within the known type range only fur
+  // (1/11) adds shader work, and type14 uses a different receiver. Water's
+  // resource class does NOT imply visual type8 or its per-entry model technique.
+  // This does NOT admit water into the ordinary rigid model route.
+  const auto type = visual ? read(uint64_t(visual) + 3000) : std::nullopt;
+  if (!mode && type && *type < 14 && *type != 1 && *type != 11 &&
+      IsDeferredWaterResource(visual, read) && CheckNativeDeferredRegistry(read)) {
+    mode = read(uint64_t(visual) + 1864);
+    if (mode && *mode > 5) mode.reset();
+  }
   const auto category = visual ? read(uint64_t(visual) + 3132) : std::nullopt;
   return mode && category ? std::optional(NativeVisualInputs{identity, NativeVisualBlend(*mode), *category}) : std::nullopt;
 }

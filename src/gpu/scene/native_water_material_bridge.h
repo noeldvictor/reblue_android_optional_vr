@@ -7,10 +7,12 @@
 #include "gpu/scene/native_water_scene.h"
 #include "gpu/scene/native_visual_inputs.h"
 #include "gpu/scene/native_selected_lights.h"
+#include "gpu/scene/native_material_data.h"
 
 namespace bd::gpu::scene {
 struct NativeWaterMaterialOutput {
   NativeWaterMaterial material;
+  NativeMaterialObjectInputs object;
   NativeTextureGpuHandle bump, environment;
   NativeImageLease planar, snapshot;
 };
@@ -35,7 +37,6 @@ private:
 class NativeWaterMaterialScope {
 public:
   NativeWaterMaterialScope(uint32_t entry, uint32_t visual, NativeVisualIdentity identity);
-  ~NativeWaterMaterialScope();
   NativeWaterMaterialScope(const NativeWaterMaterialScope &) = delete;
   NativeWaterMaterialScope &operator=(const NativeWaterMaterialScope &) = delete;
   bool Draw(uint32_t stack, uint8_t *base, bool stencil_pending, int32_t &depth_write);

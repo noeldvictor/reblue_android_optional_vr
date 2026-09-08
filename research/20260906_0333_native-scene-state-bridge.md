@@ -4853,3 +4853,58 @@ No new cache/perf files found in scoped run outputs. No exception expanded.
 Next host146/game974, deferred7/test2; other fixture IDs unchanged from above.
 Continue visual/list producer ownership and authored image-role/pixel coverage;
 do not repeat the unchanged material-only or bottom-inactive probe.
+
+### Shared native water visual scope (2026-09-08, source3102f19 plus edits)
+
+Same cumulative3GiB exception/floor62,509,998,080B; reserve, diagnostics, logs,
+raw and image caps unchanged. First/pre-build free80,130,662,400B. No live
+renderer/build/compiler/test producer found. CPU tree78,316,360B/132files;
+attachment logs298,633B/186files; host EXE48,958,464B/PDB111,083,520B.
+377 artifact-free Python checks pass. Reuse trees, shaders and GPU evidence.
+No assets/downloads/cooking/raws/images/binary copies. Planned deferred build7/
+test2 enforce32/16MiB free-drop,300/30s; host146192MiB/300s; aggregate build logs
+10MiB. Run974 only after these pass:180s/800KiB/192MiB, zero captures/perf/dumps,
+exact profile restoration. New observation: shared native water visual scopes
+plus direct material/draw/retirement in both strict cold/reload epochs, with
+neighboring legacy comparisons preserved. No unchanged bottom-inactive retry.
+Keep replacement overlap until validation, then retire identified superseded
+successful logs. Preserve failures and all protected image/raw evidence. Game
+pixel/HDR/stereo and authored bottom/snapshot qualification remain pending.
+
+Deferred7/PID32944 and test2/PID38400 exit0; host146/PID32812/session72587 exit0,
+no guest objects/codegen writes. Run974/PID38788/session33672 terminal08:33:14,
+127s, full strict chain passed,0 raws/profile restored,541432B log. BUT its
+native water visual counter never advanced: the initial visual type8-only
+assumption missed the executing resource. This is failed visual reachability,
+not delivered callback removal. Keep974 as causal evidence (SHA256
+61056EE702A3669E1B9F0C345712615CE4FB90F969C93A69064F5D96A51004B8).
+Source confirms extra=1's only differing branches are fur1/11 and receiver14;
+the known non-fur/non-indexed types share the same scope. Correct admission
+without widening ordinary rigid model routing, add exhaustive type regression,
+and record the actual admitted type mask. Retry deferred8/test3,host147/game975
+uses the SAME32/16/192MiB build and180s/800KiB/192MiB run limits. Last measured
+free80,129,581,056B; no live producer. No new image or raw allowance.
+
+Corrected deferred8/PID29988 and test3/PID22200 exit0; host147/PID38732 exit0,
+no guest objects or generated writes.975/PID31256/session33818 terminal08:38:22
+after127s, strict mixed/cold/reload chain pass,0 raws/all22 settings/profile
+byte-exact. Actual water visual type5;3109 balanced native visual scopes,3159
+direct materials/submissions,3066 emissions/3157 retirements in last samples.
+Fresh scopes and water output advance in both post-event epochs; old water
+generation94 fully retired before208 submitted. Source/hashes/full evidence in
+20260908_1236_native-water-visual.md. All producers terminal. No game pixel or
+authored bottom/snapshot/stereo claim; prior GPU shader evidence reused.
+
+Removed13 explicit superseded files after replacement: host145/146, deferred6/7,
+test1/2 stdout/stderr and verified973 log.538393B logical; immediate drivefree
+80128286720->80128835584B (+548864). Count once. Old full text retired; summaries/
+hashes retained. Keep current147/deferred8/test3/975, causal974, other current
+CPU/GPU fixtures and all unresolved failures/protected raw/image evidence.
+CPU78361684B/132files (+45324); EXE48963072/PDB111116288B (+37376combined);
+attachment logs297077B/186files (-1556);975529878B plus causal974541432B replace
+973529864B (+541446). Selected retained growth622590B for the new connection,
+runtime evidence and diagnosed reachability case. First80130662400 to cleanup
+80128835584B:1826816B less free drive-wide, separate from attributed outputs.
+No new scoped cache/perf files. No allowances reset/expanded. Next host148/game976,
+deferred9/test4. Continue native list producer ownership and real image-role/
+game-pixel/stereo coverage, not a repeat of the completed visual-admission probe.

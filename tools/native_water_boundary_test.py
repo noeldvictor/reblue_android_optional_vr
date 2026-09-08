@@ -85,8 +85,8 @@ class NativeWaterBoundaryTest(unittest.TestCase):
 
     def test_completed_writer_connects_to_native_sorted_draw_before_legacy_bind(self):
         bridge = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
-        prepare = bridge.split("void Prepare(PPCContext", 1)[1].split("NativeWaterMaterialScope::NativeWaterMaterialScope", 1)[0]
-        self.assertLess(prepare.index("PrepareWaterMaterial(adapter)"), prepare.index("ReadNativeWaterMaterial"))
+        direct = bridge.split("void PublishWaterOutput()", 1)[1].split("void SubmitWater()", 1)[0]
+        self.assertLess(direct.index("ReadNativeWaterMaterial"), direct.index("scope.Publish"))
         submit = bridge.split("bool NativeWaterMaterialScope::Submit", 1)[1]
         self.assertNotIn("ReadNativeWaterMaterial", submit)
         for required in ("publication_.Read", "FindNativeInstancePose", "FindLoadedNativeModelNodeImport",
@@ -115,6 +115,21 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         submit = bridge.split("bool NativeWaterMaterialScope::Submit(", 1)[1]
         self.assertNotIn("CommitNativeSceneLights", submit)
         self.assertNotIn("ResolveNativeSceneLights", submit)
+
+    def test_water_reuses_native_visual_scope_and_owned_late_object_inputs(self):
+        bridge = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
+        self.assertNotIn("water_output", bridge) # retired callback-capture side channel
+        publish = bridge.split("void NativeWaterMaterialScope::Publish(", 1)[1].split("bool NativeWaterMaterialScope::Submit(", 1)[0]
+        self.assertLess(publish.index("ReadMaterialObjectInputs"), publish.index("publication_.Publish"))
+        submit = bridge.split("bool NativeWaterMaterialScope::Submit(", 1)[1]
+        self.assertNotIn("ReadMaterialObjectInputs", submit)
+        self.assertIn("features,output->object", submit)
+        consumer = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
+        self.assertIn("item.native || (water_entry && visual_inputs.Read", consumer)
+        scope = consumer.split("struct NativeDeferredVisualScope", 1)[1].split("ReadNativeDeferredEffects", 1)[0]
+        self.assertLess(scope.index("PrepareNativePrimaryReceiver"), scope.index("publication.ReadAfterWriter"))
+        self.assertLess(scope.index("publication.ReadAfterWriter"), scope.index("BeginDeferredMaterialCompatibility"))
+        self.assertIn("if (!requested.empty())", consumer) # water-only batches also publish
 
     def test_native_water_preserves_sorted_alpha_and_coverage(self):
         native = (ROOT / "src/gpu/scene/native_water_inputs.h").read_text()

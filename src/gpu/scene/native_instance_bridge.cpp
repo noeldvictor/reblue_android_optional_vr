@@ -166,6 +166,13 @@ bool NativeVisualInputScope::Begin(std::span<const NativeVisualIdentity> request
   frame_ = frame; refreshes_ = 0; active_visual_inputs = this;
   return true;
 }
+std::optional<NativeVisualInputs> NativeVisualInputScope::ReadAfterWriter(
+    NativeVisualIdentity identity, uint32_t frame) const {
+  if (active_visual_inputs != this || frame != FrameStatFrameCount() || !inputs_.Read(identity, frame)) return {};
+  std::vector<NativeVisualInputs> current;
+  if (!CollectNativeVisualInputs(std::span(&identity, 1), current)) return {};
+  return current.front();
+}
 void RefreshNativeVisualInputsAfterWriter() {
   if (!active_visual_inputs) return;
   auto &scope = *active_visual_inputs;

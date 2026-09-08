@@ -50,7 +50,7 @@ template<class Adapter> void RunNativeReceiverSetup(bool enabled, Adapter &adapt
   adapter.PublishNative(colour);
 }
 std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(NativeVisualIdentity identity, uint32_t view);
-// Direct ordinary visual producer. Reuses late authored colour publication and
+// Direct non-indexed-shadow sorted visual producer. Reuses late authored colour publication and
 // explicit legacy exports without invoking the participant's guest ABI.
 bool PrepareNativePrimaryReceiver(NativeVisualIdentity identity, uint32_t stack);
 } // namespace bd::gpu::scene

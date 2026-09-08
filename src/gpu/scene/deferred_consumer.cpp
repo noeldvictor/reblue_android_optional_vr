@@ -93,6 +93,8 @@ thread_local Stats stats;
 thread_local NativeDeferredQueue native_queue;
 thread_local uint64_t native_staged = 0, native_consumed = 0;
 thread_local uint64_t native_visual_begins = 0, native_visual_ends = 0, native_effect_reads = 0;
+thread_local uint64_t water_visual_begins = 0, water_visual_ends = 0;
+thread_local uint32_t water_visual_types = 0;
 thread_local uint64_t native_input_batches = 0, native_input_visuals = 0, native_input_refreshes = 0;
 void Report() {
   const auto frame = FrameStatFrameCount();
@@ -114,6 +116,9 @@ void Report() {
       frame, native_visual_begins, native_visual_ends, native_effect_reads);
   BD_INFO("[native-deferred-inputs] frame {} batches {} visuals {} refreshes {}; native instance identities and writer-ordered values, no per-entry source sidecar",
       frame, native_input_batches, native_input_visuals, native_input_refreshes);
+  if (water_visual_begins)
+    BD_INFO("[native-water-visual] frame {} begins {} ends {}; type mask {}; shared native receiver/class/blend scope, no visual callbacks",
+        frame, water_visual_begins, water_visual_ends, water_visual_types);
 }
 uint8_t *Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address > UINT32_MAX || bytes > UINT32_MAX ||
@@ -443,6 +448,8 @@ struct DeferredMaterialCompatibility {
 struct NativeDeferredVisualScope {
   NativeVisualInputs inputs;
   uint32_t stack;
+  const NativeVisualInputScope &publication;
+  bool water = false;
   std::array<uint32_t, 11> participants{};
   int32_t count = 0;
   DeferredMaterialCompatibility Material() const { return {inputs.diffuse_class}; }
@@ -478,6 +485,7 @@ struct NativeDeferredVisualScope {
     if (PrepareEffectParticipants(*this) != 2 || !PublishNativeDeferredBlend(uint32_t(inputs.blend)))
       throw std::runtime_error("Native deferred effect production failed");
     ++native_visual_begins;
+    water_visual_begins += water;
   }
   int32_t Count() const { return count; }
   int32_t Begin(int32_t index) {
@@ -485,9 +493,12 @@ struct NativeDeferredVisualScope {
     if (participants[index] == 0x82DD6100 && !PrepareNativePrimaryReceiver(inputs.identity, stack))
       throw std::runtime_error("Native deferred receiver production failed");
     if (participants[index] == DeferredMaterialCompatibility::shader) {
+      const auto late = publication.ReadAfterWriter(inputs.identity, FrameStatFrameCount());
+      if (!late) throw std::runtime_error("Native deferred inputs changed during receiver setup");
+      inputs = *late; // receiver writes precede shader class and blend selection
       auto port = Material(); BeginDeferredMaterialCompatibility(port); return 2;
     }
-    return 1; // Ordinary indexed and auxiliary participants have no side effects.
+    return 1; // Admitted non-fur/non-indexed-shadow visuals have no other effects.
   }
   void End(int32_t index) {
     ValidateRoster();
@@ -499,7 +510,10 @@ struct NativeDeferredVisualScope {
   void SetActive(int32_t index, uint8_t value) {
     ValidateRoster(); Write<uint8_t>(participants[index] + 5, value);
   }
-  void Finish() { ValidateRoster(); FinishEffectParticipants(*this); ++native_visual_ends; }
+  void Finish() {
+    ValidateRoster(); FinishEffectParticipants(*this); ++native_visual_ends;
+    water_visual_ends += water;
+  }
 };
 
 std::optional<NativeDeferredEffects> ReadNativeDeferredEffects(NativeVisualIdentity identity) {
@@ -546,7 +560,21 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   if (HasNativeDeferredScene() && (!NativeRigidDeferredEnabled() || !NativeListMode()))
     throw std::runtime_error("Native deferred pass changed before consumption");
   NativeVisualInputScope visual_inputs;
-  if (HasNativeDeferredScene()) {
+  std::vector<NativeVisualIdentity> requested;
+  for (const auto &entry : native_queue.Entries())
+    requested.push_back({entry.submission.instance, entry.submission.model_generation});
+  if (NativeRigidSceneEnabled() && NativeListMode()) {
+    for (const auto &entry : entries) {
+      const auto visual = Read<uint32_t>(entry.address + 272);
+      const auto identity = FindNativeVisualIdentity(visual);
+      if (identity && IsDeferredWaterResource(visual, CheckedWord) &&
+          ReadNativeDeferredVisualInputs(identity, visual, CheckedWord)) {
+        requested.push_back(identity);
+        water_visual_types |= 1u << Read<uint32_t>(visual + 3000);
+      }
+    }
+  }
+  if (!requested.empty()) {
     // All walk-time writers have finished. Known later material writers refresh
     // this scoped publication at their producer boundary; unknown ones refuse.
     // Dynamic receiver/light/device outputs still resolve at their own producers.
@@ -560,9 +588,6 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
         throw std::runtime_error("Unknown legacy resource writer inside native deferred batch");
       }
     }
-    std::vector<NativeVisualIdentity> requested;
-    for (const auto &entry : native_queue.Entries())
-      requested.push_back({entry.submission.instance, entry.submission.model_generation});
     std::sort(requested.begin(), requested.end());
     requested.erase(std::unique(requested.begin(), requested.end()), requested.end());
     if (!visual_inputs.Begin(requested, FrameStatFrameCount()))
@@ -642,10 +667,10 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     if (!same_visual) {
       finish_visual();
       visual = next_visual; identity = next_identity;
-      if (item.native) {
+      if (item.native || (water_entry && visual_inputs.Read(identity, FrameStatFrameCount()))) {
         const auto inputs = visual_inputs.Read(identity, FrameStatFrameCount());
         if (!inputs) throw std::runtime_error("Native deferred visual input lease unavailable");
-        native_visual_scope.emplace(NativeDeferredVisualScope{*inputs, ctx.r1.u32});
+        native_visual_scope.emplace(NativeDeferredVisualScope{*inputs, ctx.r1.u32, visual_inputs, water_entry});
         native_visual_scope->Prepare(); technique = 2;
       } else {
         technique = bridge.Call(sub_8221DBE0, BridgeKind::Visual, {kVisualContext, visual, 1});

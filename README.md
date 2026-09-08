@@ -58,19 +58,22 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest connected checkpoint (2026-09-08, host145/run973):** admitted game water
-now bypasses per-entry model/resource callbacks and translated shader selection,
-as well as legacy geometry binding/drawing. Owned lights participate before the
-ordered water writer; its completed values/images feed the existing native Vulkan
-queue. CPU lifecycle tests, 376 source/scenario checks and strict desktop cold/reload
-checks pass. The last sample records 3,159 balanced direct material begin/end pairs,
-3,071 emitted draws and 3,157 fence-retired packets, with zero admission refusals.
+**Latest connected checkpoint (2026-09-08, host147/run975):** admitted game water
+now also bypasses visual callbacks, sharing the existing native receiver/class/blend
+scope. Its completed material output owns late object inputs; the obsolete callback
+capture side channel is removed. Model/resource callbacks, translated shader selection
+and legacy geometry binding/drawing were already bypassed on this route.
+CPU tests, 377 source/scenario checks and strict desktop cold/reload checks pass.
+The latest samples show 3,109 balanced native water visual scopes, 3,159 direct
+materials, 3,066 emitted draws and 3,157 fence-retired packets, with no admission
+refusals. An initial type-8-only admission missed the actual type-5 water visual;
+that failed reachability case is preserved, with a source-derived fix and regression.
 These are repeated draws, not unique assets or a speedup measurement. The unchanged
-20-case two-eye GPU water fixture remains the shader evidence, not game-stereo proof.
-Visual callbacks, source-list construction, parameter/state exports and image getters
-remain adapters. Game water/reflection pixels, HDR art parity and authored
-shore/refraction/stereo coverage are still unqualified.
-[Direct material connection and remaining work](research/20260908_1212_native-water-material.md).
+20-case two-eye GPU water fixture remains shader evidence, not game-stereo proof.
+Source-list construction, per-entry state/world/sampler exports, parameter descriptors
+and image getters remain adapters. Game water/reflection pixels, HDR art parity and
+authored shore/refraction/stereo coverage are still unqualified.
+[Shared visual connection and remaining work](research/20260908_1236_native-water-visual.md).
 
 ### How much is left?
 

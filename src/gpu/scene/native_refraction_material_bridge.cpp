@@ -57,7 +57,6 @@ struct Stats {
   bool reported = false;
 };
 thread_local Stats stats;
-thread_local NativeWaterMaterialScope *water_output = nullptr;
 void Report() {
   const auto frame = FrameStatFrameCount();
   if (stats.reported && frame - stats.frame < 300) return;
@@ -128,9 +127,10 @@ struct Adapter {
   const uint32_t material;
   const uint64_t saved_stack;
   const bool water;
+  const bool capture;
   NativeWaterMaterialOutput output;
-  Adapter(PPCContext &context, uint8_t *memory, bool is_water)
-      : ctx(context), base(memory), material(ctx.r3.u32), saved_stack(ctx.r1.u64), water(is_water) {
+  Adapter(PPCContext &context, uint8_t *memory, bool is_water, bool capture_output = false)
+      : ctx(context), base(memory), material(ctx.r3.u32), saved_stack(ctx.r1.u64), water(is_water), capture(capture_output) {
     ctx.r1.u32 -= 256;
     bd::mem::store<uint32_t>(ctx.r1.u32, uint32_t(saved_stack));
     ctx.fpscr.disableFlushMode();
@@ -185,13 +185,13 @@ struct Adapter {
   void BindPlanarReflection() {
     const auto address = ReadWord(kPlanarImage);
     Bind(7, address);
-    if (water_output && address)
+    if (capture && address)
       if (const auto *image = ResolveGuestTexture(address)) output.planar = image->nativeImage;
   }
   void BindSceneImage() {
     const auto image = ReadWaterSceneImage(Word);
     Check(bool(image)); Bind(12, *image);
-    if (water_output && *image) output.bump = CaptureNativeTexture(ResolveGuestTexture(*image)).primary;
+    if (capture && *image) output.bump = CaptureNativeTexture(ResolveGuestTexture(*image)).primary;
   }
   bool WantsSnapshot() { return int32_t(ReadWord(uint64_t(material) + 4700)) > 0; }
   void Snapshot() {
@@ -199,7 +199,7 @@ struct Adapter {
     ctx.r4.u64 = material;
     ++stats.snapshots;
     sub_8221D2C8(ctx, base); // native snapshot producer; unowned scopes remain tracked there
-    if (water && water_output) {
+    if (water && capture) {
       // Scheduling still selects its output getter, never an active attachment
       // or a previously bound slot. Copy its exact completed native lease now.
       constexpr uint32_t scene_getter = (uint32_t(-32035) << 16) - 26284;
@@ -214,7 +214,6 @@ struct Adapter {
 void Prepare(PPCContext &ctx, uint8_t *base, bool water) {
   const bool enabled = REXCVAR_GET(bd_native_scene_textures);
   if (!enabled || !Ready(ctx, water)) {
-    if (water_output) water_output->Publish(ctx.r3.u32, {});
     ++stats.compatibility; stats.refused += enabled;
     if (water) __imp__sub_82454720(ctx, base); else __imp__sub_82455150(ctx, base);
     Report(); return;
@@ -222,11 +221,6 @@ void Prepare(PPCContext &ctx, uint8_t *base, bool water) {
   Adapter adapter(ctx, base, water);
   if (water) {
     PrepareWaterMaterial(adapter); ++stats.water;
-    if (water_output) {
-      const auto values = ReadNativeWaterMaterial(adapter.material, Word);
-      if (values) adapter.output.material = *values;
-      water_output->Publish(adapter.material, values ? std::optional(std::move(adapter.output)) : std::nullopt);
-    }
   }
   else { PrepareRefractionMaterial(adapter); ++stats.refraction; }
   // No fallback/replay after the first material or GPU side effect.
@@ -238,9 +232,6 @@ NativeWaterMaterialScope::NativeWaterMaterialScope(uint32_t entry, uint32_t visu
   if (!entry || !identity || !NativeRigidSceneEnabled() || !IsDeferredWaterResource(visual, Word)) return;
   entry_ = entry; visual_ = visual; identity_ = identity; frame_ = FrameStatFrameCount();
   ++stats.water_candidates;
-}
-NativeWaterMaterialScope::~NativeWaterMaterialScope() {
-  if (water_output == this) water_output = nullptr;
 }
 bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_pending, int32_t &depth_write) {
   if (!identity_) return false;
@@ -265,8 +256,6 @@ bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_
   const auto recipe = lighting ? CaptureNativeSceneLights(identity_.instance,identity_.model_generation,node,lighting->inputs) : std::nullopt;
   const auto ticket = recipe ? ResolveNativeSceneLights(*recipe) : std::nullopt;
   if (!ticket) return unavailable();
-  if (water_output) throw std::runtime_error("Nested native water material publication");
-  water_output = this;
   lights_ = ticket->lights; // copied once, not resolved/committed again after the writer
   struct DirectAdapter : Adapter {
     NativeWaterMaterialScope &scope;
@@ -274,7 +263,7 @@ bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_
     int32_t &depth_write;
     DirectAdapter(PPCContext &ctx, uint8_t *memory, NativeWaterMaterialScope &owner,
                   const NativeSceneLightTicket &lights, int32_t &depth)
-        : Adapter(ctx,memory,true), scope(owner), ticket(lights), depth_write(depth) {}
+        : Adapter(ctx,memory,true,true), scope(owner), ticket(lights), depth_write(depth) {}
     bool BeginLights() { return CommitNativeSceneLights(ticket,uint32_t(saved_stack)); }
     void PublishModelFlags() {
       // Re-read after the light exporter, which can alias source parameters.
@@ -308,7 +297,6 @@ bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_
     }
   } adapter(context,base,*this,*ticket,depth_write);
   const bool consumed = ConsumeNativeWaterMaterial(adapter);
-  water_output = nullptr;
   if (!consumed) return unavailable();
   Report();
   return true;
@@ -324,6 +312,8 @@ void NativeWaterMaterialScope::Publish(uint32_t visual, std::optional<NativeWate
     const auto image = CaptureNativeTexture(ResolveGuestTexture(*source));
     output->environment = image.cube ? image.cube : image.primary;
   }
+  const auto object = ReadMaterialObjectInputs(visual_,Word);
+  Check(bool(object)); output->object = *object;
   publication_.Publish(identity_, frame_, std::move(*output));
 }
 bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
@@ -374,9 +364,8 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
   const auto receiver = FindNativePrimaryReceiver(identity_,3);
   const auto alpha = FindNativeAlphaIntent();
   const auto blend = FindNativeEnabledBlendIntent();
-  const auto object = ReadMaterialObjectInputs(visual_,Word);
-  if (!camera || !lighting || !fog || !receiver || !alpha || !blend || !object) return refuse("native camera/lighting/fog/receiver/alpha/blend/object");
-  const auto features = ComposeNativeMaterialFeatures(program.ranges[*primitive].features,*object,
+  if (!camera || !lighting || !fog || !receiver || !alpha || !blend) return refuse("native camera/lighting/fog/receiver/alpha/blend");
+  const auto features = ComposeNativeMaterialFeatures(program.ranges[*primitive].features,output->object,
       lighting->inputs,program.ranges[*primitive].reflection.enabled);
   if (!features) return refuse("owned material feature recipe");
   NativeWaterImages images;

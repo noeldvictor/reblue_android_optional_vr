@@ -29,6 +29,9 @@ public:
   ~NativeVisualInputScope();
   bool Begin(std::span<const NativeVisualIdentity> requested, uint32_t frame);
   auto Read(NativeVisualIdentity identity, uint32_t frame) const { return inputs_.Read(identity, frame); }
+  // Current visual only, after receiver compatibility writes. Reuses the
+  // instance producer; avoids republishing every visual at every transition.
+  std::optional<NativeVisualInputs> ReadAfterWriter(NativeVisualIdentity identity, uint32_t frame) const;
   uint64_t Refreshes() const { return refreshes_; }
 private:
   friend void RefreshNativeVisualInputsAfterWriter();

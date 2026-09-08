@@ -493,8 +493,23 @@ generation94 fully retires before208's first submission. Unchanged GPU shader/ba
 evidence is reused; no new game pixels/HDR/stereo or bottom/snapshot qualification.
 [Direct material source contracts and evidence](../research/20260908_1212_native-water-material.md).
 
-Next connected work: remove water's remaining visual callback execution and
-source-list construction, including per-entry sampler/world/state dispatch. Reuse the now-connected
+Shared water visual connection (2026-09-08, host147/run975): known sorted water
+visuals now reuse the existing native receiver/class/blend scope and late identity/
+generation publication, including water-only lists. Receiver writes precede a fresh
+current-visual import; completed water writers still refresh cross-visual aliases.
+The material output owns late object inputs, and the unused callback-capture pointer/
+legacy publication branch is retired. Ordinary rigid model admission is unchanged.
+Host146/run974 passed its regression chain but did NOT reach the new water scope:
+resource class was incorrectly assumed to imply visual type8. Exact extra1 branches
+and exhaustive type tests fix that admission gap. Run975 observes actual type5,
+3109 paired water visual scopes at4500 and3159 direct materials/3066 emissions/
+3157 retirements at4549,0 admission refusals. Strict cold/reload/mixed checks pass;
+generation94 fully retires before208 submits.377 Python checks and deferred CPU
+tests pass. No new images, HDR/game-stereo or authored bottom/snapshot qualification.
+[Source contracts, causal regression and evidence](../research/20260908_1236_native-water-visual.md).
+
+Next connected work: remove water's source-list construction, including per-entry
+sampler/world/state dispatch. Reuse the now-connected
 publication/queue, water update/refraction setup and existing instance/model owners.
 Replace the temporary sorted-entry, source feature and getter imports with native
 producer inputs while preserving late aliases, Bind/Keep and snapshot ordering;

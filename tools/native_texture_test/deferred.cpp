@@ -11,6 +11,7 @@
 #include "gpu/scene/native_refraction_material.h"
 #include "gpu/scene/refraction_material_import.h"
 #include "gpu/scene/deferred_visual_import.h"
+#include "gpu/scene/native_material_texture_source.h"
 #include <array>
 #include <bit>
 #ifdef NDEBUG
@@ -128,6 +129,25 @@ void TestCallbackContract() {
   words[0x4020] = 0x82454720; words[0x4024] = 0x824548A8;
   assert(CheckDeferredBatchResource(visual,read));
   assert(!CheckDeferredVisualResource(visual,read) && !CheckNativeDeferredContract(visual,read));
+  // Run974 missed water visuals: the resource class does not imply type8.
+  // Exact extra=1 visual branches: fur1/11 and receiver14 are not equivalent.
+  // Keep this independent of per-entry shader-only model admission.
+  for (uint32_t type = 0; type < 32; ++type) {
+    words[visual+3000] = type;
+    assert(bool(ReadNativeDeferredVisualInputs({1,2},visual,read)) == (type < 14 && type != 1 && type != 11));
+    assert(!CheckNativeDeferredContract(visual,read));
+  }
+  words[visual+3000] = 8;
+  for (uint32_t mode = 0; mode < 8; ++mode) {
+    words[visual+1864] = mode;
+    const auto water = ReadNativeDeferredVisualInputs({1,2},visual,read);
+    assert(bool(water) == (mode < 6));
+    if (water) assert(uint32_t(water->blend) == mode && water->diffuse_class == 64);
+  }
+  words[visual+1864] = 5;
+  words[visual+3000] = UINT32_MAX;
+  assert(!ReadNativeDeferredVisualInputs({1,2},visual,read));
+  words[visual+3000] = 0;
   words[registry+36] = 0; words[lights+4] = words[shader+4] = 0x00010000; // visual active, model idle
   for (uint32_t technique = 0; technique < 32; ++technique) {
     const bool accepted = technique == 2 || (technique >= 4 && technique <= 12) || technique == 14;
@@ -233,6 +253,21 @@ void TestWaterWriterPublication() {
   assert(publication.Read(identity,3)->diffuse_class == 17);
   assert(publication.Publish(3, {{identity, NativeVisualBlend::Alpha, words[visual+3132]}}));
   assert(publication.Read(identity,3)->diffuse_class == std::bit_cast<uint32_t>(1.f) && retained->diffuse_class == 17);
+  // Authored object controls have the same late-writer ownership boundary.
+  // Copy after the writer; the native consumer does not reread a visual VA.
+  words[visual+3044] = 1; words[visual+3052] = 0;
+  for (uint32_t i = 0; i < 4; ++i) words[visual+3404+i*4] = std::bit_cast<uint32_t>(.5f);
+  auto object = ReadMaterialObjectInputs(visual,read);
+  assert(object && object->writes_shininess && !object->diffuse_enabled);
+  words[descriptor+12] = visual+3052;
+  const auto object_destination = ReadWaterFactorDestination(water,read);
+  assert(object_destination == visual+3052);
+  Water object_writer{words[*object_destination]};
+  PrepareWaterMaterial(object_writer);
+  const auto completed = ReadMaterialObjectInputs(visual,read);
+  assert(completed && completed->diffuse_enabled && !object->diffuse_enabled);
+  words[visual+3052] = 0;
+  assert(completed->diffuse_enabled); // retained native output survives later source writes
 }
 
 void TestNativeVisualPublication() {
