@@ -509,12 +509,6 @@ std::optional<RenderCamera> FindNativePassCamera(uint32_t render_view) {
       s.depth_stencil ? s.depth_stencil->texture : nullptr);
   return commands ? commands->Camera(FrameStatFrameCount(), render_view) : std::nullopt;
 }
-std::optional<NativeOcclusionView> FindNativePassOcclusionView() {
-  auto &s = state();
-  std::lock_guard lock(s.mutex);
-  return !scenes.empty() && scenes.back().commands
-      ? scenes.back().commands->OcclusionView(FrameStatFrameCount()) : std::nullopt;
-}
 void ApplyNativeSceneClear(VideoState &s, NativeSceneCommands &commands) {
   stats.native_clears += commands.ApplyClear(*s.command_list);
   // Other, not-yet-converted clear producers remain counted at this boundary.

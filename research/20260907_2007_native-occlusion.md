@@ -121,3 +121,82 @@ Storage accounting and producer limits continue in the
 Preserve host107/run945 accepted pixels, run956's tree-gap evidence, and the
 unresolved948 UV /941 light-selection failures. Current live reload/query evidence
 is scoped above; game pixels and actual native draw skipping remain open.
+
+## Consumer-driven queries: host119/run959 (2026-09-07)
+
+Bundle: remove broad walk-time query publication for legacy-only nodes, reuse the
+owned node/pose/pass, native rigid admission and existing query/history/fence path,
+and request observations only after ordered light effects and complete sibling
+preflight, with at least one actual native draw pending. The walk passes its owned
+world sphere by value; no source address or new GPU readback enters the query.
+`FindNativePassOcclusionView` and the walk's `OcclusionCullNote` are removed.
+The active native command owner supplies the view at consumption. Empty query
+passes avoid pipeline creation/layout/descriptor handoff entirely.
+
+`NativeOcclusionTracker::Request` both admits a query and decides culling. A culled
+candidate still requests a refresh. Legacy-only/suppressed nodes never call it.
+The history predicate is unchanged; zero sample count is additionally refused.
+Duplicate conflicts remain invalid until pass end, bounds/camera/scope/identity
+and originating-frame age remain exact. Bounded decision counters report even
+when no queries emit, without per-node logs. Camera mismatch takes precedence
+over history warm-up/visible classification; these are first refusal reasons,
+not mutually independent causes. Invalid bounds includes missing/nonfinite/near
+clip packet rejection, so its runtime count does not prove one particular subtype.
+
+Verification: 326 Python source/scenario checks (0.156 s); output39/PID29224 and
+CPU22/PID37148 pass (0.37/0.39 s). CPU cases cover requests, missing input, duplicate
+invalidation, depth/sample/camera/bounds changes, delayed/old/out-of-order results,
+history capacity/pruning and refreshing culled candidates. GPU41/PID32580 builds;
+occlusion4/PID29660 passes all eight mono1/2/4/8-MSAA × translated/rotated cases
+in1.10/1.11 s, validation0 errors/0 warnings. There are now two real command
+submissions and fences per case, not duplicate stamps on one result: hidden
+warms after one zero, then receives the production Occluded decision; front and
+intersecting candidates stay Visible. The existing exact HDR/depth preservation
+and descriptor-resume checks pass. The fixture does not prove skipped game draws.
+
+Host119/PID38816/session51328 links0:29 host steps, codegen0 written, no guest
+object compilation. Actual binary stamp c9bbc8e dirty; subsequent docs/commit
+do not restamp it. Exe48,703,488 B SHA256
+`89285D58704A346C093CB4457E37EF961A85D9BAAAFC7BD218F6909558E4566B`;
+PDB109,686,784 B SHA256
+`80EC3A22FD676E647E8D77748E03CFB3F2780A70C02EAFD3F6F6284198AA5B72`.
+GPU fixture SHA256
+`4C1C5F1666167267D23D4637CA330BD970B8871104EAC599E93C921FFD6C0D69`.
+
+Run959/PID2480/session20034,20:42:39..20:45:00, exits0 after the full strict
+cold/reload chain. Generation93/instance144 fully retires before207/384; both
+interactive epochs again emit900 selected scene and shadow primitives. All21
+temporary settings took effect, no raw/image/perf/cook/dump output, exact normal
+profile restoration SHA256
+`2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0`.
+Retained511,958 B runtime log SHA256
+`F7CC0D355357FDCF10C618CC1A9BA1817AF465DAAFA3BF0680EA2179C8ABD6C8`.
+
+Last query sample4800: requested31,649, queried8,960, collected8,954, zero3,034,
+native-skipped0, history6. Decisions sum to31,649: invalid bounds22,689,
+changed camera8,613, no history304, visible43; invalid view/ambiguity/capacity/
+changed depth/changed bounds/stale/warming/occluded0. Earlier stationary field
+samples contain no new queries because candidate bounds fail preparation.
+Camera changes dominate usable inputs. This resolves the admission question;
+it is not useful game culling or a controlled performance comparison with958.
+
+Separate fresh reloaded4352..4652 window: native scene9,515 emissions /9,517
+retirements, wider shadow39,704/39,748, textured scene cutouts3,334/3,336 and
+textured shadow300/300. Scene batching emits9,515 instances in7,893 indirect
+calls; `NoteNativeRigidEmission` counts2,813 instances in groups of size>1
+(not2,813 saved calls). The corresponding scene-call difference is1,622.
+Shadow batch sample39,966 instances/calls remains singleton; its instrumentation
+boundary is distinct from the wider-family counters. Sampled layered scene0.
+This is the first fresh non-singleton runtime evidence here, not a causal
+speedup claim for this edit. Camera movement/scene exposure differ from958;
+pixels, representative layered/inherited inputs and both-eye gates remain open.
+
+Next: native canonical geometry currently has no retained tight bounds
+(`native_mesh.h::NativeGeometry`); the rigid vertex program transforms native
+position by `object_data.world`. Derive conservative load/cook-owned bounds and
+consume that exact transform, avoiding the remaining walk radius-scale adapter
+where possible. Test containment of actual indexed geometry and near-plane
+rejection before live use. Moving-view visibility still needs a safe design;
+do not replace exact camera equality with an epsilon to obtain skip counters.
+Preserve945 accepted pixels,956 gaps,957 descriptor failure and948/941. Storage
+cleanup and retained growth are recorded in the same cumulative ledger.

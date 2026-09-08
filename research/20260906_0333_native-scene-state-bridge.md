@@ -3641,3 +3641,42 @@ free81,313,525,760 B is270,741,504 B below this continuation's first reading,
 a drive-wide change not wholly attributable to the~3.10 MiB subtotal. No owned
 producer remains, no fresh raw/perf/cache/dump/cook output was found, profile
 restored exactly. Original3 GiB allowance/floor and all protected evidence remain.
+
+### Native consumer admission continuation (2026-09-07)
+
+Starting free81,299,386,368 B; same cumulative3 GiB allowance and62,509,998,080 B
+floor. Reuse existing fixture/host trees,32 MiB fixture and192 MiB host/run free-drop
+limits,10 MiB aggregate build logs, no raw/images/cooking. Output39/PID29224 and
+CPU22/PID37148 terminate0 (0.37/0.39 s); GPU41/PID32580 and occlusion4/PID29660
+terminate0. Eight query cases now exercise two real submissions/fences feeding
+the production native-consumer decision: hidden-only culling, validation0/0,
+unchanged colour/depth pixels,1.10/1.11 s.326 Python checks pass.
+
+Host119/PID38816/session51328 terminates0,29 host steps/codegen0 written, no guest
+objects. Current free81,278,443,520 B before run959. Run959 will use the existing
+strict cold/reload chain, Count0, no image/raw,300 s,800 KiB log,192 MiB free-drop,
+75 MiB diagnostic overlap and original floor. New observation: eligible-native
+query count and exact cumulative refusal reasons; no inference of speedup or
+game pixel acceptance. Preserve945/956 images and957/948/941 failures. Replacement
+fixture logs will retire their superseded predecessors after live accounting.
+
+Run959/PID2480/session20034 is terminal0 at20:45:00 after the complete strict
+cold/reload chain. Profile restored byte-for-byte; no new raw/image/perf/cache/
+dump/cook outputs. The2007 report records native-only query/refusal evidence,
+first fresh multi-instance scene batches and all remaining pixel/culling gates.
+
+Removed eight superseded agent fixture logs: output38/CPU21/GPU40/occlusion3
+stdout/stderr,4,361 logical B. Replaced by output39/CPU22/GPU41/occlusion4;
+reproducible from recorded commands. Immediate free-space gain8,192 B is not
+isolated from concurrent volume activity. Preserve runtime958 as the prior
+connection baseline,959 current admission/batching proof and all failure logs.
+No prior cleanup is credited again; no protected image/raw data was removed.
+
+Current texture fixture72,151,719 B/129 files (+31,879); GPU fixture12,207,529 B/12
+(+556,400); aggregate build/test logs224,546 B/148 (+7,032 after cleanup);
+exe/PDB+1,536/+12,288 and new runtime959511,958 B. Counted retained net +1,121,093 B
+(~1.07 MiB), for expanded production/CPU/GPU coverage and current live evidence;
+other host objects/CMake/source/Git are not allocated in that subtotal. Last free
+81,282,560,000 B is16,826,368 B below this continuation's start, a drive-wide
+change not wholly attributable to the subtotal. All limits and the original
+floor remain intact; no owned producer remains.

@@ -41,9 +41,24 @@ struct State {
   NativeOcclusionTracker tracker;
   NativeOcclusionProgram program;
   std::vector<Pipeline> pipelines; // Four mono sample-count variants, bounded.
-  uint64_t noted = 0, emitted = 0, collected = 0, zeros = 0, skipped = 0;
+  uint64_t requested = 0, emitted = 0, collected = 0, zeros = 0, skipped = 0;
+  std::array<uint64_t, size_t(NativeOcclusionDecision::Count)> decisions{};
 };
 State &Get() { static State result; return result; }
+
+void Report(State &o) {
+  const auto frame = FrameStatFrameCount();
+  if (frame-o.diag_frame < 300 || !REXCVAR_GET(bd_occlusion_diag)) return;
+  BD_INFO("[native-occ] frame {} requested {} queried {} fence-collected {} zero {} native-skipped {}; history {}; eligible native consumers only",
+      frame, o.requested, o.emitted, o.collected, o.zeros, o.skipped, o.tracker.HistoryCount());
+  const auto &d = o.decisions;
+  using D = NativeOcclusionDecision;
+  BD_INFO("[native-occ-decisions] frame {} invalid-view {} invalid-bounds {} ambiguous {} capacity {} no-history {} changed-depth {} changed-camera {} changed-bounds {} stale {} warming {} visible {} occluded {}; cumulative native requests",
+      frame, d[size_t(D::InvalidView)], d[size_t(D::InvalidBounds)], d[size_t(D::Ambiguous)], d[size_t(D::Capacity)],
+      d[size_t(D::NoHistory)], d[size_t(D::ChangedDepth)], d[size_t(D::ChangedCamera)], d[size_t(D::ChangedBounds)],
+      d[size_t(D::Stale)], d[size_t(D::Warming)], d[size_t(D::Visible)], d[size_t(D::Occluded)]);
+  o.diag_frame = frame;
+}
 
 plume::RenderPipeline *PipelineFor(State &o, VideoState &s, NativeTargetShape shape) {
   // Extent does not change the graphics pipeline; validate before canonicalizing.
@@ -65,6 +80,7 @@ void OcclusionCullFrameBegin(plume::RenderDevice *device, plume::RenderCommandLi
   o.active = ~0u;
   o.tracker.Begin(FrameStatFrameCount());
   if (!REXCVAR_GET(bd_occlusion_cull) || o.unsupported || !device || !cmd || slot >= kNumFrames) return;
+  Report(o); // Report even when every candidate refuses before query emission.
   auto &sl = o.slots[slot];
   if (!sl.pool) {
     sl.pool = device->createOcclusionQueryPool(NativeOcclusionTracker::kQueries);
@@ -95,25 +111,16 @@ void OcclusionCullCollect(u32 slot) {
     ++o.collected;
     o.zeros += results[n] == 0;
   }
-  const auto frame = FrameStatFrameCount();
-  if (frame-o.diag_frame >= 300 && REXCVAR_GET(bd_occlusion_diag)) {
-    BD_INFO("[native-occ] frame {} noted {} queried {} fence-collected {} zero {} native-skipped {}; history {}; owned world bounds/camera/depth, no translated bindings",
-        frame, o.noted, o.emitted, o.collected, o.zeros, o.skipped, o.tracker.HistoryCount());
-    o.diag_frame = frame;
-  }
 }
-void OcclusionCullNote(NativeOcclusionIdentity identity,
-    const std::optional<NativeOcclusionView> &view, const std::array<float, 4> &sphere) {
+bool OcclusionCullRequest(NativeOcclusionIdentity identity,
+    const std::optional<NativeOcclusionView> &view, const std::optional<std::array<float, 4>> &sphere) {
   auto &o = Get();
   std::lock_guard lock(o.mutex);
-  if (o.active >= kNumFrames) return;
-  o.tracker.Note(identity, view, sphere);
-  ++o.noted;
-}
-bool OcclusionCullOccluded(NativeOcclusionIdentity identity, const NativeOcclusionView &view) {
-  auto &o = Get();
-  std::lock_guard lock(o.mutex);
-  const bool culled = o.active < kNumFrames && REXCVAR_GET(bd_occlusion_cull) && o.tracker.Occluded(identity, view);
+  if (o.active >= kNumFrames || !REXCVAR_GET(bd_occlusion_cull)) return false;
+  ++o.requested;
+  const auto decision = o.tracker.Request(identity, view, sphere);
+  ++o.decisions[size_t(decision)];
+  const bool culled = decision == NativeOcclusionDecision::Occluded;
   o.skipped += culled;
   return culled;
 }
@@ -121,7 +128,8 @@ void OcclusionCullEmit(VideoState &s, const scene::NativeSceneCommands &commands
   auto &o = Get();
   std::lock_guard lock(o.mutex);
   const auto view = commands.OcclusionView(FrameStatFrameCount());
-  if (o.active >= kNumFrames || !view || !s.command_list || !s.device) {
+  if (o.active >= kNumFrames || !view || !s.command_list || !s.device || !o.tracker.HasQueries(*view) ||
+      o.slots[o.active].queries.size() >= NativeOcclusionTracker::kQueries) {
     o.tracker.EndPass();
     return;
   }

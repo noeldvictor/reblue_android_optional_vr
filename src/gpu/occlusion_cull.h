@@ -29,10 +29,10 @@ void OcclusionCullFrameBegin(plume::RenderDevice *device,
                              plume::RenderCommandList *cmd, u32 slot);
 void OcclusionCullCollect(u32 slot);
 
-// Native identity only; absent/current-invalid observations always keep drawing.
-bool OcclusionCullOccluded(NativeOcclusionIdentity identity, const NativeOcclusionView &view);
-void OcclusionCullNote(NativeOcclusionIdentity identity,
-    const std::optional<NativeOcclusionView> &view, const std::array<float, 4> &sphere);
+// Called only for a preflighted, nonempty native draw node. Registers its current
+// bounds and requests a query even when history permits skipping this draw.
+bool OcclusionCullRequest(NativeOcclusionIdentity identity,
+    const std::optional<NativeOcclusionView> &view, const std::optional<std::array<float, 4>> &sphere);
 
 // At the scene pass's end, with its framebuffer still bound: draws this
 // frame's proxies under queries. No-op unless bd_occlusion_cull and the

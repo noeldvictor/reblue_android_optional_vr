@@ -143,14 +143,23 @@ No speedup claim; real batches are still singletons.
 [Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
 [Corrected contract, live reload and open pixel issue](research/20260907_1927_corrected-shadow-coverage.md).
 
-**Native occlusion queries now run against owned scene depth.** Host118/run958
-passes the full cold/reload checks after fixing query render-pass ordering and
-the outgoing descriptor handoff. The old translated query shader/upload and
-address-keyed draw filter are removed. Eight real Vulkan query/pixel cases,
-C++ history contracts and 325 Python checks pass. The latest live sample has
-450,896 queries and 450,679 collected results, but **zero native draw skips**:
-effective culling and any speedup remain unproved. No new game image was captured;
-the tree gaps, stereo culling and full desktop acceptance remain open.
+**Native occlusion now queries only eligible native draw consumers.** Host119/run959
+passes the full strict cold/reload checks. Legacy-only nodes no longer occupy
+query/history capacity; empty passes avoid query pipeline/binding work. The old
+translated query shader/upload and address-keyed draw filter remain removed.
+Eight Vulkan cases now feed two real fenced submissions into the native culling
+decision; C++ behavior contracts and 326 Python checks pass. The latest live
+sample has 8,960 queries / 8,954 collected, but **zero native draw skips**. Bounded
+reasons identify unusable bounds and changed camera history, not capacity/depth
+identity failures. Tighter native bounds and moving-view visibility still need
+implementation/verification; no safety checks were relaxed. Game pixels, tree-gap
+investigation and stereo culling remain open, with no measured speedup.
+
+The same run supplies fresh **multi-instance batching evidence**: its reloaded
+300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with
+2,813 instances participating in merged groups. Earlier checkpoints saw only
+singletons. This is real command batching, not whole-scene or pixel qualification
+and not a controlled timing comparison; sampled layered scene draws remain zero.
 [Occlusion implementation, evidence and next decision](research/20260907_2007_native-occlusion.md).
 
 The handoff-owned lighting publication contains 2,898 node bindings; these are

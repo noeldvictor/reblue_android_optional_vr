@@ -28,47 +28,59 @@ inline void Run() {
   invalid_camera.world_to_clip[0] = std::numeric_limits<float>::quiet_NaN();
   assert(!PrepareNativeOcclusion(invalid_camera,sphere));
   NativeOcclusionTracker tracker;
+  using D = NativeOcclusionDecision;
   std::vector<NativeOcclusionObservation> submitted;
   for (uint32_t frame : {10u,11u}) {
     view.frame = frame; tracker.Begin(frame);
-    tracker.Note(node,view,sphere);
+    assert(!tracker.HasQueries(view)); // no native consumer means no queries
+    assert(tracker.Request(node,view,sphere) == D::NoHistory);
     tracker.Queries(view,[&](const auto &query) { submitted.push_back(query); });
     tracker.EndPass();
-    assert(!tracker.Occluded(node,view));
+    assert(!tracker.HasQueries(view));
   }
   assert(submitted.size() == 2);
   for (const auto &query : submitted) tracker.Collect(query,true); // delayed collection, original frame retained
   view.frame = 12; tracker.Begin(12);
-  assert(!tracker.Occluded(node,view)); // old results alone never suppress a draw
-  tracker.Note(node,view,sphere);
-  assert(tracker.Occluded(node,view));
+  assert(!tracker.HasQueries(view)); // old results alone do not request work
+  assert(tracker.Request(node,view,sphere) == D::Occluded);
+  assert(tracker.HasQueries(view)); // culled nodes still need fresh visibility results
   auto changed_view = view; ++changed_view.scope.depth;
-  assert(!tracker.Occluded(node,changed_view));
+  tracker.EndPass(); assert(tracker.Request(node,changed_view,sphere) == D::ChangedDepth);
   changed_view = view; ++changed_view.scope.samples;
-  assert(!tracker.Occluded(node,changed_view));
+  tracker.EndPass(); assert(tracker.Request(node,changed_view,sphere) == D::ChangedDepth);
   changed_view = view; changed_view.camera.world_to_clip[12] += .01f;
-  assert(!tracker.Occluded(node,changed_view));
-  assert(!tracker.Occluded({12,35,5},view) && !tracker.Occluded({13,34,5},view));
-  tracker.Note(node,std::nullopt,sphere);
-  assert(!tracker.Occluded(node,view));
-  tracker.Note(node,view,sphere); // invalidated identity remains invalid until next frame
-  assert(!tracker.Occluded(node,view));
-  view.frame = 13; tracker.Begin(13); tracker.Note(node,view,sphere);
-  assert(tracker.Occluded(node,view));
-  tracker.Note(node,view,{100,200,300.6f,.1f});
-  assert(!tracker.Occluded(node,view)); // conflicting repeated identity cannot be queried
+  tracker.EndPass(); assert(tracker.Request(node,changed_view,sphere) == D::ChangedCamera);
+  tracker.EndPass(); assert(tracker.Request(node,view,std::array{100.f,200.f,300.6f,.1f}) == D::ChangedBounds);
+  assert(tracker.Request({12,35,5},view,sphere) == D::NoHistory);
+  assert(tracker.Request({13,34,5},view,sphere) == D::NoHistory);
+  tracker.EndPass(); assert(tracker.Request(node,view,sphere) == D::Occluded);
+  assert(tracker.Request(node,std::nullopt,sphere) == D::InvalidView);
+  assert(tracker.Request(node,view,sphere) == D::Ambiguous); // cannot revive this pass
+  view.frame = 13; tracker.Begin(13);
+  assert(tracker.Request(node,view,sphere) == D::Occluded);
+  assert(tracker.Request(node,view,std::array{100.f,200.f,300.6f,.1f}) == D::Ambiguous);
   unsigned count = 0; tracker.Queries(view,[&](const auto &) { ++count; }); assert(count == 0);
-  view.frame = 16; tracker.Begin(16); tracker.Note(node,view,sphere);
-  assert(!tracker.Occluded(node,view)); // result older than three frames
+  view.frame = 16; tracker.Begin(16);
+  assert(tracker.Request(node,view,sphere) == D::Stale); // older than three frames
+  assert(tracker.Request(node,view,std::nullopt) == D::InvalidBounds);
+  assert(tracker.Request(node,view,sphere) == D::Ambiguous);
+  tracker.EndPass(); changed_view = view; ++changed_view.frame;
+  assert(tracker.Request(node,changed_view,sphere) == D::InvalidView);
+  changed_view = view; changed_view.scope.samples = 0;
+  assert(tracker.Request(node,changed_view,sphere) == D::InvalidView);
+  assert(tracker.Request(node,view,std::array{100.f,200.f,300.05f,.1f}) == D::InvalidBounds);
+  assert(!tracker.CurrentCount());
   NativeOcclusionHistory history;
   history.Collect(submitted[1],true); history.Collect(submitted[0],true);
   auto now = submitted[1]; now.frame = 12;
-  assert(!history.Occluded(now)); // out-of-order/duplicate results cannot manufacture two zeros
+  assert(history.Decide(now) == D::Warming); // out-of-order cannot manufacture two zeros
   history.Collect(submitted[1],true); assert(!history.Occluded(now));
-  history.Collect(now,false); ++now.frame; assert(!history.Occluded(now));
+  history.Collect(now,false); ++now.frame; assert(history.Decide(now) == D::Visible);
   tracker.Begin(20); view.frame = 20;
   assert(tracker.HistoryCount() == 0);
-  for (uint32_t n=0;n<NativeOcclusionTracker::kQueries+1;++n) tracker.Note({1,1,n},view,sphere);
+  for (uint32_t n=0;n<NativeOcclusionTracker::kQueries;++n)
+    assert(tracker.Request({1,1,n},view,sphere) == D::NoHistory);
+  assert(tracker.Request({1,1,NativeOcclusionTracker::kQueries},view,sphere) == D::Capacity);
   assert(tracker.CurrentCount() == NativeOcclusionTracker::kQueries);
   for (uint32_t n=0;n<NativeOcclusionTracker::kHistory+1;++n) {
     auto query = submitted[0]; query.identity.node = n; query.frame = 20;

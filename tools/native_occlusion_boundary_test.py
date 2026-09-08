@@ -30,19 +30,27 @@ class NativeOcclusionBoundaryTest(unittest.TestCase):
         start = source.index("bool SubmitNativeRigidScene(")
         light = source.index("CommitNativeRigidSceneLights", start)
         siblings = source.index("pending.push_back", light)
-        query = source.index("OcclusionCullOccluded", siblings)
+        query = source.index("OcclusionCullRequest", siblings)
         draw = source.index("DrawQueuePush", query)
         self.assertLess(light, siblings)
         self.assertLess(siblings, query)
         self.assertLess(query, draw)
-        self.assertNotIn("OcclusionCullOccluded", (ROOT / "src/gpu/hooks/draw.cpp").read_text())
+        self.assertIn("!pending.empty() && OcclusionCullRequest", source)
+        self.assertNotIn("OcclusionCullRequest", (ROOT / "src/gpu/hooks/draw.cpp").read_text())
 
     def test_owned_bounds_and_current_view_feed_queries(self):
         source = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("visible && occlusion && native_pose && bounds", source)
-        self.assertIn("instance_pose->instance, instance_pose->model_generation, index", source)
-        self.assertIn("FindNativePassOcclusionView()", source)
+        self.assertIn("const auto world_bounds = native_pose && bounds", source)
+        self.assertIn("std::array<float, 4>{out[0], out[1], out[2], radius}", source)
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy, world_bounds)", source)
+        self.assertNotIn("OcclusionCullNote", source)
+        self.assertNotIn("FindNativePassOcclusionView", source)
         self.assertNotIn("r_near", source)
+
+    def test_empty_pass_does_not_create_pipeline_or_switch_bindings(self):
+        source = (ROOT / "src/gpu/occlusion_cull.cpp").read_text().split("void OcclusionCullEmit", 1)[1]
+        self.assertLess(source.index("!o.tracker.HasQueries(*view)"), source.index("PipelineFor(o"))
+        self.assertLess(source.index("!o.tracker.HasQueries(*view)"), source.index("EngineGraphicsBindings"))
 
     def test_shader_and_behavior_fixtures_are_connected(self):
         shader = (ROOT / "src/gpu/shaders/hlsl/native_occ_proxy_vs.hlsl").read_text()

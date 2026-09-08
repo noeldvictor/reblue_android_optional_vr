@@ -74,20 +74,23 @@ void Run(RenderDevice &device, uint32_t samples, bool rotated) {
   scene->PublishCamera({identity,camera,identity},true,true,false,10,3);
   const auto view = scene->OcclusionView(10);
   Need(view && view->scope.depth == 2 && view->scope.samples == samples, "Owned occlusion view");
-  std::array<NativeOcclusionPacket,3> queries;
+  NativeOcclusionTracker tracker;
+  tracker.Begin(10);
+  std::array<std::array<float,4>,3> spheres;
+  std::array<NativeOcclusionObservation,3> queries;
   for (uint32_t i=0;i<queries.size();++i) {
     const float z = i == 0 ? .25f : i == 1 ? .75f : .5f;
-    const auto packet = PrepareNativeOcclusion(view->camera,
-        rotated ? std::array<float,4>{100+z,200,300,.15f} : std::array<float,4>{100,200,300+z,.15f});
-    Need(bool(packet), "World-space query packet"); queries[i] = *packet;
+    spheres[i] = rotated ? std::array<float,4>{100+z,200,300,.15f} : std::array<float,4>{100,200,300+z,.15f};
+    Need(tracker.Request({12,34,i},view,spheres[i]) == NativeOcclusionDecision::NoHistory, "First native request stays visible");
   }
+  tracker.Queries(*view,[&](const auto &query) { queries.at(query.identity.node) = query; });
   cmd->begin(); cmd->resetQueryPool(pool.get(),0,3);
   scene->Bind(*cmd); Need(scene->ApplyClear(*cmd), "Occlusion first clear");
   cmd->setViewports(RenderViewport(0,0,size,size)); cmd->setScissors(RenderRect(0,0,size,size));
   Need(WithNativeOcclusionBindings(*cmd,program.layout.get(),resume,[&] {
     cmd->setPipeline(pipeline.get());
     for (uint32_t i=0;i<queries.size();++i) {
-      cmd->setGraphicsPushConstants(0,&queries[i],0,sizeof(queries[i]));
+      cmd->setGraphicsPushConstants(0,&queries[i].packet,0,sizeof(queries[i].packet));
       cmd->beginQuery(pool.get(),i); cmd->drawInstanced(36,1,0,0); cmd->endQuery(pool.get(),i);
     }
   }),"Occlusion binding scope");
@@ -129,6 +132,7 @@ void Run(RenderDevice &device, uint32_t samples, bool rotated) {
   Need(results[0] > 0 && results[1] == 0 && results[2] > 0, "Front/hidden/intersecting query classification");
   pool->queryResults(3);
   Need(std::equal(results.begin(),results.end(),pool->getResults()), "Runtime query readback matches Vulkan results");
+  for (uint32_t i=0;i<queries.size();++i) tracker.Collect(queries[i],pool->getResults()[i] == 0);
   auto *native_buffer = static_cast<VulkanBuffer *>(readback.get());
   Need(vmaInvalidateAllocation(native_buffer->device->allocator,native_buffer->allocation,0,VK_WHOLE_SIZE) == VK_SUCCESS,
       "Occlusion readback visibility");
@@ -140,9 +144,39 @@ void Run(RenderDevice &device, uint32_t samples, bool rotated) {
     Need(actual == .5f,"Occlusion query changed depth");
   }
   readback->unmap();
+  // A second real submission/fence with unchanged depth and camera, not two
+  // fabricated frame stamps for one result. The hidden native consumer must
+  // warm up first, then be culled while front/intersecting consumers remain.
+  auto next_view = *view; next_view.frame = 11; tracker.Begin(11);
+  for (uint32_t i=0;i<queries.size();++i)
+    Need(tracker.Request({12,34,i},next_view,spheres[i]) ==
+        (i == 1 ? NativeOcclusionDecision::Warming : NativeOcclusionDecision::Visible), "One zero cannot cull");
+  tracker.Queries(next_view,[&](const auto &query) { queries.at(query.identity.node) = query; });
+  auto next_cmd = queue->createCommandList(); auto next_fence = device.createCommandFence();
+  next_cmd->begin(); next_cmd->resetQueryPool(pool.get(),0,3); scene->Bind(*next_cmd);
+  next_cmd->setViewports(RenderViewport(0,0,size,size)); next_cmd->setScissors(RenderRect(0,0,size,size));
+  Need(WithNativeOcclusionBindings(*next_cmd,program.layout.get(),resume,[&] {
+    next_cmd->setPipeline(pipeline.get());
+    for (uint32_t i=0;i<queries.size();++i) {
+      next_cmd->setGraphicsPushConstants(0,&queries[i].packet,0,sizeof(queries[i].packet));
+      next_cmd->beginQuery(pool.get(),i); next_cmd->drawInstanced(36,1,0,0); next_cmd->endQuery(pool.get(),i);
+    }
+  }),"Second query binding scope");
+  next_cmd->end(); queue->executeCommandLists(next_cmd.get(),next_fence.get());
+  native_fence = static_cast<VulkanCommandFence *>(next_fence.get());
+  Need(vkWaitForFences(native_fence->device->vk,1,&native_fence->vk,VK_TRUE,5'000'000'000ULL) == VK_SUCCESS,
+      "Second occlusion fence failed/timed out");
+  pool->queryResults(3);
+  for (uint32_t i=0;i<queries.size();++i) tracker.Collect(queries[i],pool->getResults()[i] == 0);
+  next_view.frame = 12; tracker.Begin(12);
+  for (uint32_t i=0;i<queries.size();++i)
+    Need(tracker.Request({12,34,i},next_view,spheres[i]) ==
+        (i == 1 ? NativeOcclusionDecision::Occluded : NativeOcclusionDecision::Visible), "Fenced native consumer culling decision");
+  uint32_t refresh = 0; tracker.Queries(next_view,[&](const auto &) { ++refresh; });
+  Need(refresh == 3,"Culled native consumer still requests a visibility refresh");
   std::cout << "PASS native occlusion samples=" << samples << " rotated=" << rotated
       << " front=" << results[0] << " hidden=" << results[1] << " intersecting=" << results[2]
-      << "; all colour/depth pixels preserved\n";
+      << "; all colour/depth pixels preserved; two real fences -> hidden-only culling decision\n";
 }
 }
 void CheckNativeOcclusion(RenderDevice &device) {

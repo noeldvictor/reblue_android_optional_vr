@@ -201,7 +201,8 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   return true;
 }
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
-                            const std::optional<PrimitivePolicyInputs> &inputs) {
+                            const std::optional<PrimitivePolicyInputs> &inputs,
+                            const std::optional<std::array<float, 4>> &world_bounds) {
   if (!NativeRigidSceneEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
@@ -304,7 +305,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   // Every authored state/light effect and every sibling preflight happens first.
   // Query history can omit GPU work, never the ordered producer side effects.
   const auto occlusion_view = commands->OcclusionView(FrameStatFrameCount());
-  if (occlusion_view && OcclusionCullOccluded({pose.instance, pose.model_generation, node}, *occlusion_view))
+  if (!pending.empty() && OcclusionCullRequest({pose.instance, pose.model_generation, node}, occlusion_view, world_bounds))
     return true;
   if (!pending.empty() && !s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);

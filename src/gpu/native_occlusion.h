@@ -71,6 +71,10 @@ struct NativeOcclusionObservation {
         packet.world_to_clip == scene::TransposeRenderMatrix(view.camera.world_to_clip);
   }
 };
+enum class NativeOcclusionDecision {
+  InvalidView, InvalidBounds, Ambiguous, Capacity, NoHistory,
+  ChangedDepth, ChangedCamera, ChangedBounds, Stale, Warming, Visible, Occluded, Count
+};
 class NativeOcclusionHistory {
 public:
   void Collect(const NativeOcclusionObservation &query, bool zero) {
@@ -79,16 +83,23 @@ public:
     zeros_ = zero ? (consecutive ? (std::min)(zeros_+1, 2u) : 1u) : 0u;
     last_ = query;
   }
-  bool Occluded(const NativeOcclusionObservation &current) const {
-    return zeros_ >= 2 && current.frame > last_.frame && current.frame-last_.frame <= 3 &&
-        current.SameInput(last_);
+  NativeOcclusionDecision Decide(const NativeOcclusionObservation &current) const {
+    using D = NativeOcclusionDecision;
+    if (!last_.frame || current.identity != last_.identity) return D::NoHistory;
+    if (current.scope != last_.scope) return D::ChangedDepth;
+    if (current.packet.world_to_clip != last_.packet.world_to_clip) return D::ChangedCamera;
+    if (current.packet.sphere != last_.packet.sphere) return D::ChangedBounds;
+    if (current.frame <= last_.frame || current.frame-last_.frame > 3) return D::Stale;
+    return zeros_ >= 2 ? D::Occluded : zeros_ ? D::Warming : D::Visible;
   }
+  bool Occluded(const NativeOcclusionObservation &current) const { return Decide(current) == NativeOcclusionDecision::Occluded; }
   uint32_t LastFrame() const { return last_.frame; }
 private:
   NativeOcclusionObservation last_{};
   uint32_t zeros_ = 0;
 };
-// Current observations authorize both queries and culling. A missing, changed or
+// Only admitted native draw consumers request observations, after sibling/state
+// preflight. Legacy-only nodes never occupy the query/history budget. A changed or
 // ambiguous observation cannot inherit an earlier node's permission to disappear.
 // Only values are retained: no source addresses, GPU pointers or mapped uploads.
 class NativeOcclusionTracker {
@@ -102,22 +113,27 @@ public:
       else ++it;
     }
   }
-  void Note(NativeOcclusionIdentity identity, const std::optional<NativeOcclusionView> &view,
-            const std::array<float, 4> &sphere) {
-    if (!identity) return;
-    const auto packet = view && view->frame == frame_ && view->scope.depth && view->scope.width && view->scope.height
-        ? PrepareNativeOcclusion(view->camera, sphere) : std::nullopt;
+  NativeOcclusionDecision Request(NativeOcclusionIdentity identity,
+      const std::optional<NativeOcclusionView> &view, const std::optional<std::array<float, 4>> &sphere) {
+    using D = NativeOcclusionDecision;
     auto it = current_.find(identity);
+    const bool valid_view = identity && view && frame_ && view->frame == frame_ &&
+        view->scope.depth && view->scope.width && view->scope.height && view->scope.samples;
+    const auto packet = valid_view && sphere ? PrepareNativeOcclusion(view->camera, *sphere) : std::nullopt;
     if (!packet) {
       if (it != current_.end()) it->second.frame = 0;
-      return;
+      return valid_view ? D::InvalidBounds : D::InvalidView;
     }
     NativeOcclusionObservation observation{identity, frame_, *packet, view->scope};
     if (it != current_.end()) {
       if (!it->second.SameInput(observation)) it->second.frame = 0;
-      return;
+      if (!it->second.frame) return D::Ambiguous;
+    } else {
+      if (current_.size() >= kQueries) return D::Capacity;
+      current_.emplace(identity, observation);
     }
-    if (current_.size() < kQueries) current_.emplace(identity, observation);
+    const auto history = history_.find(identity);
+    return history == history_.end() ? D::NoHistory : history->second.Decide(observation);
   }
   void Collect(const NativeOcclusionObservation &query, bool zero) {
     if (!query.identity || !query.frame) return;
@@ -128,11 +144,8 @@ public:
     }
     it->second.Collect(query, zero);
   }
-  bool Occluded(NativeOcclusionIdentity identity, const NativeOcclusionView &view) const {
-    const auto current = current_.find(identity);
-    const auto history = history_.find(identity);
-    return current != current_.end() && current->second.Matches(view) &&
-        history != history_.end() && history->second.Occluded(current->second);
+  bool HasQueries(const NativeOcclusionView &view) const {
+    return std::any_of(current_.begin(), current_.end(), [&](const auto &entry) { return entry.second.Matches(view); });
   }
   template <typename Emit> void Queries(const NativeOcclusionView &view, Emit &&emit) const {
     for (const auto &[id, query] : current_) if (query.Matches(view)) emit(query);

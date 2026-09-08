@@ -142,6 +142,35 @@ terminal; no image was written. The image archive has only47,920 B headroom belo
 Keep957 failure evidence,956 tree-gap evidence,945 accepted pixels and948/941.
 [Native occlusion connection and exact evidence](../research/20260907_2007_native-occlusion.md).
 
+Current follow-up, host119/run959: query admission now happens only at the
+preflighted, nonempty native rigid consumer, with owned world bounds passed by
+value from the walk. The walk's broad query publication and camera lookup bridge
+are removed; legacy-only nodes cannot consume query/history capacity. Empty
+passes avoid query pipeline creation and binding changes. Current/history bounds,
+camera, depth-generation, age and duplicate checks remain strict. 326 Python
+checks and the expanded C++ fixture pass; eight Vulkan cases now feed two actual
+submissions/fences into the production decision and cull only the hidden candidate
+(validation0/0). This is a fixture decision, not skipped game geometry/pixel proof.
+
+Run959 passes the full strict cold/reload chain, generation93 retired before207.
+At query frame4800: 31,649 native requests, 8,960 submitted /8,954 collected,
+3,034 zeros and0 native skips. Decisions: 22,689 invalid bounds, 8,613 changed
+camera, 304 missing history, 43 visible; other reasons0. Bounds rejection includes
+missing/nonfinite/near-clipped inputs; this sample does not isolate those subtypes.
+Next bundle: derive tighter bounds from owned canonical geometry and the exact
+native object transform, replacing the remaining walk radius-scale handoff where
+possible. Test actual draw coverage/near-plane behavior, then moving-view/depth
+visibility without loosening camera equality or temporal safety. Do not repeat
+this unchanged run for a different camera. Controlled hidden/visible game pixels
+and stereo remain required; the broad desktop gate is unchanged.
+
+The independent reloaded4352..4652 material window now proves real scene batching:
+9,515 instances /7,893 indirect calls, 2,813 instances in merged groups. Wider
+scene emissions advance, layered draws remain0. This replaces the current
+"singletons only" observation, not historical measurements or pixel acceptance.
+No measured speedup and no claim that the admission edit caused the observed
+batching; the moving scene differs from958. Preserve all existing visual failures.
+
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
 The direct consumer now uses `NativeSceneLightingPublication`: semantic lights
