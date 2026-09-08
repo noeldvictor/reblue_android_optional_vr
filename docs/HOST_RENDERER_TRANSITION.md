@@ -347,12 +347,20 @@ native/legacy alternation does not add transitions. Two rebuilt C++ fixtures,
 32 CPU tests,360 Python checks and host build pass; no guest objects rebuilt.
 Run966 remains evidence for host130, not this binary.
 
-Next: check the connected host132 mixed-list gate with `--deferred-effects` and
-independent cold/reload epochs: balanced scopes and actual fresh effect reads.
-Then retire the bounded visual-authored sidecar at its producer/lifetime handoff,
-not by freezing late values. Receiver descriptors, outgoing legacy state and
-legacy-opened scopes remain adapters. Qualify mixed-order pixels once the image
-budget allows it. Do not repeat the callback census or build a second renderer.
+Run967 now passes the strict host132 cold-field/title/reload chain, including
+`--deferred-effects` independently in both epochs. Cold1800..2100 consumes10,957
+native packets through3,383 paired native visual scopes alongside6,124 legacy
+draws. Reload4500..4800 consumes2,758 through234 scopes alongside7,667 legacy
+draws. No native pending work, fallback or refusal; old93/144 retires before the
+new207/388 scene. Existing receiver/light/caster/cutout and source/GPU gates pass.
+These are consumer/lifetime receipts, not pixel or timing qualification.
+
+Next: retire the bounded visual-authored sidecar at the native instance/effect
+producer and lifetime handoff, not by freezing late values or copying register
+state. Receiver descriptors, outgoing legacy state and legacy-opened scopes
+remain adapters. Reuse the now-qualified mixed-consumer gate. Qualify mixed-order
+pixels once the image budget allows it, while continuing independent native
+ownership work. Do not repeat the callback census or build a second renderer.
 Full native frame, broader authored effects/scenes/reloads and both-eye acceptance
 remain open.
 [Native effect scope connection and verification](../research/20260908_0251_native-deferred-effects.md).

@@ -260,9 +260,12 @@ Setup/cleanup runs directly through the existing host receiver, blend and effect
 owners; native packets consume retained, frame-checked effect values. Late receiver
 colour and legacy material restore are preserved without feeding compatibility
 staging back into native materials. Two rebuilt C++ fixtures,32 CPU tests,360
-Python checks and the incremental host build pass. Fresh mixed runtime/pixels are
-pending for this binary. Authored-input sidecars, outgoing legacy state and
-legacy-opened scopes remain; the route is still opt-in.
+Python checks and the incremental host build pass. **Run967 passes the strict
+cold-field/title/reload chain:** sampled windows consume10,957/2,758 native packets
+through3,383/234 balanced native visual scopes alongside legacy draws. Source and
+GPU lifetime checks pass independently in both epochs. Pixels/both eyes remain
+unqualified; no speedup is claimed. Authored-input sidecars, outgoing legacy state
+and legacy-opened scopes remain; the route is still opt-in.
 [Connected effects, contracts and verification](research/20260908_0251_native-deferred-effects.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and

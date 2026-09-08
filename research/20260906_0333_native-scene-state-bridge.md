@@ -4400,3 +4400,21 @@ Total10,581 B/10 logs removed once;9,848 B new, final273,466 B/164 logs, net733 
 smaller than start. Selected fixture/log growth267,400 B. Free80,499,597,312 B.
 Before that last log cleanup, runtime preflight77,620,288 B diagnostic retention
 fits the819,200 B reload reservation under the existing75 MiB stop. No game run yet.
+
+Run967/PID37656/session64033 terminal0,02:58:51..03:00:55 under180 s/800 KiB,
+192 MiB free-drop, original reserve and75 MiB cumulative diagnostic stop. Source
+bad7cc7 clean, unchanged host132. Full strict cold/title/reload chain plus new
+deferred-effect gate passes independently in both epochs:10,957/2,758 native
+packet reads and3,383/234 balanced visual scopes, alongside legacy consumption.
+Exact counts/hash/recipe in the effects report. No pixel or timing qualification.
+Log509,208 B; no raw/image/cache/hlsl/perf growth. Profile restored byte-exact,
+SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+
+After replacement passed, removed superseded966 plaintext505,061 B, hash verified
+against its recorded report. Full raw text retired; small results/hash/procedure
+remain. Preserve959's distinct merging proof, failures and every image/raw set.
+Immediate free80,497,496,064->80,498,003,968 B (507,904 B physical gain). Runtime-log
+retention grows4,147 B, selected fixture/build/runtime-log scopes271,547 B. Total
+logical removal this continuation515,642 B, no double credit. Free4,280,320 B above
+first reading is drive-wide activity, not all task cleanup. All producers terminal;
+full goal and image budget gates unchanged.

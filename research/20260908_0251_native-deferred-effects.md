@@ -96,3 +96,52 @@ new9,848 B, final273,466 B/164 logs (net733 B smaller). Selected fixture/log
 growth267,400 B. Free80,499,597,312 B after this cleanup. This does not re-credit
 the earlier eight-file removal. Runtime preflight77,620,288 B diagnostics before
 this last cleanup fits the819,200 B reload reservation below the75 MiB stop.
+
+## Connected runtime: run967
+
+Source bad7cc7 clean; unchanged host132 binary/hash above. The existing ignored
+`run_post_image_flow.ps1` gained `-DeferredEffectsVerify`, requiring its existing
+`-RigidDeferredProbe` and adding `--deferred-effects` to the same scenario chain.
+No readiness/comparison threshold was loosened. Full recipe: run966's strict
+cold/title/reload chain from `20260908_0225_native-deferred-live.md`, plus this
+new switch. Producer PID37656/session64033,02:58:51..03:00:55, terminal0 under
+180 s/800 KiB,192 MiB free-drop and the cumulative75 MiB diagnostic stop. All22
+profile settings took effect, no captures/CSV/dumps/cooking; exact profile bytes
+restored in guaranteed cleanup. No producer remains live.
+
+| Fresh ordinary deferred window | Cold1800..2100 | Reload4500..4800 |
+| --- | ---: | ---: |
+| Native staged/consumed/effect reads | 10,957 | 2,758 |
+| Native visual begin/end pairs | 3,383 | 234 |
+| Native pending | 0 | 0 |
+| Continuing legacy draws | 6,124 | 7,667 |
+| Legacy material bridge calls | 12,248 | 15,334 |
+
+Terminal read-only verification splits the log and calls the full
+`verify_rigid_epoch(..., True, True, True, True, True, True)` independently for
+each epoch; both PASS. Old generation93/instance144 retires, title is reached,
+and207/388 owns the new field. The existing receiver/light/caster/cutout, movement,
+source/GPU retirement and material/geometry checks pass. Final frame4800 records
+64,410 native packets consumed,16,687 native visual begin/end pairs and zero
+pending, host-consumer fallback/refused both0. Aggregate native scene GPU window:
+10,858 submitted,9,966 emitted/fence-retired,934 culled/retired-culled,10 pending
+and10,900 resource retirements. These GPU counts include direct and deferred work;
+they are not per-deferred-family fence receipts. Merged-batch delta0: no measured
+speedup or new merging evidence. No images were produced or inspected; full
+frame/authored-effect/scene/sequence/stereo acceptance remains incomplete.
+
+Retained `out/build/win-amd64-release/logs/reblue_967.log`,509,208 B, SHA256
+`4CBA6786131B4C2DF97B9A50DC6373F8325E38B3B801799002DF4AB1ACC8F7D9`.
+The owner profile still hashes to2F1BC38D...E23B0 above. No cache/hlsl/perf file
+created or modified after run start; raw/image archive unchanged.
+
+After replacement passed, retired the exact superseded run966 plaintext log,
+505,061 B (SHA2567DE6645E...A7E25E recorded in its report). Its full raw text is
+no longer retained; small results/hash/procedure remain. Run959's distinct merged
+batch proof, every unresolved failure and all pixel/raw evidence are preserved.
+Immediate free80,497,496,064->80,498,003,968 B,507,904 B physical gain. Runtime-log
+retention grows only4,147 B; combined changed fixture/build-log/runtime-log scopes
+grow271,547 B. Total removed this continuation515,642 logical B (ten superseded
+build logs plus966), counted once. Final measured free is4,280,320 B above the
+first read, not all attributed to cleanup; host/source/Git and other drive activity
+remain separate. No new budget exception or unanswered-image-budget override.
