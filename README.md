@@ -107,10 +107,16 @@ water sorting/drawing, and retained skin palettes without guest interpolation
 scratch. Raw completed poses remain separate for compatibility checks/exports.
 C++ timing, bounds, packet/queue lifetime and memory-budget tests pass, as do
 390 Python checks and the host build without guest object compilation.
-**Unlocked-FPS live motion and pixel verification remain pending.** Host164/run971
-predates this change. Original animation evaluation, conditional source-palette
-copying, secondary palettes and unconverted rendering families remain.
+**Host165/run973 passes fresh interpolation and the full strict cold/reload
+consumer checks with a temporary 60 FPS limit.** Independent 300-frame windows
+add 1,287 and 951 interpolated poses, with shared reads advancing and zero
+refusals. Native skin scene/shadow emission and fence retirement also pass.
+The scenario tooling now passes 394 Python checks. These counts do not prove
+visual smoothness, achieved 60 FPS or a speedup; motion/pixel verification remains
+pending. Original animation evaluation, conditional source-palette copying,
+secondary palettes and unconverted rendering families remain.
 [Render-pose connection, verification and remaining gates](research/20260908_1440_native-render-poses.md).
+[Live interpolation/reload evidence and storage](research/20260908_1505_native-render-pose-live.md).
 
 ### How much is left?
 

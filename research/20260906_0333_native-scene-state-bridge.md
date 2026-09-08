@@ -5636,3 +5636,90 @@ Logs now409497B/198; texture134files, same bytes. Selected net retained growth
 346718B for current fixture/host binaries and verification, not duplicated trees.
 Other object/source/Git/system activity is separate; no old cleanup recredited,
 no game data/profile/assets removed, no raw/image growth or budget reset.
+
+### 2026-09-08 host165 live render-pose gate after b45dbc0
+
+Previous turn made progress: the strict scenario gate and regression tests were
+committed as b45dbc0;394 artifact-free Python checks pass. Push was rejected
+again by security review. The exact payload/destination approval question is
+unanswered; this continuation does not retry or bypass the restriction.
+Local renderer validation can proceed independently. No C++ or shader change
+since host165; no rebuild or restamp is needed for the Python/operator changes.
+
+14:54:49 free68242821120B; no renderer/compiler/test producer observed. Host165
+EXE SHA25609ADF4E2269BB08D2A09F739BBD77585FFE23415865ADDE5A05727FAAF19C791
+and owner116B profile SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0
+match.14:55:58 free68240539648B. Existing diagnostics76839714B plus full819200B
+log reservation =77658914B, below the unchanged75MiB stop. Build logs409497B,
+recent logs839934B, archives2411452B, recent cache18252B. No new images/raws.
+
+Plan ONE180s text-only normal mono/MSAA run of host165, temporary flat-TOML
+bd_fps_limit=60. Reuse the existing operator with RenderPoseVerify and the full
+strict cold/title/reload/mixed/skin scene+shadow chain. Fresh ready-field blends
+and shared reads must independently advance in both epochs; startup-only/snap-
+only samples, counter resets and refusals cannot pass. This is native consumer
+evidence, not motion/pixel parity, achieved60FPS or speedup. Existing800KiB log,
+192MiB free-drop, cumulative floor62509998080B and guaranteed exact profile
+restore/owned-process shutdown remain. PowerShell parser accepts the operator.
+Retain the new log for this distinct timing gate and all existing pixel failure
+evidence; assess eligible superseded text after the result. No asset cook,
+perf/raw capture, PrintWindow retry, new tree or diagnostic budget reset.
+
+Run972/PID35388/session74082 terminal1 at14:58:08: the192MiB free-drop guard
+stops during the opening event, before ready-field/reload evidence. Actual
+launch14:57:06 free68240273408B, floor68038946816B. Log169284B SHA256
+CD5335186604FFD08933EBA344FF5082A08AC69EDB3BE52AF0C5DEDA79765FA1; all25
+temporary settings took effect. Startup poses read/reuse with0refused and
+0blends, not an active-field interpolation failure or pass. No recent cache,
+hlsl,perf/raw files; exact116B owner profile hash restored. Renderer absent.
+
+14:58:36/14:59:07/14:59:36 free68002377728/68002316288/68001746944B now stable
+within0.61MiB for a minute after the larger decline. Pagefile allocation remains
+2048MiB; instantaneous process write rates show only1856B/s for Codex, not an
+explanation for prior volume allocation. No other process stopped. Retain972
+as the storage-stopped attempt. One retry is now justified by stable-space
+checks, not weakened acceptance or a larger allowance: same180s/800KiB/192MiB
+guards, same cumulative floor and aggregate. Diagnostics77008998B plus819200B
+reserved next log =77828198B fits75MiB. No rebuild, image or raw producer.
+
+Run973/PID36304/session23957 terminal0 at15:02:42; launch15:00:19 free68001742848B,
+floor67800416256B. Full strict cold/title/reload/mixed/skin scene+shadow chain
+AND fresh --render-poses pass in both epochs. Cold1870..2170 poses add52361
+reads,1287blends,37961reuses,13113snaps. Reload4187..4487 adds51929reads,
+951blends,37529reuses,13449snaps. Refusals0 throughout. Skin scene1809..2109
+emits/fence-retires13198;4135..4435 adds13200. Skin shadows add13200 in each
+matching window. Model93/instance144 fully retires before207/419. These are
+repeated consumers, not unique assets; merged instances0, no speedup claim.
+All25 temporary settings took effect; no raw/perf/cache/hlsl files produced.
+Exact original116B profile restored, renderer terminal. Ending free67998818304B.
+Log550521B SHA256CB6B3511FC826F1A215F8BB624A943C5FAA1FE29EE4D9A0EB3E884A29F09B23D.
+No new pixels: preserve the971/962 discrepancy and existing image gate.
+
+15:03:26 free67994984448B; images unchanged10434657B/13. Plan checksum-verified
+archive of971+972 (706706B combined) under the existing2MiB analysis-overlap
+bound. Retain all bytes of971's visual-failure log and972's storage stop in one
+lossless ZIP; remove only their exact plaintext files after entry length/hash
+validation. Keep current973 plaintext, all images and every other artifact.
+No renderer active and no new diagnostic allowance; actual savings recorded
+after the operation, not inferred from this plan.
+
+Archive completed:144117B SHA256D5EF7766701C04BFA7BD0A90970D02E5CDA2064400E2E0A8C748B889D7C60848.
+Both original entry hashes match; only the exact971/972 plaintext files were
+removed. All content remains recoverable; no images/raw/game/profile/assets
+removed. Logical562589B saved. Actual start67559735296B, pre-delete67554144256B,
+end67554627584B: deletion-phase gain483328B, but whole-operation net free decline
+5107712B amid concurrent allocation. Do not claim a net drive cleanup gain.
+New973 plus archive minus old971 yields selected retained growth157216B;
+all earlier savings count only once. Runtime diagnostics now76996930B.
+
+Drive-wide free falls further to66042277888B at15:05:31,65629523968B at15:06:23,
+and65378684928B at15:06:57 (2864136192B below this turn's14:54:49 sample).
+Read-only inspection identifies a separate Gradle/Ninja build: PID30924,
+parent34104, started15:05:52, linking rpcsx-android under Documents/ps3-thor.
+It is NOT this workspace's producer and was not stopped or altered. This proves
+concurrent build activity, not attribution of the entire earlier drive decline.
+Pagefile allocation remains2048MiB. Our host165 binary was reused unchanged,
+no reblue renderer remains, and our two small text logs account for none of the
+GiB-scale decline. Further output-producing reblue work needs fresh stable-space
+checks; no new job is queued by this handoff. Source/Git edits are separate.
+See20260908_1505_native-render-pose-live.md for exact live gates and limitations.

@@ -748,14 +748,21 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    exports. Material44/CPU42 and output80/CPU52 pass timing, discontinuities,
    late writers, identity, rigid-only/mixed/skin bounds, actual scene/shadow
    plans, water queue retirement and shared-budget tests.390 Python checks and
-   host165 pass, without guest object compilation; no shader changes or new game
-   run. Next qualify unlocked-FPS interpolation in fresh ready-field/reload
-   epochs and renderer-owned pixels under the existing storage gate. The known
+   host165 pass, without guest object compilation or shader changes. Host165/run973
+   now passes the full strict cold/title/reload/mixed/skin scene+shadow chain with
+   a temporary 60 FPS cap and independent fresh render-pose checks. Cold 1870..2170
+   adds 1,287 blends / 37,961 shared reads; reload 4187..4487 adds 951/37,529, refused 0.
+   Skin scene emits/fence-retires 13,198 and 13,200 in its respective fresh windows;
+   shadows add 13,200 each. Old 93/144 retires before 207/419. 394 Python checks pass.
+   This proves live consumption, not visual motion, achieved 60 FPS or speedup.
+   Next qualify renderer-owned motion/pixels under the existing storage gate;
+   native animation evaluation remains implementation work. The known
    title/window discrepancy still precludes another unchanged PrintWindow run.
    Original animation evaluation/collision/effect side effects, conditional
    source-palette copying, secondary palettes and legacy interpolation remain.
    Do not restamp host164/run971 as verification of this source.
    [Render-pose connection, verification and remaining gates](../research/20260908_1440_native-render-poses.md).
+   [Fresh interpolation/reload evidence and storage](../research/20260908_1505_native-render-pose-live.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass
    scheduling and presentation. Remove guest rendering, register/resource
