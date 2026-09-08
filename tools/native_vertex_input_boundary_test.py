@@ -14,7 +14,10 @@ class VertexInputBoundaryTest(unittest.TestCase):
         text = self.read("src/gpu/scene/native_mesh.cpp")
         self.assertLess(text.index("s.vertex_inputs.Resolve("), text.index("auto result = Upload("))
         self.assertIn("result->vertex_input = std::move(vertex_input);", text)
-        self.assertIn("if (!vertex_input) return {};", text)
+        self.assertIn("if (!vertex_input && !r.skin) return {};", text)
+        self.assertIn("NativeSkinShadowVertexInput(data,s.vertex_inputs)", text)
+        self.assertIn("if (influences ? (!skin_input || !skin_bounds) : (!data.attributes.empty() && !bounds)) return {};", text)
+        self.assertIn("result->skin_shadow_vertex_input = std::move(skin_input);", text)
 
     def test_native_dispatch_clears_declaration_and_publishes_owned_strides(self):
         text = self.read("src/gpu/scene/host_draw.cpp").split("if (const auto &mesh = d.native_geometry)", 1)[1]

@@ -42,8 +42,9 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
   return result;
 }
 void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true,
-         uint32_t deferred = 0) {
+         uint32_t deferred = 0, uint32_t skin = 0) {
   Need(!deferred || (mode == 19 && !stale && restore), "Deferred ordering fixture scope");
+  Need(!skin || (skin <= 3 && (mode == 1 || mode == 4) && !stale && !deferred),"Skin caster fixture scope");
   const bool cutout = (mode >= 12 && mode < 23) || mode == 40, untextured = mode == 10 || mode == 21;
   const bool shadow_cutout = mode >= 23, shadow_untextured = mode == 31 || mode == 36 || mode == 38;
   const bool cutout_receiver = mode >= 37;
@@ -153,7 +154,9 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   const uint64_t scene_offset = placement->Offset(1), shadow_offset = placement->Offset(scene_offset+placement->bytes);
   std::vector<uint8_t> storage_bytes(shadow_offset+placement->bytes,0xCD); // poison prefix catches element/byte confusion
   std::memcpy(storage_bytes.data()+scene_offset,scene_instances.data(),placement->bytes);
-  std::memcpy(storage_bytes.data()+shadow_offset,shadow_instances.data(),placement->bytes);
+  auto uploaded_shadow_instances = shadow_instances;
+  if (skin) for (auto &instance : uploaded_shadow_instances) instance.object_data.world.rows[3].x = 999;
+  std::memcpy(storage_bytes.data()+shadow_offset,uploaded_shadow_instances.data(),placement->bytes);
   auto storage = Upload(device,storage_bytes.data(),uint32_t(storage_bytes.size()),RenderBufferFlag::STORAGE);
   struct Vertex { RigidFloat4 position, normal, uv, colour, secondary_uv; };
   std::array<Vertex, 4> vertices{};
@@ -162,6 +165,53 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
       {.3f,.4f,1,0},{xy[i][0],xy[i][1],-xy[i][1],xy[i][0]},
       {.8f,.6f,.4f,.5f},{xy[i][1],-xy[i][0],0,0}};
   auto vb = Upload(device, vertices.data(), sizeof(vertices), RenderBufferFlag::VERTEX);
+  std::unique_ptr<RenderBuffer> skin_vb, skin_palettes, skin_ranges;
+  NativePipelineHandle skin_program;
+  uint32_t skin_stride = 0, skin_vertex_bytes = 0;
+  const uint32_t palette_offset = uint32_t(std::max<uint64_t>(64,alignment));
+  const uint32_t range_offset = uint32_t(std::max<uint64_t>(16,alignment));
+  if (skin) {
+    NativeMeshData asset;
+    asset.indices = {0,1,2,0,2,3};
+    for (auto semantic : {MeshSemantic::SkinPosition,MeshSemantic::SkinNormal})
+      for (uint32_t n = 0; n < skin; ++n) asset.attributes.push_back({semantic,n,uint32_t(asset.attributes.size()*16)});
+    asset.attributes.push_back({MeshSemantic::SkinJoints,0,uint32_t(asset.attributes.size()*16)});
+    asset.attributes.push_back({MeshSemantic::SkinWeights,0,uint32_t(asset.attributes.size()*16)});
+    asset.layout = NativeMeshLayoutId(asset.attributes);
+    skin_stride = uint32_t(asset.attributes.size()*16); skin_vertex_bytes = 4*skin_stride;
+    asset.streams.push_back({0,skin_stride,std::vector<uint8_t>(skin_vertex_bytes)});
+    const RigidFloat4 weights = skin == 1 ? RigidFloat4{1,0,0,0} : skin == 2 ? RigidFloat4{.25f,.75f,0,0} : RigidFloat4{.2f,.3f,.5f,0};
+    const RigidFloat4 joints{2,0,skin == 3 ? 1.f : 0.f,0};
+    for (uint32_t v = 0; v < 4; ++v) {
+      const auto &p = vertices[v].position;
+      const RigidFloat4 positions[]{{p.x+.25f,p.y,p.z,0},{p.y,p.x,p.z,0},{-p.x,p.y,p.z,0}};
+      for (uint32_t n = 0; n < skin; ++n)
+        std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+n*16,&positions[n],16);
+      std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+skin*32,&joints,16);
+      std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+skin*32+16,&weights,16);
+    }
+    auto skin_input = NativeSkinShadowVertexInput(asset,inputs);
+    skin_program = CreateNativeSkinShadowProgram(device,skin_input);
+    Need(bool(skin_program),"Production native skin caster shader");
+    skin_vb = Upload(device,asset.streams[0].bytes.data(),skin_vertex_bytes,RenderBufferFlag::VERTEX);
+    std::vector<uint8_t> palette_bytes(palette_offset+instance_count*3*sizeof(RigidMatrix),0xCD);
+    std::vector<uint8_t> range_bytes(range_offset+instance_count*sizeof(RigidUint4),0xCD);
+    for (uint32_t i = 0; i < instance_count; ++i) {
+      const auto world = shadow_instances[i].object_data.world;
+      std::array<RigidMatrix,3> palette{world,world,world};
+      std::swap(palette[0].rows[0],palette[0].rows[1]);
+      palette[1].rows[0] = {-world.rows[0].x,-world.rows[0].y,-world.rows[0].z,0};
+      palette[2].rows[3].x -= .25f*world.rows[0].x;
+      palette[2].rows[3].y -= .25f*world.rows[0].y;
+      palette[2].rows[3].z -= .25f*world.rows[0].z;
+      const RigidUint4 range{i*3,3,0,0};
+      std::memcpy(palette_bytes.data()+palette_offset+i*sizeof(palette),palette.data(),sizeof(palette));
+      std::memcpy(range_bytes.data()+range_offset+i*sizeof(range),&range,sizeof(range));
+    }
+    skin_palettes = Upload(device,palette_bytes.data(),uint32_t(palette_bytes.size()),RenderBufferFlag::STORAGE);
+    skin_ranges = Upload(device,range_bytes.data(),uint32_t(range_bytes.size()),RenderBufferFlag::STORAGE);
+    asset = {}; skin_input.reset(); // native shader/buffers outlive producer data
+  }
   const uint16_t indices[]{0,1,2,0,2,3};
   auto ib = Upload(device, indices, sizeof(indices), RenderBufferFlag::INDEX);
   const std::array<Vertex,4> collapsed_vertices{};
@@ -202,11 +252,18 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   NativeRigidDescriptorSchema schema;
   std::array<std::unique_ptr<RenderDescriptorSet>, 3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]), "Rigid descriptors"); }
-  auto shadow_set = schema.sets[0].create(&device); Need(bool(shadow_set), "Rigid shadow storage set");
+  NativeRigidDescriptorSchema shadow_schema(skin != 0);
+  auto shadow_set = shadow_schema.sets[0].create(&device); Need(bool(shadow_set), "Rigid shadow storage set");
   const RenderBufferStructuredView scene_view(sizeof(NativeRigidInstanceGPU),uint32_t(scene_offset/sizeof(NativeRigidInstanceGPU)));
   const RenderBufferStructuredView caster_view(sizeof(NativeRigidInstanceGPU),uint32_t(shadow_offset/sizeof(NativeRigidInstanceGPU)));
   sets[0]->setBuffer(0,storage.get(),placement->bytes,&scene_view);
   shadow_set->setBuffer(0,storage.get(),placement->bytes,&caster_view);
+  if (skin) {
+    const RenderBufferStructuredView joints_view(sizeof(RigidMatrix),palette_offset/sizeof(RigidMatrix));
+    const RenderBufferStructuredView range_view(sizeof(RigidUint4),range_offset/sizeof(RigidUint4));
+    shadow_set->setBuffer(1,skin_palettes.get(),instance_count*3*sizeof(RigidMatrix),&joints_view);
+    shadow_set->setBuffer(2,skin_ranges.get(),instance_count*sizeof(RigidUint4),&range_view);
+  }
   // Match the real queue's legal inactive descriptors too: these point at the
   // owned depth image but must never supply a material sample for disabled layers.
   sets[1]->setTexture(0, untextured ? shadow.get() : albedo.get(), RenderTextureLayout::SHADER_READ,
@@ -261,8 +318,10 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     Need(foreign_pipeline && static_cast<VulkanGraphicsPipeline *>(foreign_pipeline.get())->vk,
          "Handoff foreign pipeline");
   }
-  const auto &shadow_program = shadow_cutout && !shadow_untextured ? programs.shadow_cutout : programs.shadow;
+  const auto &shadow_program = skin ? skin_program : shadow_cutout && !shadow_untextured ? programs.shadow_cutout : programs.shadow;
+  const RenderInputSlot shadow_slot(0,skin ? skin_stride : sizeof(Vertex));
   ApplyNativePipelineProgram(*shadow_program, pipeline_desc);
+  pipeline_desc.inputSlots = &shadow_slot;
   pipeline_desc.viewMask = 0; pipeline_desc.renderTargetCount = 0;
   pipeline_desc.depthTargetFormat = depth_desc.format;
   pipeline_desc.depthWriteEnabled = true; pipeline_desc.depthFunction = RenderComparisonFunction::LESS;
@@ -313,7 +372,8 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   commands->setPipeline(shadow_pipeline.get());
   const RenderVertexBufferView vertex_view({vb.get(),0},sizeof(vertices));
   const RenderIndexBufferView index_view({ib.get(),0},sizeof(indices),RenderFormat::R16_UINT);
-  commands->setVertexBuffers(0,&vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
+  const RenderVertexBufferView caster_vertex_view = skin ? RenderVertexBufferView({skin_vb.get(),0},skin_vertex_bytes) : vertex_view;
+  commands->setVertexBuffers(0,&caster_vertex_view,1,&shadow_slot); commands->setIndexBuffer(&index_view);
   commands->drawIndexedIndirect(indirect.get(),sizeof(NativeRigidIndexedCommand),1,sizeof(NativeRigidIndexedCommand));
   commands->setFramebuffer(nullptr);
   commands->barriers(RenderBarrierStage::GRAPHICS, RenderTextureBarrier(shadow.get(),RenderTextureLayout::SHADER_READ));
@@ -536,7 +596,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     }
   }
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" stale="<<stale<<" restored="<<restore<<" deferred="<<deferred
-           <<" eyes=2 pixels=128 max_error="<<maximum_error
+           <<" skin="<<skin<<" eyes=2 pixels=128 max_error="<<maximum_error
            <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" shadow cutout="<<shadow_cutout
            <<"; cutout receiver lit/shadowed/filtered="<<lit_receivers<<'/'<<shadowed_receivers<<'/'<<filtered_receivers
            <<"; native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
@@ -549,4 +609,5 @@ void CheckNativeRigid(plume::RenderDevice &device) {
     Run(device,0,stale,true);
   }
   for(uint32_t deferred=1;deferred<=3;++deferred) Run(device,19,0,true,deferred);
+  for(uint32_t skin=1;skin<=3;++skin) for (uint32_t mode : {1u,4u}) Run(device,mode,0,true,0,skin);
 }

@@ -30,6 +30,8 @@
 
 REXCVAR_DECLARE(bool, bd_occlusion_cull);
 REXCVAR_DECLARE(bool, bd_occlusion_diag);
+REXCVAR_DEFINE_BOOL(bd_native_skin_shadow, true, kCvarGroup,
+    "Native opaque phase1 skin casters from load-owned vertices and completed instance poses; requires native shadow path.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
     "Fail-closed native opaque and phase1 cutout rigid caster families; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
@@ -66,6 +68,8 @@ struct NativeRigidDrawStore {
   std::array<NativeWaterInstanceGPU, kNativeRigidBatchLimit> water_scratch;
   uint64_t water_submitted = 0, water_emitted = 0, water_culled = 0, water_retired = 0;
   uint32_t water_reported_frame = 0;
+  uint64_t skin_submitted = 0, skin_emitted = 0, skin_retired = 0;
+  uint32_t skin_reported_frame = 0;
   uint64_t submitted = 0, suppressed = 0, retired = 0;
   uint32_t reported_frame = 0;
   uint64_t emitted = 0, scene_submitted = 0, scene_emitted = 0, scene_retired = 0, scene_suppressed = 0;
@@ -109,14 +113,17 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
 }
 }
 bool NativeRigidShadowEnabled() { return REXCVAR_GET(bd_native_rigid_shadow); }
+bool NativeSkinShadowEnabled() { return NativeRigidShadowEnabled() && REXCVAR_GET(bd_native_skin_shadow); }
 bool NativeRigidSceneEnabled() { return REXCVAR_GET(bd_native_rigid_scene); }
 bool NativeRigidDeferredEnabled() { return NativeRigidSceneEnabled() && REXCVAR_GET(bd_native_rigid_deferred); }
 bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
-                             const std::optional<PrimitivePolicyInputs> &inputs) {
+                             const std::optional<PrimitivePolicyInputs> &inputs,
+                             std::shared_ptr<const NativeInstancePose> owned_pose) {
   if (!NativeRigidShadowEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
-  const auto admission = PrepareNativeRigidShadowAdmission(*model, inputs);
+  const bool skin = NativeSkinShadowEnabled() && owned_pose.get() == &pose;
+  const auto admission = PrepareNativeRigidShadowAdmission(*model, inputs, skin);
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
   Require(admission.route == NativeRigidCasterRoute::Native, "caster family or object pass policy unavailable");
   const auto camera = FindNativePassCamera(1);
@@ -126,7 +133,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
       [](const auto &policy) { return policy.alpha_test; });
   const char *refusal = "whole-node caster resources or matrices unavailable";
   const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal)
-      : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera);
+      : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera, {}, skin ? &pose : nullptr);
   if (!plans) BD_ERROR("[native-shadow-packet] instance {} generation {} node {} phase {} cutouts {} ranges {}; {}",
       pose.instance, pose.model_generation, node, inputs->phase, cutouts, model->ranges.size(), refusal);
   Require(plans.has_value(), refusal);
@@ -149,14 +156,17 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   for (const auto &plan : *plans) {
     if (!plan.draw) continue;
     const auto &geometry = plan.geometry;
+    const auto &vertex_input = geometry->skin_influences ? geometry->skin_shadow_vertex_input : geometry->rigid_vertex_input;
     auto program = std::find_if(store.programs.begin(), store.programs.end(), [&](const auto &p) {
-      return p.input == geometry->rigid_vertex_input;
+      return p.input == vertex_input;
     });
     if (program == store.programs.end()) {
-      Require(store.programs.size() < 8, "native program capacity reached");
-      auto shaders = CreateNativeRigidPrograms(*s.device, geometry->rigid_vertex_input);
-      Require(shaders.shadow && shaders.scene && shaders.shadow_cutout, "native shader creation failed");
-      store.programs.push_back({geometry->rigid_vertex_input, std::move(shaders)});
+      Require(store.programs.size() < 16, "native program capacity reached");
+      NativeRigidPrograms shaders;
+      if (geometry->skin_influences) shaders.shadow = CreateNativeSkinShadowProgram(*s.device,vertex_input);
+      else shaders = CreateNativeRigidPrograms(*s.device, vertex_input);
+      Require(shaders.shadow && (geometry->skin_influences || (shaders.scene && shaders.shadow_cutout)), "native shader creation failed");
+      store.programs.push_back({vertex_input, std::move(shaders)});
       program = store.programs.end() - 1;
     }
     PipelineState pipeline_state;
@@ -187,6 +197,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     Require(draw.bindings.Valid(), "invalid native descriptor contract");
     auto item = std::make_shared<NativeRigidBatchItem>();
     item->geometry = geometry; item->input = {plan.object,plan.pass};
+    if (geometry->skin_influences) { item->skin_pose = owned_pose; item->world_bounds = plan.skin_bounds; }
     item->albedo[0] = plan.albedo;
     if (plan.albedo) {
       Require(plan.sampler.has_value(), "native cutout sampler unavailable");
@@ -204,6 +215,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     s.draw_framebuffer_bound = true;
   }
   for (auto &entry : pending) {
+    store.skin_submitted += bool(entry.item->skin_pose);
     store.family_primitives += !entry.item->regression;
     StageNativeItem(entry.draw, std::move(entry.item));
     DrawQueuePush(entry.draw);
@@ -215,6 +227,11 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
     store.family_multi_nodes += plans->size() > 1;
   }
   const auto frame = FrameStatFrameCount();
+  if (store.skin_submitted && frame-store.skin_reported_frame >= 300) {
+    BD_INFO("[native-skin-shadow] frame {} submitted {} emitted {} fence-retired {}; model {} instance {}; owned joint-local vertices and pose, no bone-register uploads",
+        frame,store.skin_submitted,store.skin_emitted,store.skin_retired,pose.model_generation,pose.instance);
+    store.skin_reported_frame = frame;
+  }
   if (SelectedNativeRigidShadow(*model) &&
       (store.reported_generation != pose.model_generation || frame - store.reported_frame >= 300)) {
     BD_INFO("[native-rigid-shadow] frame {} submitted {} suppressed {} fence-retired {}; node {} instance {} generation {} phase {}; native program and owned matrices, no interpreter/template/replay",
@@ -294,7 +311,7 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
       return p.input == plan.vertex_input;
     });
     if (program == store.programs.end()) {
-      require(store.programs.size() < 8, "native program capacity reached");
+      require(store.programs.size() < 16, "native program capacity reached");
       auto shaders = CreateNativeRigidPrograms(*s.device, plan.vertex_input);
       require(shaders.scene && shaders.shadow, "native shader creation failed");
       store.programs.push_back({plan.vertex_input, std::move(shaders)});
@@ -438,7 +455,7 @@ bool SubmitNativeWaterScenePackets(NativeWaterSceneSubmission submission) {
       return entry.water && entry.input == geometry->water_vertex_input;
     });
     if (program == store.programs.end()) {
-      BatchRequire(store.programs.size() < 8, "native program capacity reached");
+      BatchRequire(store.programs.size() < 16, "native program capacity reached");
       auto shader = CreateNativeWaterProgram(*s.device,geometry->water_vertex_input);
       BatchRequire(bool(shader), "native water shader creation failed");
       store.programs.push_back({geometry->water_vertex_input,{},std::move(shader)});
@@ -537,13 +554,34 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   const auto prefix = uint32_t(offset-upload.ref.offset);
   BatchRequire(prefix <= upload.size && placement->bytes <= upload.size-prefix, "native storage slice outside upload");
   std::memcpy(upload.memory+prefix,packed,placement->bytes);
-  NativeRigidDescriptorSchema schema;
+  NativeRigidDescriptorSchema schema(bool(first.skin_pose));
   NativeRigidDrawStore::Batch batch;
   batch.items.assign(items.begin(),items.end());
   batch.constants = schema.sets[0].create(s.device.get());
   BatchRequire(bool(batch.constants), "native storage descriptor unavailable");
   const plume::RenderBufferStructuredView view(stride,offset/stride);
   batch.constants->setBuffer(0,upload.ref.ref,placement->bytes,&view);
+  if (first.skin_pose) {
+    std::array<std::shared_ptr<const NativeInstancePose>,kNativeRigidBatchLimit> poses;
+    for (size_t n = 0; n < items.size(); ++n) poses[n] = items[n]->skin_pose;
+    const auto plan = PlanNativeSkinPalette(std::span(poses).first(items.size()));
+    BatchRequire(plan.has_value(), "native skin palette plan refused");
+    static_assert(sizeof(RenderMatrix) == sizeof(RigidMatrix));
+    const uint32_t joint_bytes = plan->matrices*sizeof(RenderMatrix);
+    const auto joints = AllocateHostUpload(joint_bytes,uint32_t(std::max<uint64_t>(64,alignment)));
+    const auto ranges = UploadHostData(plan->ranges.data(),uint32_t(plan->ranges.size()*sizeof(RigidUint4)),
+        uint32_t(std::max<uint64_t>(16,alignment)));
+    BatchRequire(joints.memory && ranges.memory, "bounded native skin upload refused");
+    uint32_t position = 0;
+    for (const auto &pose : plan->poses) {
+      const uint32_t bytes = uint32_t(pose->transforms.size()*sizeof(RenderMatrix));
+      std::memcpy(joints.memory+position,pose->transforms.data(),bytes); position += bytes;
+    }
+    const plume::RenderBufferStructuredView joint_view(sizeof(RigidMatrix),joints.ref.offset/sizeof(RigidMatrix));
+    const plume::RenderBufferStructuredView range_view(sizeof(RigidUint4),ranges.ref.offset/sizeof(RigidUint4));
+    batch.constants->setBuffer(1,joints.ref.ref,joint_bytes,&joint_view);
+    batch.constants->setBuffer(2,ranges.ref.ref,uint32_t(plan->ranges.size()*sizeof(RigidUint4)),&range_view);
+  }
   draw.bindings = {}; draw.bindings.layout = first.layout;
   draw.bindings.set_count = 1; draw.bindings.sets[0] = batch.constants.get();
   if (first.water) {
@@ -627,6 +665,7 @@ void ResolveNativeRigidEmission(NativeRigidDrawStore &store, std::span<const Nat
       ++cutouts.emitted;
       cutouts.textured_emitted += (item->input.object_data.flags.x & RigidAlbedo) != 0;
     }
+    store.skin_emitted += visible && bool(item->skin_pose);
   }
   if (items[0]->water) {
     if (visible) store.water_emitted += instances; else store.water_culled += instances;
@@ -684,6 +723,7 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   for (const auto &record : store.records[slot]) {
     BatchRequire(record->output.Retire(), "native record retired with pending or duplicate output classification");
     const bool visible = record->output.Visible();
+    store.skin_retired += visible && bool(record->skin_pose);
     if (record->water) { ++store.water_retired; continue; }
     if (visible && record->Cutout()) {
       auto &cutouts = record->view == 3 ? store.scene_cutouts : store.shadow_cutouts;

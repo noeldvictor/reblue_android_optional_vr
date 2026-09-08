@@ -28,6 +28,9 @@ struct NativeModelMaterialProgram {
   // The same primitive ordinal selects its material and owned GPU geometry.
   // Null is explicitly unconverted, never permission to discover it in this core.
   std::vector<std::shared_ptr<const NativeGeometry>> geometries;
+  // Same ordinal, canonical native skin only. The packed geometry above remains
+  // solely for material/view families that have not left translated shaders yet.
+  std::vector<std::shared_ptr<const NativeGeometry>> skin_geometries;
   std::vector<NativeShadowPolicy> shadow_policies;
   std::vector<MaterialImageAssignment> texture_assignments;
   std::vector<PrimitivePolicyStep> policy_steps;

@@ -8,6 +8,8 @@
 #include "gpu/scene/native_mesh.h"
 #include "gpu/scene/native_rigid_inputs.h"
 #include "gpu/scene/native_texture_binding.h"
+#include "gpu/scene/native_instance.h"
+#include "gpu/scene/native_skin_mesh.h"
 
 namespace bd::gpu::scene {
 struct NativeInstancePose;
@@ -25,6 +27,7 @@ struct NativeRigidShadowPlan {
   bool draw = false;
   NativeTextureGpuHandle albedo;
   std::optional<NativeMaterialSampler2D> sampler;
+  std::optional<NativeBounds> skin_bounds;
 };
 struct NativeRigidShadowCutout {
   NativeTextureBinding image;
@@ -46,16 +49,22 @@ struct NativeRigidCasterAdmission {
 inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     const NativeModelMaterialProgram &program,
     const std::optional<PrimitivePolicyInputs> &inputs, bool scene_cutouts = false,
-    bool shadow_deferred = false) {
+    bool shadow_deferred = false, bool skin = false) {
   if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
       program.ranges.size() != program.geometries.size()) return {};
   const auto unsupported = SelectedNativeRigidShadow(program)
       ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
-  for (const auto &range : program.ranges)
-    if (!range.shader.vertex_bones || *range.shader.vertex_bones || range.skin)
-      return {unsupported};
+  bool skinned = false;
+  for (const auto &range : program.ranges) {
+    if (!range.shader.vertex_bones) return {unsupported};
+    if (*range.shader.vertex_bones) {
+      if (!skin || *range.shader.vertex_bones > 3 || !range.skin || !range.skin->count) return {unsupported};
+      skinned = true;
+    } else if (range.skin) return {unsupported};
+  }
   if (!inputs) return {};
   if (inputs->technique != 0 || inputs->phase > 1) return {unsupported};
+  if (skinned && (inputs->phase != 1 || inputs->pass_mode != 0)) return {unsupported};
   // This family deliberately excludes texture-dependent effect participation.
   // Do not classify a missing image as an ordinary volume-free material.
   if (inputs->texture_effects)
@@ -66,16 +75,16 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
       [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Unknown; }, policies)) return {};
   for (const auto &policy : policies)
     if (!policy.routing_known || (policy.deferred && !shadow_deferred) ||
-        (policy.alpha_test && !scene_cutouts)) return {unsupported};
+        (policy.alpha_test && (!scene_cutouts || skinned))) return {unsupported};
   return {NativeRigidCasterRoute::Native, std::move(policies)};
 }
 inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
-    const NativeModelMaterialProgram &program, const std::optional<PrimitivePolicyInputs> &inputs) {
+    const NativeModelMaterialProgram &program, const std::optional<PrimitivePolicyInputs> &inputs, bool skin = false) {
   // Ordinary phase1 list entries have depth writes, no colour/stencil effects
   // and no depth sorting (light-space skips it). Min-depth plus discarded holes
   // can join the same native queue as solid casters without a guest list entry.
   const bool phase1 = inputs && inputs->phase == 1 && inputs->pass_mode == 0;
-  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, phase1);
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, phase1, skin);
   if (admission.route != NativeRigidCasterRoute::Native) return admission;
   for (size_t n = 0; n < admission.policies.size(); ++n) if (admission.policies[n].alpha_test) {
     // Other phases/forced pass modes have different participation contracts.
@@ -86,11 +95,32 @@ inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
 }
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
     const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal);
+inline std::optional<NativeBounds> NativeSkinCasterBounds(const NativeModelMaterialProgram &program,
+    const NativeInstancePose &pose, uint32_t node) {
+  if (node >= pose.transforms.size() || program.skin_geometries.size() != program.ranges.size() ||
+      program.geometries.size() != program.ranges.size()) return {};
+  std::optional<NativeBounds> result;
+  for (size_t n = 0; n < program.ranges.size(); ++n) {
+    if (!program.ranges[n].shader.vertex_bones) return {};
+    const bool skin = *program.ranges[n].shader.vertex_bones != 0;
+    const auto &geometry = skin ? program.skin_geometries[n] : program.geometries[n];
+    if (!geometry) return {};
+    const auto bounds = skin ? TransformNativeSkinBounds(geometry->skin_bounds,pose.transforms) :
+        geometry->bounds ? TransformNativeBounds(*geometry->bounds,pose.transforms[node]) : std::nullopt;
+    if (!bounds) return {};
+    if (!result) result = bounds;
+    else for (uint32_t axis = 0; axis < 3; ++axis) {
+      result->min[axis] = (std::min)(result->min[axis],bounds->min[axis]);
+      result->max[axis] = (std::max)(result->max[axis],bounds->max[axis]);
+    }
+  }
+  return result;
+}
 inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadow(
     const NativeModelMaterialProgram &program, const RenderMatrix &world,
     const PrimitivePolicyInputs &inputs, const RenderCamera &camera,
-    std::span<const NativeRigidShadowCutout> cutouts = {}) {
-  const auto admission = PrepareNativeRigidShadowAdmission(program, inputs);
+    std::span<const NativeRigidShadowCutout> cutouts = {}, const NativeInstancePose *skin_pose = nullptr) {
+  const auto admission = PrepareNativeRigidShadowAdmission(program, inputs,skin_pose != nullptr);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   if (!cutouts.empty() && cutouts.size() != program.ranges.size()) return {};
   NativeRigidObjectGPU object{};
@@ -105,12 +135,20 @@ inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShado
   result.reserve(program.ranges.size());
   // Preflight every sibling. No partial plan can escape on a late failure.
   for (size_t n = 0; n < program.ranges.size(); ++n) {
-    const auto &geometry = program.geometries[n];
-    if (!geometry || !geometry->id || !geometry->canonical_vertices || !geometry->rigid_vertex_input ||
+    const bool skinned = *program.ranges[n].shader.vertex_bones != 0;
+    if (skinned && (!skin_pose || program.skin_geometries.size() != program.ranges.size())) return {};
+    const auto &geometry = skinned ? program.skin_geometries[n] : program.geometries[n];
+    if (!geometry || !geometry->id || !geometry->canonical_vertices ||
+        !(skinned ? geometry->skin_shadow_vertex_input : geometry->rigid_vertex_input) ||
         geometry->stream_mask != 1 || !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref ||
         !geometry->count || geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255) return {};
     const auto &policy = admission.policies[n];
     NativeRigidShadowPlan plan{geometry, object, pass, policy.cull, policy.direct || policy.deferred};
+    if (skinned) {
+      if (geometry->skin_influences != *program.ranges[n].shader.vertex_bones) return {};
+      plan.skin_bounds = TransformNativeSkinBounds(geometry->skin_bounds,skin_pose->transforms);
+      if (!plan.skin_bounds) return {};
+    }
     if (policy.alpha_test) {
       if (cutouts.empty()) return {};
       const auto &cutout = cutouts[n];

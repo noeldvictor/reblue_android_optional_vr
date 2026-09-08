@@ -12,6 +12,8 @@
 #include "plume_render_interface.h"
 #include "gpu/scene/native_vertex_input.h"
 #include "gpu/scene/native_bounds.h"
+#include "gpu/scene/native_mesh_data.h"
+#include "gpu/scene/native_skin.h"
 
 namespace bd::gpu {
 struct GuestBuffer;
@@ -33,6 +35,10 @@ struct NativeMeshImport {
   // An already cooked LOD replaces the source indices, keeping its winding
   // and the same vertex layout. Empty means import the original mesh.
   std::span<const uint32_t> lod_indices;
+  // Explicit load-owned skin request, distinct from the temporary replay mesh.
+  // Never infer a joint binding or influence count from declaration attributes.
+  const NativeSkinBinding *skin = nullptr;
+  uint32_t skin_influences = 0;
 };
 
 struct NativeGeometry {
@@ -48,6 +54,9 @@ struct NativeGeometry {
   NativeVertexInputHandle rigid_vertex_input;
   NativeVertexInputHandle layered_rigid_vertex_input; // explicit TexCoord2, no substituted UV
   NativeVertexInputHandle water_vertex_input; // authored tangent, resolved at load
+  NativeVertexInputHandle skin_shadow_vertex_input;
+  uint32_t skin_influences = 0;
+  std::vector<NativeSkinJointBounds> skin_bounds;
   std::optional<float> wave_weight; // indexed maximum |COLOR0.r|, CPU-derived
   uint32_t strides[16]{};
   plume::RenderVertexBufferView streams[16]{};
@@ -61,7 +70,7 @@ struct NativeGeometry {
 // boundary touches guest buffers. The resulting GPU geometry owns its bytes
 // independently of model allocations, stream VAs, and physical-block mirrors.
 std::shared_ptr<const NativeGeometry> ImportNativeMesh(const NativeMeshImport &r);
-// A native asset reference loads v2 geometry without source buffers, a
+// A native asset reference loads v2/v3 geometry without source buffers, a
 // declaration, renderer warm-up, or import-source storage. Rejects v1 files.
 std::shared_ptr<const NativeGeometry> LoadNativeGeometry(uint64_t content_id);
 void NativeMeshNoteDraw(bool native, bool canonical = false);

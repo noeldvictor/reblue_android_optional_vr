@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_mesh_cook.h"
 #include "gpu/scene/native_skin_mesh.h"
+#include "gpu/scene/native_rigid_program.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -210,10 +211,18 @@ static void TestSkinCook() {
       {0,1,0,0, -1,0,0,0, 0,0,1,0, 0,20,0,1},
       {2,0,0,0, 0,3,0,0, 0,0,4,0, 0,0,30,1}}};
   const auto bounds = BuildNativeSkinBounds(cooked,pose);
+  const auto envelopes = BuildNativeMeshJointBounds(cooked);
+  const auto conservative = envelopes ? TransformNativeSkinBounds(*envelopes,pose) : std::nullopt;
+  NativeVertexInputLibrary skin_inputs;
+  const auto skin_input = NativeSkinShadowVertexInput(cooked,skin_inputs);
+  Check(skin_input && skin_input->Elements().size() == 5 && skin_input->ShaderDecode() == VertexShaderDecode{},
+      "native skin GPU signature has no source decoder state");
+  Check(envelopes && envelopes->size() == 3 && conservative,"load-time native joint envelopes");
   const std::array<float,3> expected{.6f,18.4f,21.3f};
   Check(bool(bounds),"native skin consumes owned pose");
   for (size_t axis = 0; axis < 3; ++axis)
-    Check(std::abs(bounds->min[axis]-expected[axis]) < 1e-4f && bounds->min[axis] == bounds->max[axis],
+    Check(std::abs(bounds->min[axis]-expected[axis]) < 1e-4f && bounds->min[axis] == bounds->max[axis] &&
+        conservative->min[axis] <= expected[axis] && conservative->max[axis] >= expected[axis],
         "joint-local weighted deformation, rotation/nonuniform scale and world translation once");
   NativeSkinVertex vertex;
   vertex.positions = {{{1,2,3},{4,5,6},{7,8,9}}};
@@ -234,6 +243,8 @@ static void TestSkinCook() {
   Check(!BuildNativeSkinBounds(cooked,std::span(pose).first(2)),"missing model joint refuses");
   pose[0][12] += 100;
   const auto animated = BuildNativeSkinBounds(cooked,pose);
+  const auto animated_envelope = TransformNativeSkinBounds(*envelopes,pose);
+  Check(animated_envelope && animated_envelope->max[0] >= animated->max[0],"same immutable envelopes follow changed poses");
   Check(animated && std::abs(animated->min[0]-bounds->min[0]-20) < 1e-4f,"fresh animated pose changes bound");
   pose[0][3] = 1;
   Check(!BuildNativeSkinBounds(cooked,pose),"nonaffine palette refuses");

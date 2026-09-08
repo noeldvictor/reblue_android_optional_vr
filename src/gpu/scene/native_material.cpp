@@ -110,6 +110,7 @@ NativeModelMaterialProgram ReadCommands(uint32_t source, size_t &word_budget, st
 void LoadModelGeometry(ModelMaterialImport &mesh) {
   auto &program = mesh.program;
   program.geometries.resize(program.ranges.size());
+  program.skin_geometries.resize(program.ranges.size());
   mesh.source_bindings.resize(program.ranges.size());
   // bdSceneGraphNodeProcess: mesh+4 counts 8-byte index records at +8;
   // mesh+16 points to {count, 12-byte vertex records}. Each vertex record is
@@ -168,6 +169,10 @@ void LoadModelGeometry(ModelMaterialImport &mesh) {
     // StartIndex from operand 2 and count from operand 1 plus two.
     request.primitive_type = 6;
     program.geometries[i] = ImportNativeMesh(request);
+    if (range.skin && range.shader.vertex_bones && *range.shader.vertex_bones >= 1 && *range.shader.vertex_bones <= 3) {
+      request.skin = &*range.skin; request.skin_influences = *range.shader.vertex_bones;
+      program.skin_geometries[i] = ImportNativeMesh(request);
+    }
     ++(program.geometries[i] ? geometry_loaded : geometry_unconverted);
   }
 }

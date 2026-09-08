@@ -11,6 +11,21 @@
 #include <limits>
 
 namespace bd::gpu::scene {
+inline std::optional<NativeBounds> TransformNativeSkinBounds(
+    std::span<const NativeSkinJointBounds> joints, std::span<const RenderMatrix> pose) {
+  std::optional<NativeBounds> result;
+  for (const auto &joint : joints) {
+    if (joint.joint >= pose.size()) return {};
+    const auto bounds = TransformNativeBounds(joint.bounds,pose[joint.joint]);
+    if (!bounds) return {};
+    if (!result) result = bounds;
+    else for (uint32_t axis = 0; axis < 3; ++axis) {
+      result->min[axis] = (std::min)(result->min[axis],bounds->min[axis]);
+      result->max[axis] = (std::max)(result->max[axis],bounds->max[axis]);
+    }
+  }
+  return result;
+}
 struct NativeSkinVertex {
   std::array<std::array<float,3>,3> positions{}, normals{};
   std::array<uint16_t,3> joints{};

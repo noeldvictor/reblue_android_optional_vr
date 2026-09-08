@@ -11,13 +11,15 @@ struct NativeRigidBatchItem;
 struct NativeRigidSceneSubmission;
 struct NativeWaterSceneSubmission;
 bool NativeRigidShadowEnabled();
+bool NativeSkinShadowEnabled();
 bool NativeRigidSceneEnabled();
 bool NativeRigidDeferredEnabled();
 // Called before the per-node interpreter/replay/capture, after host culling.
 // Once a supported family is recognized, missing owners/resources are fatal;
 // it cannot silently warm a template. Unsupported participation stays legacy.
 bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
-                             const std::optional<PrimitivePolicyInputs> &inputs);
+                             const std::optional<PrimitivePolicyInputs> &inputs,
+                             std::shared_ptr<const NativeInstancePose> owned_pose = {});
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
                             const std::optional<PrimitivePolicyInputs> &inputs, uint32_t stack);
 // Owns every input through final light resolution and queue retention. The stack

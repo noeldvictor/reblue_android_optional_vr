@@ -52,7 +52,7 @@ struct Store {
   // not consult this adapter; bound it independently of GPU byte residency.
   std::unordered_map<u64, u64> import_aliases;
   NativeVertexInputLibrary vertex_inputs;
-  u64 allocated = 0;
+  u64 allocated = 0, skin_bounds_bytes = 0;
   u32 built = 0, loaded = 0, refused = 0, budget_refused = 0;
   u32 native_draws = 0, legacy_draws = 0, last_frame = 0;
   u32 canonical_meshes = 0, canonical_draws = 0, source_free_loads = 0;
@@ -69,7 +69,7 @@ std::filesystem::path CacheDir() {
     root = runtime->cache_root();
   if (root.empty())
     root = std::filesystem::current_path();
-  // Historical directory name, shared by both checked file versions. Keeping
+  // Historical directory name, shared by all checked file versions. Keeping
   // it avoids a duplicate cache or a reset of its byte/file accounting.
   return root / "native_meshes" / "v1";
 }
@@ -84,7 +84,12 @@ u32 Align(u32 n) { return (n + 15u) & ~15u; }
 std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &data, u64 key,
                                           NativeVertexInputHandle vertex_input) {
   const auto bounds = BuildNativeMeshBounds(data); // CPU payload, before map/upload.
-  if (!data.attributes.empty() && !bounds) return {};
+  const auto influences = NativeMeshSkinInfluences(data.attributes);
+  auto skin_input = influences ? NativeSkinShadowVertexInput(data,s.vertex_inputs) : nullptr;
+  auto skin_bounds = influences ? BuildNativeMeshJointBounds(data) : std::nullopt;
+  if (influences ? (!skin_input || !skin_bounds) : (!data.attributes.empty() && !bounds)) return {};
+  const uint64_t bounds_bytes = skin_bounds ? skin_bounds->capacity()*sizeof(NativeSkinJointBounds) : 0;
+  if (s.allocated+s.skin_bounds_bytes+bounds_bytes > kGeometryBudget) { ++s.budget_refused; return {}; }
   auto water_input = NativeWaterVertexInput(data, s.vertex_inputs);
   const auto wave_weight = water_input ? BuildNativeMeshWaveWeight(data) : std::nullopt;
   if (water_input && !wave_weight) return {};
@@ -93,7 +98,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
     bytes += Align(u32(stream.bytes.size()));
   if (s.chunks.empty() || s.chunks.back().size - s.chunks.back().used < bytes) {
     const u32 size = std::max(kChunkBytes, bytes);
-    if (s.allocated + size > kGeometryBudget) {
+    if (s.allocated + s.skin_bounds_bytes + bounds_bytes + size > kGeometryBudget) {
       ++s.budget_refused;
       return {};
     }
@@ -122,6 +127,10 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   result->rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs);
   result->layered_rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs, true);
   result->water_vertex_input = std::move(water_input);
+  result->skin_shadow_vertex_input = std::move(skin_input);
+  result->skin_influences = influences;
+  if (skin_bounds) result->skin_bounds = std::move(*skin_bounds);
+  s.skin_bounds_bytes += bounds_bytes;
   result->wave_weight = wave_weight;
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
@@ -147,6 +156,8 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
 std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r) {
   if (!r.declaration || !r.index || r.index->ownsMirror || !r.count)
     return {};
+  if (r.skin && (!r.skin->count || r.skin->count > r.skin->joints.size() ||
+      r.skin_influences < 1 || r.skin_influences > 3)) return {};
   NativeMeshData data;
   data.layout = r.declaration->hash;
   data.base_vertex = r.base_vertex;
@@ -213,6 +224,11 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   }
   if (!n)
     return {};
+  if (r.skin) {
+    const u32 skin_identity[]{3,r.skin_influences,r.skin->count};
+    key = XXH3_64bits_withSeed(skin_identity,sizeof(skin_identity),key);
+    key = XXH3_64bits_withSeed(r.skin->joints.data(),r.skin->count*sizeof(uint16_t),key);
+  }
   if (auto it = s.import_aliases.find(key); it != s.import_aliases.end())
     return s.meshes.at(it->second);
   if (s.import_aliases.size() >= kMaxImportAliases) {
@@ -252,8 +268,11 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
       decl.swappedTangents, decl.swappedBlendWeights, decl.swappedPositions,
       decl.sintTexcoords};
   NativeMeshData canonical;
-  if (CookRigidMesh(data, {decl.inputElements.get(), decl.inputElementCount},
-                    decode, decl.hasR11G11B10Normal, canonical)) {
+  const auto elements = std::span(decl.inputElements.get(),decl.inputElementCount);
+  const bool cooked = r.skin ? CookSkinMesh(data,elements,decode,decl.hasR11G11B10Normal,
+      r.skin_influences,*r.skin,canonical) : CookRigidMesh(data,elements,decode,decl.hasR11G11B10Normal,canonical);
+  if (r.skin && !cooked) return {}; // never publish packed data as a native skin
+  if (cooked) {
     data = std::move(canonical);
     key = NativeMeshContentId(data);
     if (!key) return {};
@@ -279,10 +298,10 @@ std::shared_ptr<const NativeGeometry> Import(Store &s, const NativeMeshImport &r
   uint32_t stream_mask = 0;
   for (uint32_t slot = 0; slot < 16; ++slot)
     if (decl.vertexStreams[slot]) stream_mask |= 1u << slot;
-  auto vertex_input = data.attributes.empty() ? s.vertex_inputs.Resolve(
+  auto vertex_input = r.skin ? NativeVertexInputHandle{} : data.attributes.empty() ? s.vertex_inputs.Resolve(
       {decl.inputElements.get(), decl.inputElementCount}, stream_mask,
       decode) : RigidMeshVertexInput(data, s.vertex_inputs);
-  if (!vertex_input) return {};
+  if (!vertex_input && !r.skin) return {};
   auto result = Upload(s, data, key, std::move(vertex_input));
   if (!result)
     return {};
@@ -334,7 +353,7 @@ std::shared_ptr<const NativeGeometry> LoadNativeGeometry(u64 content_id) {
       !DiskCache().Read(content_id, data) || NativeMeshContentId(data) != content_id)
     return {};
   auto input = RigidMeshVertexInput(data, s.vertex_inputs);
-  if (!input) return {};
+  if (!input && !NativeMeshSkinInfluences(data.attributes)) return {};
   auto result = Upload(s, data, content_id, std::move(input));
   if (!result) return {};
   s.meshes.emplace(content_id, result);

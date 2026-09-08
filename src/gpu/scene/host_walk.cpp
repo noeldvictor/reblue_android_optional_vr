@@ -62,6 +62,8 @@
 #include "gpu/scene/node_tag.h"
 #include "gpu/shadow_fit.h"
 #include <cmath>
+#include <stdexcept>
+#include "gpu/scene/native_rigid_shadow.h"
 
 REXCVAR_DECLARE(bool, bd_host_walk);
 REXCVAR_DECLARE(bool, bd_host_cull);
@@ -289,7 +291,22 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           float out[3];
           for (u32 k = 0; k < 3; ++k)
             out[k] = m[12 + k] + c[0] * m[k] + c[1] * m[4 + k] + c[2] * m[8 + k];
-          const float radius = radius_scale * (bounds ? (*bounds)[3] : LoadF32(mesh + offsetof(GuestMesh, radius)));
+          float radius = radius_scale * (bounds ? (*bounds)[3] : LoadF32(mesh + offsetof(GuestMesh, radius)));
+          if (view_id == 1 && NativeSkinShadowEnabled() && program &&
+              std::any_of(program->ranges.begin(),program->ranges.end(),[](const auto &range) {
+                return range.shader.vertex_bones && *range.shader.vertex_bones;
+              }) && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true).route == NativeRigidCasterRoute::Native) {
+            const auto animated = NativeSkinCasterBounds(*program,*instance_pose,index);
+            if (!animated) throw std::runtime_error("Native skin caster has no owned animated bounds");
+            double squared = 0;
+            for (uint32_t axis = 0; axis < 3; ++axis) {
+              out[axis] = float((double(animated->min[axis])+animated->max[axis])*.5);
+              const double extent = std::max(double(out[axis])-animated->min[axis],double(animated->max[axis])-out[axis]);
+              squared += extent*extent;
+            }
+            radius = std::nextafter(float(std::sqrt(squared)),std::numeric_limits<float>::infinity());
+            if (!std::isfinite(radius)) throw std::runtime_error("Native skin caster bound overflow");
+          }
           // The node's world sphere, for the draw queue's blended gather: two
           // draws whose spheres do not overlap in the view cannot write the
           // same pixel, so their order is free (draw_queue.cpp).
@@ -380,7 +397,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             ctx.r5.u64 = matrix;
             ctx.r6.u64 = ctx_va;
             if (!(view_id == 1 && instance_pose &&
-                  SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)) &&
+                  SubmitNativeRigidShadow(*instance_pose, index, shadow_policy, instance_pose)) &&
                 !(view_id == 3 && instance_pose &&
                   (StageNativeWaterForObject(*instance_pose,index) ||
                    SubmitNativeRigidScene(*instance_pose, index, shadow_policy, ctx.r1.u32))))

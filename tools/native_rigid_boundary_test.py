@@ -176,11 +176,11 @@ class NativeRigidBoundaryTest(unittest.TestCase):
 
     def test_direct_caster_precedes_interpreter_and_has_bounded_fence_owners(self):
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)", walk)
+        self.assertIn("SubmitNativeRigidShadow(*instance_pose, index, shadow_policy, instance_pose)", walk)
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         for required in ("PrepareNativeRigidShadow(", "FindNativePassCamera(1)",
                          "CreateNativeRigidPrograms(", "GetOrCreatePipeline(", "DrawQueuePush(entry.draw)",
-                         "plans->size() <= 4096-records.size()", "store.programs.size() < 8", "store.records[slot].clear()",
+                         "plans->size() <= 4096-records.size()", "store.programs.size() < 16", "store.records[slot].clear()",
                          "draw.bindings.set_count = 1", "throw std::runtime_error(reason)"):
             self.assertIn(required, direct)
         for forbidden in ("__imp__", "HostDrawReplay(", "HostDrawCommit(", "bd::mem::", "ConstantBlockBytes("):
@@ -191,7 +191,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_caster_family_preflights_all_siblings_without_expanding_reload_counts(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         shadow = direct.split("bool SubmitNativeRigidShadow(", 1)[1].split("bool SubmitNativeRigidScene(", 1)[0]
-        self.assertIn("PrepareNativeRigidShadowAdmission(*model, inputs)", shadow)
+        self.assertIn("PrepareNativeRigidShadowAdmission(*model, inputs, skin)", shadow)
         self.assertLess(shadow.index("pending.push_back("), shadow.index("StageNativeItem("))
         self.assertLess(shadow.index("for (const auto &plan : *plans)"), shadow.index("DrawQueuePush(entry.draw)"))
         self.assertIn("if (item->regression) NoteNativeRigidSubmitted", direct)
@@ -209,11 +209,27 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
         paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h"]
-        self.assertEqual(len(paths), 8)
+        self.assertEqual(len(paths), 9)
         for path in paths:
             text = path.read_text()
             for forbidden in ("shader_common.h", "g_VSC", "g_PSC", "BD_SHARED", "BOOL_BIT", "GuestShader", "packoffset"):
                 self.assertNotIn(forbidden, text)
+
+    def test_skin_caster_reuses_owned_load_pose_queue_and_native_program(self):
+        load = (ROOT / "src/gpu/scene/native_material.cpp").read_text()
+        self.assertIn("request.skin = &*range.skin", load)
+        self.assertIn("program.skin_geometries[i] = ImportNativeMesh(request)", load)
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        for required in ("CreateNativeSkinShadowProgram(", "item->skin_pose = owned_pose",
+                         "PlanNativeSkinPalette(", "pose->transforms.data()",
+                         "NativeRigidDescriptorSchema schema(bool(first.skin_pose))"):
+            self.assertIn(required, direct)
+        walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
+        self.assertLess(walk.index("NativeSkinCasterBounds("), walk.index("PublishNodeSphere(out, radius)"))
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_skin_shadow_vs.hlsl").read_text()
+        self.assertIn("skin_joints[range.x+joint]", shader)
+        self.assertNotIn("object_data.world", shader)
+        self.assertNotIn("exMatrix", shader)
 
     def test_gpu_fixture_uses_production_programs_and_real_pixels(self):
         text = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()

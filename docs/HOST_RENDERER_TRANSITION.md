@@ -655,13 +655,19 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    BDMESH v3 stores explicit paired joint-local positions/normals and weights,
    using the existing aggregate mesh budget. Do not collapse these into a single
    bind position without the skeleton/inverse-bind contract. Source-free indexed
-   deformation/bounds are tested, not connected to live culling yet. Next connect
-   the load-owned primitive's skin binding/influence count to this cooker and
-   existing geometry owner, then the existing instance pose to native GPU palette
-   storage and scene/shadow shaders/queues, including animated bounds and fences.
-   `ImportNativeMesh` still calls only the rigid cooker; current native admission
-   still rejects skin. No shader/register adapter has been removed at runtime by
-   this prerequisite. GPU/pixel/game/reload/both-eye skin acceptance remains open.
+   deformation/bounds passed the prerequisite fixture. The next connection is now
+   implemented as a **source checkpoint, not yet compiled or run**: load-owned skin
+   bindings/counts feed `CookSkinMesh` and the shared geometry store; opaque phase1
+   caster admission uses animated bounds and completed instance poses, with native
+   GPU palettes pinned through the existing batch queue and fences. Palette storage
+   is bounded and deduplicates shared poses. Added CPU ownership and six GPU shadow
+   cases still need execution. Python source/scenario checks do not qualify their
+   behavior. Next build/run those fixtures and the incremental host, then verify
+   fresh live skin submission/emission/retirement and shadow pixels across reload.
+   Skinned scene shading, cutout casting, original animation production and the
+   remaining replay geometry/register consumers are not converted. No additional
+   runtime adapter removal is proven; host155/run980 evidence is unchanged.
+   GPU/pixel/game/reload/both-eye skin acceptance remains open.
    [Exact contract and evidence](../research/20260908_1410_native-skin-assets.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass

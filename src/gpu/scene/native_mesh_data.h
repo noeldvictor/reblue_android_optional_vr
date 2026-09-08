@@ -60,6 +60,10 @@ bool ValidateNativeMesh(const NativeMeshData &mesh);
 // Derive once from checked v2 indexed positions, including signed base vertex.
 // Reuses persisted bytes/identity; v1 has no native position contract and refuses.
 std::optional<NativeBounds> BuildNativeMeshBounds(const NativeMeshData &mesh);
+struct NativeSkinJointBounds { uint16_t joint; NativeBounds bounds; };
+// Load-time envelopes of indexed, nonzero-weight joint-local positions. Their
+// transformed union contains every normalized nonnegative skin blend.
+std::optional<std::vector<NativeSkinJointBounds>> BuildNativeMeshJointBounds(const NativeMeshData &mesh);
 // Indexed COLOR0 red magnitude used by native water displacement. No assumed
 // [0,1] colour range and no unused vertex may enlarge/shrink this mesh's bound.
 std::optional<float> BuildNativeMeshWaveWeight(const NativeMeshData &mesh);

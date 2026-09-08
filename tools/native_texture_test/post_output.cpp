@@ -1703,6 +1703,76 @@ void RigidBatches() {
   a = {}; b = {};
   assert(packed[1].object_data.world.rows[3].x == 7); // packed CPU data survives source retirement
 }
+void SkinCasterOwnership() {
+  using namespace bd::gpu::scene;
+  const RenderMatrix identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+  int token = 0;
+  NativeVertexInputLibrary library;
+  RenderInputElement element{"POSITION",0,0,RenderFormat::R32G32B32A32_FLOAT,0,0};
+  auto geometry = std::make_shared<NativeGeometry>();
+  geometry->id = 42; geometry->canonical_vertices = true;
+  geometry->skin_influences = 1; geometry->skin_bounds = {{2,{{-1,-2,-3},{1,2,3}}}};
+  geometry->skin_shadow_vertex_input = library.Resolve(std::span(&element,1),1,{});
+  geometry->stream_mask = 1; geometry->strides[0] = 64; geometry->count = 6;
+  geometry->streams[0].buffer.ref = reinterpret_cast<RenderBuffer *>(&token);
+  geometry->index.buffer.ref = geometry->streams[0].buffer.ref;
+  ModelMaterialImport source;
+  source.source_mesh = 100; source.program.valid = true;
+  source.program.ranges.resize(1); source.program.ranges[0].shader.vertex_bones = 1;
+  source.program.ranges[0].skin = DecodeNativeSkinBinding(std::array<uint16_t,1>{2});
+  source.program.geometries.resize(1); source.program.skin_geometries = {geometry};
+  source.program.materials.resize(1); source.program.shadow_policies.resize(1); source.source_bindings.resize(1);
+  ModelMaterialRegistry models;
+  const ModelNodeSourceBinding node{0,100};
+  assert(models.Publish(1,{source},std::span(&node,1)));
+  const auto model = models.FindModel(1);
+  NativeInstanceRegistry instances;
+  const auto first = instances.Create(model->Generation(),model), second = instances.Create(model->Generation(),model);
+  std::array<RenderMatrix,3> transforms{identity,identity,identity};
+  transforms[0][12] = 100; transforms[2][12] = 7;
+  assert(instances.Publish(first,1,transforms) && instances.Publish(second,1,transforms));
+  auto a = instances.Read(first,1), b = instances.Read(second,1);
+  PrimitivePolicyInputs policy; policy.phase = 1;
+  RenderCamera camera{identity,identity,identity};
+  const auto *program = model->FindNode(0);
+  assert(PrepareNativeRigidShadowAdmission(*program,policy).route == NativeRigidCasterRoute::Legacy);
+  assert(PrepareNativeRigidShadowAdmission(*program,policy,true).route == NativeRigidCasterRoute::Native);
+  auto plans = PrepareNativeRigidShadow(*program,transforms[0],policy,camera,{},a.get());
+  assert(plans && plans->size() == 1 && plans->front().skin_bounds &&
+      plans->front().skin_bounds->min[0] < 6 && plans->front().skin_bounds->max[0] > 8);
+  auto invalid = *program; invalid.skin_geometries.clear();
+  assert(!PrepareNativeRigidShadow(invalid,transforms[0],policy,camera,{},a.get()));
+  invalid = *program; invalid.ranges.push_back(invalid.ranges[0]); invalid.geometries.resize(2);
+  invalid.skin_geometries.push_back(nullptr);
+  assert(!PrepareNativeRigidShadow(invalid,transforms[0],policy,camera,{},a.get())); // transactional siblings
+  invalid = *program; invalid.policy_steps = {{PrimitivePolicyOperation::Alpha,1,0}}; invalid.ranges[0].policy_step_end = 1;
+  assert(PrepareNativeRigidShadowAdmission(invalid,policy,true).route == NativeRigidCasterRoute::Legacy);
+  const std::array<std::shared_ptr<const NativeInstancePose>,3> poses{a,b,a};
+  auto palette = PlanNativeSkinPalette(poses);
+  assert(palette && palette->matrices == 6 && palette->poses.size() == 2 &&
+      palette->ranges[0].x == 0 && palette->ranges[1].x == 3 && palette->ranges[2].x == 0);
+  transforms[2][12] = 20;
+  assert(instances.Publish(first,1,transforms));
+  const auto fresh = instances.Read(first,1);
+  assert(a->transforms[2][12] == 7 && fresh->transforms[2][12] == 20);
+  auto bad = std::make_shared<NativeInstancePose>(*a); bad->transforms[2][3] = 1;
+  const std::array<std::shared_ptr<const NativeInstancePose>,1> bad_poses{bad};
+  assert(!PlanNativeSkinPalette(bad_poses));
+  bad->transforms = {identity}; bad->model_generation++; assert(!PlanNativeSkinPalette(bad_poses));
+  NativeRigidBatchItem item;
+  item.geometry = geometry; item.skin_pose = a; item.instance = first; item.model_generation = model->Generation();
+  item.pipeline = reinterpret_cast<RenderPipeline *>(&token); item.layout = reinterpret_cast<RenderPipelineLayout *>(&token);
+  OutputFramebuffer fb; item.framebuffer = &fb; item.frame = 1; item.slot = 0; item.view = 1;
+  item.world_bounds = plans->front().skin_bounds;
+  assert(item.Ready(1,0));
+  auto missing = item; missing.skin_pose.reset(); assert(!missing.Ready(1,0));
+  missing = item; missing.instance = second; assert(!missing.Ready(1,0));
+  missing = item; missing.input.object_data.flags.x = RigidCutout; assert(!missing.Ready(1,0));
+  models.Retire(1); instances.Retire(first); instances.Retire(second); source = {}; a.reset(); b.reset();
+  assert(item.Ready(1,0) && item.skin_pose->transforms[2][12] == 7 && palette->poses[1]->instance == second);
+  assert(item.output.Record() && item.output.Resolve(true) && item.output.Retire());
+  assert(!item.output.Retire()); // exact draw/fence lifecycle, same as other native batches
+}
 void SceneCommands() {
   using namespace bd::gpu::scene;
   const NativeSceneClear clear{{.125f, .25f, .5f, 1.f}, .75f, 23};
@@ -1917,6 +1987,7 @@ int main() {
   ReceiverSetupOrder();
   DeferredEffectOwnership();
   RigidBatches();
+  SkinCasterOwnership();
   SceneCommands();
   refraction_material_tests::Run();
   water_update_tests::Run();

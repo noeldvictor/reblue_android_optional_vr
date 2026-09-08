@@ -8,6 +8,7 @@
 #include "gpu/scene/native_water_scene.h"
 #include "gpu/native_indexed_command.h"
 #include "gpu/scene/native_rigid_lifecycle.h"
+#include "gpu/scene/native_skin_batch.h"
 #include <numeric>
 
 namespace bd::gpu::scene {
@@ -17,6 +18,7 @@ struct NativeRigidBatchItem {
   // Water reuses this queue/store/fence path with its own larger GPU record.
   // Ordinary draws keep the existing ABI and allocate no water payload.
   std::shared_ptr<const NativeWaterBatchData> water;
+  std::shared_ptr<const NativeInstancePose> skin_pose;
   std::shared_ptr<const NativeGeometry> geometry;
   std::array<NativeTextureGpuHandle, 3> albedo;
   NativeTargetImageHandle shadow;
@@ -36,6 +38,13 @@ struct NativeRigidBatchItem {
   const NativeRigidPassGPU &Pass() const { return water ? water->input.pass_data : input.pass_data; }
   bool Cutout() const { return !water && (input.object_data.flags.x & RigidCutout); }
   bool Ready(uint32_t expected_frame, uint32_t expected_slot) const {
+    if (skin_pose && (water || view != 1 || Cutout() || !geometry || !geometry->skin_shadow_vertex_input ||
+        !geometry->skin_influences || geometry->skin_bounds.empty() || !world_bounds || !world_bounds->Valid() ||
+        skin_pose->instance != instance || skin_pose->model_generation != model_generation ||
+        !skin_pose->model || skin_pose->model->Generation() != model_generation ||
+        skin_pose->transforms.empty() || skin_pose->transforms.size() > NativeInstanceRegistry::kMaxTransforms ||
+        geometry->skin_bounds.back().joint >= skin_pose->transforms.size())) return false;
+    if (geometry && geometry->skin_influences && !skin_pose) return false;
     if (water) {
       return view == 3 && frame == expected_frame && slot == expected_slot && model_generation && instance &&
           !regression && geometry && geometry->water_vertex_input && geometry->canonical_vertices &&
@@ -62,7 +71,7 @@ struct NativeRigidBatchItem {
   }
 };
 inline bool SameNativeRigidBatch(const NativeRigidBatchItem &a, const NativeRigidBatchItem &b) {
-  return bool(a.water) == bool(b.water) && (!a.water ||
+  return bool(a.skin_pose) == bool(b.skin_pose) && bool(a.water) == bool(b.water) && (!a.water ||
       (a.water->images == b.water->images && a.water->samplers == b.water->samplers)) &&
       a.frame == b.frame && a.slot == b.slot && a.view == b.view && a.model_generation == b.model_generation &&
       a.regression == b.regression && a.geometry == b.geometry && a.pipeline == b.pipeline && a.layout == b.layout && a.framebuffer == b.framebuffer &&
@@ -96,8 +105,22 @@ inline uint32_t NativeRigidBatchLength(std::span<const NativeRigidBatchItem *con
                                      uint32_t frame, uint32_t slot) {
   if (items.empty() || !items[0] || !items[0]->Ready(frame,slot)) return 0;
   uint32_t count = 1;
+  std::array<const NativeInstancePose *,kNativeRigidBatchLimit> poses{};
+  uint32_t pose_count = 0, matrices = 0;
+  if (items[0]->skin_pose) {
+    poses[pose_count++] = items[0]->skin_pose.get();
+    matrices = uint32_t(items[0]->skin_pose->transforms.size());
+    if (matrices > kNativeSkinPaletteMatrices) return 0;
+  }
   while (count < items.size() && count < kNativeRigidBatchLimit && items[count] &&
-         items[count]->Ready(frame,slot) && SameNativeRigidBatch(*items[0],*items[count])) ++count;
+         items[count]->Ready(frame,slot) && SameNativeRigidBatch(*items[0],*items[count])) {
+    const auto &pose = items[count]->skin_pose;
+    if (pose && std::find(poses.begin(),poses.begin()+pose_count,pose.get()) == poses.begin()+pose_count) {
+      if (pose->transforms.size() > kNativeSkinPaletteMatrices-matrices) break;
+      matrices += uint32_t(pose->transforms.size()); poses[pose_count++] = pose.get();
+    }
+    ++count;
+  }
   return count;
 }
 // Preflight all entries before copying any output. CPU packets, never GPU mapped

@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstring>
 #include <limits>
+#include <map>
 
 namespace bd::gpu::scene {
 namespace {
@@ -225,6 +226,42 @@ std::optional<float> BuildNativeMeshWaveWeight(const NativeMeshData &mesh) {
     Reader reader{std::span(stream.bytes).subspan(size_t(vertex*stream.stride+colour->offset),4)};
     result = (std::max)(result,std::abs(std::bit_cast<float>(uint32_t(reader.Get()))));
   }
+  return result;
+}
+
+std::optional<std::vector<NativeSkinJointBounds>> BuildNativeMeshJointBounds(const NativeMeshData &mesh) {
+  const auto influences = NativeMeshSkinInfluences(mesh.attributes);
+  if (!influences || !ValidateNativeMesh(mesh)) return {};
+  uint32_t joints = 0, weights = 0;
+  std::array<uint32_t,3> positions{};
+  for (const auto &a : mesh.attributes) {
+    if (a.semantic == MeshSemantic::SkinJoints) joints = a.offset;
+    if (a.semantic == MeshSemantic::SkinWeights) weights = a.offset;
+    if (a.semantic == MeshSemantic::SkinPosition) positions[a.index] = a.offset;
+  }
+  std::map<uint16_t,NativeBounds> bounds;
+  const auto &stream = mesh.streams[0];
+  for (uint32_t index : mesh.indices) {
+    const auto offset = size_t(int64_t(index)+mesh.base_vertex)*stream.stride;
+    const auto value = [&](size_t at) {
+      Reader reader{std::span(stream.bytes).subspan(offset+at,4)};
+      return std::bit_cast<float>(uint32_t(reader.Get()));
+    };
+    for (uint32_t n = 0; n < influences; ++n) {
+      if (!value(weights+n*4)) continue;
+      const auto joint = uint16_t(value(joints+n*4));
+      NativeBounds point;
+      for (uint32_t axis = 0; axis < 3; ++axis) point.min[axis] = point.max[axis] = value(positions[n]+axis*4);
+      auto [it,inserted] = bounds.try_emplace(joint,point);
+      if (!inserted) for (uint32_t axis = 0; axis < 3; ++axis) {
+        it->second.min[axis] = (std::min)(it->second.min[axis],point.min[axis]);
+        it->second.max[axis] = (std::max)(it->second.max[axis],point.max[axis]);
+      }
+    }
+  }
+  if (bounds.empty()) return {};
+  std::vector<NativeSkinJointBounds> result; result.reserve(bounds.size());
+  for (const auto &[joint,box] : bounds) result.push_back({joint,box});
   return result;
 }
 

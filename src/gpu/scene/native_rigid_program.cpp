@@ -8,6 +8,7 @@
 #include "src/gpu/shaders/hlsl/native_rigid_layered_vs.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_ps.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.dxil.h"
+#include "src/gpu/shaders/hlsl/native_rigid_skin_shadow_vs.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_cutout_vs.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_cutout_ps.hlsl.dxil.h"
 #define RIGID_BLOB(name) g_##name##_dxil, sizeof(g_##name##_dxil)
@@ -16,11 +17,35 @@
 #include "src/gpu/shaders/hlsl/native_rigid_layered_vs.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_ps.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.spirv.h"
+#include "src/gpu/shaders/hlsl/native_rigid_skin_shadow_vs.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_cutout_vs.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_cutout_ps.hlsl.spirv.h"
 #define RIGID_BLOB(name) g_##name##_spirv, sizeof(g_##name##_spirv)
 #endif
 namespace bd::gpu::scene {
+NativePipelineHandle CreateNativeSkinShadowProgram(plume::RenderDevice &device, NativeVertexInputHandle input) {
+  if (!input || input->Streams() != 1 || input->Elements().size() != 5) return {};
+  for (uint32_t n = 0; n < 5; ++n) {
+    const auto &element = input->Elements()[n];
+    const char *name = n < 3 ? "POSITION" : n == 3 ? "BLENDINDICES" : "BLENDWEIGHT";
+    if (!element.semanticName || std::strcmp(element.semanticName,name) || element.semanticIndex != (n < 3 ? n : 0) ||
+        element.location != n || element.slotIndex || element.format != plume::RenderFormat::R32G32B32A32_FLOAT) return {};
+  }
+  NativeRigidDescriptorSchema schema(true);
+  plume::RenderPipelineLayoutBuilder builder;
+  builder.begin(false,true);
+  for (const auto &set : schema.sets) builder.addDescriptorSet(set);
+  builder.end();
+  std::shared_ptr<plume::RenderPipelineLayout> layout = builder.create(&device);
+#if defined(REBLUE_D3D12)
+  constexpr auto format = plume::RenderShaderFormat::DXIL;
+#else
+  constexpr auto format = plume::RenderShaderFormat::SPIRV;
+#endif
+  std::shared_ptr<plume::RenderShader> vertex = device.createShader(RIGID_BLOB(native_rigid_skin_shadow_vs),"main",format);
+  if (!layout || !vertex) return {};
+  return NativePipelineProgram::Create(layout,vertex,{},std::move(input));
+}
 NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device, NativeVertexInputHandle input) {
   if (!input || (input->Elements().size() != 4 && input->Elements().size() != 5) || input->Streams() != 1) return {};
   const bool layered = input->Elements().size() == 5;

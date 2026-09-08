@@ -67,6 +67,7 @@ size_t ModelMaterialRegistry::RetainedBytes(
     add(mesh.program.ranges.capacity(), sizeof(NativeMaterialRange));
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
     add(mesh.program.geometries.capacity(), sizeof(std::shared_ptr<const NativeGeometry>));
+    add(mesh.program.skin_geometries.capacity(), sizeof(std::shared_ptr<const NativeGeometry>));
     add(mesh.program.shadow_policies.capacity(), sizeof(NativeShadowPolicy));
     add(mesh.program.texture_assignments.capacity(), sizeof(MaterialImageAssignment));
     add(mesh.program.policy_steps.capacity(), sizeof(PrimitivePolicyStep));
@@ -98,6 +99,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
     if (!mesh.source_mesh || mesh.source_mesh == previous ||
         mesh.program.ranges.size() != mesh.program.materials.size() ||
         mesh.program.ranges.size() != mesh.program.geometries.size() ||
+        (!mesh.program.skin_geometries.empty() && mesh.program.ranges.size() != mesh.program.skin_geometries.size()) ||
         mesh.program.ranges.size() != mesh.program.shadow_policies.size() ||
         mesh.program.ranges.size() != mesh.source_bindings.size() ||
         (!mesh.program.valid && !mesh.program.ranges.empty())) {

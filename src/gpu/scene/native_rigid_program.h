@@ -11,9 +11,13 @@
 namespace bd::gpu::scene {
 struct NativeRigidDescriptorSchema {
   std::array<plume::RenderDescriptorSetBuilder, 3> sets;
-  NativeRigidDescriptorSchema() {
+  explicit NativeRigidDescriptorSchema(bool skin = false) {
     sets[0].begin();
     sets[0].addStructuredBuffer(0); // NativeRigidInstanceGPU[], indexed by SV_InstanceID
+    if (skin) {
+      sets[0].addStructuredBuffer(1); // Row-vector joint-to-world matrices
+      sets[0].addStructuredBuffer(2); // Per-instance {first joint,count,reserved,reserved}
+    }
     sets[0].end();
     // Explicit TEXTURE_2D_ARRAY sampled views: three albedo layers and mono sun
     // depth, both using layer zero. Do not bind a texture's default 2D view.
@@ -31,6 +35,27 @@ struct NativeRigidPrograms { NativePipelineHandle scene, shadow, shadow_cutout; 
 // this function does not accumulate a global cache or read any source resources.
 NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device,
                                               NativeVertexInputHandle input);
+NativePipelineHandle CreateNativeSkinShadowProgram(plume::RenderDevice &device, NativeVertexInputHandle input);
+
+inline NativeVertexInputHandle NativeSkinShadowVertexInput(const NativeMeshData &mesh,
+                                                          NativeVertexInputLibrary &library) {
+  const auto influences = NativeMeshSkinInfluences(mesh.attributes);
+  if (!influences || !ValidateNativeMesh(mesh) || mesh.streams[0].stride > 255) return {};
+  std::array<plume::RenderInputElement,5> elements{};
+  for (uint32_t n = 0; n < elements.size(); ++n) {
+    const auto semantic = n < 3 ? MeshSemantic::SkinPosition : n == 3 ? MeshSemantic::SkinJoints : MeshSemantic::SkinWeights;
+    // Inactive lanes have zero weights. Reuse a valid position fetch rather
+    // than advertise an unbound input or carry a console missing-stream rule.
+    const uint32_t index = n < influences ? n : 0;
+    const auto a = std::find_if(mesh.attributes.begin(),mesh.attributes.end(),[&](const auto &a) {
+      return a.semantic == semantic && a.index == (n < 3 ? index : 0);
+    });
+    if (a == mesh.attributes.end()) return {};
+    elements[n] = {n < 3 ? "POSITION" : n == 3 ? "BLENDINDICES" : "BLENDWEIGHT",
+        n < 3 ? n : 0,n,plume::RenderFormat::R32G32B32A32_FLOAT,0,a->offset};
+  }
+  return library.Resolve(elements,1,{});
+}
 
 // Native shader locations come from the named asset schema, not the translated
 // shader signature. Layer 2 additionally requires the asset's TexCoord2;
