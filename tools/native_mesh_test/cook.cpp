@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_mesh_cook.h"
+#include "gpu/scene/native_skin_mesh.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -122,7 +123,134 @@ static void TestMeshBounds() {
   std::cout << "native bounds: indexed positions, persistence, signed base, affine containment and hostile inputs passed\n";
 }
 
+static void TestSkinCook() {
+  NativeMeshData packed;
+  packed.layout = 1; packed.base_vertex = -7; packed.indices = {7,8,9};
+  packed.streams.push_back({2,96,std::vector<uint8_t>(3*96)});
+  const std::array<std::array<float,4>,6> values{{
+      {1,2,3,2}, {1,0,0,1.f/64}, // position0 / normal0 + palette slot1
+      {4,5,6,3}, {0,1,0,0},      // position1 / normal1 + slot0
+      {7,8,9,5}, {0,0,1,2.f/64}  // position2 / normal2 + slot2
+  }};
+  const auto set = [&](NativeMeshData &mesh, size_t vertex, size_t a, size_t lane, float value) {
+    Word(mesh.streams[0].bytes,vertex*96+a*16+lane*4,std::bit_cast<uint32_t>(value));
+  };
+  for (size_t v = 0; v < 3; ++v)
+    for (size_t a = 0; a < 6; ++a)
+      for (size_t lane = 0; lane < 4; ++lane) set(packed,v,a,lane,values[a][lane]);
+  const std::vector<plume::RenderInputElement> elements{
+      {"POSITION",0,0,F::R32G32B32A32_FLOAT,2,0},
+      {"NORMAL",0,5,F::R32G32B32A32_FLOAT,2,16},
+      {"POSITION",1,1,F::R32G32B32A32_FLOAT,2,32},
+      {"POSITION",2,2,F::R32G32B32A32_FLOAT,2,48},
+      {"POSITION",3,3,F::R32G32B32A32_FLOAT,2,64},
+      {"POSITION",4,4,F::R32G32B32A32_FLOAT,2,80}};
+  const auto binding = *DecodeNativeSkinBinding(std::array<uint16_t,3>{2,0,1});
+  NativeMeshData cooked;
+  for (uint32_t influences = 1; influences <= 3; ++influences) {
+    Check(CookSkinMesh(packed,elements,{},false,influences,binding,cooked),"joint-local skin cook");
+    Check(NativeMeshSkinInfluences(cooked.attributes) == influences &&
+        cooked.attributes.size() == influences*2+2,"explicit paired skin schema");
+    const auto joint_attribute = influences*2, weight_attribute = joint_attribute+1;
+    Check(Lane(cooked,joint_attribute,0) == 0 && Lane(cooked,0,3) == 0 &&
+        Lane(cooked,influences,3) == 0,"joint IDs resolved and source index/weight packing removed");
+    const float denominator = influences == 1 ? 2.f : influences == 2 ? 5.f : 10.f;
+    Check(Lane(cooked,weight_attribute,0) == 2.f/denominator,"weights normalized at cook boundary");
+    std::vector<uint8_t> file;
+    Check(EncodeNativeMesh(cooked,file) && file[6] == 3,"skin v3 persisted");
+    NativeMeshData restored;
+    Check(DecodeNativeMesh(file,restored) && NativeMeshContentId(restored) == NativeMeshContentId(cooked),
+        "skin persistence identity");
+    const auto id = NativeMeshContentId(cooked);
+    for (size_t n = 0; n < file.size(); ++n) {
+      auto bad = file; bad[n] ^= 1;
+      Check(!DecodeNativeMesh(bad,cooked) && NativeMeshContentId(cooked) == id,"skin corrupt file transactional");
+      Check(!DecodeNativeMesh(std::span(file).first(n),cooked),"skin truncation");
+    }
+    auto downgraded = file; downgraded[6] = 2;
+    Check(!DecodeNativeMesh(downgraded,cooked),"skin schema cannot masquerade as v2");
+    NativeVertexInputLibrary library;
+    Check(!RigidMeshVertexInput(cooked,library) && !BuildNativeMeshBounds(cooked),
+        "skin never admitted as rigid geometry/bounds");
+  }
+  const auto id = NativeMeshContentId(cooked);
+  for (uint32_t influences : {0u,4u})
+    Check(!CookSkinMesh(packed,elements,{},false,influences,binding,cooked),"invalid influence count");
+  auto missing = elements; missing.pop_back();
+  Check(!CookSkinMesh(packed,missing,{},false,3,binding,cooked),"missing joint-local normal refuses");
+  auto short_binding = binding; short_binding.count = 2;
+  Check(!CookSkinMesh(packed,elements,{},false,3,short_binding,cooked),"palette slot checked at producer");
+  Check(!CookSkinMesh(packed,elements,{},false,3,binding,packed),"skin aliased output refuses");
+  auto bad = packed; set(bad,0,0,3,-1);
+  Check(!CookSkinMesh(bad,elements,{},false,3,binding,cooked),"negative skin weight refuses");
+  bad = packed; for (size_t a : {0u,2u,4u}) set(bad,0,a,3,0);
+  Check(!CookSkinMesh(bad,elements,{},false,3,binding,cooked),"zero weight sum refuses");
+  Check(NativeMeshContentId(cooked) == id,"failed skin cooks preserve prior owner");
+  auto reordered = elements; std::reverse(reordered.begin(),reordered.end());
+  NativeMeshData second;
+  Check(CookSkinMesh(packed,reordered,{},false,3,binding,second) && NativeMeshContentId(second) == id,
+      "skin stable identity independent of source declaration order");
+  auto swapped = packed;
+  for (size_t v = 0; v < 3; ++v)
+    for (size_t a = 0; a < 6; ++a)
+      for (size_t lane = 0; lane < 4; ++lane) set(swapped,v,a,lane,values[a][lane^1]);
+  VertexShaderDecode swap_decode{}; swap_decode.positions = 31; swap_decode.normals = 1;
+  Check(CookSkinMesh(swapped,elements,swap_decode,false,3,binding,second) && NativeMeshContentId(second) == id,
+      "all joint-local position/normal pairs use the shared endian decoder");
+  auto inactive = packed; set(inactive,0,0,3,0); set(inactive,0,1,3,-100);
+  Check(CookSkinMesh(inactive,elements,{},false,3,binding,second) && Lane(second,6,0) == 0 &&
+      Lane(second,7,0) == 0,"inactive lane ignores an unused source palette slot");
+  auto other_binding = binding; other_binding.joints[1] = UINT16_MAX;
+  Check(CookSkinMesh(packed,elements,{},false,3,other_binding,second) &&
+      Lane(second,6,0) == UINT16_MAX && NativeMeshContentId(second) != id,"full model-local joint identity");
+  // Destroy source bytes/recipes before the world-space consumer runs.
+  packed = {}; second = {};
+  std::array<RenderMatrix,3> pose{{
+      {1,0,0,0, 0,1,0,0, 0,0,1,0, 10,0,0,1},
+      {0,1,0,0, -1,0,0,0, 0,0,1,0, 0,20,0,1},
+      {2,0,0,0, 0,3,0,0, 0,0,4,0, 0,0,30,1}}};
+  const auto bounds = BuildNativeSkinBounds(cooked,pose);
+  const std::array<float,3> expected{.6f,18.4f,21.3f};
+  Check(bool(bounds),"native skin consumes owned pose");
+  for (size_t axis = 0; axis < 3; ++axis)
+    Check(std::abs(bounds->min[axis]-expected[axis]) < 1e-4f && bounds->min[axis] == bounds->max[axis],
+        "joint-local weighted deformation, rotation/nonuniform scale and world translation once");
+  NativeSkinVertex vertex;
+  vertex.positions = {{{1,2,3},{4,5,6},{7,8,9}}};
+  vertex.normals = {{{1,0,0},{0,1,0},{0,0,1}}};
+  vertex.joints = {0,2,1}; vertex.weights = {.2f,.3f,.5f};
+  const auto deformed = DeformNativeSkinVertex(vertex,pose);
+  Check(deformed && std::abs(deformed->normal[0]-.2f) < 1e-6f &&
+      std::abs(deformed->normal[1]-.9f) < 1e-6f && deformed->normal[2] == .5f,
+      "independent authored normals use weighted joint linear transforms");
+  auto unused = cooked;
+  const auto extra = std::vector<uint8_t>(cooked.streams[0].bytes.begin(),
+      cooked.streams[0].bytes.begin()+cooked.streams[0].stride);
+  unused.streams[0].bytes.insert(unused.streams[0].bytes.end(),extra.begin(),extra.end());
+  Word(unused.streams[0].bytes,3*unused.streams[0].stride,std::bit_cast<uint32_t>(1e20f));
+  Check(BuildNativeSkinBounds(unused,pose) == bounds,"unindexed animated outlier cannot change bounds");
+  unused.base_vertex = 0; unused.indices = {2,0,1};
+  Check(BuildNativeSkinBounds(unused,pose) == bounds,"skin index order/base do not change effective vertices");
+  Check(!BuildNativeSkinBounds(cooked,std::span(pose).first(2)),"missing model joint refuses");
+  pose[0][12] += 100;
+  const auto animated = BuildNativeSkinBounds(cooked,pose);
+  Check(animated && std::abs(animated->min[0]-bounds->min[0]-20) < 1e-4f,"fresh animated pose changes bound");
+  pose[0][3] = 1;
+  Check(!BuildNativeSkinBounds(cooked,pose),"nonaffine palette refuses");
+  auto hostile = cooked;
+  Word(hostile.streams[0].bytes,6*16,std::bit_cast<uint32_t>(.5f));
+  Check(!ValidateNativeMesh(hostile),"fractional native joint refuses");
+  hostile = cooked; Word(hostile.streams[0].bytes,7*16,std::bit_cast<uint32_t>(-.1f));
+  Check(!ValidateNativeMesh(hostile),"negative persisted weight refuses");
+  hostile = cooked; Word(hostile.streams[0].bytes,12,std::bit_cast<uint32_t>(1.f));
+  Check(!ValidateNativeMesh(hostile),"source packing cannot leak into native local position");
+  hostile = cooked; hostile.attributes[4].index = 0; hostile.layout = NativeMeshLayoutId(hostile.attributes);
+  Check(!ValidateNativeMesh(hostile),"duplicate/missing joint-local normal rejects persistence");
+  std::cout << "native skin: 1/2/3 joint-local influences, exact IDs, source-destroyed persistence, deformation and animated bounds passed\n";
+}
+
 void TestMeshCook() {
+  TestSkinCook();
   TestMeshBounds();
   const VertexShaderDecode decode{1, 1, 0, 0, 0, 0, 1};
   NativeMeshData cooked;

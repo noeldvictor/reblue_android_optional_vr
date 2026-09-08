@@ -98,10 +98,10 @@ uint32_t SwapMask(MeshSemantic semantic, const VertexShaderDecode &decode) {
 }
 } // namespace
 
-bool CookRigidMesh(const NativeMeshData &packed,
+static bool DecodeMesh(const NativeMeshData &packed,
                    std::span<const plume::RenderInputElement> elements,
                    VertexShaderDecode decode, bool packed_basis,
-                   NativeMeshData &result) {
+                   NativeMeshData &result, bool skin) {
   if (&packed == &result || !packed.attributes.empty() ||
       !ValidateNativeMesh(packed) || elements.empty() || elements.size() > 32)
     return false;
@@ -135,7 +135,7 @@ bool CookRigidMesh(const NativeMeshData &packed,
       }
       return false;
     }
-    if (binding->semantic == MeshSemantic::Position && binding->index != 0)
+    if (!skin && binding->semantic == MeshSemantic::Position && binding->index != 0)
       return false; // constrained/animated vertices are not rigid assets
     const uint32_t width = Width(element.format);
     if (!width || element.alignedByteOffset > stream->stride ||
@@ -197,6 +197,89 @@ bool CookRigidMesh(const NativeMeshData &packed,
         const uint32_t bits = std::bit_cast<uint32_t>(value[lane]);
         const uint64_t offset = vertex * stride + i * 16 + lane * 4;
         for (uint32_t b = 0; b < 4; ++b) bytes[offset + b] = uint8_t(bits >> (b * 8));
+      }
+    }
+  }
+  // Secondary POSITION semantics exist only in this private decode staging
+  // object. CookSkinMesh must replace them before persistence or consumption.
+  if (!skin && !ValidateNativeMesh(cooked)) return false;
+  result = std::move(cooked);
+  return true;
+}
+
+bool CookRigidMesh(const NativeMeshData &packed,
+    std::span<const plume::RenderInputElement> elements,
+    VertexShaderDecode decode, bool packed_basis, NativeMeshData &result) {
+  return DecodeMesh(packed,elements,decode,packed_basis,result,false);
+}
+
+bool CookSkinMesh(const NativeMeshData &packed,
+    std::span<const plume::RenderInputElement> elements,
+    VertexShaderDecode decode, bool packed_basis, uint32_t influences,
+    const NativeSkinBinding &binding, NativeMeshData &result) {
+  if (&packed == &result || influences < 1 || influences > 3 ||
+      !binding.count || binding.count > binding.joints.size()) return false;
+  NativeMeshData decoded;
+  if (!DecodeMesh(packed,elements,decode,packed_basis,decoded,true)) return false;
+  const auto attribute = [&](MeshSemantic semantic, uint32_t index) -> const NativeMeshAttribute * {
+    for (const auto &a : decoded.attributes)
+      if (a.semantic == semantic && a.index == index) return &a;
+    return nullptr;
+  };
+  std::array<const NativeMeshAttribute *,3> positions{}, normals{};
+  for (uint32_t n = 0; n < influences; ++n) {
+    positions[n] = attribute(MeshSemantic::Position,n ? n*2-1 : 0);
+    normals[n] = n ? attribute(MeshSemantic::Position,n*2) : attribute(MeshSemantic::Normal,0);
+    if (!positions[n] || !normals[n]) return false;
+  }
+  NativeMeshData cooked;
+  cooked.base_vertex = decoded.base_vertex; cooked.indices = decoded.indices;
+  for (const auto &a : decoded.attributes)
+    if (a.semantic != MeshSemantic::Position && a.semantic != MeshSemantic::Normal)
+      cooked.attributes.push_back({a.semantic,a.index,0});
+  for (auto semantic : {MeshSemantic::SkinPosition,MeshSemantic::SkinNormal})
+    for (uint32_t n = 0; n < influences; ++n) cooked.attributes.push_back({semantic,n,0});
+  cooked.attributes.push_back({MeshSemantic::SkinJoints,0,0});
+  cooked.attributes.push_back({MeshSemantic::SkinWeights,0,0});
+  if (cooked.attributes.size() > 16) return false;
+  for (size_t n = 0; n < cooked.attributes.size(); ++n) cooked.attributes[n].offset = uint32_t(n*16);
+  const auto &input = decoded.streams[0];
+  const auto vertices = input.bytes.size()/input.stride;
+  const uint32_t stride = uint32_t(cooked.attributes.size()*16);
+  const uint64_t overhead = 52 + cooked.attributes.size()*12 + cooked.indices.size()*4;
+  if (overhead > kNativeMeshMaxBytes || vertices > (kNativeMeshMaxBytes-overhead)/stride) return false;
+  cooked.layout = NativeMeshLayoutId(cooked.attributes);
+  cooked.streams.push_back({0,stride,std::vector<uint8_t>(vertices*stride)});
+  for (size_t vertex = 0; vertex < vertices; ++vertex) {
+    const auto fetch = [&](const NativeMeshAttribute *a) {
+      return Fetch(input.bytes.data()+vertex*input.stride+a->offset,F::R32G32B32A32_FLOAT);
+    };
+    std::array<std::array<float,4>,3> p{}, n{};
+    std::array<float,4> joints{}, weights{};
+    float sum = 0;
+    for (uint32_t lane = 0; lane < influences; ++lane) {
+      p[lane] = fetch(positions[lane]); n[lane] = fetch(normals[lane]);
+      const float weight = p[lane][3];
+      if (weight < 0) return false;
+      if (weight != 0) {
+        const float slot = std::floor(n[lane][3]*64.f);
+        if (!std::isfinite(slot) || slot < 0 || slot >= binding.count) return false;
+        joints[lane] = float(binding.joints[uint32_t(slot)]);
+      }
+      weights[lane] = weight; sum += weight;
+      p[lane][3] = n[lane][3] = 0;
+    }
+    if (!std::isfinite(sum) || sum <= 0) return false;
+    for (auto &weight : weights) weight /= sum;
+    for (const auto &a : cooked.attributes) {
+      const auto value = a.semantic == MeshSemantic::SkinPosition ? p[a.index] :
+          a.semantic == MeshSemantic::SkinNormal ? n[a.index] :
+          a.semantic == MeshSemantic::SkinJoints ? joints :
+          a.semantic == MeshSemantic::SkinWeights ? weights : fetch(attribute(a.semantic,a.index));
+      for (uint32_t lane = 0; lane < 4; ++lane) {
+        const uint32_t bits = std::bit_cast<uint32_t>(value[lane]);
+        const size_t offset = vertex*stride+a.offset+lane*4;
+        for (uint32_t b = 0; b < 4; ++b) cooked.streams[0].bytes[offset+b] = uint8_t(bits >> (8*b));
       }
     }
   }

@@ -43,13 +43,19 @@ struct Reader {
 };
 } // namespace
 
+uint32_t NativeMeshSkinInfluences(std::span<const NativeMeshAttribute> attributes) {
+  return uint32_t(std::count_if(attributes.begin(), attributes.end(), [](const auto &a) {
+    return a.semantic == MeshSemantic::SkinPosition;
+  }));
+}
+
 uint64_t NativeMeshLayoutId(std::span<const NativeMeshAttribute> attributes) {
   uint64_t hash = 14695981039346656037ull;
   const auto word = [&](uint32_t value) {
     for (unsigned i = 0; i < 4; ++i)
       hash = (hash ^ uint8_t(value >> (8 * i))) * 1099511628211ull;
   };
-  word(2); // format version, including float4/interleaved packing
+  word(NativeMeshSkinInfluences(attributes) ? 3 : 2);
   word(uint32_t(attributes.size()));
   for (const auto &a : attributes) {
     word(uint32_t(a.semantic));
@@ -116,19 +122,30 @@ bool ValidateNativeMesh(const NativeMeshData &mesh) {
       return false;
     uint32_t previous = 0;
     bool position = false;
+    uint32_t skin_positions = 0, skin_normals = 0, skin_fields = 0;
     for (size_t i = 0; i < mesh.attributes.size(); ++i) {
       const auto &a = mesh.attributes[i];
       const auto semantic = uint32_t(a.semantic);
-      if (semantic < 1 || semantic > 6 ||
-          a.index > (a.semantic == MeshSemantic::TexCoord ? 7u : 0u) ||
+      const bool skin_vector = a.semantic == MeshSemantic::SkinPosition || a.semantic == MeshSemantic::SkinNormal;
+      if (semantic < 1 || semantic > 10 ||
+          a.index > (a.semantic == MeshSemantic::TexCoord ? 7u : skin_vector ? 2u : 0u) ||
           a.offset != i * 16)
         return false;
       const uint32_t key = semantic * 8 + a.index;
       if (key <= previous) return false;
       previous = key;
       position |= a.semantic == MeshSemantic::Position;
+      if (a.semantic == MeshSemantic::SkinPosition) skin_positions |= 1u << a.index;
+      if (a.semantic == MeshSemantic::SkinNormal) skin_normals |= 1u << a.index;
+      if (a.semantic == MeshSemantic::SkinJoints) skin_fields |= 1;
+      if (a.semantic == MeshSemantic::SkinWeights) skin_fields |= 2;
     }
-    if (!position) return false;
+    if (skin_positions || skin_normals || skin_fields) {
+      if (position || skin_normals != skin_positions || skin_fields != 3 ||
+          (skin_positions != 1 && skin_positions != 3 && skin_positions != 7)) return false;
+      for (const auto &a : mesh.attributes)
+        if (a.semantic == MeshSemantic::Normal || a.semantic == MeshSemantic::Binormal) return false;
+    } else if (!position) return false;
     bytes += 4 + mesh.attributes.size() * 12;
   }
   for (const auto &s : mesh.streams) {
@@ -146,6 +163,29 @@ bool ValidateNativeMesh(const NativeMeshData &mesh) {
     Reader r{mesh.streams[0].bytes};
     while (!r.bytes.empty())
       if (!std::isfinite(std::bit_cast<float>(uint32_t(r.Get())))) return false;
+    const auto influences = NativeMeshSkinInfluences(mesh.attributes);
+    if (influences) {
+      const auto &stream = mesh.streams[0];
+      for (size_t vertex = 0; vertex < stream.bytes.size(); vertex += stream.stride) {
+        for (const auto &a : mesh.attributes) {
+          Reader values{std::span(stream.bytes).subspan(vertex+a.offset,16)};
+          float sum = 0;
+          for (uint32_t lane = 0; lane < 4; ++lane) {
+            const float value = std::bit_cast<float>(uint32_t(values.Get()));
+            if (a.semantic == MeshSemantic::SkinJoints &&
+                (value < 0 || value > UINT16_MAX || std::floor(value) != value ||
+                 (lane >= influences && value != 0))) return false;
+            if (a.semantic == MeshSemantic::SkinWeights) {
+              if (value < 0 || value > 1 || (lane >= influences && value != 0)) return false;
+              sum += value;
+            }
+            if ((a.semantic == MeshSemantic::SkinPosition || a.semantic == MeshSemantic::SkinNormal) &&
+                lane == 3 && value != 0) return false;
+          }
+          if (a.semantic == MeshSemantic::SkinWeights && std::abs(sum-1.f) > 1e-5f) return false;
+        }
+      }
+    }
   }
   return true;
 }
@@ -193,7 +233,7 @@ bool EncodeNativeMesh(const NativeMeshData &mesh, std::vector<uint8_t> &file) {
   if (!ValidateNativeMesh(mesh))
     return false;
   file.insert(file.end(), std::begin(kMagic), std::end(kMagic));
-  if (!mesh.attributes.empty()) file[6] = 2;
+  if (!mesh.attributes.empty()) file[6] = NativeMeshSkinInfluences(mesh.attributes) ? 3 : 2;
   Put(file, 0, 8);
   Put(file, mesh.layout, 8);
   Put(file, std::bit_cast<uint32_t>(mesh.base_vertex));
@@ -250,7 +290,7 @@ bool DecodeNativeMesh(std::span<const uint8_t> file, NativeMeshData &mesh) {
   // mesh in the renderer. Counts are bounded by the remaining file first.
   if (file.size() < 36 || file.size() > kNativeMeshMaxBytes ||
       std::memcmp(file.data(), kMagic, 6) != 0 || file[7] != 0 ||
-      (file[6] != 1 && file[6] != 2))
+      (file[6] != 1 && file[6] != 2 && file[6] != 3))
     return false;
   Reader r{file.subspan(8)};
   if (r.Get(8) != Checksum(file.subspan(16)))
@@ -262,7 +302,7 @@ bool DecodeNativeMesh(std::span<const uint8_t> file, NativeMeshData &mesh) {
   const uint32_t indices = uint32_t(r.Get());
   if (streams == 0 || streams > 16 || indices > r.bytes.size() / 4)
     return false;
-  if (file[6] == 2) {
+  if (file[6] >= 2) {
     const auto count = r.Get();
     if (!count || count > 16 || count > r.bytes.size() / 12) return false;
     for (uint64_t i = 0; i < count; ++i) {
@@ -289,7 +329,8 @@ bool DecodeNativeMesh(std::span<const uint8_t> file, NativeMeshData &mesh) {
   result.indices.reserve(indices);
   for (uint32_t i = 0; i < indices; ++i)
     result.indices.push_back(uint32_t(r.Get()));
-  if (!r.ok || !ValidateNativeMesh(result))
+  if (!r.ok || !ValidateNativeMesh(result) ||
+      (file[6] == 3) != bool(NativeMeshSkinInfluences(result.attributes)))
     return false;
   mesh = std::move(result);
   return true;

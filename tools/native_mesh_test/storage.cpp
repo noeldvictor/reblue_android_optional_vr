@@ -91,13 +91,35 @@ void TestMeshStorage() {
     canonical.streams = {{0, 16, std::vector<uint8_t>(48)}};
     const auto key = NativeMeshContentId(canonical);
     const auto canonical_bytes = Bytes(canonical);
-    NativeMeshDiskCache writer(scratch.path, {bytes.size() + canonical_bytes.size(), 2, 0});
-    Require(key && writer.Write(key, canonical) && writer.Write(1, mesh), "v1/v2 shared budget");
+    NativeMeshData skin;
+    skin.indices = {0,1,2};
+    skin.attributes = {{MeshSemantic::SkinPosition,0,0},{MeshSemantic::SkinNormal,0,16},
+        {MeshSemantic::SkinJoints,0,32},{MeshSemantic::SkinWeights,0,48}};
+    skin.layout = NativeMeshLayoutId(skin.attributes);
+    skin.streams = {{0,64,std::vector<uint8_t>(3*64)}};
+    for (size_t vertex = 0; vertex < 3; ++vertex) {
+      const auto bits = std::bit_cast<uint32_t>(1.f);
+      for (size_t b = 0; b < 4; ++b) skin.streams[0].bytes[vertex*64+48+b] = uint8_t(bits >> (8*b));
+    }
+    const auto skin_key = NativeMeshContentId(skin);
+    const auto skin_bytes = Bytes(skin);
+    const auto budget_bytes = bytes.size()+canonical_bytes.size()+skin_bytes.size();
+    NativeMeshDiskCache writer(scratch.path, {budget_bytes, 3, 0});
+    Require(key && skin_key && writer.Write(key, canonical) && writer.Write(1, mesh) &&
+        writer.Write(skin_key,skin), "v1/v2/v3 share the same aggregate budget");
     Require(!writer.Write(2, mesh), "new format cannot reset aggregate budget");
+    const auto stamp = fs::last_write_time(scratch.path / writer.FileName(skin_key));
+    Require(writer.Write(skin_key,skin) && fs::last_write_time(scratch.path / writer.FileName(skin_key)) == stamp,
+        "native skin unchanged reuse does not create another representation");
+    NativeMeshDiskCache restarted(scratch.path,{budget_bytes,3,0});
+    Require(!restarted.Write(2,mesh),"skin cache restart cannot reset shared budget");
     canonical = {}; // discard the producer; reopen using only a stable asset ID
+    skin = {};
     NativeMeshDiskCache reader(scratch.path, {0, 0, UINT64_MAX});
     Require(reader.Read(key, canonical) && NativeMeshContentId(canonical) == key &&
             Bytes(canonical) == canonical_bytes, "source-free v2 persistent round trip");
+    Require(reader.Read(skin_key,skin) && NativeMeshContentId(skin) == skin_key &&
+        Bytes(skin) == skin_bytes,"source-free v3 persistent round trip with writes disabled");
   }
   {
     Scratch scratch;

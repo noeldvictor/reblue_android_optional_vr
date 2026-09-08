@@ -650,6 +650,19 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    pose production and GPU skinning as connected character paths. Test authored
    changes and field/battle/cutscene/shadow lifetimes. Cook only formats/assets
    actually needed, with stable IDs, persistence and bounded streaming.
+   The native skin asset prerequisite is now implemented and CPU-tested:
+   `CookSkinMesh` resolves authored palette slots into model-local joints;
+   BDMESH v3 stores explicit paired joint-local positions/normals and weights,
+   using the existing aggregate mesh budget. Do not collapse these into a single
+   bind position without the skeleton/inverse-bind contract. Source-free indexed
+   deformation/bounds are tested, not connected to live culling yet. Next connect
+   the load-owned primitive's skin binding/influence count to this cooker and
+   existing geometry owner, then the existing instance pose to native GPU palette
+   storage and scene/shadow shaders/queues, including animated bounds and fences.
+   `ImportNativeMesh` still calls only the rigid cooker; current native admission
+   still rejects skin. No shader/register adapter has been removed at runtime by
+   this prerequisite. GPU/pixel/game/reload/both-eye skin acceptance remains open.
+   [Exact contract and evidence](../research/20260908_1410_native-skin-assets.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass
    scheduling and presentation. Remove guest rendering, register/resource

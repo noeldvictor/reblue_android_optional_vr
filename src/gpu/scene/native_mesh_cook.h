@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_mesh_data.h"
 #include "gpu/scene/native_vertex_input.h"
+#include "gpu/scene/native_skin.h"
 
 namespace bd::gpu::scene {
 
@@ -16,6 +17,15 @@ bool CookRigidMesh(const NativeMeshData &packed,
                    std::span<const plume::RenderInputElement> elements,
                    VertexShaderDecode decode, bool packed_basis,
                    NativeMeshData &result);
+
+// Convert the authored 1..3 joint-local positions/normals and index fractions
+// into v3 values. Resolve per-primitive palette slots to exact model-local joint
+// IDs at this boundary. Neither the binding nor any source decode state persists.
+bool CookSkinMesh(const NativeMeshData &packed,
+                  std::span<const plume::RenderInputElement> elements,
+                  VertexShaderDecode decode, bool packed_basis,
+                  uint32_t influences, const NativeSkinBinding &binding,
+                  NativeMeshData &result);
 
 // Temporary adapter to the existing shader signature. Derives IA and pulling
 // from the decoded asset alone, with no declaration or per-draw decode masks.

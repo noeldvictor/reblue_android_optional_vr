@@ -5093,3 +5093,40 @@ attributed. No new caches/raws/images/downloads/assets; limits unchanged. Keep
 causal977/archived974 and all other protected unresolved/raw/image evidence.
 All producers terminal. Next host156/game981,CPU66/output41 only for a new
 connected change or explicitly scoped missing coverage, not another planar-read probe.
+
+### Native joint-local skin assets (2026-09-08, source f04aaa8 plus edits)
+
+Previous turn made progress:42fd400/f04aaa8 now pushed; origin/main equals HEAD.
+No live producer on resumption. Same cumulative3GiB exception/floor62,509,998,080B
+and diagnostic/log/raw/image limits; no allowance reset. Last preflight free
+80,071,610,368B. Earlier post-Git free-space movement was drive-wide, not claimed
+as renderer growth; scoped logs/cache inspection and process check precede the
+next producer. No new game output, capture, downloads, assets or build tree.
+Cooker/schema changes and source-free indexed deformation use the existing mesh
+fixture. Plan native_mesh_test14 (32MiB/300s) and mesh_cpu12 (16MiB/30s CTest),
+within the existing supervisor's cumulative floor and10MiB aggregate logs.
+Native GPU palette/program/scene/shadow admission remain unconnected; do not
+restamp host155/run980 or infer native character/game-pixel acceptance.
+
+Scoped preflight found no live renderer/compiler/test process and no new cache
+or log payload after980 (its existing log has the boundary timestamp). Mesh tree
+1537443B/30files; attachment logs302033B/192files. No new raw/image/game outputs.
+Build14/PID37340 and CPU12/PID33928 exit0. After added source-pair/normal/bounds/
+shared-disk regressions, build15/PID29008 and CPU13/PID36612 exit0 (CTest0.12s,
+0.14s total). All378 artifact-free guards pass. Mesh EXE SHA256
+8A87AD2B06F099748644CD7AB8CF892269D4BF4E7E4F1DAD587FFEDF442BC3E7.
+No host/shader build, game run, profile edit, data cook or new capture; host155/
+run980 remain unchanged. Full skin GPU/live/pixel acceptance stays open.
+
+After validating replacement15/13, inspected and removed8 exact superseded
+mesh-build13/14 and mesh-CPU11/12 stdout/stderr logs,4059B logical. Old13/11
+were passing rigid/storage fixture evidence;14/12 were passing intermediate
+skin evidence. Their results remain recorded; no unresolved failure, raw,
+image, asset, save or active binary was deleted. Current15/13 logs retained.
+Cleanup free interval80074461184->80074473472B (+12288 drive-wide), count once.
+Closing selected mesh tree1653096B/30files (+115653), attachment logs302234B/
+192files (+201):115854B net retained fixture/log growth for skin coverage.
+Ending free80074473472B vs preflight80071610368B:2863104B more free drive-wide,
+not attributed as cleanup beyond the measured interval. Source/Git/other drive
+activity is separate. All producers terminal; same cumulative limits. Next
+mesh build16/CPU14; host156/game981 remain unused and require a real connection.

@@ -30,7 +30,11 @@ struct NativeMeshStream {
 // Values and all file metadata are little-endian. These are asset semantics,
 // not shader locations, console declaration types or decoder masks.
 enum class MeshSemantic : uint32_t {
-  Position = 1, Normal = 2, Tangent = 3, Binormal = 4, TexCoord = 5, Color = 6
+  Position = 1, Normal = 2, Tangent = 3, Binormal = 4, TexCoord = 5, Color = 6,
+  // v3: joint-local xyz (w=0), paired at indices 0..2. Joints/Weights are
+  // float4 for portable vertex fetch: exact model-local uint16 IDs, normalized
+  // nonnegative weights, unused lanes zero. No encoded register offsets.
+  SkinPosition = 7, SkinNormal = 8, SkinJoints = 9, SkinWeights = 10
 };
 struct NativeMeshAttribute {
   MeshSemantic semantic = MeshSemantic::Position;
@@ -38,10 +42,12 @@ struct NativeMeshAttribute {
   bool operator==(const NativeMeshAttribute &) const = default;
 };
 uint64_t NativeMeshLayoutId(std::span<const NativeMeshAttribute> attributes);
+uint32_t NativeMeshSkinInfluences(std::span<const NativeMeshAttribute> attributes);
 
 struct NativeMeshData {
   // Empty attributes identify the transitional v1 packed payload. Nonempty
-  // attributes are self-describing v2; layout is derived from that schema.
+  // attributes are self-describing v2 (rigid) or v3 (skin); layout derives from
+  // that schema. Skin assets deliberately have no rigid Position semantic.
   uint64_t layout = 0;
   int32_t base_vertex = 0;
   std::vector<uint32_t> indices;

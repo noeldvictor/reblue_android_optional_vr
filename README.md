@@ -78,6 +78,15 @@ and other unadmitted families still use the legacy producer. Game water/reflecti
 pixels, HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
 [Completed image connection, verification and remaining work](research/20260908_1345_native-water-images.md).
 
+**Character prerequisite (2026-09-08, CPU-tested):** a versioned native skin mesh
+format now preserves the authored one-to-three joint-local positions/normals,
+with explicit model-local joint IDs and normalized weights. It reuses the bounded
+mesh store; source-free deformation and animated indexed bounds pass the mesh
+fixture. The load-time game connection, GPU palette/shaders and native skinned
+scene/shadow draws are still pending. This removes no additional live guest calls
+yet and does not supersede the host155/run980 evidence.
+[Skin contract, implementation and next connection](research/20260908_1410_native-skin-assets.md).
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native
