@@ -13,7 +13,7 @@ from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
 from native_instance_scenario import verify_cutout_family
-from native_instance_scenario import verify_skin_shadow, verify_skin_scene
+from native_instance_scenario import verify_skin_shadow, verify_skin_scene, verify_render_poses
 from native_instance_scenario import observe_occlusion
 from native_instance_scenario import verify_frame_probe
 from native_instance_scenario import (
@@ -800,6 +800,50 @@ class CasterFamilyScenarioTest(unittest.TestCase):
                     module.verify_rigid_epoch(first, caster_family=True)
                     module.verify_rigid_epoch(second, caster_family=True)
             module.verify_rigid_epoch("\n".join(self.rows()), caster_family=True)
+
+
+class RenderPoseScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        for index, frame in ((2,100), (4,150)):
+            rows[index] = (f"[native-render-poses] frame {frame} reads {frame*3} blends {frame} "
+                           f"reused {frame} snapped {frame} refused 0;")
+        return rows
+
+    def test_fresh_blends_and_shared_reads(self):
+        self.assertEqual(verify_render_poses("\n".join(self.rows())), dict(
+            first_frame=100,last_frame=150,reads_delta=150,blends_delta=50,reused_delta=50,snaps_delta=50))
+
+    def test_stale_wrong_scene_and_snap_only_do_not_qualify(self):
+        rows = self.rows(); text = "\n".join(rows)
+        for bad in (text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
+                    text.replace("blends 150", "blends 100").replace("snapped 150", "snapped 200"),
+                    text.replace("reused 150", "reused 100").replace("snapped 150", "snapped 200"),
+                    "\n".join([rows[2],rows[4]] + scenario()[::2])):
+            with self.assertRaises(Pending): verify_render_poses(bad)
+
+    def test_refusal_bad_accounting_reset_malformed_and_failure(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("refused 0", "refused 1"), text.replace("reads 450", "reads 449"),
+                    text.replace("frame 150", "frame 99"), text + "\n[error] late failure",
+                    text + "\n[native-instance-drift] raw mismatch", "[native-render-poses] invalid\n" + text,
+                    "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_render_poses(bad)
+
+    def test_each_reload_epoch_requires_interpolation(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in ("verify_rigid_epoch", "verify_render_poses"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for first, second in ((cold,"\n".join(self.rows())),("\n".join(self.rows()),new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(first,render_poses=True)
+                    module.verify_rigid_epoch(second,render_poses=True)
+            module.verify_rigid_epoch("\n".join(self.rows()),render_poses=True)
 
 
 class SkinShadowScenarioTest(unittest.TestCase):
