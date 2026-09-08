@@ -5,9 +5,21 @@
  */
 #pragma once
 #include <cstdint>
+#include <optional>
 
 namespace bd::gpu::scene {
 struct VisualBlendImport { uint32_t source, destination, mode; };
+inline std::optional<VisualBlendImport> ImportDeferredVisualBlend(uint32_t mode) {
+  switch (mode) {
+  case 0: return VisualBlendImport{6, 7, mode};
+  case 1: return VisualBlendImport{6, 1, mode};
+  case 2: return VisualBlendImport{0, 4, mode};
+  case 3: return VisualBlendImport{9, 1, mode};
+  case 4: return VisualBlendImport{0, 7, mode};
+  case 5: return VisualBlendImport{0, 5, mode};
+  default: return {};
+  }
+}
 inline VisualBlendImport ImportVisualBlend(uint32_t flags) {
   // Equality, not bit priority: combinations select the ordinary alpha recipe.
   switch (flags & 0xff00) {

@@ -298,7 +298,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_deferred_packets_connect_to_the_same_consumer_without_entry_imports(self):
         source = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
         branch = source.split("auto submission = native_queue.Take(item.index);", 1)[1].split("++native_consumed", 1)[0]
-        for required in ("FindNativeEnabledBlendIntent()", "FindNativePrimaryReceiver(visual, 3)",
+        for required in ("ReadNativeDeferredEffects(visual)", "FinalizeNativeDeferredEffects(*submission, *effects, FrameStatFrameCount())",
                          "SubmitNativeRigidScenePackets(std::move(*submission), ctx.r1.u32)"):
             self.assertIn(required, branch)
         for forbidden in ("Read<", "bd::mem::", "Material(", "BindEntry", "D3DDevice_", "ResolveGuestTexture"):
@@ -309,6 +309,25 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         queue = (ROOT / "src/gpu/scene/native_deferred_queue.h").read_text()
         for forbidden in ("NodeTag", "visual", "bd::mem::", "816", "DeferredEntryRecipe"):
             self.assertNotIn(forbidden, queue)
+
+    def test_native_visual_scope_exports_legacy_state_without_dispatching_callbacks(self):
+        source = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
+        scope = source.split("struct NativeDeferredVisualScope {", 1)[1].split("} // namespace", 1)[0]
+        for forbidden in ("PPCContext", "bridge.Call", "GetFunction", "__imp__", "sub_8221DBE0(", "sub_82174648("):
+            self.assertNotIn(forbidden, scope)
+        for required in ("PrepareNativePrimaryReceiver(visual, stack)", "PublishNativeDeferredBlend(blend_mode)",
+                         "BeginDeferredMaterialCompatibility(port)", "EndDeferredMaterialCompatibility(port)",
+                         "PrepareEffectParticipants(*this)", "FinishEffectParticipants(*this)", "ValidateRoster()"):
+            self.assertIn(required, scope)
+        pure = (ROOT / "src/gpu/scene/native_deferred_effects.h").read_text()
+        for forbidden in ("bd::mem::", "PPCContext", "Read<uint", "ResolveGuest", "Staging("):
+            self.assertNotIn(forbidden, pure)
+        blend = (ROOT / "src/gpu/scene/native_blend_bridge.cpp").read_text().split("bool PublishNativeDeferredBlend", 1)[1]
+        self.assertIn("REXCVAR_GET(bd_native_blend_verify)", blend)
+        self.assertNotIn("Bootstrap(", blend)
+        self.assertNotIn("__imp__", blend)
+        self.assertIn("NativeUpdate(context, nullptr, 2, false)", blend)
+        self.assertIn("NativeUpdate(context, nullptr, 3, false)", blend)
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()

@@ -119,6 +119,16 @@ struct Adapter {
   void PublishNative(const LightingVector &colour) { Publish(source,visual,colour); }
 };
 }
+bool PrepareNativePrimaryReceiver(uint32_t visual, uint32_t stack) {
+  if (!REXCVAR_GET(bd_native_shadow_receiver) || Word(uint64_t(visual) + 3000) != 0 ||
+      Word(kRenderViewIdVa) != 3) return false;
+  const auto mode = Word(kMode);
+  if (!mode || !ImportReceiverParticipation(0, *mode)) return false;
+  Adapter adapter{kPrimary, visual, stack};
+  RunNativeReceiverSetup(true, adapter);
+  ++stats.native; Report();
+  return receiver.Read(visual, FrameStatFrameCount(), 3).has_value();
+}
 std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(uint32_t visual, uint32_t view) {
   auto result = receiver.Read(visual,FrameStatFrameCount(),view);
   ++(result ? stats.reads : stats.missing); Report();

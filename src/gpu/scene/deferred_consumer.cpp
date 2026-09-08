@@ -18,6 +18,9 @@
 #include "gpu/scene/deferred_work.h"
 #include "gpu/scene/native_deferred_queue.h"
 #include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/native_deferred_effects.h"
+#include "gpu/scene/deferred_visual_import.h"
+#include "gpu/scene/native_effect_lifecycle.h"
 #include "gpu/scene/native_rigid_draw.h"
 #include "gpu/scene/native_blend_bridge.h"
 #include "gpu/scene/native_alpha_bridge.h"
@@ -87,10 +90,12 @@ struct Stats {
 thread_local Stats stats;
 thread_local NativeDeferredQueue native_queue;
 // Source identities never enter the owned queue or native draw consumer. This
-// bounded sidecar disappears when the last visual-transition adapter retires.
+// bounded sidecar is a late authored-input/compatibility boundary, not a native
+// draw input. Ordinary native transitions below no longer dispatch callbacks.
 struct VisualTransition { uint32_t visual, blend_mode; };
 thread_local std::vector<VisualTransition> native_visuals;
 thread_local uint64_t native_staged = 0, native_consumed = 0;
+thread_local uint64_t native_visual_begins = 0, native_visual_ends = 0, native_effect_reads = 0;
 void Report() {
   const auto frame = FrameStatFrameCount();
   if (frame - stats.frame < 300)
@@ -105,8 +110,10 @@ void Report() {
       stats.bridges[3], stats.bridges[4], stats.bridges[5], stats.fallback,
       stats.refused);
   stats.frame = frame;
-  BD_INFO("[native-deferred] frame {} staged {} consumed {} pending {}; owned sorted packets, temporary visual transitions remain",
+  BD_INFO("[native-deferred] frame {} staged {} consumed {} pending {}; owned sorted packets, late authored imports and compatibility exports remain",
       frame, native_staged, native_consumed, native_queue.Entries().size());
+  BD_INFO("[native-deferred-effects] frame {} begins {} ends {} reads {}; ordinary native scopes dispatch no guest callbacks",
+      frame, native_visual_begins, native_visual_ends, native_effect_reads);
 }
 uint8_t *Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address > UINT32_MAX || bytes > UINT32_MAX ||
@@ -413,6 +420,95 @@ void SubmitSurface(EngineBridge &bridge, uint32_t entry, uint32_t visual,
     bridge.Draw(entry);
   }
 }
+
+// This port exports the original shader participant's zero/restore side effects
+// for unmigrated visuals. Native materials never read this staging representation.
+struct DeferredMaterialCompatibility {
+  static constexpr uint32_t shader = 0x82783A58, staging = High(-32034) - 32552;
+  uint32_t visual;
+  uint32_t Category() { return Read<uint32_t>(visual + 3132); }
+  uint32_t DiffuseMask() {
+    const auto source = CheckedWord(High(-32137) + 30280);
+    const auto mask = source && *source ? CheckedWord(uint64_t(*source) + 49240) : std::nullopt;
+    if (!mask) throw std::runtime_error("Native deferred diffuse class source unavailable");
+    return *mask;
+  }
+  uint32_t Staging(uint32_t offset) { return Read<uint32_t>(staging + offset); }
+  void Store(uint32_t offset, uint32_t value) { Write<uint32_t>(staging + offset, value); }
+  uint8_t Restore() { return Read<uint8_t>(shader + 12); }
+  void SetRestore(uint8_t value) { Write<uint8_t>(shader + 12, value); }
+  uint32_t SavedColour(uint32_t index) { return Read<uint32_t>(shader + 28 + index * 4); }
+};
+
+struct NativeDeferredVisualScope {
+  uint32_t visual, blend_mode, stack;
+  std::array<uint32_t, 11> participants{};
+  int32_t count = 0;
+  DeferredMaterialCompatibility Material() const { return {visual}; }
+  void ValidateRoster() const {
+    const auto entries = CheckedWord(kVisualContext + 12);
+    if (!entries || !*entries || CheckedWord(kVisualContext + 20) != uint32_t(count))
+      throw std::runtime_error("Native deferred visual roster changed inside scope");
+    for (int32_t i = 0; i < count; ++i) {
+      const auto participant = CheckedWord(uint64_t(*entries) + uint32_t(i) * 4);
+      const auto table = participant ? CheckedWord(*participant) : std::nullopt;
+      const auto end = table && *table ? CheckedWord(uint64_t(*table) + 12) : std::nullopt;
+      if (participant != participants[i] || end != (participants[i] == DeferredMaterialCompatibility::shader ? 0x82174C60u : 0x820DFA50u))
+        throw std::runtime_error("Native deferred visual cleanup contract changed");
+    }
+  }
+  void Prepare() {
+    if (CheckNativeDeferredContract(visual, CheckedWord) != blend_mode ||
+        CheckedWord(kVisualContext + 36) != 0 ||
+        !Range(visual, 3136) || !Range(DeferredMaterialCompatibility::shader, 44) ||
+        !Range(DeferredMaterialCompatibility::staging, 412))
+      throw std::runtime_error("Native deferred visual import unavailable");
+    count = int32_t(Read<uint32_t>(kVisualContext + 20));
+    const auto entries = Read<uint32_t>(kVisualContext + 12);
+    bool primary = false;
+    for (int32_t i = 0; i < count; ++i) {
+      participants[i] = Read<uint32_t>(entries + uint32_t(i) * 4);
+      if (!Range(participants[i], 6)) throw std::runtime_error("Native deferred active export unavailable");
+      primary |= participants[i] == 0x82DD6100;
+    }
+    if (!primary) throw std::runtime_error("Native deferred primary receiver participant missing");
+    // Receiver before shader, exactly once at the visual transition. Its native
+    // producer preserves descriptor writes before the late authored colour read.
+    if (PrepareEffectParticipants(*this) != 2 || !PublishNativeDeferredBlend(blend_mode))
+      throw std::runtime_error("Native deferred effect production failed");
+    ++native_visual_begins;
+  }
+  int32_t Count() const { return count; }
+  int32_t Begin(int32_t index) {
+    ValidateRoster();
+    if (participants[index] == 0x82DD6100 && !PrepareNativePrimaryReceiver(visual, stack))
+      throw std::runtime_error("Native deferred receiver production failed");
+    if (participants[index] == DeferredMaterialCompatibility::shader) {
+      auto port = Material(); BeginDeferredMaterialCompatibility(port); return 2;
+    }
+    return 1; // Ordinary indexed and auxiliary participants have no side effects.
+  }
+  void End(int32_t index) {
+    ValidateRoster();
+    if (participants[index] == DeferredMaterialCompatibility::shader) {
+      auto port = Material(); EndDeferredMaterialCompatibility(port);
+    }
+  }
+  uint8_t Active(int32_t index) const { return Read<uint8_t>(participants[index] + 5); }
+  void SetActive(int32_t index, uint8_t value) {
+    ValidateRoster(); Write<uint8_t>(participants[index] + 5, value);
+  }
+  void Finish() { ValidateRoster(); FinishEffectParticipants(*this); ++native_visual_ends; }
+};
+
+std::optional<NativeDeferredEffects> ReadNativeDeferredEffects(uint32_t visual) {
+  const auto blend = FindNativeEnabledBlendIntent();
+  const auto alpha = FindNativeAlphaIntent();
+  const auto receiver = FindNativePrimaryReceiver(visual, 3);
+  if (!blend || !alpha || !receiver) return {};
+  ++native_effect_reads;
+  return NativeDeferredEffects{FrameStatFrameCount(), *blend, alpha->alpha_to_coverage, *receiver};
+}
 } // namespace
 
 void RecordDeferredConsumerFallback() {
@@ -493,6 +589,11 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   uint32_t alpha = UINT32_MAX, winding = UINT32_MAX, sidedness = 127;
   int32_t depth_write = 1;
   bool stencil_pending = false;
+  std::optional<NativeDeferredVisualScope> native_visual_scope;
+  const auto finish_visual = [&] {
+    if (native_visual_scope) { native_visual_scope->Finish(); native_visual_scope.reset(); }
+    else if (visual) bridge.Call(sub_8221DCA0, BridgeKind::Visual, {kVisualContext});
+  };
   for (const auto &item : merged) {
     const auto entry = item.native ? 0 : entries[item.index].address;
     ++stats.entries;
@@ -508,14 +609,15 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     if (item.native && CheckNativeDeferredContract(next_visual, CheckedWord) != native_visuals[item.index].blend_mode)
       throw std::runtime_error("Native deferred visual or callback contract changed");
     if (next_visual != visual) {
-      if (visual)
-        bridge.Call(sub_8221DCA0, BridgeKind::Visual, {kVisualContext});
+      finish_visual();
       visual = next_visual;
-      technique = bridge.Call(sub_8221DBE0, BridgeKind::Visual,
-                              {kVisualContext, visual, 1});
-      if (visual)
-        bridge.Call(sub_82425C28, BridgeKind::Visual,
-                    {Read<uint32_t>(visual + 1864)});
+      if (item.native) {
+        native_visual_scope.emplace(NativeDeferredVisualScope{visual, native_visuals[item.index].blend_mode, ctx.r1.u32});
+        native_visual_scope->Prepare(); technique = 2;
+      } else {
+        technique = bridge.Call(sub_8221DBE0, BridgeKind::Visual, {kVisualContext, visual, 1});
+        if (visual) bridge.Call(sub_82425C28, BridgeKind::Visual, {Read<uint32_t>(visual + 1864)});
+      }
     }
     if (item.native) {
       if (technique != 2 || stencil_pending ||
@@ -523,23 +625,12 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
           CheckedWord(kVisualContext + 36) != 0)
         throw std::runtime_error("Native deferred visual transition no longer ordinary");
       auto submission = native_queue.Take(item.index);
-      const auto blend = FindNativeEnabledBlendIntent();
-      const auto alpha_intent = FindNativeAlphaIntent();
-      const auto receiver = FindNativePrimaryReceiver(visual, 3);
-      if (!submission || !blend || !alpha_intent || !receiver)
+      const auto effects = ReadNativeDeferredEffects(visual);
+      if (!submission || !effects)
         throw std::runtime_error("Native deferred late visual outputs unavailable");
-      for (auto &plan : submission->plans) {
-        const auto matrix = PackRigidMatrix(receiver->world_to_shadow);
-        if (plan.shadow != receiver->image || std::memcmp(&matrix, &plan.pass.world_to_shadow, sizeof(matrix)))
-          throw std::runtime_error("Native deferred shadow owner changed before consumption");
-        // Consume typed native publications after visual begin, never the old
-        // PSO/register file or a frozen walk-time blend/receiver colour.
-        plan.blend = *blend;
-        plan.alpha_to_coverage = alpha_intent->alpha_to_coverage;
-        const auto &colour = receiver->colour;
-        plan.pass.shadow_colour_strength = {colour[0], colour[1], colour[2], colour[3]};
-      }
-      if (!submission || !SubmitNativeRigidScenePackets(std::move(*submission), ctx.r1.u32))
+      if (!FinalizeNativeDeferredEffects(*submission, *effects, FrameStatFrameCount()))
+        throw std::runtime_error("Native deferred effect owners changed before consumption");
+      if (!SubmitNativeRigidScenePackets(std::move(*submission), ctx.r1.u32))
         throw std::runtime_error("Native deferred packet consumption failed");
       ++native_consumed;
       continue;
@@ -606,8 +697,7 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     bridge.Material(40);
   }
   Write<uint8_t>(kObjectMode, saved_mode);
-  if (visual)
-    bridge.Call(sub_8221DCA0, BridgeKind::Visual, {kVisualContext});
+  finish_visual();
   const auto pool = Read<uint32_t>(kList + 8);
   Write<uint32_t>(kList + 4, pool);
   Write<uint32_t>(kList, 0);

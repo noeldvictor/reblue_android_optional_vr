@@ -17,4 +17,7 @@ BlendState CurrentBlendIntent(uint32_t device);
 // Enabled requested factors, even while the preceding opaque draw disabled
 // blending. No bootstrap/readback: an unowned pass is explicitly unavailable.
 std::optional<BlendState> FindNativeEnabledBlendIntent();
+// Ordinary visual producer, with outgoing compatibility shadows but no setter
+// callbacks, bootstrap, original body or shader-state readback.
+bool PublishNativeDeferredBlend(uint32_t mode);
 } // namespace bd::gpu::scene

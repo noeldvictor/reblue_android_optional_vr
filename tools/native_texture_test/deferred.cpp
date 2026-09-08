@@ -8,6 +8,7 @@
 #include "gpu/scene/deferred_entry_bridge.h"
 #include "gpu/scene/deferred_work.h"
 #include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/deferred_visual_import.h"
 #include <array>
 #ifdef NDEBUG
 #undef NDEBUG
@@ -18,6 +19,62 @@
 #include <unordered_map>
 
 using namespace bd::gpu::scene;
+
+void TestOrdinaryVisualExports() {
+  constexpr std::array<uint32_t, 6> flags{0, 0x100, 0x200, 0x800, 0x400, 0x1000};
+  for (uint32_t mode = 0; mode < flags.size(); ++mode) {
+    const auto blend = ImportDeferredVisualBlend(mode);
+    const auto authored = ImportVisualBlend(flags[mode]);
+    assert(blend && blend->mode == mode && blend->source == authored.source && blend->destination == authored.destination);
+  }
+  assert(!ImportDeferredVisualBlend(6) && !ImportDeferredVisualBlend(UINT32_MAX));
+  for (uint32_t category = 0; category < 512; ++category) {
+    const auto bit = category & 32 ? 0 : 1u << (category & 31);
+    assert(DeferredDiffuseClassEnabled(category, UINT32_MAX) == bool(bit));
+    assert(!DeferredDiffuseClassEnabled(category, ~bit));
+  }
+  struct Port {
+    uint32_t category = 2, mask = 4;
+    uint8_t restore = 0;
+    std::array<uint32_t, 103> words{};
+    std::array<uint32_t, 4> colour{};
+    std::vector<std::pair<uint32_t, uint32_t>> writes;
+    uint32_t Category() { return category; }
+    uint32_t DiffuseMask() { return mask; }
+    uint32_t Staging(uint32_t offset) { return words[offset / 4]; }
+    void Store(uint32_t offset, uint32_t value) { words[offset / 4] = value; writes.emplace_back(offset, value); }
+    uint8_t Restore() { return restore; }
+    void SetRestore(uint8_t value) { restore = value; }
+    uint32_t SavedColour(uint32_t index) { return colour[index]; }
+  } port;
+  port.words.fill(0x12345678); port.colour.fill(0x3f800000);
+  const auto before = port.words;
+  BeginDeferredMaterialCompatibility(port);
+  assert(port.writes.empty() && !port.restore && port.words == before);
+  EndDeferredMaterialCompatibility(port); assert(port.writes.empty());
+  port.mask = 0; port.words[102] = UINT32_MAX;
+  BeginDeferredMaterialCompatibility(port);
+  assert(port.restore == 1 && port.words[102] == 1);
+  for (uint32_t offset : {0u,4u,8u,12u,80u,84u,88u,92u}) assert(!port.words[offset/4]);
+  assert(port.words[93] == 1 && port.words[94] == 1);
+  for (uint32_t i = 0; i < port.words.size(); ++i)
+    if (i > 3 && (i < 20 || i > 23) && i != 93 && i != 94 && i != 102) assert(port.words[i] == before[i]);
+  // Simulate a legacy material update inside the shared visual, including an
+  // authored signalling NaN, signed zero and a subnormal. End must read now.
+  port.colour = {0x7f800001, 0x80000000, 1, 0x3e800000};
+  port.words[102] = 51;
+  EndDeferredMaterialCompatibility(port);
+  assert(!port.restore && port.words[102] == 53);
+  for (uint32_t i = 0; i < 4; ++i)
+    assert(port.words[i] == VisualScalarWord(port.colour[i]) && port.words[20+i] == port.words[i]);
+  port.writes.clear(); EndDeferredMaterialCompatibility(port); assert(port.writes.empty());
+  port.restore = 2; EndDeferredMaterialCompatibility(port); assert(port.writes.empty() && port.restore == 2);
+  // Begin with an enabled class does not clear a restore request from another
+  // compatibility writer. Its paired end still restores the latest colour.
+  port.restore = 1; port.mask = 4;
+  BeginDeferredMaterialCompatibility(port); assert(port.writes.empty() && port.restore == 1);
+  EndDeferredMaterialCompatibility(port); assert(!port.restore);
+}
 
 void TestCallbackContract() {
   constexpr uint32_t registry = (uint32_t(-32030) << 16) - 31132;
@@ -221,6 +278,7 @@ void TestDepth() {
 }
 
 int main() {
+  TestOrdinaryVisualExports();
   TestCallbackContract();
   TestMixedOrder();
   TestDepth();

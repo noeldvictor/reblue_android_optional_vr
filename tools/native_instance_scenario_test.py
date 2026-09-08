@@ -928,6 +928,32 @@ class RigidDeferredScenarioTest(unittest.TestCase):
             first_frame=110, last_frame=410, staged_delta=100, consumed_delta=100,
             pending=0, legacy_draws_delta=100, material_bridges_delta=200))
 
+    def effect_text(self):
+        return "\n".join(self.rows()).replace(
+            "frame 110 staged 100 consumed 100 pending 0;",
+            "frame 110 staged 100 consumed 100 pending 0;\n[native-deferred-effects] frame 110 begins 50 ends 50 reads 100;").replace(
+            "frame 410 staged 200 consumed 200 pending 0;",
+            "frame 410 staged 200 consumed 200 pending 0;\n[native-deferred-effects] frame 410 begins 90 ends 90 reads 200;")
+
+    def test_owned_effects_require_paired_fresh_visual_scopes(self):
+        result = verify_rigid_deferred(self.effect_text(), require_effects=True)
+        self.assertEqual((result["visual_begins_delta"], result["visual_ends_delta"], result["effects_delta"]), (40,40,100))
+        with self.assertRaises(Pending):
+            verify_rigid_deferred(self.effect_text().replace("begins 90 ends 90", "begins 50 ends 50"), require_effects=True)
+        with self.assertRaises(Pending):
+            verify_rigid_deferred(self.effect_text().rsplit("\n",1)[0], require_effects=True)
+
+    def test_missing_mismatched_or_unbalanced_effects_are_not_qualified(self):
+        text = self.effect_text()
+        final = "[native-deferred-effects] frame 410 begins 90 ends 90 reads 200;"
+        for bad in (text.replace("ends 90", "ends 89"), text.replace("reads 200", "reads 199"),
+                    text.replace("effects] frame 410", "effects] frame 409"),
+                    text.replace("begins 90 ends 90", "begins 201 ends 201"),
+                    text.replace("begins 90 ends 90", "begins 49 ends 49"),
+                    text + "\n" + final, final + "\n" + text,
+                    text.replace("begins 90", "begins invalid"), "\n".join(self.rows())):
+            with self.assertRaises(ValueError): verify_rigid_deferred(bad, require_effects=True)
+
     def test_startup_wrong_scene_stale_or_one_sided_work_is_pending(self):
         text = "\n".join(self.rows())
         for bad in (text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
@@ -962,6 +988,8 @@ class RigidDeferredScenarioTest(unittest.TestCase):
             for name in names: stack.enter_context(patch.object(module, name))
             module.verify_rigid_epoch(good, rigid_deferred=True)
             with self.assertRaises(Pending): module.verify_rigid_epoch("", rigid_deferred=True)
+            module.verify_rigid_epoch(self.effect_text(), deferred_effects=True)
+            with self.assertRaises(ValueError): module.verify_rigid_epoch(good, deferred_effects=True)
 
 
 class RigidBatchScenarioTest(unittest.TestCase):

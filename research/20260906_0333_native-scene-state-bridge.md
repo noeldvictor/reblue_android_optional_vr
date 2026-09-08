@@ -4362,3 +4362,41 @@ than the continuation's initial state. Current966, all unresolved failure logs
 Post-cleanup free80,507,469,824 B,204,800 B above the first reading; this drive-wide
 movement is not the logical cleanup saving. Source/Git and unrelated activity
 remain separate. Per-image budget question is still unanswered; no export tried.
+
+### Native ordinary visual-effect continuation (2026-09-08)
+
+Original3 GiB exception/floor62,509,998,080 B unchanged. First free80,493,723,648 B;
+producer preflight80,497,094,656 B. No producer live at start. Texture fixture
+76,577,767 B/132 files; material8,361,060 B/41; GPU15,275,881 B/17; build logs
+274,199 B/164 files. Planned replacement-only fixture growth below2 MiB and128 KiB
+logs;32 MiB fixture/192 MiB host free-drop,300 s supervisors/30 s CTest and10 MiB
+aggregate logs. No new raw/image/cook/perf producers or changed capture allowance.
+
+Output51/PID37604, deferred3/PID29712, CPU34/PID28444 and host131/PID29472/session42367
+all terminal0. Two rebuilt C++ fixtures,32 CPU tests,360 Python checks pass.
+Host131 is41711b837 dirty, codegen0 written/one module current, no guest objects;
+exact binary hashes/contracts in `20260908_0251_native-deferred-effects.md`.
+New ordinary native visual scopes are connected and built, not yet live/pixel
+qualified. Prior unchanged shader GPU evidence is reused, not rerun.
+
+Removed eight exact superseded success logs after replacement: output50,
+deferred2, CPU33 and host130 stdout/stderr pairs.7,268 logical B removed once;
+immediate free80,501,141,504->80,501,149,696 B,8,192 B physical gain. Reproducible
+logs only; no distinct GPU/material proof, failure, raw/image or user data removed.
+New logs7,324 B; ending274,255 B/164 files, net56 B. Texture fixture76,845,900 B/
+132 files, up268,133 B; material/GPU fixtures unchanged. Selected fixture/log
+growth268,189 B, separate from host/source/Git and unrelated volume activity.
+Ending free is7,426,048 B above first reading, not all cleanup savings. Profile
+unchanged SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+Protected raw/image inventory and unanswered image-budget request unchanged.
+
+Final no-original-call review explicitly disables blend reference execution in
+the direct producer, including a setting change after preflight. Host132/PID37724/
+session81881 terminal0 links the final source;360 Python checks pass again. No
+guest objects, shader changes or new C++ fixture rebuild. Current binary hashes
+are appended in the effects report. New host132 logs2,524 B; superseded host131
+success logs3,313 B removed after validation,4,096 B immediate physical gain.
+Total10,581 B/10 logs removed once;9,848 B new, final273,466 B/164 logs, net733 B
+smaller than start. Selected fixture/log growth267,400 B. Free80,499,597,312 B.
+Before that last log cleanup, runtime preflight77,620,288 B diagnostic retention
+fits the819,200 B reload reservation under the existing75 MiB stop. No game run yet.

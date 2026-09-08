@@ -338,14 +338,24 @@ are not per-deferred-family fence receipts. No pixels or speedup are claimed.
 consecutive-ready-window rules; it also checks both epochs with `--rigid-reload`.
 357 Python checks pass. Renderer sources/binary are unchanged from host130.
 
-Next: retire the remaining ordinary visual transition dependency as a connected
-owned effect-publication/consumer bundle, reusing `NativeReceiverPublication`,
-native blend/alpha and scene-light owners. Preserve the demonstrated late-read
-semantics and outgoing state for unmigrated visuals; do not simply skip setup or
-substitute cached shader state. Qualify actual mixed-order pixels once the image
-budget allows it. Do not repeat the passed cold-reachability probe or completed
-callback census, or build a second renderer. Full native frame, broader authored
-effects/scenes/reloads and both-eye acceptance remain open.
+Host132 removes registry/participant and blend-setter callback dispatch from
+ordinary visual transitions opened by native deferred work. Existing lifecycle,
+receiver, blend/alpha and scene-light owners feed `NativeDeferredEffects`, with
+transactional frame/image/matrix checks. A separate outgoing port preserves
+material zero/late-restore and active bytes for unmigrated draws. Same-visual
+native/legacy alternation does not add transitions. Two rebuilt C++ fixtures,
+32 CPU tests,360 Python checks and host build pass; no guest objects rebuilt.
+Run966 remains evidence for host130, not this binary.
+
+Next: check the connected host132 mixed-list gate with `--deferred-effects` and
+independent cold/reload epochs: balanced scopes and actual fresh effect reads.
+Then retire the bounded visual-authored sidecar at its producer/lifetime handoff,
+not by freezing late values. Receiver descriptors, outgoing legacy state and
+legacy-opened scopes remain adapters. Qualify mixed-order pixels once the image
+budget allows it. Do not repeat the callback census or build a second renderer.
+Full native frame, broader authored effects/scenes/reloads and both-eye acceptance
+remain open.
+[Native effect scope connection and verification](../research/20260908_0251_native-deferred-effects.md).
 [Native deferred live qualification and archive locations](../research/20260908_0225_native-deferred-live.md).
 [Sorted producer/consumer connection and evidence](../research/20260908_0206_native-deferred-connection.md).
 [Deferred contracts and pending runtime connection](../research/20260908_0109_deferred-packet-order.md).

@@ -255,6 +255,16 @@ this is not a complete host frame or a measured speedup.
 [Connection, callback evidence and next acceptance gate](research/20260908_0206_native-deferred-connection.md).
 [Live cold/reload evidence and retained logs](research/20260908_0225_native-deferred-live.md).
 
+**Host132 removes callback dispatch from native-opened ordinary visual scopes.**
+Setup/cleanup runs directly through the existing host receiver, blend and effect
+owners; native packets consume retained, frame-checked effect values. Late receiver
+colour and legacy material restore are preserved without feeding compatibility
+staging back into native materials. Two rebuilt C++ fixtures,32 CPU tests,360
+Python checks and the incremental host build pass. Fresh mixed runtime/pixels are
+pending for this binary. Authored-input sidecars, outgoing legacy state and
+legacy-opened scopes remain; the route is still opt-in.
+[Connected effects, contracts and verification](research/20260908_0251_native-deferred-effects.md).
+
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded
 300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with

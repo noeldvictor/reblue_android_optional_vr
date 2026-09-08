@@ -49,4 +49,7 @@ template<class Adapter> void RunNativeReceiverSetup(bool enabled, Adapter &adapt
 }
 // Temporary visual identity is resolved at the object producer boundary only.
 std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(uint32_t visual, uint32_t view);
+// Direct ordinary visual producer. Reuses late authored colour publication and
+// explicit legacy exports without invoking the participant's guest ABI.
+bool PrepareNativePrimaryReceiver(uint32_t visual, uint32_t stack);
 } // namespace bd::gpu::scene

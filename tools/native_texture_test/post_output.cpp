@@ -10,6 +10,7 @@
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/native_deferred_queue.h"
+#include "gpu/scene/native_deferred_effects.h"
 #include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_rigid_route.h"
@@ -870,6 +871,52 @@ void ReceiverSetupOrder() {
         (technique != 14 && (phase == 0 || phase == 3 || phase == 5 || phase == 6)));
   assert(!ImportReceiverParticipation(0,~0u));
 }
+void DeferredEffectOwnership() {
+  using namespace bd::gpu::scene;
+  const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+  NativeDeferredEffects effects{7, {.alphaBlendEnable = true}, true,
+      {std::make_shared<NativeTargetImage>(), identity, {.1f,.2f,.3f,.4f}}};
+  NativeRigidScenePlan plan{};
+  plan.draw = plan.deferred = true; plan.shadow = effects.receiver.image;
+  plan.pass.world_to_shadow = PackRigidMatrix(identity);
+  NativeRigidSceneSubmission submission{11, 19, 3, 7, false, {plan,plan}};
+  for (uint32_t fault = 0; fault < 14; ++fault) {
+    auto bad = submission; auto late = effects;
+    if (fault == 0) bad.instance = 0;
+    if (fault == 1) bad.model_generation = 0;
+    if (fault == 2) ++bad.frame;
+    if (fault == 3) ++late.frame;
+    if (fault == 4) late.blend.alphaBlendEnable = false;
+    if (fault == 5) late.receiver.image.reset();
+    if (fault == 6) late.receiver.colour[3] = std::numeric_limits<float>::quiet_NaN();
+    if (fault == 7) late.receiver.world_to_shadow[12] = std::numeric_limits<float>::infinity();
+    if (fault == 8) bad.plans.back().shadow = std::make_shared<NativeTargetImage>();
+    if (fault == 9) bad.plans.back().pass.world_to_shadow = PackRigidMatrix(RenderMatrix{});
+    if (fault == 10) bad.plans.back().deferred = false;
+    if (fault == 11) bad.plans.back().draw = false;
+    if (fault == 12) bad.plans.clear();
+    if (fault == 13) bad.plans.resize(4097, plan);
+    assert(!FinalizeNativeDeferredEffects(bad, late, 7));
+    if (!bad.plans.empty()) {
+      assert(bad.plans.front().blend == plan.blend && !bad.plans.front().alpha_to_coverage);
+      assert(!std::memcmp(&bad.plans.front().pass.shadow_colour_strength, &plan.pass.shadow_colour_strength, sizeof(RigidFloat4)));
+    }
+  }
+  // A retained effects value survives replacement of the author's publication.
+  auto retained = effects;
+  effects.receiver.colour[0] = .9f;
+  assert(FinalizeNativeDeferredEffects(submission, retained, 7));
+  for (const auto &item : submission.plans) {
+    assert(item.blend == retained.blend && item.alpha_to_coverage);
+    const RigidFloat4 expected{.1f,.2f,.3f,.4f};
+    assert(!std::memcmp(&item.pass.shadow_colour_strength, &expected, sizeof(expected)));
+    assert(!std::memcmp(&item.object, &plan.object, sizeof(plan.object))); // No legacy zeroed material input.
+  }
+  assert(FinalizeNativeDeferredEffects(submission, effects, 7)); // Later same-visual update is consumed.
+  const auto image = effects.receiver.image;
+  effects.receiver.image.reset(); retained.receiver.image.reset();
+  assert(submission.plans.front().shadow == image);
+}
 void RigidScenePacket() {
   using namespace bd::gpu::scene;
   const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
@@ -1591,6 +1638,7 @@ int main() {
   RigidLifecycle();
   RigidScenePacket();
   ReceiverSetupOrder();
+  DeferredEffectOwnership();
   RigidBatches();
   SceneCommands();
   refraction_material_tests::Run();

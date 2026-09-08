@@ -9,6 +9,7 @@
 #include "core/memory_helpers.h"
 #include "gpu/frame_stats.h"
 #include "gpu/scene/blend_import.h"
+#include "gpu/scene/visual_schedule_import.h"
 #include <bit>
 #include <cstring>
 #include <mutex>
@@ -102,7 +103,7 @@ void CheckTrackedShadow(uint32_t device) {
     BD_WARN("[native-blend] untracked blend writer; native state not silently "
             "repaired");
 }
-bool NativeUpdate(PPCContext &ctx, uint8_t *base, size_t index) {
+bool NativeUpdate(PPCContext &ctx, uint8_t *base, size_t index, bool allow_reference = true) {
   const uint32_t offset = ctx.r3.u32, value = ctx.r4.u32;
   if (!Range(kCache, 96) || !Range(kDevice, 4))
     return false;
@@ -111,7 +112,7 @@ bool NativeUpdate(PPCContext &ctx, uint8_t *base, size_t index) {
       bd::mem::load<uint32_t>(device + 56 + offset) != kBlendSetters[index])
     return false;
   Bootstrap(device);
-  const bool verify = REXCVAR_GET(bd_native_blend_verify);
+  const bool verify = allow_reference && REXCVAR_GET(bd_native_blend_verify);
   if (verify) {
     ++stats.update_checks;
     CheckTrackedShadow(device);
@@ -205,5 +206,21 @@ std::optional<BlendState> FindNativeEnabledBlendIntent() {
   std::lock_guard lock(blend_mutex);
   if (!REXCVAR_GET(bd_native_blend) || !initialized_device) return {};
   return DecodeEnabledBlendImport(imported);
+}
+bool PublishNativeDeferredBlend(uint32_t mode) {
+  const auto recipe = ImportDeferredVisualBlend(mode);
+  std::lock_guard lock(blend_mutex);
+  if (!recipe || !REXCVAR_GET(bd_native_blend) || REXCVAR_GET(bd_native_blend_verify) ||
+      !initialized_device || !Range(kDevice, 4) || !Range(kCache, 96) ||
+      bd::mem::load<uint32_t>(kDevice) != initialized_device || !Range(initialized_device, kDeviceBytes)) return false;
+  for (size_t index : {2u, 3u})
+    if (bd::mem::load<uint32_t>(initialized_device + 56 + kBlendOffsets[index]) != kBlendSetters[index]) return false;
+  PPCContext context{};
+  context.r3.u32 = 72; context.r4.u32 = recipe->source;
+  if (!NativeUpdate(context, nullptr, 2, false)) throw std::runtime_error("Native visual blend source lost preflight");
+  context.r3.u32 = 76; context.r4.u32 = recipe->destination;
+  if (!NativeUpdate(context, nullptr, 3, false)) throw std::runtime_error("Native visual blend destination lost preflight");
+  Report();
+  return true;
 }
 } // namespace bd::gpu::scene
