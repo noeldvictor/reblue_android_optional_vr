@@ -41,11 +41,15 @@ std::optional<RenderMatrix> ReadRoot(const std::array<uint64_t,5> &pairs,
 // +56/+60. bdAnimBoneEvaluate reads these same authored TRS/pre/post fields.
 // Camera-facing nodes need a separate owned view contract, never identity math.
 template <class ReadWord>
-std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, ReadWord &&read) {
+std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, ReadWord &&read,
+    std::vector<uint32_t> *animation_targets = nullptr) {
   struct Pending { uint32_t source, parent; };
   std::vector<Pending> pending;
   std::vector<NativeSkeletonJoint> joints;
   std::unordered_set<uint32_t> visited;
+  std::vector<std::pair<uint32_t,uint32_t>> targets;
+  std::unordered_set<uint32_t> names;
+  bool unique_names = true;
   if (root) pending.push_back({root,kNativeSkeletonRoot});
   while (!pending.empty()) {
     const auto item = pending.back(); pending.pop_back();
@@ -54,6 +58,12 @@ std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, Read
     const auto index = read(source), flags = read(source+8), child = read(source+56), sibling = read(source+60);
     if (!index || !flags || !child || !sibling || *index >= kMaxNativeJoints || (*flags & 0x00600000)) return {};
     NativeSkeletonJoint joint; joint.pose_index = *index; joint.parent = item.parent;
+    if (animation_targets) {
+      const auto name = read(source+4);
+      if (!name) return {};
+      targets.emplace_back(*index,*name);
+      unique_names &= names.insert(*name).second;
+    }
     joint.inherit_parent_scale = (*flags & 0x40) != 0;
     if ((*flags & 1) && !Floats(source+16,joint.translation,read)) return {};
     if ((*flags & 8) && !Floats(source+44,joint.scale,read)) return {};
@@ -71,6 +81,14 @@ std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, Read
     if (*child) pending.push_back({*child,parent});
   }
   if (!ValidNativeSkeleton(joints)) return {};
+  if (animation_targets) {
+    std::vector<uint32_t> dense;
+    if (unique_names) {
+      dense.resize(joints.size());
+      for (auto [index,name] : targets) dense[index] = name;
+    }
+    *animation_targets = std::move(dense);
+  }
   return joints;
 }
 

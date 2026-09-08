@@ -266,8 +266,16 @@ void TestSkeleton() {
   }
   words[0x1000] = 2; words[0x1038] = 0x2000; words[0x103c] = 0x3000;
   words[0x2000] = 0; words[0x3000] = 1;
+  words[0x1004] = 12; words[0x2004] = 10; words[0x3004] = 11;
   put(0x1010,{5,0,0}); put(0x102c,{2,3,4}); put(0x2010,{1,2,3}); put(0x202c,{5,1,1});
-  auto skeleton = skeleton_source::ReadSkeleton(0x1000,read);
+  std::vector<uint32_t> animation_targets;
+  auto skeleton = skeleton_source::ReadSkeleton(0x1000,read,&animation_targets);
+  Require(animation_targets == std::vector<uint32_t>{10,11,12},"load-owned animation names use dense pose order, not tree traversal order");
+  words[0x3004] = 12;
+  std::vector<uint32_t> ambiguous;
+  Require(skeleton_source::ReadSkeleton(0x1000,read,&ambiguous).has_value() && ambiguous.empty(),
+          "duplicate animation names cannot invalidate independent skeleton geometry");
+  words[0x3004] = 11;
   Require(skeleton && skeleton->size() == 3 && (*skeleton)[1].parent == 0 &&
           (*skeleton)[2].parent == kNativeSkeletonRoot, "load-owned topology preserves child and root sibling");
   std::vector<NativeJointChannels> channels(3);
@@ -318,9 +326,10 @@ void TestSkeleton() {
   words.clear(); // all subsequent work must survive complete source destruction
 
   ModelMaterialRegistry models;
-  Require(models.Publish(51,{}, {},*skeleton), "skeleton shares the load-owned model and budget");
+  Require(models.Publish(51,{}, {},*skeleton,animation_targets), "skeleton shares the load-owned model and budget");
   auto model = models.FindModel(51);
   Require(model && model->Skeleton().size() == 3, "model holds the native hierarchy");
+  Require(std::ranges::equal(model->AnimationTargets(),animation_targets),"animation bindings share the immutable model generation after source destruction");
   Require(EvaluateNativeSkeleton(model->Skeleton(),channels,World(10),pose), "evaluate without any remaining source bytes");
   NativeInstanceRegistry instances;
   const auto id = instances.Create(model->Generation(),model);
@@ -343,6 +352,9 @@ void TestSkeleton() {
   ModelMaterialRegistry too_small(required-1);
   Require(!too_small.Publish(51,{}, {},*skeleton) && too_small.Stats().bytes == 0,
           "skeletal vector residency cannot escape existing aggregate model budget");
+  ModelMaterialRegistry names_too_small(required+animation_targets.size()*sizeof(uint32_t)-1);
+  Require(!names_too_small.Publish(51,{}, {},*skeleton,animation_targets),"authored animation bindings debit model capacity budget");
+  Require(!models.Publish(51,{}, {},*skeleton,{10}),"partial animation bindings cannot be published");
 }
 }
 void TestNativeInstances() {

@@ -58,7 +58,7 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest connected checkpoint (2026-09-08, host155/run980):** native water now
+**Water image checkpoint (2026-09-08, host155/run980):** native water now
 gets its planar reflection directly from the completed native pass. Refraction
 snapshots also return their exact image lease directly, without callback/getter
 readback in the water consumer. Late outgoing-image aliases are checked, not ignored.
@@ -130,11 +130,18 @@ integration acceptance. Animation curves, special bones, late writers, source
 palette adapters and motion/both-eye pixels remain; normal defaults stay unchanged.
 [Contract, scoped live evidence and remaining failures](research/20260908_1544_native-skeleton-evaluation.md).
 
-Keyed animation clips now have a bounded native importer/sampler feeding the same
-channel, skeleton and instance types in CPU tests, including source destruction
-and angular-wrap regressions. **Runtime clip loading, slot/layer integration and
-guest-sampler replacement are still pending**; this does not change host167's
-live status. [Clip contract and tests](research/20260908_1612_native-animation-clips.md).
+**Loaded animation sampling (2026-09-08, host168; opt-in):** standalone and packed
+type2 motions now feed owned tracks and whole-model channel production, reusing
+native skeleton/instance consumers. CPU ownership/retirement tests,405 source/
+scenario checks and the desktop build pass. Run976 imports69 clips and verifies
+one real sampling call against the original before a deliberate diagnostic stop.
+**This is initial admission, not sustained field/reload or motion-pixel proof.**
+Compressed type3 clips appear among refused loads; compressed/dense families,
+weighted/subtree/layer application, slot clocks and outgoing channel/palette
+adapters remain. Normal defaults are unchanged; earlier reload and pixel failures
+remain unresolved.
+[Runtime connection, exact evidence and next work](research/20260908_1653_loaded-animation-sampling.md).
+[Clip math/source contract and regressions](research/20260908_1612_native-animation-clips.md).
 
 ### How much is left?
 

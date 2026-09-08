@@ -787,18 +787,29 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    palettes/completed source copy, unsupported bone routes and full desktop
    sequence/both-eye gates remain. No speedup/full host frame or Quest claim.
    [Skeleton contract, live scopes and preserved failures](../research/20260908_1544_native-skeleton-evaluation.md).
-   **Keyed clip ownership prerequisite (CPU-only):** `native_animation_source.h`
-   imports relocated type2 T/R/S keys into immutable `NativeAnimationClip`, with
-   dense model-local joints, seconds, exact turn fractions and capacity bounds.
-   Material49/CPU47 verifies source destruction -> sampling -> existing hierarchy
-   evaluation -> completed instance publication/retirement. An independent384-case
-   packed-angle regression exposed/fixed half-turn arc reversal before runtime
-   wiring. Types0/1/3, weighted/subtree/layer application, slot clocks and loaded
-   clip residency/lifetime binding remain. No additional guest execution is yet
-   removed. Next connect the verified loader/slot contracts to existing owners,
-   replacing whole channel production with original comparison; do not add a
-   per-draw or per-tick source-key cache. Host167 and its live gates are unchanged.
-   [Recovered clip/loader contracts and prerequisite tests](../research/20260908_1612_native-animation-clips.md).
+   **Loaded keyed animation sampling (host168, opt-in):** completed standalone/
+   packed loads now publish immutable named tracks under an8MiB aggregate motion
+   residency cap. Packed aliases share keys; loader retirement and source reuse
+   invalidate lookup without repointing pinned leases. The existing model owner
+   retains dense authored name bindings within its budget. Whole reset and
+   weight1/full-root preserve sampling now bypass original recursive keyed walks
+   and source-key reads for admitted type2 clips, feeding the existing channel/
+   skeleton/instance chain. Source clock/slot advancement, weighted/subtree/layer
+   application and outgoing48-byte channels remain explicit adapters.
+   Material50/CPU48,output82/CPU54,405 Python checks and host168 pass, including
+   source destruction, flag/byte semantics, aliases, budgets and real native pose
+   consumption. Run976 observes69 imported clips and one matching preserve-mode
+   sampling call, then deliberately stops as an admission probe (terminal1).
+   This is NOT sustained field/reload/nonconstant-animation/pixel qualification;
+   whole-reset live reachability and live retirement are also pending. Four
+   refusal examples identify compressed type3, not every one of992 refusals.
+   Next own compressed tracks and weighted/subtree/layer application through
+   these same assets/consumers, extending source-clock/interior-key comparison.
+   Types0/1, slots, late writers/special bones, persistent clip cooking, outgoing
+   channels/palettes and full desktop/both-eye gates remain. Preserve975's reload
+   and971/962's pixel failures; no unchanged retry or Quest work. Defaults stay
+   unchanged. [Runtime connection, scope and storage](../research/20260908_1653_loaded-animation-sampling.md).
+   [Recovered clip/loader contracts and angular regressions](../research/20260908_1612_native-animation-clips.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass
    scheduling and presentation. Remove guest rendering, register/resource

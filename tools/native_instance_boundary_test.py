@@ -17,6 +17,31 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.loader = (root / "src/gpu/scene/native_material.cpp").read_text(encoding="utf-8")
         cls.animation = (root / "src/gpu/scene/native_animation_clip.h").read_text(encoding="utf-8")
         cls.animation_test = (root / "tools/native_material_test/animation.cpp").read_text(encoding="utf-8")
+        cls.animation_bridge = (root / "src/gpu/scene/native_animation_bridge.cpp").read_text(encoding="utf-8")
+        cls.animation_asset = (root / "src/gpu/scene/native_animation_asset.h").read_text(encoding="utf-8")
+
+    def test_animation_import_is_load_scoped_and_sampler_never_reads_source_keys(self):
+        for name in ("sub_8217BD70", "sub_8217C5E8"):
+            hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
+            self.assertLess(hook.index("Retire(owner)"), hook.index(f"__imp__{name}"))
+            self.assertLess(hook.index("LoadScope"), hook.index(f"__imp__{name}"))
+        hook = self.animation_bridge.split("REX_HOOK_RAW(sub_82288680)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("__imp__sub_82288680"), hook.index("Import(source)"))
+        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("} // namespace", 1)[0]
+        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "emplace", "Publish(", "loading_owner"):
+            self.assertNotIn(forbidden, sampler)
+        self.assertIn("asset=store.assets.Find(ctx.r5.u32)", sampler)
+        self.assertIn("ApplyKeyedAsset(*asset,model->AnimationTargets()", sampler)
+        self.assertLess(sampler.index("throw std::runtime_error"), sampler.index("auto *output"))
+
+    def test_animation_assets_retire_with_both_loader_types_and_pinned_bytes_remain_charged(self):
+        for name in ("sub_8217BD00", "sub_8217C580"):
+            hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
+            self.assertLess(hook.index("Retire(ctx.r3.u32)"), hook.index(f"__imp__{name}"))
+        for forbidden in ("PPCContext", "REX_", "bd::mem", "ReadWord", "ofstream"):
+            self.assertNotIn(forbidden, self.animation_asset)
+        self.assertIn("accounting->bytes.fetch_sub(bytes)", self.animation_asset)
+        self.assertIn("asset.RetainedBytes() > AvailableAssetBytes()", self.animation_asset)
 
     def test_animation_sampler_owns_keys_and_reuses_existing_channel_and_pose_types(self):
         for forbidden in ("PPCContext", "REX_", "bd::mem", "ReadWord", "name_hash", "NodeTag", "ofstream"):

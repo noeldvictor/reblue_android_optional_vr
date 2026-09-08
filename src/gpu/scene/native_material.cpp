@@ -248,15 +248,16 @@ bool PublishModelMaterials(uint32_t graph) {
                             ModelMaterialRegistry::kMaxBytes)
       return false;
   }
+  std::vector<uint32_t> animation_targets;
   auto skeleton = skeleton_source::ReadSkeleton(uint32_t(*root), [](uint64_t address) -> std::optional<uint32_t> {
     if ((address & 3) || address > UINT32_MAX-3) return {};
     const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
     return word ? std::optional(uint32_t(*word)) : std::nullopt;
-  });
+  }, &animation_targets);
   // Unconverted camera-facing/sparse skeletons do not invalidate independently
   // owned geometry. An empty skeleton cannot enter the native evaluator.
   return Models().Publish(graph, std::move(meshes), node_bindings,
-      skeleton ? std::move(*skeleton) : std::vector<NativeSkeletonJoint>{});
+      skeleton ? std::move(*skeleton) : std::vector<NativeSkeletonJoint>{},std::move(animation_targets));
 }
 
 std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {

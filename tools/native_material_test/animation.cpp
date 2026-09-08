@@ -1,5 +1,6 @@
 #include "gpu/scene/native_animation_source.h"
 #include "gpu/scene/native_instance.h"
+#include "gpu/scene/native_skeleton_source.h"
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -181,8 +182,83 @@ void TestPackedAngularReference() {
             "packed half-turn tie and adjacent arcs match independent source arithmetic");
   }
 }
+void TestLoadedAnimationAssets() {
+  ClipSource source;
+  auto read = [&](uint64_t address){return source.Read(address);};
+  auto import = [&](size_t budget = NativeAnimationResidency::kMaxBytes){
+    return animation_source::ReadKeyedAsset(0x1000,budget,read);
+  };
+  auto asset = import();
+  Require(asset && asset->FindTrack(0xAA998877)->pose_index == 2 && !asset->FindTrack(0x12345678),
+          "completed load owns all named tracks before model/slot selection");
+  const size_t bytes = asset->RetainedBytes();
+  Require(import(bytes).has_value() && !import(bytes-1),"whole asset metadata and key capacity share exact byte budget");
+  NativeAnimationResidency residency(bytes+NativeAnimationResidency::kEntryBytes);
+  Require(residency.Publish(7,0x1000,std::move(*asset)),"completed loader publishes owned clip");
+  auto lease = residency.Find(0x1000), alias = residency.Find(0x1000);
+  Require(lease && lease == alias && residency.Size() == 1 && residency.AvailableAssetBytes() == 0,
+          "packed aliases share the one resident payload and aggregate cap");
+  residency.Retire(8);
+  Require(residency.Find(0x1000) == lease,"unrelated loader retirement cannot erase shared motion");
+  residency.Retire(7);
+  Require(!residency.Find(0x1000) && residency.Bytes() == bytes+NativeAnimationResidency::kEntryBytes,
+          "retired but leased motion still counts against residency");
+  auto replacement = import();
+  Require(replacement && !residency.Publish(9,0x1000,std::move(*replacement)) && !residency.Find(0x1000),
+          "reused source cannot bypass retired lease budget or expose stale generation");
+  source.words.clear();
+  // Model dense order B,C,A plus a joint absent from this clip. No source reads
+  // remain possible. Sentinel values expose accidental writes to inactive bytes.
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u,0x12345678u};
+  std::vector<animation_source::ChannelRecord> records(4);
+  for (auto &record : records) { record.fill(0x7FC01234); record[0]=64|7; }
+  const auto before = records;
+  Require(animation_source::ApplyKeyedAsset(*lease,names,.25f,true,records),"source-free preserve-mode application");
+  Require(records[0][0] == (64|1) && records[0][5] == before[0][5] &&
+          records[1][0] == 64 && records[1][2] == before[1][2] &&
+          records[2][0] == (64|128|7) && std::bit_cast<float>(records[2][2]) == 2 &&
+          records[3][0] == before[3][0] && records[3][1] == names[3] && records[3][2] == before[3][2],
+          "matched absent channels clear only activation, unmatched tracks preserve flags/values, animated tracks dirty");
+  Require(animation_source::ApplyKeyedAsset(*lease,names,.25f,false,records) && records[0][0] == 1 &&
+          records[0][5] == 0 && records[1][0] == 0 && records[1][2] == 0 &&
+          records[2][0] == (128|7) && records[3][0] == 0 && records[3][2] == 0,
+          "whole-model application clears all bytes before assigning authored names and channels");
+  const auto valid = records;
+  Require(!animation_source::ApplyKeyedAsset(*lease,names,std::numeric_limits<float>::quiet_NaN(),true,records) &&
+          records == valid,"sampling failure leaves output transactional");
+  auto duplicate = names; duplicate[0]=duplicate[1];
+  Require(!animation_source::ApplyKeyedAsset(*lease,duplicate,.25f,true,records) && records == valid,
+          "duplicate model names cannot guess traversal cursor semantics");
+  Require(!animation_source::ApplyKeyedAsset(*lease,std::span(names).first(3),.25f,true,records) && records == valid,
+          "preserve mode cannot resize an incompatible channel array");
+  // Decode exactly the records produced by the runtime boundary into the real
+  // native hierarchy consumer, then publish through the existing instance owner.
+  auto channels = skeleton_source::ReadChannels(0x8000,records.size(),[&](uint64_t address)->std::optional<uint32_t>{
+    if (address<0x8000 || (address&3) || address>=0x8000+records.size()*48) return {};
+    const auto offset = address-0x8000; return records[offset/48][(offset%48)/4];
+  });
+  std::vector<NativeSkeletonJoint> skeleton(4);
+  for (uint32_t n=0; n<4; ++n) skeleton[n].pose_index=n;
+  std::vector<RenderMatrix> pose;
+  Require(channels && EvaluateNativeSkeleton(skeleton,*channels,JointIdentity(),pose) && pose[2][12] == 2,
+          "runtime outgoing channel representation drives actual native hierarchy evaluation");
+  NativeInstanceRegistry instances;
+  auto id=instances.Create(91);
+  Require(instances.Publish(id,0,pose) && instances.Transfer(id,0,1,4),"owned clip reaches completed native pose owner");
+  auto completed=instances.Read(id,1);
+  lease.reset(); alias.reset(); instances.Retire(id);
+  Require(residency.Bytes() == 0 && completed->transforms[2][12] == 2,
+          "completed pose outlives motion/model/instance sources without retaining curve residency");
+  source = ClipSource{}; replacement=import();
+  Require(replacement && residency.Publish(9,0x1000,std::move(*replacement)),"source-address reuse loads fresh asset after leases retire");
+  const auto reloaded = residency.Find(0x1000);
+  residency.Invalidate(0x1000);
+  source.Half(0x1006,3);
+  Require(!import() && !residency.Find(0x1000) && reloaded->Duration() == 1,
+          "unsupported replacement invalidates lookup while prior native lease remains immutable");
+}
 } // namespace
 void TestAnimationClips() {
-  TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference();
+  TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

@@ -4,7 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #pragma once
-#include "gpu/scene/native_animation_clip.h"
+#include "gpu/scene/native_animation_asset.h"
 #include <bit>
 #include <unordered_map>
 
@@ -115,5 +115,58 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
     tracks.push_back(std::move(track));
   }
   return NativeAnimationClip::Create(bindings.size(),float(*duration)/30,std::move(tracks),maximum_bytes);
+}
+
+// Import all named tracks at completed load, before any model selects a slot.
+// Packed aliases refer to this same asset rather than duplicating key storage.
+template <class ReadWord>
+std::optional<NativeAnimationAsset> ReadKeyedAsset(uint32_t source, size_t maximum_bytes, ReadWord &&read) {
+  const auto records = Word(source,read);
+  const auto type = Half(uint64_t(source)+6,read), count = Half(uint64_t(source)+8,read);
+  if (!records || !*records || !type || *type != 2 || !count || !*count || *count > kMaxNativeJoints ||
+      uint64_t(*records)+uint64_t(*count)*36 > uint64_t(UINT32_MAX)+1 ||
+      maximum_bytes < sizeof(NativeAnimationAsset)+size_t(*count)*sizeof(NativeAnimationAsset::Target)) return {};
+  std::vector<JointBinding> bindings;
+  std::vector<uint32_t> names;
+  bindings.reserve(*count); names.reserve(*count);
+  for (uint32_t n=0; n<*count; ++n) {
+    const auto hash = Word(uint64_t(*records)+n*36+18,read);
+    if (!hash) return {};
+    bindings.push_back({n,*hash}); names.push_back(*hash);
+  }
+  auto clip = ReadKeyedClip(source,bindings,
+      maximum_bytes-sizeof(NativeAnimationAsset)-size_t(*count)*sizeof(NativeAnimationAsset::Target),read);
+  return clip ? NativeAnimationAsset::Create(std::move(*clip),std::move(names),maximum_bytes) : std::nullopt;
+}
+
+// Outgoing compatibility records only; the owned asset and sampler know no
+// 48-byte layout. Whole reset clears all bytes; preserve mode keeps unmatched
+// records and inactive values, clears missing matched-channel activation only,
+// and ORs dirty128 for multi-key tracks. Original gameplay/late writers still
+// consume these records until their complete native channel handoff is ready.
+using ChannelRecord = std::array<uint32_t,12>;
+inline bool ApplyKeyedAsset(const NativeAnimationAsset &asset, std::span<const uint32_t> names,
+    float seconds, bool preserve, std::vector<ChannelRecord> &records) {
+  if (names.empty() || names.size() > kMaxNativeJoints || (preserve && records.size() != names.size())) return false;
+  std::unordered_set<uint32_t> unique;
+  for (uint32_t name : names) if (!unique.insert(name).second) return false;
+  std::vector<NativeJointChannels> sampled;
+  if (!asset.Clip().Sample(seconds,sampled)) return false;
+  auto output = preserve ? records : std::vector<ChannelRecord>(names.size());
+  for (size_t n=0; n<names.size(); ++n) {
+    auto &record = output[n]; record[1] = names[n];
+    const auto *track = asset.FindTrack(names[n]);
+    if (!track) continue;
+    const auto &channel = sampled[track->pose_index];
+    record[0] &= ~7u;
+    auto put = [&](const auto &value, unsigned word) {
+      for (float component : value) record[word++] = std::bit_cast<uint32_t>(component);
+    };
+    if (channel.translated) { record[0] |= 1; put(channel.translation,2); }
+    if (channel.rotated) { record[0] |= 2; put(channel.rotation,5); }
+    if (channel.scaled) { record[0] |= 4; put(channel.scale,9); }
+    if (track->translation.size()>1 || track->rotation.size()>1 || track->scale.size()>1) record[0] |= 128;
+  }
+  records = std::move(output); return true;
 }
 } // namespace bd::gpu::scene::animation_source

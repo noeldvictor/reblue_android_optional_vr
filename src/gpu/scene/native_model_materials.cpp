@@ -51,7 +51,8 @@ ModelMaterialRegistry::Model::~Model() {
 }
 
 size_t ModelMaterialRegistry::RetainedBytes(
-    std::span<const ModelMaterialImport> meshes, size_t mesh_capacity, size_t node_capacity, size_t joint_capacity) {
+    std::span<const ModelMaterialImport> meshes, size_t mesh_capacity, size_t node_capacity, size_t joint_capacity,
+    size_t target_capacity) {
   constexpr size_t limit = std::numeric_limits<size_t>::max();
   size_t bytes = sizeof(Model) + 256;
   auto add = [&](size_t count, size_t stride) {
@@ -64,6 +65,7 @@ size_t ModelMaterialRegistry::RetainedBytes(
   add(mesh_capacity, sizeof(ModelMaterialImport));
   add(node_capacity, sizeof(NativeModelRenderData::Node));
   add(joint_capacity, sizeof(NativeSkeletonJoint));
+  add(target_capacity, sizeof(uint32_t));
   for (const auto &mesh : meshes) {
     add(mesh.program.ranges.capacity(), sizeof(NativeMaterialRange));
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
@@ -80,16 +82,18 @@ size_t ModelMaterialRegistry::RetainedBytes(
 bool ModelMaterialRegistry::Publish(uint32_t source_model,
                                      std::vector<ModelMaterialImport> meshes,
                                      std::span<const ModelNodeSourceBinding> nodes,
-                                     std::vector<NativeSkeletonJoint> skeleton) {
+                                     std::vector<NativeSkeletonJoint> skeleton,
+                                     std::vector<uint32_t> animation_targets) {
   std::lock_guard lock(mutex_);
   // A failed new load must not leave a previous allocation's recipes visible.
   // Existing leases remain valid, but cannot be found through a reused key.
   if (models_.erase(source_model))
     ++stats_.retired;
-  size_t bytes = RetainedBytes(meshes, meshes.capacity(), nodes.size(), skeleton.capacity());
+  size_t bytes = RetainedBytes(meshes, meshes.capacity(), nodes.size(), skeleton.capacity(), animation_targets.capacity());
   if (!source_model || stats_.published == UINT64_MAX || meshes.size() > kMaxMeshes || nodes.size() > kMaxMeshes || bytes > max_bytes_ ||
       accounting_->bytes.load() > max_bytes_ - bytes ||
-      accounting_->live.load() >= max_models_ || (!skeleton.empty() && !ValidNativeSkeleton(skeleton))) {
+      accounting_->live.load() >= max_models_ || (!skeleton.empty() && !ValidNativeSkeleton(skeleton)) ||
+      (!animation_targets.empty() && animation_targets.size() != skeleton.size())) {
     ++stats_.refused;
     return false;
   }
@@ -126,6 +130,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   model->meshes = std::move(meshes);
   model->render.generation_ = model->generation;
   model->render.skeleton_ = std::move(skeleton);
+  model->render.animation_targets_ = std::move(animation_targets);
   model->render.nodes_.reserve(nodes.size());
   for (const auto &node : nodes) {
     const auto found = std::lower_bound(model->meshes.begin(), model->meshes.end(), node.source_mesh,
@@ -138,7 +143,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   std::sort(model->render.nodes_.begin(), model->render.nodes_.end(),
       [](const auto &a, const auto &b) { return a.matrix_index < b.matrix_index; });
   bytes = RetainedBytes(model->meshes, model->meshes.capacity(), model->render.nodes_.capacity(),
-                        model->render.skeleton_.capacity());
+                        model->render.skeleton_.capacity(),model->render.animation_targets_.capacity());
   if (bytes > max_bytes_ || accounting_->bytes.load() > max_bytes_ - bytes) { ++stats_.refused; return false; }
   model->bytes = bytes;
   accounting_->bytes.fetch_add(bytes);

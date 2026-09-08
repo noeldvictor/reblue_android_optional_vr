@@ -5929,3 +5929,91 @@ all six owned build/test handles are terminal, no next producer queued.
 the288825B selected retained output growth. No measured positive cleanup credit,
 no extra capture allowance and no pending live producer. README/active queue
 and the clip contract record the CPU-only scope and pending runtime producer.
+
+### 2026-09-08 loaded animation sampling after566af49
+
+The prior implementation turn made progress (owned clip CPU prerequisite); the
+intervening push request remained blocked by external-upload review. No push
+retry is authorized by automatic continuation. Continue the connected motion
+loader/retirement -> owned named tracks -> whole channel production -> existing
+native skeleton/instance consumer. Preserve original slot clocks/layer blending,
+collision/effect side effects and all pending desktop/pixel acceptance gates.
+
+16:39:03 free63877292032B; no observed renderer/compiler/test producer. Material
+tree9043673B/43, build logs410557B/204, exact116B owner profile unchanged (SHA256
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0).
+Same cumulative62509998080B stop floor,3GiB exception,100MiB diagnostics,
+10MiB build logs; runtime77202335B and images10434657B/13. New raw/image0.
+Reuse material50/CPU48, then host168 for connected runtime hooks. Estimate
+<16MiB incremental CPU fixture peak and <192MiB host relink/changed objects;
+supervise under64/8/192MiB free-drop and300s guards. Budget <32KiB build logs.
+Keep49/47 current and48/46 causal failure until replacement passes; no new tree,
+download, shader/guest rebuild, cooked asset, cache or game capture is planned.
+
+Material50/PID37032 terminal0,16:46:27 free63870423040->63871205376B;
+CPU48/PID36916 terminal0,16:46:53 free63871139840->63871135744B,0.14s test/
+0.15s CTest.405 Python source/scenario checks pass0.262s. Host168/PID35812,
+session11075 terminal0,16:47:25 free63870873600->63868436480B. Existing CMake
+regenerated for the new bridge translation unit; codegen reports0 written,
+0 unchanged,0 deleted,1 module up-to-date. No guest objects or shaders compiled.
+EXE SHA33745F1F9E348F8AEB2F4A1B2A914F44A0BCF683E85561469F5C032E7D7C7E19,
+PDB SHA2CCEB56D805777264823D0C88EFFBEF26E4CDD59D2AA32625918FDE7E8B82B93.
+Material EXE SHAD41793F2D60A9CF0DC528F162D39B9C5320CAC071EC4AB1C2424DE087787F3E5.
+16:49:09 free63868043264B, material tree9249678B/43, build logs417201B/210.
+
+Next one capture-free admission observation on changed host168: determine
+whether actual loaded type2 motions reach whole-channel replacement and original
+comparison, or which source family/contract prevents admission. This is not an
+unchanged975 reload retry and cannot qualify field/reload/motion pixels. Reuse
+the existing profile-safe operator with an explicit AnimationProbe (60s,400KiB
+text,192MiB free-drop,75MiB aggregate diagnostic stop, raw/image/perf0). Probe
+stops distinctly as diagnostic-only after a matching sampled/check receipt;
+all original scenario thresholds remain unchanged. Exact profile restoration
+and owned-process shutdown are in finally. Full integration remains pending.
+
+Host168/run976/PID27188,session50191 is terminal at16:50:22. The diagnostic
+stopped deliberately (tool exit1) after its first matching admission receipt,
+not a scenario PASS: frame385,69 loaded,992 refused,69 resident/6201072B,
+sampled1 whole0 preserved1 unavailable0 checked1 wrong0. The first four sampled
+load-refusal messages identify type3; this does not classify all992 refusals.
+Source compressed motion import remains implementation work. No fresh field,
+reload, nonconstant animation, GPU draw/pixel or live retirement is qualified.
+All11 temporary settings took effect. Exact owner profile hash restored; no
+observed renderer/compiler/test producer at16:51:33. Log39663B SHA256
+9BFDE6156EAE47CE67BEA8B67E60B61FB25AFD6A6803C545D3C4E54B29C8EE99 retained as
+initial new-path evidence. Runtime aggregate77250195B, no new raw/image/perf.
+
+Because the shared model owner gained authored animation bindings, rebuild the
+existing output82/CPU54 consumer fixture too (64/8MiB free-drop guards, estimate
+<16MiB incremental peak, same300s/log caps). Current texture tree85806091B/134;
+keep81/53 until replacement passes, preserving all earlier unresolved evidence.
+
+Output82/PID36504 terminal0,16:52:18 free63863996416->63863926784B;
+CPU54/PID34544 terminal0,16:53:04 free63863685120->63863681024B,0.53s test/
+0.55s CTest. Current output EXE1848832B SHA256
+B0C024EB9B0E2388B0E19E0E8988BD75ED0EA7FB15BF2BABB09DCCBB6573A65F;
+texture tree85868113B/134 (+62022B). Material tree9249678B/43 (+206005B),
+EXE837120B. Host EXE49198080B (+58368B), PDB112742400B (+643072B).
+
+After replacements passed, removed8 exact superseded text logs: material49/
+CPU47 and output81/CPU53 stdout/stderr. Their logical3839B was reproducible;
+prior results remain documented. Verified literal paths/non-reparse ancestors
+before deletion. Free63862177792->63862185984B,8192B measured net reclaimed in
+this scoped removal; no earlier cleanup credited. Preserve48/46 causal failure,
+current50/48,82/54,host168/run976,975 and all prior unresolved visual evidence.
+No source/build tree/game data/profile/capture was deleted.
+
+Closing read-only accounting: runtime diagnostics77248032B, build logs415038B/
+206, images unchanged10434657B/13. Selected retained growth1013611B (~0.97MiB):
+changed material/output fixtures, host EXE/PDB, build logs+4481B and run976's
+39663B text. This is not a new tree; other objects/source/Git/system activity is
+separate. All five build/test handles and run976 are terminal, no next producer
+queued, exact profile hash restored. The refreshed guest-source/devloop skills
+kept work at completed load/retirement boundaries and CPU-first verification;
+the only new game probe has explicitly limited admission evidence.
+
+16:59 closing pre-commit free63862149120B (~59.48GiB),15142912B below the
+16:39:03 snapshot (~14.44MiB drive-wide use), not all attributable to selected
+outputs. Full renderer goal remains active/incomplete; no Quest or new capture
+allowance. README and active queue distinguish connected source, passing CPU/
+build evidence, initial live admission and pending full desktop acceptance.
