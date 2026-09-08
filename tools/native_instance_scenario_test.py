@@ -12,6 +12,7 @@ from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
 from native_instance_scenario import verify_cutout_family
+from native_instance_scenario import observe_occlusion
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -1136,6 +1137,37 @@ class RigidReloadScenarioTest(unittest.TestCase):
         for text in (shutdown, self.sample()+"\n"+shutdown):
             with self.assertRaisesRegex(ValueError, "title-menu Exit"):
                 split_rigid_reload(text)
+
+
+class OcclusionObservationTest(unittest.TestCase):
+    def rows(self):
+        def occ(frame, requests, queries, collected, zero, skips):
+            return (f"[native-occ] frame {frame} requested {requests} queried {queries} "
+                    f"fence-collected {collected} zero {zero} native-skipped {skips};")
+        return [scenario()[0], scenario()[1], occ(1500, 100, 80, 70, 60, 5),
+                scenario()[3], occ(1800, 200, 180, 170, 160, 10)]
+
+    def test_fresh_skips_independent_of_pending_reload(self):
+        text = "\n".join(self.rows())
+        self.assertEqual(observe_occlusion(text)["skipped_delta"], 5)
+        with self.assertRaises(Pending): split_rigid_reload(text)
+
+    def test_stale_zero_delta_transition_and_wrong_scene_refuse_capture(self):
+        rows = self.rows(); text = "\n".join(rows)
+        for bad in (text.replace("native-skipped 10", "native-skipped 5"),
+                    text.replace("bg41_01", "bg42_01"), "\n".join(rows[1:]),
+                    "\n".join(rows[:-1]), text + "\n[native-material-context] mode Loading",
+                    text + "\n[native-rigid-reload] title requested",
+                    text + "\n[native-rigid-lifecycle] source-retired",
+                    text.replace("frame 1800", "frame 1499")):
+            with self.subTest(bad=bad), self.assertRaises(Pending): observe_occlusion(bad)
+
+    def test_failure_and_byte_limits_are_not_bypassed(self):
+        text = "\n".join(self.rows())
+        for bad in (text + "\n[error] fault", text + "\n[native-object-input-mismatch]",
+                    text + "\n[shutdown] complete", "x"*(2*MAX_LOG_BYTES+1),
+                    text.replace("queried 180", "queried 150")):
+            with self.assertRaises(ValueError): observe_occlusion(bad)
 
 
 if __name__ == "__main__":

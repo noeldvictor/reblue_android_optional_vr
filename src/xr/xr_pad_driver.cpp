@@ -110,7 +110,8 @@ void ApplyAutoplay(PadState &pad, bool enabled) {
     observation.stage = (uint64_t(stage.Category() + 1) << 32) | stage.CombinedNum();
   observation.position = field.Position();
   const auto input = policy.Step(t, observation);
-  gpu::scene::ObserveNativeRigidReloadField(input.walking,observation.stage);
+  gpu::scene::ObserveNativeRigidReloadField(input.walking,observation.stage,
+      observation.Blockers(),policy.Episode());
   // Explicit diagnostic mode owns the whole pad; neutralize stale real sticks.
   pad = {};
   pad.menu = input.start;

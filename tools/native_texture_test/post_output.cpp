@@ -1166,6 +1166,27 @@ void RigidLifecycle() {
   assert(!window.Step(true,epoch));
   epoch.views[0].emitted = epoch.views[1].emitted = 900;
   assert(window.Step(true,epoch));
+  NativeRigidReloadReadiness readiness{false,true,(2ull<<32)|4101};
+  assert(readiness.Blockers(0) == 0 && readiness.Blockers(249999999) == 0);
+  assert(readiness.Blockers(250000000) == NativeRigidReloadReadiness::Stale);
+  assert(readiness.Blockers(-1) == NativeRigidReloadReadiness::Stale);
+  // A stale observer must discard even899 emissions, not resume that baseline
+  // when input starts polling again. Readiness reporting cannot qualify output.
+  window = {}; epoch.views[0].emitted = epoch.views[1].emitted = 0;
+  assert(!window.Step(readiness.Blockers(1) == 0,epoch));
+  assert(window.Generation() == epoch.generation);
+  epoch.views[0].emitted = epoch.views[1].emitted = 899;
+  assert(!window.Step(readiness.Blockers(250000000) == 0,epoch));
+  assert(window.Generation() == 0);
+  assert(!window.Step(readiness.Blockers(1) == 0,epoch));
+  epoch.views[0].emitted = epoch.views[1].emitted = 900;
+  assert(!window.Step(true,epoch));
+  epoch.views[0].emitted = epoch.views[1].emitted = 1799;
+  assert(window.Step(true,epoch));
+  readiness.walking = false;
+  assert(readiness.Blockers(1) == NativeRigidReloadReadiness::NotWalking);
+  readiness.paused = true; ++readiness.stage;
+  assert(readiness.Blockers(250000000) == 15);
 }
 void RigidBatches() {
   using namespace bd::gpu::scene;

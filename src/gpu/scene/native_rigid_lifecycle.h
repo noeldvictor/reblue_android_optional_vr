@@ -66,6 +66,7 @@ private:
 // readiness resets its baseline; a different generation starts a new window.
 class NativeRigidOutputWindow {
 public:
+  uint64_t Generation() const { return generation_; }
   const std::array<uint64_t,2> &Baseline() const { return baseline_; }
   // Reports precede their same-frame context. Three 300-frame periods leave
   // two complete post-readiness windows even at the worst reporting phase.
@@ -83,5 +84,17 @@ public:
 private:
   uint64_t generation_ = 0;
   std::array<uint64_t, 2> baseline_{};
+};
+// Same opt-in readiness contract as the reload bridge, exposed for boundary
+// tests and reason reporting. These are refusal bits, not a relaxed fallback.
+struct NativeRigidReloadReadiness {
+  bool paused = false, walking = false;
+  uint64_t stage = 0;
+  enum : uint32_t { Paused = 1, NotWalking = 2, WrongStage = 4, Stale = 8 };
+  uint32_t Blockers(int64_t age_ns) const {
+    return (paused ? Paused : 0) | (!walking ? NotWalking : 0) |
+        (stage != ((uint64_t(2) << 32) | 4101) ? WrongStage : 0) |
+        (age_ns < 0 || age_ns >= 250000000 ? Stale : 0);
+  }
 };
 } // namespace bd::gpu::scene

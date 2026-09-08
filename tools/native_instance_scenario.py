@@ -103,6 +103,36 @@ def recent_field_samples(contexts, metrics):
     return earlier[2], later[2]
 
 
+def observe_occlusion(text):
+    """Fresh culling context for a separate image; NOT reload/pixel acceptance."""
+    if len(text.encode("utf-8")) > 2 * MAX_LOG_BYTES:
+        raise ValueError("occlusion observation exceeds 800 KiB")
+    if re.search(r"\[(?:error|critical)\]|\[native-[^\]]*-mismatch\]|\[shutdown\]", text):
+        raise ValueError("runtime failure or shutdown before occlusion observation")
+    pattern = re.compile(r"\[native-occ\] frame (\d+) requested (\d+) queried (\d+) "
+                         r"fence-collected (\d+) zero (\d+) native-skipped (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = pattern.search(line)
+        if match:
+            values = tuple(map(int, match.groups()))
+            if not (values[4] <= values[3] <= values[2] <= values[1]) or values[5] > values[1]:
+                raise ValueError("inconsistent native query counters")
+            metrics.append((index, values))
+        # A context from before teardown cannot authorize a title/loading image.
+        if "[native-rigid-reload] title requested" in line or "[native-rigid-lifecycle] source-retired" in line:
+            contexts.append((index, "lifecycle transition"))
+    a, b = recent_field_samples(contexts, metrics)
+    if metrics[-1][0] < contexts[-1][0] or any(y < x for x, y in zip(a, b)):
+        raise Pending("need current, monotonic field occlusion samples")
+    if b[0] <= a[0] or any(b[i] <= a[i] for i in (1, 2, 3, 5)):
+        raise Pending("native queries, collection and skips must advance in the ready field")
+    return dict(frame=b[0], requests_delta=b[1]-a[1], queries_delta=b[2]-a[2],
+                collected_delta=b[3]-a[3], skipped_delta=b[5]-a[5])
+
+
 def verify_texture_tables(text, comparison=True):
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
         raise ValueError("texture-table diagnostic exceeds 400 KiB")
@@ -836,6 +866,8 @@ def main():
     parser.add_argument("--rigid-batches", action="store_true")
     parser.add_argument("--rigid-hard-off", action="store_true")
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
+    parser.add_argument("--occlusion-observation", action="store_true",
+                        help="standalone fresh-culling image trigger, NOT reload or pixel acceptance")
     parser.add_argument("--receiver-setup", action="store_true", help="host receiver callback and fresh retained packet reads in each requested epoch")
     parser.add_argument("--scene-lights", action="store_true", help="owned scene/object handoffs and fresh native reads in each requested epoch")
     parser.add_argument("--caster-family", action="store_true", help="non-regression multi-primitive native caster emissions and fence retirement")
@@ -848,12 +880,19 @@ def main():
     args = parser.parse_args()
     reload = None
     try:
-        limit = MAX_LOG_BYTES * (2 if args.rigid_reload else 1)
+        if args.occlusion_observation and any(value for name, value in vars(args).items()
+                                              if name not in ("log", "occlusion_observation")):
+            raise ValueError("occlusion observation is separate from acceptance switches")
+        limit = MAX_LOG_BYTES * (2 if args.rigid_reload or args.occlusion_observation else 1)
         with args.log.open("rb") as source:
             data = source.read(limit + 1)
         if len(data) > limit:
             raise ValueError(f"instance diagnostic exceeds {limit // 1024} KiB")
         text = data.decode("utf-8")
+        if args.occlusion_observation:
+            print("OBSERVED: fresh native culling; reload/pixels NOT qualified " +
+                  ", ".join(f"{k}={v}" for k, v in observe_occlusion(text).items()))
+            return 0
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
             verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family)

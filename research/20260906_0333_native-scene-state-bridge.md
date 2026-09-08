@@ -3753,3 +3753,24 @@ to the counted files. There is no next producer approved by this accounting:
 review the unexplained drive change before another output-producing attempt.
 The cumulative3 GiB allowance, original62,509,998,080 B floor and protected
 evidence obligations remain unchanged.
+
+### Readiness and separate culling-image continuation (2026-09-07)
+
+Previous goal turn made progress through indexed native bounds, actual primitive
+culling and the preserved960 timeout. First free80,994,217,984 B. Scoped build-root
+inventory since960 start finds only the already-counted780,656 B log, restored
+116 B profile and204 B material records; no renderer/compiler process is live.
+Later free80,991,305,728 B: the unallocated drive-wide change is not a new owned
+artifact producer. No broad drive scan or protected cleanup is justified.
+
+Reuse the same fixture/build trees and cumulative3 GiB allowance/original floor.
+Next output41/CPU24 reserve32 MiB peak/free-drop and10 MiB aggregate text; then
+host121 reserves192 MiB with300 s supervision, no guest rebuild. Changes only
+expose exact readiness refusal/window resets and add a fresh-culling observation
+trigger that is separate from full acceptance.330 Python checks pass before
+build. Unchanged query shaders/GPU fixtures need no rebuild for these edits.
+After the host link, at most one changed-observation run961 is planned, same
+strict settings,300 s/800 KiB/192 MiB/75 MiB overlap and one110 KiB JPEG within
+the existing172,616 B headroom. No raw/perf/dumps or asset conversion requested;
+bounded existing material caches remain counted. Retire only superseded fixture
+logs after replacement passes; preserve all prior failure and accepted pixels.

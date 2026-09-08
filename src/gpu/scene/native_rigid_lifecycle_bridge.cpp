@@ -39,7 +39,10 @@ struct Evidence {
   std::mutex mutex;
   NativeRigidLifecycle lifecycle;
   uint64_t latest = 0;
-  bool ready = false;
+  NativeRigidReloadReadiness readiness;
+  uint32_t autoplay_blockers = 0;
+  uint64_t episode = 0;
+  int64_t poll_gap_us = 0;
   std::chrono::steady_clock::time_point observed{};
   NativeRigidReloadInput input{};
 };
@@ -88,11 +91,15 @@ void NoteNativeRigidEmitted(uint64_t generation, uint32_t view, uint32_t count) 
 void NoteNativeRigidFenceRetired(uint64_t generation, uint32_t view) {
   Note(NativeRigidLifecycle::Event::FenceRetired,generation,0,view,1);
 }
-void ObserveNativeRigidReloadField(bool walking, uint64_t stage) {
+void ObserveNativeRigidReloadField(bool walking, uint64_t stage, uint32_t blockers, uint64_t episode) {
   if (!NativeRigidLifecycleEnabled()) return;
   auto &state = State(); std::lock_guard lock(state.mutex);
-  state.ready = !state.input.paused && walking && stage == ((uint64_t(2) << 32) | 4101);
-  state.observed = std::chrono::steady_clock::now();
+  const auto now = std::chrono::steady_clock::now();
+  state.poll_gap_us = state.observed.time_since_epoch().count() ?
+      std::chrono::duration_cast<std::chrono::microseconds>(now - state.observed).count() : 0;
+  state.readiness = {state.input.paused,walking,stage};
+  state.autoplay_blockers = blockers; state.episode = episode;
+  state.observed = now;
 }
 NativeRigidReloadInput GetNativeRigidReloadInput() {
   if (!NativeRigidLifecycleEnabled()) return {};
@@ -115,16 +122,38 @@ void TickNativeRigidReload(uint32_t sequence) {
   if (phase == Phase::Complete) return;
   auto &state = State();
   NativeRigidEpoch current, old;
-  bool ready;
+  uint32_t blockers, autoplay_blockers;
+  uint64_t episode;
+  int64_t age_ns, poll_gap_us;
   {
     std::lock_guard lock(state.mutex);
     if (const auto *epoch = state.lifecycle.Find(state.latest)) current = *epoch;
     if (const auto *epoch = state.lifecycle.Find(old_generation)) old = *epoch;
-    ready = state.ready && std::chrono::steady_clock::now() - state.observed < std::chrono::milliseconds(250);
+    age_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - state.observed).count();
+    blockers = state.readiness.Blockers(age_ns);
+    autoplay_blockers = state.autoplay_blockers; episode = state.episode;
+    poll_gap_us = state.poll_gap_us;
   }
+  const bool ready = blockers == 0;
+  // Report only window transitions, at most64 lines for the entire diagnostic.
+  // No per-tick output, guest reads or new qualification path.
+  const auto step_window = [&] {
+    static uint32_t reports = 0;
+    const auto before = window.Generation();
+    const auto baseline = window.Baseline();
+    const bool qualified = window.Step(ready,current);
+    if (before != window.Generation() && reports < 64) {
+      ++reports;
+      BD_INFO("[native-rigid-readiness] window {}->{} epoch {} blockers {} age-us {} poll-gap-us {} autoplay-blockers {} episode {} scene {}->{} shadow {}->{} retired {}; report {}/64",
+          before,window.Generation(),current.generation,blockers,age_ns/1000,poll_gap_us,
+          autoplay_blockers,episode,baseline[1],current.views[1].emitted,
+          baseline[0],current.views[0].emitted,current.source_retired ? 1 : 0,reports);
+    }
+    return qualified;
+  };
   const auto child = mem::try_field<uint32_t>(sequence,104);
   const auto game_task = mem::try_load<uint32_t>(engine::addr::kGameTask);
-  if (phase == Phase::ColdField && window.Step(ready,current)) {
+  if (phase == Phase::ColdField && step_window()) {
     Require(LiveTask(sequence) && TaskUID(sequence) && LiveTask(game_task) && TaskUID(game_task) && child == game_task &&
         mem::try_field<uint32_t>(game_task,72) == sequence && mem::try_field<uint64_t>(game_task,80) == TaskUID(sequence) &&
         mem::try_field<uint32_t>(sequence,112) == 0 && mem::try_field<uint32_t>(sequence,116) == 0 &&
@@ -137,7 +166,7 @@ void TickNativeRigidReload(uint32_t sequence) {
     old_generation = current.generation; old_instance = current.first_instance;
     {
       std::lock_guard lock(state.mutex);
-      state.input.paused = true; state.ready = false;
+      state.input.paused = true; state.readiness.paused = true;
       Report("cold-qualified",current);
       BD_INFO("[native-rigid-reload] window generation {} scene {}->{} shadow {}->{}",current.generation,
           window.Baseline()[1],current.views[1].emitted,window.Baseline()[0],current.views[0].emitted);
@@ -156,17 +185,17 @@ void TickNativeRigidReload(uint32_t sequence) {
         engine::Game::Get().Mode() != engine::EngineMode::TitleOrMenu) return;
     std::lock_guard lock(state.mutex);
     Report("closed-at-title",old);
-    ++state.input.serial; state.input.paused = false; state.ready = false;
+    ++state.input.serial; state.input.paused = false; state.readiness.walking = false;
     window = {}; phase = Phase::ReloadedField;
     BD_INFO("[native-rigid-reload] title reached; old generation {} fully fence-retired; autoplay epoch {}",old_generation,state.input.serial);
   } else if (phase == Phase::ReloadedField) {
     Require(dispatcher.Is(sequence), "sequence dispatcher identity changed after title");
-    if (!ready) { window.Step(false,current); return; }
+    if (!ready) { step_window(); return; }
     Require(old.Closed() && current.generation && current.generation != old_generation &&
         current.first_instance && current.first_instance != old_instance && LiveTask(game_task) &&
         TaskUID(game_task) && TaskUID(game_task) != old_task_uid && child == game_task,
         "field returned without fresh selected model, instance and game-task identities");
-    if (!window.Step(true,current)) return;
+    if (!step_window()) return;
     std::lock_guard lock(state.mutex);
     Report("reload-qualified",current);
     BD_INFO("[native-rigid-reload] window generation {} scene {}->{} shadow {}->{}",current.generation,
