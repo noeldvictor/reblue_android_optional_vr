@@ -1776,7 +1776,37 @@ void SkinCasterOwnership() {
     mixed = {}; images.clear(); assert(covered->at(1).albedo && covered->at(1).geometry);
   }
   auto other_technique = policy; other_technique.technique = 1; other_technique.texture_effects = true;
-  assert(std::string_view(PrepareNativeRigidShadowAdmission(*program,other_technique,true).reason) == "unconverted technique/phase");
+  assert(std::string_view(PrepareNativeRigidShadowAdmission(*program,other_technique,true).reason) == "owned primitive participation unavailable");
+  auto routed = *program; routed.ranges.resize(44,routed.ranges[0]);
+  routed.geometries.resize(44); routed.skin_geometries.resize(44,geometry);
+  routed.policy_steps = {{PrimitivePolicyOperation::Texture,7,0},{PrimitivePolicyOperation::Texture,8,0}};
+  for (auto &range : routed.ranges) range.policy_step_end = 1;
+  routed.ranges.back().policy_step_end = 2;
+  std::vector<NativePrimitivePolicy> owned;
+  const auto classify = [&](PrimitiveTextureClass last) {
+    return ComposePrimitivePolicies(std::span(std::as_const(routed).policy_steps),std::span(std::as_const(routed).ranges),other_technique,
+        [last](const PrimitivePolicyStep &step) { return step.value == 8 ? last : PrimitiveTextureClass::Ordinary; },owned);
+  };
+  const auto routed_build = [&] {
+    return PrepareNativeRigidShadow(routed,transforms[0],other_technique,camera,{},a.get(),owned);
+  };
+  assert(classify(PrimitiveTextureClass::Ordinary));
+  auto ordinary_plans = routed_build(); assert(ordinary_plans && ordinary_plans->size() == 44);
+  for (auto unknown : {PrimitiveTextureClass::Volume,PrimitiveTextureClass::Unknown}) {
+    assert(classify(unknown) && !routed_build()); // late effect sibling refuses the complete node
+  }
+  assert(classify(PrimitiveTextureClass::Unchanged) && routed_build()); // early override preserves preceding ordinary route
+  owned.back().cull = PrimitiveCull::Front; assert(!routed_build()); // not a policy-override escape hatch
+  assert(classify(PrimitiveTextureClass::Ordinary));
+  owned.back().alpha_test = true; assert(!routed_build());
+  assert(classify(PrimitiveTextureClass::Ordinary));
+  owned.pop_back(); assert(!routed_build());
+  assert(classify(PrimitiveTextureClass::Ordinary));
+  for (uint32_t mode : {1u,2u,3u}) { other_technique.pass_mode = mode; assert(!routed_build()); }
+  other_technique.pass_mode = 0; other_technique.phase = 0; assert(!routed_build());
+  other_technique.phase = 1;
+  auto routed_plans = routed_build(); assert(routed_plans && routed_plans->size() == 44);
+  routed = {}; owned.clear(); assert(routed_plans->back().geometry && routed_plans->back().skin_bounds);
   const std::array<std::shared_ptr<const NativeInstancePose>,3> poses{a,b,a};
   auto palette = PlanNativeSkinPalette(poses);
   assert(palette && palette->matrices == 6 && palette->poses.size() == 2 &&

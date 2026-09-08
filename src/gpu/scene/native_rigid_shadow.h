@@ -50,7 +50,8 @@ struct NativeRigidCasterAdmission {
 inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     const NativeModelMaterialProgram &program,
     const std::optional<PrimitivePolicyInputs> &inputs, bool scene_cutouts = false,
-    bool shadow_deferred = false, bool skin = false) {
+    bool shadow_deferred = false, bool skin = false,
+    std::span<const NativePrimitivePolicy> owned_policies = {}) {
   if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
       program.ranges.size() != program.geometries.size()) return {};
   const auto unsupported = SelectedNativeRigidShadow(program)
@@ -65,16 +66,30 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     } else if (range.skin) return {unsupported,{},"rigid sibling retains a skin binding"};
   }
   if (!inputs) return {};
-  if (inputs->technique != 0 || inputs->phase > 1) return {unsupported,{},"unconverted technique/phase"};
+  const bool toon_shadow = skin && inputs->technique == 1 && inputs->phase == 1 && inputs->pass_mode == 0;
+  if ((inputs->technique != 0 && !toon_shadow) || inputs->phase > 1)
+    return {unsupported,{},"unconverted technique/phase"};
   if (skinned && (inputs->phase != 1 || inputs->pass_mode != 0)) return {unsupported,{},"unconverted skin pass mode"};
-  // This family deliberately excludes texture-dependent effect participation.
-  // Do not classify a missing image as an ordinary volume-free material.
+  // Texture classification comes from the exact object scope's owned base
+  // table and early overrides. A missing image must never mean ordinary.
+  bool needs_owned = toon_shadow;
   if (inputs->texture_effects)
     for (const auto &step : program.policy_steps)
-      if (step.operation == PrimitivePolicyOperation::Texture) return {unsupported,{},"texture-dependent participation"};
+      needs_owned |= step.operation == PrimitivePolicyOperation::Texture;
+  if (needs_owned && owned_policies.empty()) return {unsupported,{},"owned primitive participation unavailable"};
   std::vector<NativePrimitivePolicy> policies;
+  // Recompose non-texture semantics and compare with the classified producer's
+  // complete result. Ordinary below is only a reference: unknown/volume routes
+  // cannot pass the owned-policy equality check, nor can altered alpha/cull/order.
   if (!ComposePrimitivePolicies(std::span(program.policy_steps), std::span(program.ranges), *inputs,
-      [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Unknown; }, policies)) return {};
+      [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Ordinary; }, policies)) return {};
+  if (!owned_policies.empty()) {
+    if (owned_policies.size() != policies.size()) return {unsupported,{},"owned primitive policy count mismatch"};
+    for (size_t n = 0; n < policies.size(); ++n) {
+      if (!owned_policies[n].routing_known) return {unsupported,{},"texture-dependent participation"};
+      if (owned_policies[n] != policies[n]) return {NativeRigidCasterRoute::Refused,{},"owned primitive policy mismatch"};
+    }
+  }
   for (const auto &policy : policies) {
     if (!policy.routing_known) return {unsupported,{},"unknown primitive routing"};
     if (policy.deferred && !shadow_deferred) return {unsupported,{},"unconverted deferred participation"};
@@ -83,12 +98,13 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
   return {NativeRigidCasterRoute::Native, std::move(policies),"owned caster"};
 }
 inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
-    const NativeModelMaterialProgram &program, const std::optional<PrimitivePolicyInputs> &inputs, bool skin = false) {
+    const NativeModelMaterialProgram &program, const std::optional<PrimitivePolicyInputs> &inputs, bool skin = false,
+    std::span<const NativePrimitivePolicy> owned_policies = {}) {
   // Ordinary phase1 list entries have depth writes, no colour/stencil effects
   // and no depth sorting (light-space skips it). Min-depth plus discarded holes
   // can join the same native queue as solid casters without a guest list entry.
   const bool phase1 = inputs && inputs->phase == 1 && inputs->pass_mode == 0;
-  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, phase1, skin);
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, phase1, skin, owned_policies);
   if (admission.route != NativeRigidCasterRoute::Native) return admission;
   for (size_t n = 0; n < admission.policies.size(); ++n) if (admission.policies[n].alpha_test) {
     // Other phases/forced pass modes have different participation contracts.
@@ -99,6 +115,10 @@ inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
 }
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
     const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal, bool skin = false);
+// Borrowed only within the exact current object/pose/pass scope. Preparation
+// uses its immutable model/image owners, never source keys or shader registers.
+std::span<const NativePrimitivePolicy> FindNativeShadowPoliciesForObject(
+    const NativeInstancePose &pose, uint32_t node, const PrimitivePolicyInputs &inputs);
 inline std::optional<NativeBounds> NativeSkinCasterBounds(const NativeModelMaterialProgram &program,
     const NativeInstancePose &pose, uint32_t node) {
   if (node >= pose.transforms.size() || program.skin_geometries.size() != program.ranges.size() ||
@@ -123,8 +143,9 @@ inline std::optional<NativeBounds> NativeSkinCasterBounds(const NativeModelMater
 inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadow(
     const NativeModelMaterialProgram &program, const RenderMatrix &world,
     const PrimitivePolicyInputs &inputs, const RenderCamera &camera,
-    std::span<const NativeRigidShadowCutout> cutouts = {}, const NativeInstancePose *skin_pose = nullptr) {
-  const auto admission = PrepareNativeRigidShadowAdmission(program, inputs,skin_pose != nullptr);
+    std::span<const NativeRigidShadowCutout> cutouts = {}, const NativeInstancePose *skin_pose = nullptr,
+    std::span<const NativePrimitivePolicy> owned_policies = {}) {
+  const auto admission = PrepareNativeRigidShadowAdmission(program, inputs,skin_pose != nullptr,owned_policies);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   if (!cutouts.empty() && cutouts.size() != program.ranges.size()) return {};
   NativeRigidObjectGPU object{};

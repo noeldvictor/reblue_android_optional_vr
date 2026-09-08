@@ -663,26 +663,35 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    all55 prior rigid cases,20 water cases and8 snapshot cases pass, validation0/0.
    CPU coverage includes source retirement, pose replacement, exact palette
    capacity, shared-pose reuse, prefix splitting and conservative FP32 bounds.
-   **Live reachability is not qualified.** Run981 stopped at the192MiB free-drop
+   Earlier run981 stopped at the192MiB free-drop
    limit during reload, with no native skin emission. Targeted983 proves native
    skin geometry exists, but generation97/node47 (4primitives) and node62
    (6primitives) reject for `unconverted cutout sibling`. Generation38/node1
    (44primitives) uses technique1 with texture-dependent participation.
-   **Cutout source checkpoint:** skin deformation now connects to the existing
-   shadow cutout producer, UV/base image/wrap-sampler contract and fixed0.6-alpha
-   shader, preserving whole-node admission. Added fixtures cover mixed4/6-sibling
-   nodes, missing UV/image refusal, alpha boundaries and overlapping instanced
-   shadows across1/2/3 influences. All379 Python source/scenario checks pass;
-   changed C++ fixtures, shader compilation, GPU pixels and live emission remain
-   pending. These source changes do not update the host158 binary or its evidence.
-   Next build/run the affected fixtures and verify the connected live consumer.
-   Then handle
-   technique1 participation using owned image classes, not an assumed ordinary
-   texture or relaxed rejection. Reuse `PrepareNativeRigidShadowForObject`, the
-   current skin vertex/palette owner and the shared queue. Native scene shading,
-   animation production and remaining replay/register consumers remain open.
-   No additional runtime adapter removal or game/stereo skin acceptance is proven;
-   host155/run980 remains the last complete strict reload result, not host158.
+   **Current connection verified through cold-field emission (host160):** skin
+   deformation shares the shadow cutout image/UV/wrap-sampler producer and fixed
+   0.6-alpha shader. Technique1 now consumes the existing exact object/pose/pass
+   scope's texture-classified policies; admission checks all siblings against
+   native alpha/cull/order semantics. Unknown/volume and mismatched policies do
+   not become ordinary draws. Pre-cull animated bounds use that same admission.
+   Mesh18/CPU16, output70/CPU45 and host160 pass. GPU70/rigid25 passes85 cases,
+   including30 skin cases across1/2/3 influences, cutouts, alpha boundaries and
+   overlapping instances (validation0/0). CPU tests include4/6/44-sibling packets,
+   missing inputs, late volume/unknown, policy mismatch and source retirement.
+   All383 Python checks pass, including fresh skin emission/fence checks required
+   independently in each reload epoch.
+   Host159/run984 passed the full strict cold/reload/mixed regression, but emitted
+   no native skin. Host160's11:37 run (PID37048, reused log978, NOT the older water
+   run978) emits/retires13200 skin primitives in the fresh1857..2157 cold-field
+   window. It stopped during reload at the192MiB drive-free-drop guard before its
+   requested image. Full skin reload/game-pixel/stereo qualification remains open.
+   The reached native node consumer bypasses its original node/interpreter/replay
+   and bone-register draw path; object/visual setup and animation producers remain.
+   Next qualify the changed consumer's reload and pixels after reconciling runtime
+   storage, then extend this same geometry/palette/material ownership to skinned
+   scene shading and native animation, removing their remaining replay/register
+   consumers. No full character/frame completion or speedup is established.
+   [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).
    [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).
    [Exact contract and evidence](../research/20260908_1410_native-skin-assets.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,

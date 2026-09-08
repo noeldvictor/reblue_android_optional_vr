@@ -5215,3 +5215,94 @@ mostly unattributed by scoped output checks; do not call it renderer output or
 cleanup savings. No owned producer remains. Same cumulative limits, no reset.
 Next host159/game984 only after the connected cutout or technique-participation
 change; no repeat opaque-only probe. See20260908_1100_native-skin-caster-verification.md.
+
+### Native skinned cutout connection (2026-09-08, source017ace5)
+
+Previous turn made progress: connected cutout source/fixtures committed and
+pushed,379 Python checks pass, native compilation/GPU/live gates pending.
+Preflight11:18:45 EDT: free79,372,439,552B; no live renderer/compiler/test process.
+Mesh1703082B/30files, texture82677563B/132files, GPU19836673B/19files,
+attachment logs306127B/194files. Same cumulative3GiB exception and62509998080B
+floor; diagnostic/log/raw/image limits unchanged. No new allowance or cleanup
+credit. Reuse existing trees: mesh18/CPU16 (32/16MiB), output69/CPU44
+(64/16MiB), GPU70/rigid25 (96/32MiB), host159 (192MiB), each supervised at300s
+build/30s CTest and10MiB aggregate logs. No guest rebuild, asset copy/cook,
+download or raw capture. Validate replacement before retiring superseded logs.
+The changed consumer must pass actual alpha/overlap pixels and live admission;
+the full desktop scene/sequence/both-eye gate remains open. A new game run will
+check native skin emission, not repeat the resolved opaque-only refusal probe.
+
+Mesh18/PID28564 and CPU16/PID25476 pass (0.15s total); output69/PID32680 and
+CPU44/PID38316 pass (0.50s). GPU70/PID38292 compiles both skin shaders; rigid25/
+PID38164 passes85cases (30skin), validation0/0, raw0,1.44s total. Host159/
+PID27660/session29734 terminal exit0: codegen0written and no guest objects.
+EXE SHA25694DFEC25B475AFE10F45DFC3AE63273D6E6F53E53A3D205D1FDCE11DF4B4D1A0.
+After replacement, removed14 inspected superseded build/test logs (27181B
+logical, free79370121216->79370162176B). Runtime overlap still needed headroom;
+losslessly archived980/981's904121B full text to176180B ZIP, verifying both
+original SHA256/lengths before plaintext removal. Saving727941B logical;
+free79369519104->79370248192B. Archive retained-native-runtime-980-981.zip
+SHA2562F142C222FC37A0860946E2BAA58ECAB9E06AA0F3636707D0768F3BE0E37EC72.
+Both strict980 and storage-stop981 remain fully recoverable. No raw/image/asset
+deletion. Next984 uses existing strict cold/reload/mixed gate,180s/800KiB/192MiB,
+capture/perf/persistence off and exact profile restoration. Skin emission will
+be inspected separately; old rigid counters alone cannot qualify the new path.
+
+984/PID38324/session45914 terminal11:26:56 after129s, exit0. Full strict
+cold/reload/mixed chain passed; all23 settings effective, raw0, profile restored.
+Log541083B. No native skin emission; only technique1 skin admission refusals
+(generation29/node1, then152/node1 after reload,44primitives). This is fresh
+regression evidence, not acceptance of native skin. No repeat of the same probe:
+next connection supplies the existing object-scope's texture-classified policies
+to native shadow admission, animated bounds and packet construction. Whole-node
+equality checks preserve alpha/cull/order and refuse late volume/unknown siblings.
+No new policy/image cache or shader change; reuse GPU70/rigid25. Source provenance:
+generated64 sub_82174270 phase1 direct shader24 except wind3; generated90
+sub_82286228 table dispatch; existing texture routing audit20260907_0047 and
+PrepareMaterialMesh's owned base-table/early-override classifier. Visual callbacks
+remain outside the replaced node consumer. Added44-sibling ownership fixtures,
+late unknown/volume/mismatch/forced-pass refusal and source retirement. All379
+Python guards pass after updating the expected admission signature.
+Plan output70/CPU45 (64/16MiB) then host160 (192MiB), existing limits and trees.
+
+Output70/PID36920, CPU45/PID32804 and host160/PID33844/session18923 pass.
+Host160 EXE006AE437469881E2C9F3F6E9C08288049E2DEA9439A1EF8D9D671E2F718E3385;
+no guest objects rebuilt.383 Python checks pass, including a new fresh skin
+emission/fence gate required independently in each reload epoch. No new shader:
+GPU70/rigid25 evidence remains applicable, not restamped.
+Losslessly archived983/984 (630783B to122511B), SHA256/length-verified before
+plaintext retirement, saving508272B logical. ZIP7764BD303423FE04071A83A8DE22A1046B52075DCF3B862A3EE465BFC2AD36BB;
+free79366017024->79366529024B. Keep both full causal and strict-regression texts
+recoverable; no raw/image deletion. Aggregate images10303111B/11files leaves
+182649B under10MiB. Next985 retains all strict reload/mixed checks plus skin
+emission/fence checks; only after those pass request one110KiB maximum,
+full-resolution PrintWindow JPEG. Same180s/800KiB/192MiB/no-raw bounds; no
+sequence/stereo qualification implied, no storage cap raised.
+
+Actual host160 run used reused filename978 (higher plaintext numbers had been
+archived), PID37048/session44518,11:37:29..11:39:05, NOT historical water978.
+First skin submission frame657=44; fresh cold1857..2157 adds13200 submitted/
+emitted/fence-retired. Reload stopped at192MiB drive-free-drop before new field
+or requested image; exact profile restored, no runtime correctness error logged.
+Current978310025B SHA2560848E2709BA5F32D8BA15B38C4198C490FA586A18895622A0291F4F555E07067.
+Only new scoped game output is this log; no game cache/HLSL/raw/asset payload.
+Existing NVIDIA GLCache .bin/.toc modified (430261257B total, not known growth);
+no earlier size baseline proves delta. Pagefile remains2048MiB. Other ninja/
+linker briefly observed, then gone before command-line ownership inspection;
+not stopped. No cap increase or unchanged runtime retry.
+
+Final cleanup6 exact superseded output69/CPU44/host159 logs=4113B logical,
+free79098605568->79098613760B. Total20 log removals31294B plus1236213B archival
+savings=1267507B logical this continuation, credited once. Both archives remain
+hash-verified recoverable; no raw/image removal. Mesh1714796B (+11714),
+texture82806622B (+129059), GPU19900651B (+63978), EXE49047552B (+9728),
+PDB111693824B (+8192), attachment logs316904B/194files (+10777). Selected
+retained change233448B minus385105B runtime/archive reduction=-151657B.
+Ending79098613760B vs initial79372439552B:273825792B less free drive-wide,
+mostly not assigned by these scoped measurements. Source/Git/other objects
+remain separate. All owned producers terminal. Keep current160/CPU70/45,
+GPU70/rigid25 and mesh18/16; older water15/snapshot23 remain unchanged-program
+evidence. Full host159/run984 archived; current978 retains skin emission and
+reload storage-stop evidence. Next actual renderer log979 (not an assumed985),
+only after storage reconciliation and for missing skin reload/pixels or a new
+connected consumer. Full details20260908_1143_native-skinned-shadow-consumer.md.

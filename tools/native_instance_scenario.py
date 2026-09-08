@@ -996,8 +996,36 @@ def verify_cutout_family(text):
             for i, name in enumerate(("submitted", "emitted", "retired", "textured_emitted", "textured_retired"))}
 
 
+def verify_skin_shadow(text):
+    """Fresh native skin emission and fences; not pixel or per-character proof."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("skin shadow diagnostic exceeds 400 KiB")
+    metric = re.compile(r"\[native-skin-shadow\] frame (\d+) submitted (\d+) emitted (\d+) fence-retired (\d+); model (\d+) instance (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if re.search(r"\[(?:error|critical)\]|\[native-rigid-(?:shadow|batch)\].*refused", line):
+            raise ValueError("runtime failure or native skin consumer refusal")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if "[native-skin-shadow]" in line and not match:
+            raise ValueError("malformed native skin shadow evidence")
+        if match:
+            values = tuple(map(int, match.groups()))
+            if not (values[3] <= values[2] <= values[1]) or not all(values[4:]):
+                raise ValueError("impossible skin emission/lifetime counts or missing identity")
+            if metrics and any(b < a for a, b in zip(metrics[-1][1][:4], values[:4])):
+                raise ValueError("skin counters or frame reset inside a reload epoch")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1, 2, 3)):
+        raise Pending("need fresh native skin submissions, emissions and fence retirement")
+    return dict(first_frame=a[0], last_frame=b[0], submitted_delta=b[1]-a[1],
+                emitted_delta=b[2]-a[2], retired_delta=b[3]-a[3])
+
+
 def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False, cutout_family=False,
-                       rigid_deferred=False, deferred_effects=False, deferred_inputs=False):
+                       rigid_deferred=False, deferred_effects=False, deferred_inputs=False, skin_shadow=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -1016,6 +1044,8 @@ def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_fa
         verify_caster_family(text)
     if cutout_family:
         verify_cutout_family(text)
+    if skin_shadow:
+        verify_skin_shadow(text)
     if rigid_deferred or deferred_effects or deferred_inputs:
         verify_rigid_deferred(text, require_effects=deferred_effects, require_inputs=deferred_inputs)
 
@@ -1057,6 +1087,7 @@ def main():
     parser.add_argument("--scene-lights", action="store_true", help="owned scene/object handoffs and fresh native reads in each requested epoch")
     parser.add_argument("--caster-family", action="store_true", help="non-regression multi-primitive native caster emissions and fence retirement")
     parser.add_argument("--cutout-family", action="store_true", help="fresh scene/shadow cutout emissions and textured fence retirement in each requested epoch")
+    parser.add_argument("--skin-shadow", action="store_true", help="fresh native skin emissions and fence retirement in each requested epoch; pixels separately required")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -1099,8 +1130,8 @@ def main():
             return 0
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs)
-            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs, args.skin_shadow)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs, args.skin_shadow)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -1127,6 +1158,7 @@ def main():
         scene_lights = verify_scene_lights(text) if args.scene_lights else None
         caster_family = verify_caster_family(text) if args.caster_family else None
         cutout_family = verify_cutout_family(text) if args.cutout_family else None
+        skin_shadow = verify_skin_shadow(text) if args.skin_shadow else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -1149,6 +1181,8 @@ def main():
         print("PASS: multi-primitive native caster family " + ", ".join(f"{k}={v}" for k,v in caster_family.items()))
     if cutout_family is not None:
         print("PASS: native scene/shadow cutout family (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in cutout_family.items()))
+    if skin_shadow is not None:
+        print("PASS: native skin shadow emission and fences (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in skin_shadow.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:

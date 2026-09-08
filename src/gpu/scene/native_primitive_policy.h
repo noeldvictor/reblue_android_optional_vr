@@ -28,6 +28,7 @@ struct PrimitivePolicyInputs {
   bool wind_rejects_shadow = false, wind_forces_sorted = false;
   bool special_shadow_block = false, shadow_modulates_colour = false;
   bool texture_effects = false;
+  bool operator==(const PrimitivePolicyInputs &) const = default;
 };
 struct NativePrimitivePolicy {
   PrimitiveCull cull = PrimitiveCull::None;

@@ -191,7 +191,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_caster_family_preflights_all_siblings_without_expanding_reload_counts(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         shadow = direct.split("bool SubmitNativeRigidShadow(", 1)[1].split("bool SubmitNativeRigidScene(", 1)[0]
-        self.assertIn("PrepareNativeRigidShadowAdmission(*model, inputs, skin)", shadow)
+        self.assertIn("PrepareNativeRigidShadowAdmission(*model, inputs, skin,policies)", shadow)
         self.assertLess(shadow.index("pending.push_back("), shadow.index("StageNativeItem("))
         self.assertLess(shadow.index("for (const auto &plan : *plans)"), shadow.index("DrawQueuePush(entry.draw)"))
         self.assertIn("if (item->regression) NoteNativeRigidSubmitted", direct)
@@ -233,6 +233,13 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("exMatrix", shader)
         bridge = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
         self.assertIn("camera, cutouts,skin ? &pose : nullptr", bridge)
+        self.assertIn("*scope->policy_inputs != inputs", bridge)
+        self.assertIn("FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)", walk)
+        self.assertIn("FindNativeShadowPoliciesForObject(pose,node,*inputs)", direct)
+        admission = (ROOT / "src/gpu/scene/native_rigid_shadow.h").read_text()
+        self.assertIn("needs_owned && owned_policies.empty()", admission)
+        self.assertIn("!owned_policies[n].routing_known", admission)
+        self.assertIn("owned_policies[n] != policies[n]", admission)
         cutout = (ROOT / "src/gpu/shaders/hlsl/native_rigid_skin_shadow_cutout_vs.hlsl").read_text()
         self.assertIn("NativeSkinWorld(", cutout)
         self.assertIn("object_data.uv_scale_offset", cutout)

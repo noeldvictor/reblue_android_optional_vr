@@ -78,21 +78,21 @@ and other unadmitted families still use the legacy producer. Game water/reflecti
 pixels, HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
 [Completed image connection, verification and remaining work](research/20260908_1345_native-water-images.md).
 
-**Characters (2026-09-08, opaque path CPU/GPU-tested; cutout source checkpoint):** native skin
-geometry, animated bounds and owned pose palettes connect to the existing shadow
-queue and frame fences. Six Vulkan pixel cases cover one-to-three influences and
-single/instanced casters; the host build and CPU lifetime/capacity tests pass.
-Live probes of the opaque-only build confirm skin geometry loads but reject
-ordinary nodes with cutout siblings. Source now connects skin deformation to the
-existing cutout image/UV/sampler owner and fixed-alpha shader, with mixed-sibling,
-missing-resource and alpha-edge fixtures added. All 379 Python source/scenario
-checks pass; the changed C++ fixtures, shaders, GPU pixels and live game emission
-are not yet verified. Another observed family needs technique-1 texture-dependent
-participation; skinned scene shading and native animation production also remain
-pending. No native skin-shadow game emission is proven yet.
-Host158 is built; host155/run980 remains the last complete strict reload result.
-No speedup or full native character/frame completion is claimed.
-[Verification, exact live refusals and next connection](research/20260908_1100_native-skin-caster-verification.md).
+**Characters (2026-09-08, native skin shadows now emitting in-game):** owned skin
+geometry, animated bounds and pose palettes feed the shared native shadow queue
+and frame fences. Cutout image/UV/sampler support and checked technique-1 texture
+participation are connected; missing or volume-effect inputs remain refused.
+Mesh/ownership tests and the host build pass. All 85 Vulkan pixel cases pass,
+including 30 skin cases covering one-to-three influences, cutouts and overlapping
+instances; Vulkan validation reports zero errors/warnings. All 383 Python checks pass.
+Host160's cold-field window emits and fence-retires 13,200 native skin primitives
+over 300 frames. Its run stopped during reload at the disk-growth guard, before
+the requested game image. Full skin reload, game-pixel and stereo acceptance
+remain pending; host159/run984 is the last complete strict regression run.
+Skinned scene shading, native animation production and remaining rendering
+adapters are still open. No measured speedup or full native character/frame
+completion is claimed.
+[Connection, live evidence and remaining gates](research/20260908_1143_native-skinned-shadow-consumer.md).
 
 ### How much is left?
 

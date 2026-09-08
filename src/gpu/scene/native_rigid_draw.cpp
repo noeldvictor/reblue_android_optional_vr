@@ -123,7 +123,9 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
   const bool skin = NativeSkinShadowEnabled() && owned_pose.get() == &pose;
-  const auto admission = PrepareNativeRigidShadowAdmission(*model, inputs, skin);
+  const auto policies = skin && inputs && (inputs->technique == 1 || inputs->texture_effects)
+      ? FindNativeShadowPoliciesForObject(pose,node,*inputs) : std::span<const NativePrimitivePolicy>{};
+  const auto admission = PrepareNativeRigidShadowAdmission(*model, inputs, skin,policies);
   if (skin && admission.route != NativeRigidCasterRoute::Native &&
       std::any_of(model->ranges.begin(),model->ranges.end(),[](const auto &range) {
         return range.skin || range.shader.vertex_bones.value_or(0);
@@ -150,7 +152,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });
   const char *refusal = "whole-node caster resources or matrices unavailable";
-  const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal, skin)
+  const auto plans = (cutouts || !policies.empty()) ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal, skin)
       : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera, {}, skin ? &pose : nullptr);
   if (!plans) BD_ERROR("[native-shadow-packet] instance {} generation {} node {} phase {} cutouts {} ranges {}; {}",
       pose.instance, pose.model_generation, node, inputs->phase, cutouts, model->ranges.size(), refusal);

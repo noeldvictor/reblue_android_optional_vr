@@ -295,7 +295,10 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           if (view_id == 1 && NativeSkinShadowEnabled() && program &&
               std::any_of(program->ranges.begin(),program->ranges.end(),[](const auto &range) {
                 return range.shader.vertex_bones && *range.shader.vertex_bones;
-              }) && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true).route == NativeRigidCasterRoute::Native) {
+              }) && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true,
+                  shadow_policy && (shadow_policy->technique == 1 || shadow_policy->texture_effects)
+                      ? FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)
+                      : std::span<const NativePrimitivePolicy>{}).route == NativeRigidCasterRoute::Native) {
             const auto animated = NativeSkinCasterBounds(*program,*instance_pose,index);
             if (!animated) throw std::runtime_error("Native skin caster has no owned animated bounds");
             double squared = 0;

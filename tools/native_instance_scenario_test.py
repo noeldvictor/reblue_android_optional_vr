@@ -13,6 +13,7 @@ from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
 from native_instance_scenario import verify_cutout_family
+from native_instance_scenario import verify_skin_shadow
 from native_instance_scenario import observe_occlusion
 from native_instance_scenario import verify_frame_probe
 from native_instance_scenario import (
@@ -799,6 +800,50 @@ class CasterFamilyScenarioTest(unittest.TestCase):
                     module.verify_rigid_epoch(first, caster_family=True)
                     module.verify_rigid_epoch(second, caster_family=True)
             module.verify_rigid_epoch("\n".join(self.rows()), caster_family=True)
+
+
+class SkinShadowScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        for index, frame in ((2, 100), (4, 150)):
+            rows[index] = (f"[native-skin-shadow] frame {frame} submitted {frame+3} emitted {frame+2} "
+                           f"fence-retired {frame+1}; model 38 instance 73;")
+        return rows
+
+    def test_fresh_native_emission_and_retirement(self):
+        self.assertEqual(verify_skin_shadow("\n".join(self.rows())), dict(
+            first_frame=100, last_frame=150, submitted_delta=50, emitted_delta=50, retired_delta=50))
+
+    def test_stale_startup_wrong_scene_and_submission_only_remain_pending(self):
+        rows = self.rows(); text = "\n".join(rows)
+        for bad in (text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
+                    text.replace("emitted 152", "emitted 102").replace("retired 151", "retired 101"),
+                    text.replace("retired 151", "retired 101"), "\n".join([rows[2], rows[4]] + scenario()[::2])):
+            with self.assertRaises(Pending): verify_skin_shadow(bad)
+
+    def test_failure_reset_malformed_and_impossible_counts(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("emitted 152", "emitted 154"), text.replace("retired 151", "retired 153"),
+                    text.replace("frame 150", "frame 99"), text.replace("model 38", "model 0"),
+                    text + "\n[error] late runtime error", "[native-skin-shadow] invalid\n" + text,
+                    "x" * (MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_skin_shadow(bad)
+
+    def test_each_reload_epoch_requires_skin_consumption(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in (
+                        "verify_rigid_epoch", "verify_skin_shadow"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for first, second in ((cold, "\n".join(self.rows())), ("\n".join(self.rows()), new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(first, skin_shadow=True)
+                    module.verify_rigid_epoch(second, skin_shadow=True)
+            module.verify_rigid_epoch("\n".join(self.rows()), skin_shadow=True)
 
 
 class CutoutFamilyScenarioTest(unittest.TestCase):

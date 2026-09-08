@@ -409,6 +409,17 @@ NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
 }
 } // namespace
 
+std::span<const NativePrimitivePolicy> FindNativeShadowPoliciesForObject(
+    const NativeInstancePose &pose, uint32_t node, const PrimitivePolicyInputs &inputs) {
+  const auto *scope = current;
+  if (!scope || !scope->shadow_phase || scope->render_view != 1 || scope->pose.get() != &pose ||
+      scope->model != pose.model || !scope->policy_inputs || *scope->policy_inputs != inputs ||
+      node >= pose.transforms.size()) return {};
+  const auto *program = FindNativeInstanceNode(pose,node);
+  const auto *mesh = program ? PrepareMaterialMesh(*program) : nullptr;
+  return mesh ? std::span<const NativePrimitivePolicy>(mesh->policies) : std::span<const NativePrimitivePolicy>{};
+}
+
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
     const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal, bool skin) {
   const auto *scope = current;
@@ -420,7 +431,8 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
   refusal = "shadow owned node/admission unavailable";
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
-  const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs,skin);
+  const auto policies = FindNativeShadowPoliciesForObject(pose,node,*scope->policy_inputs);
+  const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs,skin,policies);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const auto *mesh = PrepareMaterialMesh(*program);
   refusal = "shadow owned texture recipe unavailable";
@@ -445,7 +457,7 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
     }
   }
   refusal = "shadow canonical geometry, matrices or sampled image contract unavailable";
-  auto plans = PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts,skin ? &pose : nullptr);
+  auto plans = PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts,skin ? &pose : nullptr,policies);
   if (!plans) for (size_t n=0;n<std::min<size_t>(8,cutouts.size());++n) {
     const auto &geometry = program->geometries[n];
     const auto &cutout = cutouts[n];
