@@ -5,6 +5,21 @@
  */
 #include "gpu/scene/native_refraction_material.h"
 #include "gpu/scene/native_instance_bridge.h"
+#include "gpu/scene/native_water_material_bridge.h"
+#include "gpu/scene/native_water_material_source.h"
+#include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/native_material.h"
+#include "gpu/scene/native_material_texture_source.h"
+#include "gpu/scene/native_lighting_bridge.h"
+#include "gpu/scene/native_fog_bridge.h"
+#include "gpu/scene/native_shadow_receiver_bridge.h"
+#include "gpu/scene/native_water_bottom.h"
+#include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene/native_texture_binding_bridge.h"
+#include "gpu/scene/native_alpha_bridge.h"
+#include "gpu/scene/native_blend_bridge.h"
+#include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/deferred_surface.h"
 #include "gpu/scene/refraction_material_import.h"
 #include "gpu/scene/shader_parameter_import.h"
 #include "gpu/native_texture_mirror.h"
@@ -35,10 +50,13 @@ struct Stats {
   uint64_t water = 0, refraction = 0, compatibility = 0, refused = 0, faults = 0;
   uint64_t parameters = 0, state_adapters = 0, bindings = 0, null_bindings = 0, snapshots = 0, clamped = 0;
   uint64_t debug_bindings = 0;
+  uint64_t water_candidates = 0, water_consumed = 0, water_unavailable = 0;
+  uint32_t water_refusal_frame = 0;
   uint32_t frame = 0;
   bool reported = false;
 };
 thread_local Stats stats;
+thread_local NativeWaterMaterialScope *water_output = nullptr;
 void Report() {
   const auto frame = FrameStatFrameCount();
   if (stats.reported && frame - stats.frame < 300) return;
@@ -50,6 +68,9 @@ void Report() {
       stats.debug_bindings);
   stats.frame = frame;
   stats.reported = true;
+  if (stats.water_candidates)
+    BD_INFO("[native-water-admission] candidates {} consumed {} unavailable {}; sorted material/visual adapters remain",
+        stats.water_candidates,stats.water_consumed,stats.water_unavailable);
 }
 bool Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address > UINT32_MAX || bytes > UINT32_MAX ||
@@ -103,6 +124,7 @@ struct Adapter {
   const uint32_t material;
   const uint64_t saved_stack;
   const bool water;
+  NativeWaterMaterialOutput output;
   Adapter(PPCContext &context, uint8_t *memory, bool is_water)
       : ctx(context), base(memory), material(ctx.r3.u32), saved_stack(ctx.r1.u64), water(is_water) {
     ctx.r1.u32 -= 256;
@@ -156,10 +178,16 @@ struct Adapter {
     } else ++stats.null_bindings;
     ctx.r3.u64 = ReadWord(kDevice); // temporary void-callback register convention
   }
-  void BindPlanarReflection() { Bind(7, ReadWord(kPlanarImage)); }
+  void BindPlanarReflection() {
+    const auto address = ReadWord(kPlanarImage);
+    Bind(7, address);
+    if (water_output && address)
+      if (const auto *image = ResolveGuestTexture(address)) output.planar = image->nativeImage;
+  }
   void BindSceneImage() {
     const auto image = ReadWaterSceneImage(Word);
     Check(bool(image)); Bind(12, *image);
+    if (water_output && *image) output.bump = CaptureNativeTexture(ResolveGuestTexture(*image)).primary;
   }
   bool WantsSnapshot() { return int32_t(ReadWord(uint64_t(material) + 4700)) > 0; }
   void Snapshot() {
@@ -167,22 +195,198 @@ struct Adapter {
     ctx.r4.u64 = material;
     ++stats.snapshots;
     sub_8221D2C8(ctx, base); // native snapshot producer; unowned scopes remain tracked there
+    if (water && water_output) {
+      // Scheduling still selects its output getter, never an active attachment
+      // or a previously bound slot. Copy its exact completed native lease now.
+      constexpr uint32_t scene_getter = (uint32_t(-32035) << 16) - 26284;
+      constexpr uint32_t reflection_getter = (uint32_t(-32035) << 16) - 26280;
+      const auto phase = Word(kPhase);
+      const auto address = phase == 3 ? Word(scene_getter) : phase == 5 ? Word(reflection_getter) : std::nullopt;
+      if (address && *address)
+        if (const auto *image = ResolveGuestTexture(*address)) output.snapshot = image->nativeImage;
+    }
   }
 };
 void Prepare(PPCContext &ctx, uint8_t *base, bool water) {
   const bool enabled = REXCVAR_GET(bd_native_scene_textures);
   if (!enabled || !Ready(ctx, water)) {
+    if (water_output) water_output->Publish(ctx.r3.u32, {});
     ++stats.compatibility; stats.refused += enabled;
     if (water) __imp__sub_82454720(ctx, base); else __imp__sub_82455150(ctx, base);
     Report(); return;
   }
   Adapter adapter(ctx, base, water);
-  if (water) { PrepareWaterMaterial(adapter); ++stats.water; }
+  if (water) {
+    PrepareWaterMaterial(adapter); ++stats.water;
+    if (water_output) {
+      const auto values = ReadNativeWaterMaterial(adapter.material, Word);
+      if (values) adapter.output.material = *values;
+      water_output->Publish(adapter.material, values ? std::optional(std::move(adapter.output)) : std::nullopt);
+    }
+  }
   else { PrepareRefractionMaterial(adapter); ++stats.refraction; }
   // No fallback/replay after the first material or GPU side effect.
   Report();
 }
 } // namespace
+
+NativeWaterMaterialScope::NativeWaterMaterialScope(uint32_t entry, uint32_t visual, NativeVisualIdentity identity) {
+  if (!entry || !identity || !NativeRigidSceneEnabled() || !IsDeferredWaterResource(visual, Word)) return;
+  if (water_output) throw std::runtime_error("Nested native water material publication");
+  entry_ = entry; visual_ = visual; identity_ = identity; frame_ = FrameStatFrameCount();
+  water_output = this;
+  ++stats.water_candidates;
+}
+NativeWaterMaterialScope::~NativeWaterMaterialScope() {
+  if (water_output == this) water_output = nullptr;
+}
+void NativeWaterMaterialScope::Publish(uint32_t visual, std::optional<NativeWaterMaterialOutput> output) {
+  publication_.Reset();
+  if (visual != visual_ || frame_ != FrameStatFrameCount() || !output) return;
+  // This is the original sorted image producer's explicit slot5 selection,
+  // copied after the resource writer's possible aliases. Null means unowned
+  // inheritance, not permission to borrow the previous draw's cube.
+  const auto source = Word(uint64_t(entry_) + 372);
+  if (source && *source) {
+    const auto image = CaptureNativeTexture(ResolveGuestTexture(*source));
+    output->environment = image.cube ? image.cube : image.primary;
+  }
+  publication_.Publish(identity_, frame_, std::move(*output));
+}
+bool NativeWaterMaterialScope::Submit(uint32_t entry, uint32_t stack, bool stencil_pending) {
+  if (!identity_) return false;
+  const auto refuse = [&](const char *reason) {
+    ++stats.water_unavailable;
+    if (stats.water_unavailable == 1 || FrameStatFrameCount()-stats.water_refusal_frame >= 300) {
+      BD_INFO("[native-water-admission] unavailable: {}; instance {} generation {} frame {}",
+          reason,identity_.instance,identity_.model_generation,frame_);
+      stats.water_refusal_frame = FrameStatFrameCount();
+    }
+    return false;
+  };
+  const auto output = publication_.Read(identity_, FrameStatFrameCount());
+  if (!output || entry != entry_ || stencil_pending || Word(kPhase) != 3 ||
+      Word(uint64_t(entry)+244) != visual_ || Word(uint64_t(entry)+272) != visual_ ||
+      !Range(entry,816) || bd::mem::load<int8_t>(entry+289) > 0 ||
+      bd::mem::load<int8_t>(entry+292) != 0) return refuse("completed material or regular sorted surface");
+  const auto graph = Word(uint64_t(visual_)+2620), palette = Word(uint64_t(entry)+268);
+  const auto node = ReadWord(uint64_t(entry)+252);
+  if (!graph || !*graph || !palette || !*palette) return refuse("model/palette import");
+  const auto pose = FindNativeInstancePose(visual_,*graph,*palette);
+  const auto mesh = FindLoadedNativeModelNodeImport(*graph,node);
+  if (!pose || !mesh || pose->instance != identity_.instance || pose->model_generation != identity_.model_generation ||
+      node >= pose->transforms.size() || FindNativeInstanceNode(*pose,node) != &mesh->program) return refuse("native pose/model node owner");
+  // The entry is still an import adapter, never the native transform owner.
+  // Reject missed pose publication rather than freezing its copied source matrix.
+  for (uint32_t i=0; i<16; ++i)
+    if (pose->transforms[node][i] != ReadFloat(uint64_t(entry)+16+i*4)) return refuse("sorted world differs from completed native pose");
+  const auto &program = mesh->program;
+  std::optional<size_t> primitive;
+  for (size_t i=0; i<program.ranges.size(); ++i) {
+    if (!ModelPrimitiveMatches(program.ranges[i],mesh->source_bindings[i],ReadWord(uint64_t(entry)+384),
+        ReadWord(uint64_t(entry)+380),bd::mem::load<uint16_t>(entry+284),uint32_t(bd::mem::load<uint16_t>(entry+280))+2)) continue;
+    if (primitive) return refuse("ambiguous sorted primitive");
+    primitive = i;
+  }
+  if (!primitive) return refuse("load-owned primitive association");
+  const auto &geometry = program.geometries[*primitive];
+  if (!geometry || !geometry->id || !geometry->canonical_vertices || !geometry->water_vertex_input ||
+      geometry->stream_mask != 1 || !geometry->strides[0] || geometry->strides[0] > 255 ||
+      !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref || !geometry->count ||
+      program.ranges[*primitive].skin) return refuse("canonical water geometry/tangent or skin");
+  const auto camera = FindNativePassCamera(3);
+  const auto lighting = FindNativeLightingPass(3);
+  const auto fog = FindNativeFogLayers();
+  const auto receiver = FindNativePrimaryReceiver(identity_,3);
+  const auto alpha = FindNativeAlphaIntent();
+  const auto blend = FindNativeEnabledBlendIntent();
+  const auto object = ReadMaterialObjectInputs(visual_,Word);
+  if (!camera || !lighting || !fog || !receiver || !alpha || !blend || !object) return refuse("native camera/lighting/fog/receiver/alpha/blend/object");
+  const auto features = ComposeNativeMaterialFeatures(program.ranges[*primitive].features,*object,
+      lighting->inputs,program.ranges[*primitive].reflection.enabled);
+  if (!features) return refuse("owned material feature recipe");
+  NativeWaterImages images;
+  images.bump = output->bump; images.environment = output->environment;
+  images.planar = output->planar; images.snapshot = output->snapshot;
+  images.shadow = NativeImageLease::From(receiver->image);
+  const auto bottom = FindCompletedNativeWaterBottom();
+  if (output->material.shore && !bottom) return refuse("authored shore needs completed bottom depth/projection");
+  // Legal unused descriptors are explicit leases. They are never sampled for
+  // disabled features, and must still pass the active-attachment exclusion.
+  images.bottom = bottom ? bottom->image : images.shadow;
+  if (!output->material.refraction) images.snapshot = images.planar;
+  if (output->material.reflection != WaterReflectionEnvironment) {
+    static const NativeTextureHandle unused_cube = [] {
+      NativeTextureData data{NativeTextureFormat::RGBA8,NativeTextureDimension::Cube,1,1,1,1,
+          std::vector<std::vector<uint8_t>>(6,std::vector<uint8_t>{0,0,0,255})};
+      std::vector<uint8_t> encoded;
+      if (!EncodeNativeTexture(data,encoded)) return NativeTextureHandle{};
+      return NativeTextureHandle(std::make_shared<NativeTextureAsset>(NativeTextureContentId(encoded),std::move(data)));
+    }();
+    images.environment = AcquireNativeTextureGpu(unused_cube); // existing bounded GPU asset store, no disk cache
+  }
+  NativeRigidPassInputs pass;
+  const auto vector = [](const LightingVector &v) { return RigidFloat4{v[0],v[1],v[2],v[3]}; };
+  pass.world_to_clip = {camera->world_to_clip,camera->world_to_clip};
+  pass.world_to_shadow = receiver->world_to_shadow;
+  pass.cameras = {vector(lighting->inputs.camera_position),vector(lighting->inputs.camera_position)};
+  pass.ambient = vector(lighting->inputs.ambient); pass.colour_grade = vector(lighting->inputs.color_scale);
+  pass.shadow_colour_strength = vector(receiver->colour);
+  pass.shadow_filter = {lighting->inputs.shadow_bias,.4f*lighting->inputs.shadow_bias,
+      .65f/float(receiver->image->shape.width),0};
+  pass.fog = *fog;
+  const auto recipe = CaptureNativeSceneLights(identity_.instance,identity_.model_generation,node,lighting->inputs);
+  const auto ticket = recipe ? ResolveNativeSceneLights(*recipe) : std::nullopt;
+  if (!ticket) return refuse("ordered native light ticket");
+  pass.lights = ticket->lights;
+  const auto receive = bd::mem::load<uint8_t>(entry+295);
+  if (receive > 1 || program.shadow_policies[*primitive] == NativeShadowPolicy::Unknown) return refuse("owned shadow participation");
+  const uint32_t flags = (features->diffuse ? WaterDiffuse : 0) | (features->fog ? WaterFog : 0) |
+      (receive && program.shadow_policies[*primitive] == NativeShadowPolicy::Receive ? WaterShadow : 0);
+  const auto projection = bottom ? bottom->world_to_bottom : RenderMatrix{};
+  const std::array<uint32_t,3> layers{images.planar.image.layers,images.snapshot.image.layers,images.bottom.image.layers};
+  auto input = BuildNativeWaterInstance(pose->transforms[node],output->material,pass,{projection,projection},layers,flags);
+  if (!input || !SetNativeWaterCutout(*input,alpha->enabled,uint32_t(alpha->compare),alpha->threshold) ||
+      !images.Ready(input->image_layers) || !NativeWaterWorldBounds(*geometry,*input)) return refuse("water GPU values/image leases/wave bounds");
+  NativeWaterScenePlan plan;
+  plan.geometry = geometry; plan.input = *input; plan.images = std::move(images); plan.blend = *blend;
+  plan.depth_write = ReadWord(uint64_t(visual_)+3000) == 8 ? false : bool(receive);
+  plan.alpha_to_coverage = alpha->alpha_to_coverage;
+  const auto winding = bd::mem::load<uint16_t>(entry+286);
+  if (winding != 0x1000 && winding != 0x2000 && winding != 0x3000) return refuse("explicit winding policy");
+  const auto face = DeferredFaces(winding == 0x2000,winding == 0x3000 ? 2 : bd::mem::load<uint8_t>(entry+288));
+  plan.cull = face == DeferredCullFace::Back ? plume::RenderCullMode::BACK :
+      face == DeferredCullFace::Front ? plume::RenderCullMode::FRONT : plume::RenderCullMode::NONE;
+  // Explicit native water sampling policy: repeating animated normals, clamped
+  // screen/depth/cube inputs and the existing comparison sun filter. No fetch bits.
+  for (uint32_t role=0; role<6; ++role) {
+    auto &sampler = plan.samplers[role];
+    sampler.addressU = sampler.addressV = sampler.addressW = role ? plume::RenderTextureAddressMode::CLAMP : plume::RenderTextureAddressMode::WRAP;
+    sampler.minFilter = sampler.magFilter = plume::RenderFilter::LINEAR;
+    sampler.mipmapMode = plume::RenderMipmapMode::LINEAR;
+    if (role == 3) { // D32 shoreline depth need not support ordinary linear filtering.
+      sampler.minFilter = sampler.magFilter = plume::RenderFilter::NEAREST;
+      sampler.mipmapMode = plume::RenderMipmapMode::NEAREST;
+    }
+    sampler.comparisonEnabled = role == 5;
+    sampler.comparisonFunc = plume::RenderComparisonFunction::LESS_EQUAL;
+  }
+  {
+    auto &s = state(); std::lock_guard lock(s.mutex);
+    auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,
+        s.depth_stencil ? s.depth_stencil->texture : nullptr);
+    if (!s.ready || !s.device || !s.command_list_open || !commands || !commands->ColorShape() ||
+        commands->ColorShape()->layers != 1 || !commands->Camera(frame_,3)) return refuse("native mono command scope");
+    for (uint32_t role=0; role<6; ++role)
+      if (commands->WritesImage(plan.images.Image(role))) return refuse("sampled water image aliases active attachment");
+  }
+  if (!CommitNativeSceneLights(*ticket,stack)) throw std::runtime_error("Native water light publication changed");
+  NativeWaterSceneSubmission submission{identity_.instance,identity_.model_generation,frame_};
+  submission.plans.push_back(std::move(plan));
+  if (!SubmitNativeWaterScenePackets(std::move(submission))) throw std::runtime_error("Native water packet submission failed");
+  ++stats.water_consumed;
+  return true;
+}
 } // namespace bd::gpu::scene
 REX_HOOK_RAW(sub_82454720) {
   bd::gpu::scene::Prepare(ctx, base, true);

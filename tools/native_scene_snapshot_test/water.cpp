@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_water_program.h"
 #include "gpu/scene/native_water_material_source.h"
+#include "gpu/scene/native_water_material_bridge.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_scene_framebuffer.h"
@@ -72,6 +73,18 @@ void CheckImport() {
   auto changed = ReadNativeWaterMaterial(material,read);
   Need(changed && changed->scroll_u == .75f && changed->phase == .75f && initial->phase == 3,
       "Water late alias and retained material copy");
+  NativeWaterMaterialPublication publication;
+  publication.Publish({7,11},17,{*initial});
+  const auto retained = publication.Read({7,11},17);
+  publication.Publish({7,11},17,{*changed});
+  Need(retained && retained->material.phase == 3 && publication.Read({7,11},17)->material.phase == .75f,
+      "Ordered water material replacement preserves already queued values");
+  Need(!publication.Read({8,11},17) && !publication.Read({7,12},17) && !publication.Read({7,11},18),
+      "Water publication rejects wrong native instance, generation and frame");
+  publication.Reset();
+  Need(!publication.Read({7,11},17),"Failed or absent writer cannot inherit another water material");
+  publication.Publish({},17,{*changed});
+  Need(!publication.Read({7,11},17),"Invalid native identity cannot publish water");
   words.erase(buffer+20*16);
   Need(!ReadNativeWaterMaterial(material,read), "Water truncated final parameter refuses");
   words.clear(); // no source storage survives GPU packing/consumption
@@ -85,6 +98,17 @@ void CheckImport() {
   Need(!BuildNativeWaterInstance(Identity(),bad,Pass(),bottom,{1,1,1},0), "Water nonfinite phase");
   auto singular = Identity(); singular[0] = 0;
   Need(!BuildNativeWaterInstance(singular,*changed,Pass(),bottom,{1,1,1},0), "Water singular transform");
+  auto cutout = *BuildNativeWaterInstance(Identity(),*changed,Pass(),bottom,{1,1,1},0);
+  for (uint32_t compare=0; compare<=RigidCutoutAlways; ++compare) {
+    Need(SetNativeWaterCutout(cutout,true,compare,.5f),"Water explicit alpha comparison packing");
+    Need(cutout.object_data.material.modes.z == compare && cutout.object_data.material.modes.w == bits(.5f),
+        "Water alpha layout shares the real shader predicate");
+  }
+  const auto valid_cutout = cutout;
+  Need(!SetNativeWaterCutout(cutout,true,8,.5f) && !SetNativeWaterCutout(cutout,true,0,NAN) &&
+      !std::memcmp(&cutout,&valid_cutout,sizeof(cutout)),"Invalid water alpha update is transactional");
+  Need(SetNativeWaterCutout(cutout,false,0,.5f) && !(cutout.object_data.material.modes.y & WaterCutout) &&
+      !cutout.object_data.material.modes.z && !cutout.object_data.material.modes.w,"Disabled water alpha canonicalizes unused values");
 }
 void CheckWaveBounds() {
   NativeMeshData mesh;
@@ -206,7 +230,10 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     if (lit) instance_pass.lights[1].colour.x += .1f*i; // not batch-wide lighting
     auto packed = BuildNativeWaterInstance(world,m,instance_pass,bottom,{2,2,2},
         mode == 5 ? WaterDiffuse|WaterFog|WaterShadow : lit ? WaterDiffuse|WaterFog : 0);
-    Need(bool(packed),"Water instance packing"); instances[i+1] = *packed;
+    Need(bool(packed),"Water instance packing");
+    if (mode >= 16) Need(SetNativeWaterCutout(*packed,true,mode == 16 ? RigidCutoutGE : RigidCutoutLess,.5f),
+        "Production water alpha consumer input");
+    instances[i+1] = *packed;
   }
   struct Vertex { RigidFloat4 position,normal,tangent,uv,colour; };
   std::array<Vertex,4> vertices;
@@ -379,8 +406,14 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   std::array<const NativeRigidBatchItem *,2> pointers{&items[0],&items[1]};
   for (uint32_t n = 0; n < 2; ++n) {
     auto water = std::make_shared<NativeWaterBatchData>(); water->input = instances[n+1];
-    water->images = {bump,environment,NativeImageLease::From(reflection),NativeImageLease::From(snapshot),
+    NativeWaterMaterialPublication publication;
+    publication.Publish({n+1,29},17,{materials[n],bump,environment,
+        NativeImageLease::From(reflection),NativeImageLease::From(snapshot)});
+    const auto produced = publication.Read({n+1,29},17);
+    Need(bool(produced),"Ordered native water material/image producer");
+    water->images = {produced->bump,produced->environment,produced->planar,produced->snapshot,
         NativeImageLease::From(images[3].owner),NativeImageLease::From(images[5].owner)};
+    publication.Reset(); // real native consumer retains images after producer retirement
     water->samplers = {bump_sampler.get(),sampler.get(),sampler.get(),sampler.get(),sampler.get(),sun_sampler.get()};
     auto &item = items[n]; item.water = std::move(water); item.geometry = geometry;
     item.world_bounds = NativeWaterWorldBounds(*geometry,item.water->input);
@@ -583,6 +616,10 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
       for (uint32_t c = 0; c < 3; ++c) expected[c] = expected[c]*expected[3]+background[c]*(1-expected[3]);
       expected[3] = 1; // separate-alpha source-over, not colour factors applied to alpha
     }
+    const bool discarded = (mode == 16 && instance == 0) || (mode == 17 && instance == 1);
+    // Discard preserves the LIVE target's deliberate post-snapshot clear,
+    // not the old background retained by snapshot_image.
+    if (discarded) expected = {9,8,7,1};
     for (uint32_t c = 0; c < 4; ++c) {
       // HDR16 quantization of both sampled inputs and the output, all oracle
       // values below one; this bound also includes ordinary shader arithmetic.
@@ -594,7 +631,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
         Need(false,"Water independent pixel oracle");
       }
     }
-    Need(std::abs(pixels[2*pixels_per_eye*4+index]-(mode == 12 ? 1.f : eye ? .375f : .5f)) < 1e-6f,"Water per-eye depth oracle");
+    Need(std::abs(pixels[2*pixels_per_eye*4+index]-((mode == 12 || discarded) ? 1.f : eye ? .375f : .5f)) < 1e-6f,"Water per-eye depth oracle");
   }
   std::cout << "PASS water mode=" << mode << " phase=" << phase << "; two-eye instanced indirect draw, source/program leases and snapshot\n";
   return pixels;
@@ -604,7 +641,7 @@ void CheckNativeWater(RenderDevice &device) {
   CheckImport();
   CheckWaveBounds();
   for (uint32_t mode = 0; mode < 6; ++mode) Run(device,mode);
-  for (uint32_t mode = 8; mode <= 15; ++mode) Run(device,mode);
+  for (uint32_t mode = 8; mode <= 17; ++mode) Run(device,mode);
   for (uint32_t mode : {6u,7u}) {
     const auto first = Run(device,mode,0), second = Run(device,mode,.37f);
     for (uint32_t eye = 0; eye < 2; ++eye) {

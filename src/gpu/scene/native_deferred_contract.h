@@ -57,15 +57,18 @@ bool CheckDeferredVisualResource(uint32_t visual, Read read) {
   return table && *table && read(uint64_t(*table) + 32) == 0x820DFA50 &&
       read(uint64_t(*table) + 36) == 0x820DFA50;
 }
-// Water resource callbacks still EXECUTE for the legacy draw. Their whole-function
-// producer refreshes the active native input publication after all writes,
-// including indirect parameter aliases. Other unknown writers remain refused.
+// Water resource callbacks still EXECUTE at ordered material begin. Their native
+// producer publishes water inputs for admitted native draws and refreshes other
+// active visual inputs after all writes, including aliases. Unknown writers refuse.
 template <class Read>
-bool CheckDeferredBatchResource(uint32_t visual, Read read) {
-  if (CheckDeferredVisualResource(visual, read)) return true;
+bool IsDeferredWaterResource(uint32_t visual, Read read) {
   const auto table = visual ? read(visual) : std::nullopt;
   return table && *table && read(uint64_t(*table) + 32) == 0x82454720 &&
       read(uint64_t(*table) + 36) == 0x824548A8;
+}
+template <class Read>
+bool CheckDeferredBatchResource(uint32_t visual, Read read) {
+  return CheckDeferredVisualResource(visual, read) || IsDeferredWaterResource(visual, read);
 }
 template <class Read>
 std::optional<uint32_t> CheckNativeDeferredContract(uint32_t visual, Read read) {

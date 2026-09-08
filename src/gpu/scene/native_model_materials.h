@@ -151,6 +151,10 @@ public:
   void Retire(uint32_t source_model);
   std::shared_ptr<const ModelMaterialImport> Find(
       uint32_t source_model, uint32_t source_mesh);
+  // Transitional sorted-entry association. Reuses the load index and rejects
+  // ambiguous node identities; the returned lease pins this exact generation.
+  std::shared_ptr<const ModelMaterialImport> FindNodeImport(
+      uint32_t source_model, uint32_t node);
   ModelMaterialRegistryStats Stats() const;
   uint64_t Generation(uint32_t source_model) const;
   NativeModelRenderHandle FindModel(uint32_t source_model) const;

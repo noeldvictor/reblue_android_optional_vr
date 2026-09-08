@@ -58,15 +58,17 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest connected checkpoint (2026-09-08, host142/run971):** planar reflection
-now renders into an exclusive native HDR image lease, reuses native depth/framebuffer
-owners and publishes the same image without a console resolve. The live cold/reload
-check passes; its last sample records 3,900 completed publications with no fallback
-or ownership faults. CPU ownership tests, 18 two-eye water GPU cases and the existing
-rigid/snapshot regressions pass. Authored camera/extent/getter and legacy draw adapters
-remain, and the game still has no native water-queue caller. Reflection game pixels,
-HDR art parity and reflection-phase refraction snapshots remain unqualified.
-[Reflection connection, verification and remaining work](research/20260908_1110_native-reflection-pass.md).
+**Latest connected checkpoint (2026-09-08, host144/run972):** real game water now
+submits owned material/image packets to the native Vulkan queue, bypassing legacy
+vertex/index/constant binding and translated drawing for admitted entries. Cold and
+reloaded field checks pass; the last sample records 3,179 submissions, 3,084 emissions,
+93 culled and 3,177 fence-retired packets, with no water admission refusals. These are
+repeated draws, not unique converted assets. CPU ownership checks, 20 two-eye water
+GPU cases and the existing rigid/snapshot regressions pass. Sorted alpha testing and
+wave-expanded queue bounds are connected. Material/visual callbacks, the source list
+and image-getter imports remain temporary adapters; game water/reflection pixels,
+HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
+[Water connection, verification and remaining work](research/20260908_1146_native-water-draw.md).
 
 ### How much is left?
 

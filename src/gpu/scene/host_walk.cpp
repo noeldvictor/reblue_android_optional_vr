@@ -56,6 +56,7 @@
 #include "gpu/scene/native_rigid_route_bridge.h"
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
+#include "gpu/scene/native_deferred_contract.h"
 #include "gpu/scene/host_frustum_bridge.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/shadow_fit.h"
@@ -162,6 +163,15 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
   // triangles into the shadow map and 49k into the reflection against 79k
   // in the scene (research/20260904_0400, before this).
   const u32 view_id = bd::mem::try_load<u32>(kRenderViewIdVa);
+  // Water's final amplitude is written at sorted material begin. No finite
+  // early amplitude can safely bound those later aliases. Keep these nodes
+  // until the shared native queue tests their actual displaced world bounds.
+  const bool late_water_bounds = view_id == 3 && NativeRigidSceneEnabled() &&
+      IsDeferredWaterResource(bd::mem::try_load<u32>(ctx_va), [](uint64_t address) -> std::optional<uint32_t> {
+        if (!address || address > UINT32_MAX-3 || (address & 3)) return {};
+        const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
+        return word ? std::optional(uint32_t(*word)) : std::nullopt;
+      });
   // Transitional object producer boundary, before visiting any primitive. The
   // direct consumer receives values and owned pose/model handles, never VAs.
   const auto shadow_policy = ((view_id == 1 && NativeRigidShadowEnabled()) || (view_id == 3 && NativeRigidSceneEnabled()))
@@ -284,7 +294,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           // same pixel, so their order is free (draw_queue.cpp).
           bd::gpu::scene::PublishNodeSphere(out, radius);
           bool visible = false;
-          if (have_eye) {
+          if (have_eye && !late_water_bounds) {
             const float dx = out[0] - eye[0], dy = out[1] - eye[1], dz = out[2] - eye[2];
             const f64 d = std::sqrt(f64(dx) * dx + f64(dy) * dy + f64(dz) * dz) - radius;
             if (d > extra_cull) {
@@ -292,7 +302,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
               goto children;
             }
           }
-          if (have_light) {
+          if (have_light && !late_water_bounds) {
             const float cx = light_clip[0] * out[0] + light_clip[1] * out[1] +
                              light_clip[2] * out[2] + light_clip[3];
             const float cy = light_clip[4] * out[0] + light_clip[5] * out[1] +
@@ -303,7 +313,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
               goto children;
             }
           }
-          if (host_cull) {
+          if (late_water_bounds) {
+            visible = true;
+          } else if (host_cull) {
             // Host floats end to end: the centre never goes through guest
             // scratch, and the census hooks take it as floats. The bias
             // hook may scale the radius (bd_cull_bias), so the plane test

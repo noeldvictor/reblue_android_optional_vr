@@ -83,6 +83,40 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         for required in ("TransformNativeBounds", "1.5 * std::abs", "std::nextafter"):
             self.assertIn(required, bounds)
 
+    def test_completed_writer_connects_to_native_sorted_draw_before_legacy_bind(self):
+        bridge = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
+        prepare = bridge.split("void Prepare(PPCContext", 1)[1].split("NativeWaterMaterialScope::NativeWaterMaterialScope", 1)[0]
+        self.assertLess(prepare.index("PrepareWaterMaterial(adapter)"), prepare.index("ReadNativeWaterMaterial"))
+        submit = bridge.split("bool NativeWaterMaterialScope::Submit", 1)[1]
+        self.assertNotIn("ReadNativeWaterMaterial", submit)
+        for required in ("publication_.Read", "FindNativeInstancePose", "FindLoadedNativeModelNodeImport",
+                         "FindCompletedNativeWaterBottom", "ResolveNativeSceneLights", "CommitNativeSceneLights",
+                         "commands->WritesImage", "SubmitNativeWaterScenePackets"):
+            self.assertIn(required, submit)
+        consumer = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
+        start = consumer.index("NativeWaterMaterialScope water(")
+        section = consumer[start:]
+        self.assertLess(section.index("bridge.Material(36"), section.index("water.Submit"))
+        self.assertLess(section.index("water.Submit"), section.index("BindEntry("))
+        self.assertIn("if (item.native || water_entry) CloseDeferredCompatibilityCapture()", consumer)
+        walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
+        self.assertIn("if (late_water_bounds)", walk)
+        self.assertIn("if (have_eye && !late_water_bounds)", walk)
+        self.assertIn("if (have_light && !late_water_bounds)", walk)
+
+    def test_native_water_preserves_sorted_alpha_and_coverage(self):
+        native = (ROOT / "src/gpu/scene/native_water_inputs.h").read_text()
+        pixel = (ROOT / "src/gpu/shaders/hlsl/native_water_ps.hlsl").read_text()
+        backend = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text().split(
+            "bool SubmitNativeWaterScenePackets(", 1)[1].split("void PrepareNativeRigidBatchDraw(", 1)[0]
+        self.assertIn("SetNativeWaterCutout", native)
+        self.assertIn("RigidCutoutPasses(material.modes.z,opacity,asfloat(material.modes.w))", pixel)
+        self.assertIn("pipeline_state.enableAlphaToCoverage = plan.alpha_to_coverage && shape->samples > 1", backend)
+        fixture = (ROOT / "tools/native_scene_snapshot_test/water.cpp").read_text()
+        for required in ("NativeWaterMaterialPublication", "Invalid water alpha update is transactional",
+                         "if (discarded) expected = {9,8,7,1}", "mode <= 17"):
+            self.assertIn(required, fixture)
+
     def test_dynamic_images_retain_actual_live_producer_views(self):
         paths = ("src/gpu/scene/native_scene_snapshot_bridge.cpp", "src/gpu/hooks/native_deferred_visuals.cpp",
                  "src/gpu/scene/native_scene_pass_bridge.cpp", "src/gpu/scene/native_shadow_pass_bridge.cpp",

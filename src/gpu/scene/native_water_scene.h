@@ -93,7 +93,7 @@ struct NativeWaterScenePlan {
   std::array<plume::RenderSamplerDesc,6> samplers{};
   BlendState blend;
   plume::RenderCullMode cull = plume::RenderCullMode::NONE;
-  bool depth_write = true;
+  bool depth_write = true, alpha_to_coverage = false;
 };
 struct NativeWaterSceneSubmission {
   uint64_t instance = 0, model_generation = 0;

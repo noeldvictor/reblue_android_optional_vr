@@ -12,7 +12,7 @@ namespace bd::gpu::scene {
 #endif
 
 static const RigidUInt WaterRefraction = 1, WaterShore = 2, WaterDiffuse = 4,
-    WaterFog = 8, WaterShadow = 16, WaterCel = 32;
+    WaterFog = 8, WaterShadow = 16, WaterCel = 32, WaterCutout = 64;
 static const RigidUInt WaterReflectionNone = 0, WaterReflectionPlanar = 1,
     WaterReflectionEnvironment = 2;
 struct NativeWaterMaterialGPU {
@@ -22,7 +22,7 @@ struct NativeWaterMaterialGPU {
   RigidFloat4 surface; // reflection distortion, refraction distortion, distance fade, normal blend
   RigidFloat4 highlight; // exponent, intensity, shoreline brightness, shoreline gain
   RigidFloat4 shore; // depth-to-opacity scale; yzw reserved
-  RigidUint4 modes; // reflection choice, feature flags; zw reserved
+  RigidUint4 modes; // reflection choice, feature flags, alpha comparison, float threshold bits
 };
 struct NativeWaterObjectGPU {
   RigidMatrix world;
@@ -55,6 +55,16 @@ static_assert(offsetof(NativeWaterInstanceGPU, world_to_bottom) == 832);
 static_assert(offsetof(NativeWaterInstanceGPU, image_layers) == 960);
 static_assert(sizeof(NativeWaterInstanceGPU) == 976 && alignof(NativeWaterInstanceGPU) == 16);
 static_assert(std::is_trivially_copyable_v<NativeWaterInstanceGPU>);
+
+inline bool SetNativeWaterCutout(NativeWaterInstanceGPU &input, bool enabled,
+    uint32_t comparison, float threshold) {
+  if (comparison > RigidCutoutAlways || !std::isfinite(threshold)) return false;
+  auto &m = input.object_data.material;
+  m.modes.y = (m.modes.y & ~WaterCutout) | (enabled ? WaterCutout : 0);
+  m.modes.z = enabled ? comparison : 0;
+  m.modes.w = enabled ? std::bit_cast<uint32_t>(threshold) : 0;
+  return true;
+}
 
 inline std::optional<NativeWaterInstanceGPU> BuildNativeWaterInstance(
     const RenderMatrix &world, const NativeWaterMaterial &material,

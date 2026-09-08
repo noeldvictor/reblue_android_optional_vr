@@ -452,6 +452,7 @@ bool SubmitNativeWaterScenePackets(NativeWaterSceneSubmission submission) {
     pipeline_state.sampleCount = static_cast<plume::RenderSampleCounts>(shape->samples);
     pipeline_state.zWriteEnable = plan.depth_write;
     pipeline_state.cullMode = plan.cull;
+    pipeline_state.enableAlphaToCoverage = plan.alpha_to_coverage && shape->samples > 1;
     bool blend_dirty = false;
     ApplyBlendState(plan.blend,pipeline_state,blend_dirty);
     SanitizePipelineState(pipeline_state);

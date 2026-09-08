@@ -167,6 +167,18 @@ std::shared_ptr<const ModelMaterialImport> ModelMaterialRegistry::Find(
   return {};
 }
 
+std::shared_ptr<const ModelMaterialImport> ModelMaterialRegistry::FindNodeImport(
+    uint32_t source_model, uint32_t node) {
+  std::lock_guard lock(mutex_);
+  const auto found = models_.find(source_model);
+  if (found == models_.end()) return {};
+  const auto *program = found->second->render.FindNode(node);
+  if (!program) return {};
+  for (const auto &mesh : found->second->meshes)
+    if (&mesh.program == program) return {found->second, &mesh};
+  return {};
+}
+
 ModelMaterialRegistryStats ModelMaterialRegistry::Stats() const {
   std::lock_guard lock(mutex_);
   auto stats = stats_;

@@ -4752,3 +4752,56 @@ Raw/image sets unchanged; no exception expanded. All producers terminal and
 profile restored. Next IDs CPU60/output36,GPU66/water13/rigid23/snapshot22,
 host143/game972. Continue the ordered water producer/native mixed-consumer
 connection, not another unchanged reflection-only or bottom-inactive boot.
+
+### Ordered water draw connection (2026-09-08, source efa8c7b plus edits)
+
+Same cumulative3GiB exception/floor62,509,998,080B,20GiB reserve (supervisor21),
+100MiB diagnostics and10MiB attachment-log caps; raw/image gate unchanged.
+First measured free80,170,917,888B; pre-build80,170,790,912B. No live renderer,
+compiler/build or test producer found. Existing CPU tree78,216,846B/132files,
+GPU tree18,933,958B/19files and attachment logs299,998B/180files match the prior
+handoff. No new assets, trees, downloads, raw/images or profile changes planned.
+Reusing bounded wrapper: CPU60 and GPU66 each32MiB free-drop/300s; tests16MiB/
+30s; eventual host143192MiB/300s. CPU/GPU combined peak estimate64MiB; no game
+launch until the connected shader/owner fixtures and integration build pass.
+373 artifact-free Python boundary/scenario checks pass before builds. Retain
+new producer evidence until replacement passes; preserve all unresolved failures.
+
+Completed: CPU60/PID34016/test36/PID38712 passed; CPU61/PID37792/test37/PID27716
+supersede them with node retirement/reuse/ambiguity assertions. GPU66/PID24480
+compiled both water shaders; GPU67/PID32032 rebuilt the fixture. Water13/PID33804
+failed only the new discard oracle (expected old snapshot instead of actual
+post-snapshot clear); keep its full log. Corrected that new expectation, unchanged
+old oracles/tolerances: water14/PID37580 passes20 two-eye cases, rigid23/PID36096
+passes55 and snapshot22/PID38280 passes8, Vulkan validation0/0.375 Python checks
+exit0. Host143/PID35168/session68957 and host144/PID35932 terminal0; codegen0
+writes/deletions and no guest object compilation. Host144 is the live binary.
+
+Run972/PID35416/session9141 terminal0,07:44:01..07:46:08Eastern. Same180s/800KiB/
+192MiB bounds, no captures/perf/dumps, all22 temporary settings audited, exact
+116B profile hash restored. Full strict mixed/deferred-input/cold/reload chain
+passes. Water now actually submits/emits/retires in both epochs; last sample3179/
+3084/3177 with93 culled and no admission refusals. All prior water packets retired
+before the new generation's first submission. No actual game pixel/HDR/bottom/
+refraction/stereo qualification; those gates remain open. Details/hashes in
+20260908_1146_native-water-draw.md. No new assets, trees, downloads or raw/images.
+
+After replacement checks, removed18 explicit successful attachment logs:
+CPU59/test35,GPU65,water12,rigid22,snapshot21,host142,CPU60/test36, both streams;
+41701B. Removed hash-verified run971524518B after972 replaced its strict purposes.
+19files566219B logical total. Immediate free80146726912->80147308544B,
+581632B interval gain; credit once. Full old text retired, dated evidence remains.
+Keep water13 new failure, prior CPU29/build52/GPU62/water10 and game failures,
+the historical lossless zip and all protected image/raw sets. No originals removed.
+
+Retained CPU tree78238320B/132files (+21474), GPU19063572B/19files (+129614),
+EXE48952832/PDB111058944B (+206336 combined). Attachment logs298537B/186files:
+40240B new less41701B retired =1461B net shrink. Run972541835B replaces524518B,
+17317B net growth. These selected products/logs grow373280B net, needed for current
+draw/ownership and causal failure evidence; other host objects/metadata are separate.
+Drive first80170917888, post-cleanup80147308544B (~74.64GiB):23609344B less free.
+Scoped runtime cache/perf enumeration found no new files; do not label the whole
+drive change as task-owned output or cleanup. All producers terminal, profile
+restored. Next IDs CPU62/output38,GPU68/water15/rigid24/snapshot23,host145/game973.
+Next remove water's remaining material/visual/list adapters and qualify authored
+image-role/game-pixel cases, not another unchanged admission-only run.

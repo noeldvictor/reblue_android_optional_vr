@@ -114,5 +114,6 @@ float4 main(WaterFragment fragment, uint eye : SV_ViewID) : SV_Target0 {
     const float luminance = dot(max(colour,0),float3(.2126,.7152,.0722));
     if (luminance > 1e-6) colour *= (floor(luminance*4)+.5)/(4*luminance);
   }
+  if ((flags & WaterCutout) && !RigidCutoutPasses(material.modes.z,opacity,asfloat(material.modes.w))) discard;
   return float4(colour,opacity);
 }

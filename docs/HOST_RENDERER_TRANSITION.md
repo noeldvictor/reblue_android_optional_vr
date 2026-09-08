@@ -449,35 +449,47 @@ Authored camera calculation, extent/getter update and legacy draws remain adapte
 This does not add a game caller to the native water queue or qualify a full native
 frame. [Reflection producer and evidence](../research/20260908_1110_native-reflection-pass.md).
 
-Next connected work: publish completed water values and image owners from the
-ordered material writer and admit the family into the existing mixed scene
-consumer, calling `SubmitNativeWaterScenePackets`. Reuse the current
-water update/refraction setup, instance/model/mesh owners and native scene-image
-publications. Remove this family's per-entry legacy material/resource execution,
-not just another callback helper; preserve authored updates, reflections,
-refraction, blend/depth and snapshot order. Exit through production CPU/GPU
-fixtures plus fresh water consumption/retirement and mixed cold/reload checks.
-Publish completed material values with native instance/generation identity after
-the resource writer, not a draw-time descriptor lookup. The current import copies
-final parameter destinations; it is not yet installed in a frame-bounded owner.
-Supply the new typed image leases at the ordered material producer; the queue's
-image-owner mismatch is resolved. Use the completed bottom depth/projection
-pair, not a colour snapshot or a guessed later constant transform. Establish an
-authored bottom-active scenario or its scheduling gate before another live probe;
-unchanged bg41_01 retries add no evidence. Bump slot12, environment slot5,
-ordered planar-reflection lease publication, late per-primitive material writes and sampler publication
-still need native producer connections; ordinary sampler tracking covers only
-slots0..4. Keep producer command framebuffers/resolve
-owners alive through their fences too. Load-owned tangent
-and displacement metadata now exist; apply displaced bounds before live walk
-culling as well as queued visibility. Do not recreate these owners/helpers.
-The shader supports per-eye cameras/image layers; their actual game producers,
-water shadow-view variants and all authored controls remain integration work.
-Do not freeze late values or weaken unknown-writer refusal. Receiver descriptors,
-source-input imports, outgoing legacy state and legacy-opened scopes remain
-adapters in the broader scene. Qualify mixed-order
-pixels once the image budget allows it, while continuing independent native
-ownership work. Do not repeat the callback census or build a second renderer.
+Water draw connection (2026-09-08, host144/run972): completed resource writers now
+publish copied water values and typed bump/environment/planar/snapshot leases in a
+single ordered, instance/generation/frame-keyed scope. The mixed consumer calls
+`SubmitNativeWaterScenePackets` before `BindEntry`/`SubmitSurface`; admitted entries
+skip legacy geometry/constant binding and translated drawing, and cannot replay an
+older captured water entry. The existing model index supplies exact node/range
+associations, not a new address cache. Native packets retain model geometry, pose,
+images, lighting and current alpha/blend/depth inputs. Water alpha comparison and
+MSAA coverage intent are connected; early undisplaced walk culling is deferred until
+the shared queue has finalized wave-expanded bounds. Native water sampling explicitly
+uses wrapping linear normals, clamped screen/cube inputs, point D32 shore sampling
+and comparison sun sampling; no slots0..4 filter-publication assumption is made.
+
+CPU61/output37 checks sorted node identity, retirement/reuse and ambiguity. GPU67/
+water14 passes20 two-eye cases, including actual discard colour/depth behavior and
+material/image publication retirement;55 rigid and8 snapshot cases also pass,
+validation0/0.375 Python guards/scenario checks pass. Host143/144 link without guest
+object compilation. Run972 passes the strict mixed cold/reload chain and observes
+native water in both epochs: last sample3179 submitted,3084 emitted,93 culled,3177
+fence-retired, zero admission refusals. Fresh post-event windows advance emissions
+and retirement. The new generation starts with every preceding water packet retired.
+No new images/raws: this is live draw/lifetime evidence, not game-pixel or HDR art
+qualification. [Implementation, failure correction and evidence](../research/20260908_1146_native-water-draw.md).
+
+Next connected work: remove water's remaining per-entry material/resource and
+visual callback execution and source-list construction. Reuse the now-connected
+publication/queue, water update/refraction setup and existing instance/model owners.
+Replace the temporary sorted-entry, source feature and getter imports with native
+producer inputs while preserving late aliases, Bind/Keep and snapshot ordering;
+do not freeze them at the initial walk or recreate owners. Complete image-role
+production for currently unavailable cases, not a permanent fallback family.
+The observed water had no admission refusals, but no authored bottom/snapshot call
+was observed. Establish their scheduling gate or an authored active scenario before
+another live probe; unchanged bg41_01 retries add no evidence. Shore must retain its
+completed bottom depth/projection pair, never a guessed transform or colour snapshot.
+Reflection still has authored camera/extent/getter/draw adapters and initial camera
+misses (10 in972, unchanged after startup), not a solved full-frame path. The shader
+supports per-eye inputs, but actual game stereo producers, water shadow variants,
+authored controls and game-pixel/HDR/mixed-order sequence coverage remain open.
+Keep strict unknown-writer refusal, outgoing compatibility state and fence ownership.
+Do not repeat the callback census or build a second renderer.
 Full native frame, broader authored effects/scenes/reloads and both-eye acceptance
 remain open.
 [Native effect scope connection and verification](../research/20260908_0251_native-deferred-effects.md).

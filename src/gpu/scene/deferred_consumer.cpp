@@ -26,6 +26,7 @@
 #include "gpu/scene/native_blend_bridge.h"
 #include "gpu/scene/native_alpha_bridge.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
+#include "gpu/scene/native_water_material_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/shader_parameter_import.h"
@@ -631,7 +632,9 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     PPCRegister entry_reg{}, visual_reg{};
     entry_reg.u32 = entry;
     visual_reg.u32 = same_visual ? next_visual : 0;
-    if (item.native) CloseDeferredCompatibilityCapture();
+    const bool water_entry = !item.native && NativeRigidSceneEnabled() && NativeListMode() &&
+        IsDeferredWaterResource(next_visual, CheckedWord);
+    if (item.native || water_entry) CloseDeferredCompatibilityCapture();
     else if (bdRenderListEntryHook(entry_reg, visual_reg)) {
       ++stats.replayed;
       continue;
@@ -713,7 +716,17 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
       winding = next_winding;
       sidedness = next_side;
     }
+    NativeWaterMaterialScope water(NativeListMode() ? entry : 0,visual,identity);
     if (bridge.Material(36, {entry + 240, 1}) != 3) {
+      if (water.Submit(entry,ctx.r1.u32,stencil_pending)) {
+        // Native draw state is private; export the original end-of-entry depth
+        // intent for subsequent compatibility material callbacks and draws.
+        if (visual && Read<uint32_t>(visual + 3000) == 8) Write<uint8_t>(entry + 295,0);
+        const int32_t next_depth = int8_t(Read<uint8_t>(entry + 295));
+        if (next_depth != depth_write) { depth_write = next_depth; bridge.State(48,uint32_t(depth_write)); }
+        bridge.Material(40);
+        continue;
+      }
       if (visual && Read<uint32_t>(visual + 3000) == 3) {
         const auto foliage = ImportFoliage(visual, Read<uint32_t>(entry + 252));
         bridge.Floats(true, 57, foliage.displacement);

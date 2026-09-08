@@ -18,6 +18,8 @@ std::shared_ptr<const NativeModelRenderData> FindLoadedNativeModel(uint32_t sour
 void NoteNativeModelNodeCandidate(const NativeInstancePose &pose, uint32_t index, uint32_t view, uint32_t technique);
 std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelMaterials(
     uint32_t source_model, uint32_t source_mesh);
+std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelNodeImport(
+    uint32_t source_model, uint32_t node);
 uint64_t LoadedNativeModelGeneration(uint32_t source_model);
 std::shared_ptr<const NativeGeometry> FindLoadedNativeGeometry(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,

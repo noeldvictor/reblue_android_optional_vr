@@ -316,6 +316,11 @@ std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelMaterials(
   return Models().Find(source_model, source_mesh);
 }
 
+std::shared_ptr<const ModelMaterialImport> FindLoadedNativeModelNodeImport(
+    uint32_t source_model, uint32_t node) {
+  return Models().FindNodeImport(source_model, node);
+}
+
 std::shared_ptr<const NativeGeometry> FindLoadedNativeGeometry(
     const NodeTag &tag, uint32_t index_va, uint32_t stream_va,
     uint32_t first_index, uint32_t index_count, uint64_t layout, uint32_t stride) {

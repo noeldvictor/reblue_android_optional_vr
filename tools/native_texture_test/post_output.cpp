@@ -923,6 +923,10 @@ void RigidHardOffRouting() {
   const ModelNodeSourceBinding nodes[]{{0,100}, {1,200}};
   assert(models.Publish(10, {mesh(100,true),mesh(200,false)}, nodes));
   auto model = models.FindModel(10);
+  const auto node_import = models.FindNodeImport(10,0);
+  assert(node_import && &node_import->program == model->FindNode(0));
+  assert(models.FindNodeImport(10,1) == models.Find(10,200));
+  assert(!models.FindNodeImport(10,2) && !models.FindNodeImport(11,0));
   NativeInstancePose pose{1,model->Generation(),model,{identity,identity}};
   const auto route = [&](uint32_t node, uint32_t view) {
     return PrepareNativeRigidRoute(model,&pose,node,view).route;
@@ -975,10 +979,13 @@ void RigidHardOffRouting() {
   const auto retained = model;
   models.Retire(10);
   assert(!models.FindModel(10) && !models.Find(10,100));
+  assert(!models.FindNodeImport(10,0) && &node_import->program == retained->FindNode(0));
   assert(PrepareNativeRigidRoute(models.FindModel(10),&pose,0,3).route == NativeRigidRoute::Refused);
   assert(models.Publish(10,{mesh(100,true),mesh(200,false)},nodes));
   model = models.FindModel(10);
   assert(model != retained && model->Generation() != retained->Generation());
+  assert(models.FindNodeImport(10,0) != node_import &&
+      &models.FindNodeImport(10,0)->program == model->FindNode(0));
   assert(route(0,3) == NativeRigidRoute::Refused);
   pose.model_generation = model->Generation(); // Even a forged matching stamp is insufficient.
   assert(route(0,3) == NativeRigidRoute::Refused);
@@ -988,10 +995,12 @@ void RigidHardOffRouting() {
   assert(route(0,3) == NativeRigidRoute::Refused); // No source-bounds fallback.
   const ModelNodeSourceBinding ambiguous[]{{0,100},{0,200}};
   assert(models.Publish(10,{mesh(100,true),mesh(200,false)},ambiguous));
+  assert(!models.FindNodeImport(10,0));
   model = models.FindModel(10); pose.model = model; pose.model_generation = model->Generation();
   assert(route(0,3) == NativeRigidRoute::Refused);
   assert(!models.Publish(10,{mesh(100,true)},nodes));
   assert(!models.FindModel(10)); // Failed replacement cannot expose the prior generation.
+  assert(!models.FindNodeImport(10,0));
 }
 void ReceiverSetupOrder() {
   using namespace bd::gpu::scene;
