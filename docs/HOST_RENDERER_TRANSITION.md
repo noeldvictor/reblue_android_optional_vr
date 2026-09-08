@@ -655,19 +655,29 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    BDMESH v3 stores explicit paired joint-local positions/normals and weights,
    using the existing aggregate mesh budget. Do not collapse these into a single
    bind position without the skeleton/inverse-bind contract. Source-free indexed
-   deformation/bounds passed the prerequisite fixture. The next connection is now
-   implemented as a **source checkpoint, not yet compiled or run**: load-owned skin
-   bindings/counts feed `CookSkinMesh` and the shared geometry store; opaque phase1
-   caster admission uses animated bounds and completed instance poses, with native
-   GPU palettes pinned through the existing batch queue and fences. Palette storage
-   is bounded and deduplicates shared poses. Added CPU ownership and six GPU shadow
-   cases still need execution. Python source/scenario checks do not qualify their
-   behavior. Next build/run those fixtures and the incremental host, then verify
-   fresh live skin submission/emission/retirement and shadow pixels across reload.
-   Skinned scene shading, cutout casting, original animation production and the
-   remaining replay geometry/register consumers are not converted. No additional
-   runtime adapter removal is proven; host155/run980 evidence is unchanged.
-   GPU/pixel/game/reload/both-eye skin acceptance remains open.
+   deformation/bounds passed the prerequisite fixture. The connection now passes
+   CPU/GPU fixtures and host158 compilation: load-owned skin bindings/counts feed
+   `CookSkinMesh` and the shared geometry store; animated bounds and completed
+   instance poses feed bounded, deduplicated palettes in the existing queue/fences.
+   Six new Vulkan cases cover1/2/3 influences with single and instanced casters;
+   all55 prior rigid cases,20 water cases and8 snapshot cases pass, validation0/0.
+   CPU coverage includes source retirement, pose replacement, exact palette
+   capacity, shared-pose reuse, prefix splitting and conservative FP32 bounds.
+   **Live reachability is not qualified.** Run981 stopped at the192MiB free-drop
+   limit during reload, with no native skin emission. Targeted983 proves native
+   skin geometry exists, but generation97/node47 (4primitives) and node62
+   (6primitives) reject for `unconverted cutout sibling`. Generation38/node1
+   (44primitives) uses technique1 with texture-dependent participation.
+   Next connect skin deformation to the existing shadow cutout producer, UV/base
+   image/wrap-sampler contract and fixed0.6-alpha shader; preserve whole-node
+   admission and test these mixed siblings before another broad run. Then handle
+   technique1 participation using owned image classes, not an assumed ordinary
+   texture or relaxed rejection. Reuse `PrepareNativeRigidShadowForObject`, the
+   current skin vertex/palette owner and the shared queue. Native scene shading,
+   animation production and remaining replay/register consumers remain open.
+   No additional runtime adapter removal or game/stereo skin acceptance is proven;
+   host155/run980 remains the last complete strict reload result, not host158.
+   [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).
    [Exact contract and evidence](../research/20260908_1410_native-skin-assets.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass

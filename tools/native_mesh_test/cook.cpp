@@ -244,10 +244,17 @@ static void TestSkinCook() {
   pose[0][12] += 100;
   const auto animated = BuildNativeSkinBounds(cooked,pose);
   const auto animated_envelope = TransformNativeSkinBounds(*envelopes,pose);
-  Check(animated_envelope && animated_envelope->max[0] >= animated->max[0],"same immutable envelopes follow changed poses");
+  Check(animated && animated_envelope && animated_envelope->max[0] >= animated->max[0],"same immutable envelopes follow changed poses");
   Check(animated && std::abs(animated->min[0]-bounds->min[0]-20) < 1e-4f,"fresh animated pose changes bound");
   pose[0][3] = 1;
   Check(!BuildNativeSkinBounds(cooked,pose),"nonaffine palette refuses");
+  const RenderMatrix far_joint{1,0,0,0,0,1,0,0,0,0,1,0,1e6f,-1e6f,0,1};
+  const NativeSkinJointBounds far_envelope{0,{{0,0,0},{0,0,0}}};
+  NativeSkinVertex near_unit; near_unit.weights = {.5f,.500009f,0};
+  const auto far_point = DeformNativeSkinVertex(near_unit,std::span(&far_joint,1));
+  const auto far_bounds = TransformNativeSkinBounds(std::span(&far_envelope,1),std::span(&far_joint,1));
+  Check(far_point && far_bounds && far_bounds->max[0] >= far_point->world[0] &&
+      far_bounds->min[1] <= far_point->world[1],"joint envelopes include accepted weight-sum and GPU arithmetic error");
   auto hostile = cooked;
   Word(hostile.streams[0].bytes,6*16,std::bit_cast<uint32_t>(.5f));
   Check(!ValidateNativeMesh(hostile),"fractional native joint refuses");

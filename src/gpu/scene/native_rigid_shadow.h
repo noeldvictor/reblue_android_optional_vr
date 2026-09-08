@@ -39,6 +39,7 @@ enum class NativeRigidCasterRoute { Legacy, Native, Refused };
 struct NativeRigidCasterAdmission {
   NativeRigidCasterRoute route = NativeRigidCasterRoute::Refused;
   std::vector<NativePrimitivePolicy> policies;
+  const char *reason = "invalid program or missing policy";
 };
 // Classify the authored family before consulting a pose or GPU allocation.
 // Depth-only opaque casting does not consume material colour, texture layers,
@@ -56,27 +57,30 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
       ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
   bool skinned = false;
   for (const auto &range : program.ranges) {
-    if (!range.shader.vertex_bones) return {unsupported};
+    if (!range.shader.vertex_bones) return {unsupported,{},"missing influence count"};
     if (*range.shader.vertex_bones) {
-      if (!skin || *range.shader.vertex_bones > 3 || !range.skin || !range.skin->count) return {unsupported};
+      if (!skin || *range.shader.vertex_bones > 3 || !range.skin || !range.skin->count)
+        return {unsupported,{},"skin disabled or unsupported binding/count"};
       skinned = true;
-    } else if (range.skin) return {unsupported};
+    } else if (range.skin) return {unsupported,{},"rigid sibling retains a skin binding"};
   }
   if (!inputs) return {};
-  if (inputs->technique != 0 || inputs->phase > 1) return {unsupported};
-  if (skinned && (inputs->phase != 1 || inputs->pass_mode != 0)) return {unsupported};
+  if (inputs->technique != 0 || inputs->phase > 1) return {unsupported,{},"unconverted technique/phase"};
+  if (skinned && (inputs->phase != 1 || inputs->pass_mode != 0)) return {unsupported,{},"unconverted skin pass mode"};
   // This family deliberately excludes texture-dependent effect participation.
   // Do not classify a missing image as an ordinary volume-free material.
   if (inputs->texture_effects)
     for (const auto &step : program.policy_steps)
-      if (step.operation == PrimitivePolicyOperation::Texture) return {unsupported};
+      if (step.operation == PrimitivePolicyOperation::Texture) return {unsupported,{},"texture-dependent participation"};
   std::vector<NativePrimitivePolicy> policies;
   if (!ComposePrimitivePolicies(std::span(program.policy_steps), std::span(program.ranges), *inputs,
       [](const PrimitivePolicyStep &) { return PrimitiveTextureClass::Unknown; }, policies)) return {};
-  for (const auto &policy : policies)
-    if (!policy.routing_known || (policy.deferred && !shadow_deferred) ||
-        (policy.alpha_test && (!scene_cutouts || skinned))) return {unsupported};
-  return {NativeRigidCasterRoute::Native, std::move(policies)};
+  for (const auto &policy : policies) {
+    if (!policy.routing_known) return {unsupported,{},"unknown primitive routing"};
+    if (policy.deferred && !shadow_deferred) return {unsupported,{},"unconverted deferred participation"};
+    if (policy.alpha_test && (!scene_cutouts || skinned)) return {unsupported,{},"unconverted cutout sibling"};
+  }
+  return {NativeRigidCasterRoute::Native, std::move(policies),"owned caster"};
 }
 inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
     const NativeModelMaterialProgram &program, const std::optional<PrimitivePolicyInputs> &inputs, bool skin = false) {

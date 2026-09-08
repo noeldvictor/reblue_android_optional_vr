@@ -124,6 +124,24 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   if (!model) return false;
   const bool skin = NativeSkinShadowEnabled() && owned_pose.get() == &pose;
   const auto admission = PrepareNativeRigidShadowAdmission(*model, inputs, skin);
+  if (skin && admission.route != NativeRigidCasterRoute::Native &&
+      std::any_of(model->ranges.begin(),model->ranges.end(),[](const auto &range) {
+        return range.skin || range.shader.vertex_bones.value_or(0);
+      })) {
+    // Bounded ownership-boundary evidence, not another fallback or per-frame trace.
+    thread_local std::array<std::pair<uint64_t,uint32_t>,8> observed{};
+    thread_local uint32_t reported = 0;
+    const auto key = std::pair(pose.model_generation,node);
+    if (reported < observed.size() && std::find(observed.begin(),observed.begin()+reported,key) == observed.begin()+reported) {
+      observed[reported++] = key;
+      const auto &range = model->ranges.front();
+      BD_INFO("[native-skin-caster-admission] generation {} node {} instance {} route {} ranges {}; reason {}; policy {} technique {} phase {} mode {} effects {}; first bones {} binding {} native-geometry {}; sample {}/8",
+          pose.model_generation,node,pose.instance,uint32_t(admission.route),model->ranges.size(),admission.reason,bool(inputs),
+          inputs ? inputs->technique : ~0u,inputs ? inputs->phase : ~0u,inputs ? inputs->pass_mode : ~0u,
+          inputs && inputs->texture_effects,range.shader.vertex_bones ? int(*range.shader.vertex_bones) : -1,
+          range.skin ? range.skin->count : 0,!model->skin_geometries.empty() && bool(model->skin_geometries[0]),reported);
+    }
+  }
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
   Require(admission.route == NativeRigidCasterRoute::Native, "caster family or object pass policy unavailable");
   const auto camera = FindNativePassCamera(1);

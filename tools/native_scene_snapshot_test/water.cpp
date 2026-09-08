@@ -407,8 +407,10 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   for (uint32_t n = 0; n < 2; ++n) {
     auto water = std::make_shared<NativeWaterBatchData>(); water->input = instances[n+1];
     NativeWaterMaterialPublication publication;
-    publication.Publish({n+1,29},17,{materials[n],bump,environment,
-        NativeImageLease::From(reflection),NativeImageLease::From(snapshot)});
+    NativeWaterMaterialOutput output;
+    output.material = materials[n]; output.bump = bump; output.environment = environment;
+    output.planar = NativeImageLease::From(reflection); output.snapshot = NativeImageLease::From(snapshot);
+    publication.Publish({n+1,29},17,std::move(output));
     const auto produced = publication.Read({n+1,29},17);
     Need(bool(produced),"Ordered native water material/image producer");
     water->images = {produced->bump,produced->environment,produced->planar,produced->snapshot,

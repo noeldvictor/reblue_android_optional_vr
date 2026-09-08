@@ -5130,3 +5130,88 @@ Ending free80074473472B vs preflight80071610368B:2863104B more free drive-wide,
 not attributed as cleanup beyond the measured interval. Source/Git/other drive
 activity is separate. All producers terminal; same cumulative limits. Next
 mesh build16/CPU14; host156/game981 remain unused and require a real connection.
+
+### Native skin caster connection (2026-09-08, source319586c plus fixes)
+
+Previous turn made progress: source connection319586c committed and pushed, with
+379 Python guards passing and compilation/live verification explicitly pending.
+No renderer/build/test producer is active. Preflight free80,049,041,408B; mesh
+tree1653096B/30files, texture fixture79082588B/132files, GPU fixture19063572B/
+19files, attachment logs302234B/192files. Reuse the same cumulative3GiB owner
+exception/floor62,509,998,080B and all existing diagnostic/log/raw/image limits.
+No allowance reset. Prior free-space movement is drive-wide, not attributed to
+renderer outputs. Existing fixture payloads are unchanged; no new cache/game run.
+Plan mesh16/CPU14 (32/16MiB), output66/CPU41 (64/16MiB), GPU68/rigid24
+(96/32MiB), then incremental host156 (192MiB), with existing300s build/30s CTest
+supervision and10MiB aggregate logs. No guest rebuild, new tree, download, asset
+copy/cook or raw capture. Retain replacement fixtures/logs; remove identified
+superseded passing logs after replacement. This tests actual native joint-local
+caster vertices/palettes, animated bounds and owned queue/fence lifetime; game
+submission/emission/reload/pixels remain pending until a fresh targeted run.
+
+Mesh16/PID27316 and CPU14/PID35608 passed; output66/PID23632 and CPU41/PID38828
+passed. GPU68/PID29516 failed on the older water fixture's positional initializer
+after a production field addition. Replaced it with explicit fields, without
+changing its shader/oracle. GPU69/PID35828 passed; rigid24/PID26808 passes all61
+cases (six new1/2/3-influence single/instanced skin cases), water15/PID34340 all20.
+Vulkan validation0errors/0warnings; one unrelated missing GOG overlay manifest
+loader message; no raw/image files. Added weight-sum/FP32 bounds padding and
+exact palette-capacity/shared-pose/prefix-split regressions. Final mesh17/PID27680,
+CPU15/PID30628, output67/PID38448 and CPU42/PID37484 pass. All379 Python guards pass.
+Host156/PID29368/session95103 terminal exit0; codegen0written/no guest objects.
+EXE49033216B/PDB111661056B. Post-link free80,039,821,312B. Next981 is a named
+skin reachability and fresh cold/reload emission/retirement check, retaining the
+strict mixed-consumer regression. Wrapper explicitly sets bd_native_skin_shadow;
+same180s/800KiB/192MiB bounds, exact profile restoration, zero capture/persistence.
+
+Snapshot23/PID36544 passes8cases, validation0/0. After replacement, retired26
+inspected superseded fixture logs (mesh15/13,16/14,output65/40,66/41,GPU67/68,
+rigid23/water14/snapshot22 stdout/stderr):38387B logical, free80039010304->
+80039067648B. First runtime preflight refused diagnostic overlap before any
+profile write/launch. Losslessly archived958/959 (1013088B input) to
+retained-native-runtime-958-959.zip156174B; both entry SHA256/lengths match before
+plaintext removal. Logical saving856914B, free80037871616->80038727680B. Archive
+SHA256EA1F252DE014B378907ABF30A355FBE89CEBD896BD14E553893E56C4140031DB;
+959's distinct merging proof and958's full evidence remain recoverable. No raw
+or image deletion. Each cleanup credited once; all prior failure protection stays.
+
+981/PID24776/session84710 launched10:49:36, terminal10:51:20 after104s when the
+192MiB free-drop supervisor stopped it during reload. Profile restored exactly.
+No native skin-shadow emissions observed; unchanged skin replay remains active.
+No runtime error detected before the stop; full reload gate not completed.
+Only new game output is365353B log, SHA256899E71D4F3A0F091B2FDA634B55C62994CA968F8A92FD2B3FACCE3D61D84483D.
+Post-stop free79801425920B; roughly237MB drive-wide drop is not attributed to
+that log. Scoped game cache/HLSL/raw and recent NVIDIA DX/GL caches show no new
+payload. Pagefile allocated2048MiB/current410MiB/peak1524MiB; no earlier pagefile
+sample proves its delta. No live renderer/compiler remains. Keep981 and add
+bounded skin admission evidence before another attempt; do not repeat unchanged
+eligibility or label absent skin emission a pass. Same limits remain in force.
+
+Host157/PID29124 builds. Probe982/PID29676/session92826 stops intentionally after
+observing admission at10:55:32 (23s); native skin geometry exists, route remains
+Legacy. Added exact refusal reasons and CPU regressions. Final output68/PID20020,
+CPU43/PID38668 and host158/PID30588/session68209 pass;379 Python guards pass.
+983/PID20444/session36558 stops intentionally10:59:49 after21s: ordinary
+generation97 nodes47/62 refuse cutout siblings (4/6primitives); generation38
+node1 (44primitives) refuses technique1/effect participation. No new skin emission,
+no runtime correctness failure before diagnostic stop, and no field/reload/pixel
+qualification. Exact profile restored; no new raw/image/cache payload. 98389700B
+SHA2564796FBE511641E26E0D429D9ED31E4051D0794C028C592523D6DE2D30C05F7CC.
+Keep981's storage-stop evidence and983's causal admission evidence. Retired9
+inspected superseded logs: host156/157,output67/CPU42 stdout/stderr plus hash-
+verified98271496B (its evidence replaced by983).77221B logical, free79327309824->
+79327395840B. 982SHA256DC306048C9F9B1C330BB2D455C07A6589EDCAE5E3BC605A55AB8EADB17E7CE34.
+Total this turn35 superseded logs115608B removed plus856914B net lossless archival
+reduction=972522B logical reclaimed, counted once. Two historical plaintext logs
+remain fully recoverable from the checked ZIP. No protected image/raw or asset lost.
+
+Closing mesh1703082B/30files (+49986), texture82677563B/132files (+3594975),
+GPU19836673B/19files (+773101), EXE49037824B (+43008), PDB111685632B (+372736),
+attachment logs306127B/194files (+3893). Runtime981/983455053B plus archival
+reduction856914B gives selected net retained growth4435838B for the new fixtures,
+host code and causal evidence. Other objects/metadata/source/Git remain separate.
+Ending free79327395840B vs first80049041408B:721645568B less free drive-wide,
+mostly unattributed by scoped output checks; do not call it renderer output or
+cleanup savings. No owned producer remains. Same cumulative limits, no reset.
+Next host159/game984 only after the connected cutout or technique-participation
+change; no repeat opaque-only probe. See20260908_1100_native-skin-caster-verification.md.

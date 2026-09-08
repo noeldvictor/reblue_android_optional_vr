@@ -24,6 +24,17 @@ inline std::optional<NativeBounds> TransformNativeSkinBounds(
       result->max[axis] = (std::max)(result->max[axis],bounds->max[axis]);
     }
   }
+  if (result) for (uint32_t axis = 0; axis < 3; ++axis) {
+    // Asset validation permits a 1e-5 weight-sum error. Include that plus the
+    // three weighted GPU multiply/adds; the affine envelope alone is not enough
+    // when joint points coincide far from the origin.
+    const double magnitude = (std::max)(std::abs(double(result->min[axis])),std::abs(double(result->max[axis])));
+    const double error = (1e-5+32*std::numeric_limits<float>::epsilon())*magnitude +
+        32*double((std::numeric_limits<float>::min)());
+    result->min[axis] = std::nextafter(float(double(result->min[axis])-error),-std::numeric_limits<float>::infinity());
+    result->max[axis] = std::nextafter(float(double(result->max[axis])+error),std::numeric_limits<float>::infinity());
+  }
+  if (result && !result->Valid()) return {};
   return result;
 }
 struct NativeSkinVertex {

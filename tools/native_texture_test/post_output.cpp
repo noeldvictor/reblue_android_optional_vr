@@ -1746,7 +1746,10 @@ void SkinCasterOwnership() {
   invalid.skin_geometries.push_back(nullptr);
   assert(!PrepareNativeRigidShadow(invalid,transforms[0],policy,camera,{},a.get())); // transactional siblings
   invalid = *program; invalid.policy_steps = {{PrimitivePolicyOperation::Alpha,1,0}}; invalid.ranges[0].policy_step_end = 1;
-  assert(PrepareNativeRigidShadowAdmission(invalid,policy,true).route == NativeRigidCasterRoute::Legacy);
+  const auto alpha_refusal = PrepareNativeRigidShadowAdmission(invalid,policy,true);
+  assert(alpha_refusal.route == NativeRigidCasterRoute::Legacy && std::string_view(alpha_refusal.reason) == "unconverted cutout sibling");
+  auto other_technique = policy; other_technique.technique = 1; other_technique.texture_effects = true;
+  assert(std::string_view(PrepareNativeRigidShadowAdmission(*program,other_technique,true).reason) == "unconverted technique/phase");
   const std::array<std::shared_ptr<const NativeInstancePose>,3> poses{a,b,a};
   auto palette = PlanNativeSkinPalette(poses);
   assert(palette && palette->matrices == 6 && palette->poses.size() == 2 &&
@@ -1768,6 +1771,29 @@ void SkinCasterOwnership() {
   auto missing = item; missing.skin_pose.reset(); assert(!missing.Ready(1,0));
   missing = item; missing.instance = second; assert(!missing.Ready(1,0));
   missing = item; missing.input.object_data.flags.x = RigidCutout; assert(!missing.Ready(1,0));
+  missing = item; missing.world_bounds->min[0] = std::numeric_limits<float>::infinity(); assert(!missing.Ready(1,0));
+  std::array<std::shared_ptr<const NativeInstancePose>,6> capacity_poses;
+  std::array<NativeRigidBatchItem,6> capacity_items;
+  std::array<const NativeRigidBatchItem *,6> capacity_pointers;
+  for (size_t n = 0; n < 6; ++n) {
+    if (n == 4) capacity_poses[n] = capacity_poses[0]; // alias fits even at exact capacity
+    else {
+      auto large = std::make_shared<NativeInstancePose>(*item.skin_pose);
+      large->instance = n+100; large->transforms.assign(NativeInstanceRegistry::kMaxTransforms,identity);
+      capacity_poses[n] = std::move(large);
+    }
+    capacity_items[n] = item; capacity_items[n].skin_pose = capacity_poses[n];
+    capacity_items[n].instance = capacity_poses[n]->instance; capacity_pointers[n] = &capacity_items[n];
+  }
+  const auto full = PlanNativeSkinPalette(std::span(capacity_poses).first(5));
+  assert(full && full->matrices == kNativeSkinPaletteMatrices && full->poses.size() == 4 && full->ranges[4].x == 0);
+  assert(!PlanNativeSkinPalette(capacity_poses));
+  assert(NativeRigidBatchLength(capacity_pointers,1,0) == 5);
+  assert(NativeRigidBatchLength(std::span(capacity_pointers).last(1),1,0) == 1);
+  auto oversized = std::make_shared<NativeInstancePose>(*capacity_poses[0]); oversized->transforms.push_back(identity);
+  missing = capacity_items[0]; missing.skin_pose = oversized; assert(!missing.Ready(1,0));
+  const std::array<std::shared_ptr<const NativeInstancePose>,1> oversized_poses{oversized};
+  assert(!PlanNativeSkinPalette(oversized_poses));
   models.Retire(1); instances.Retire(first); instances.Retire(second); source = {}; a.reset(); b.reset();
   assert(item.Ready(1,0) && item.skin_pose->transforms[2][12] == 7 && palette->poses[1]->instance == second);
   assert(item.output.Record() && item.output.Resolve(true) && item.output.Retire());
