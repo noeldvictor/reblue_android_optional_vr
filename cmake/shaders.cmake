@@ -46,6 +46,14 @@ function(reblue_host_shader STEM PROFILE)
     if(STEM MATCHES "^native_rigid_skin_")
         list(APPEND hlsl_includes "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_skin_vertex.h")
     endif()
+    if(STEM MATCHES "^native_skin_scene_")
+        list(APPEND hlsl_includes
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_inputs.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_rigid_shader.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_skin_vertex.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_skin_scene_vertex.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/scene/native_lit_shading.h")
+    endif()
     if(STEM MATCHES "^native_visibility_")
         list(APPEND hlsl_includes "${REBLUE_HLSL_DIR}/native_visibility_depth.h")
     endif()
@@ -89,7 +97,7 @@ function(reblue_host_shader STEM PROFILE)
         foreach(target IN LISTS ${target_list})
             target_sources(${target} PRIVATE "${out}")
         endforeach()
-        if((STEM MATCHES "^native_rigid_" OR STEM MATCHES "^native_water_" OR STEM MATCHES "^native_visibility_" OR STEM STREQUAL "native_occ_proxy_vs" OR STEM STREQUAL "occ_proxy_ps")
+        if((STEM MATCHES "^native_rigid_" OR STEM MATCHES "^native_skin_scene_" OR STEM MATCHES "^native_water_" OR STEM MATCHES "^native_visibility_" OR STEM STREQUAL "native_occ_proxy_vs" OR STEM STREQUAL "occ_proxy_ps")
             AND ext STREQUAL "spirv" AND TARGET native_scene_snapshot_test)
             target_sources(native_scene_snapshot_test PRIVATE "${out}")
         endif()

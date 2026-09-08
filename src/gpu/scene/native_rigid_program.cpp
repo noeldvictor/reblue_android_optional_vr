@@ -6,6 +6,8 @@
 #if defined(REBLUE_D3D12)
 #include "src/gpu/shaders/hlsl/native_rigid_vs.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_layered_vs.hlsl.dxil.h"
+#include "src/gpu/shaders/hlsl/native_skin_scene_vs.hlsl.dxil.h"
+#include "src/gpu/shaders/hlsl/native_skin_scene_layered_vs.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_ps.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.dxil.h"
 #include "src/gpu/shaders/hlsl/native_rigid_skin_shadow_vs.hlsl.dxil.h"
@@ -16,6 +18,8 @@
 #else
 #include "src/gpu/shaders/hlsl/native_rigid_vs.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_layered_vs.hlsl.spirv.h"
+#include "src/gpu/shaders/hlsl/native_skin_scene_vs.hlsl.spirv.h"
+#include "src/gpu/shaders/hlsl/native_skin_scene_layered_vs.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_ps.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_shadow_vs.hlsl.spirv.h"
 #include "src/gpu/shaders/hlsl/native_rigid_skin_shadow_vs.hlsl.spirv.h"
@@ -25,6 +29,33 @@
 #define RIGID_BLOB(name) g_##name##_spirv, sizeof(g_##name##_spirv)
 #endif
 namespace bd::gpu::scene {
+NativePipelineHandle CreateNativeSkinSceneProgram(plume::RenderDevice &device, NativeVertexInputHandle input) {
+  if (!input || input->Streams() != 1 || (input->Elements().size() != 10 && input->Elements().size() != 11)) return {};
+  const char *names[]{"POSITION","NORMAL","BLENDINDICES","BLENDWEIGHT","TEXCOORD","COLOR","TEXCOORD"};
+  for (uint32_t n = 0; n < input->Elements().size(); ++n) {
+    const auto &element = input->Elements()[n];
+    const uint32_t kind = n < 6 ? n/3 : n-4, index = n < 6 ? n%3 : n == 10 ? 2 : 0;
+    if (!element.semanticName || std::strcmp(element.semanticName,names[kind]) || element.semanticIndex != index ||
+        element.location != n || element.slotIndex || element.format != plume::RenderFormat::R32G32B32A32_FLOAT) return {};
+  }
+  NativeRigidDescriptorSchema schema(true);
+  plume::RenderPipelineLayoutBuilder builder;
+  builder.begin(false,true);
+  for (const auto &set : schema.sets) builder.addDescriptorSet(set);
+  builder.end();
+  std::shared_ptr<plume::RenderPipelineLayout> layout = builder.create(&device);
+#if defined(REBLUE_D3D12)
+  constexpr auto format = plume::RenderShaderFormat::DXIL;
+#else
+  constexpr auto format = plume::RenderShaderFormat::SPIRV;
+#endif
+  std::shared_ptr<plume::RenderShader> vertex = input->Elements().size() == 11
+      ? device.createShader(RIGID_BLOB(native_skin_scene_layered_vs),"main",format)
+      : device.createShader(RIGID_BLOB(native_skin_scene_vs),"main",format);
+  std::shared_ptr<plume::RenderShader> pixel = device.createShader(RIGID_BLOB(native_rigid_ps),"main",format);
+  if (!layout || !vertex || !pixel) return {};
+  return NativePipelineProgram::Create(layout,vertex,pixel,std::move(input));
+}
 NativePipelineHandle CreateNativeSkinShadowProgram(plume::RenderDevice &device, NativeVertexInputHandle input, bool cutout) {
   if (!input || input->Streams() != 1 || input->Elements().size() != (cutout ? 6 : 5)) return {};
   for (uint32_t n = 0; n < input->Elements().size(); ++n) {

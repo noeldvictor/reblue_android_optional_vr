@@ -64,6 +64,7 @@
 #include <cmath>
 #include <stdexcept>
 #include "gpu/scene/native_rigid_shadow.h"
+#include "gpu/scene/native_rigid_scene.h"
 
 REXCVAR_DECLARE(bool, bd_host_walk);
 REXCVAR_DECLARE(bool, bd_host_cull);
@@ -292,13 +293,15 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
           for (u32 k = 0; k < 3; ++k)
             out[k] = m[12 + k] + c[0] * m[k] + c[1] * m[4 + k] + c[2] * m[8 + k];
           float radius = radius_scale * (bounds ? (*bounds)[3] : LoadF32(mesh + offsetof(GuestMesh, radius)));
-          if (view_id == 1 && NativeSkinShadowEnabled() && program &&
+          if (program &&
               std::any_of(program->ranges.begin(),program->ranges.end(),[](const auto &range) {
                 return range.shader.vertex_bones && *range.shader.vertex_bones;
-              }) && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true,
+              }) && ((view_id == 3 && NativeSkinSceneEnabled() &&
+                  PrepareNativeRigidSceneAdmission(*program,shadow_policy,NativeRigidDeferredEnabled(),true).route == NativeRigidCasterRoute::Native) ||
+                (view_id == 1 && NativeSkinShadowEnabled() && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true,
                   shadow_policy && (shadow_policy->technique == 1 || shadow_policy->texture_effects)
                       ? FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)
-                      : std::span<const NativePrimitivePolicy>{}).route == NativeRigidCasterRoute::Native) {
+                      : std::span<const NativePrimitivePolicy>{}).route == NativeRigidCasterRoute::Native))) {
             const auto animated = NativeSkinCasterBounds(*program,*instance_pose,index);
             if (!animated) throw std::runtime_error("Native skin caster has no owned animated bounds");
             double squared = 0;

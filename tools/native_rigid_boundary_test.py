@@ -6,6 +6,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeRigidBoundaryTest(unittest.TestCase):
+    def test_skin_scene_uses_owned_palette_normals_bounds_and_fences(self):
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        for required in ("CreateNativeSkinSceneProgram(*s.device,plan.vertex_input)",
+                         "item->skin_pose = plan.skin_pose", "plan.skin_pose ? plan.skin_bounds",
+                         "store.skin_scene_emitted : store.skin_emitted", "store.skin_scene_retired : store.skin_retired"):
+            self.assertIn(required, direct)
+        scene = (ROOT / "src/gpu/scene/native_rigid_scene.h").read_text()
+        for required in ("FindNativeInstanceNode(*packet.pose,packet.node) != &program",
+                         "plan.skin_pose = packet.pose", "TransformNativeSkinBounds(",
+                         "skin_scene_layered_vertex_input"):
+            self.assertIn(required, scene)
+        shader = (ROOT / "src/gpu/scene/native_skin_scene_vertex.h").read_text()
+        self.assertIn("NativeSkinNormal(", shader)
+        self.assertIn("world_to_clip[eye]", shader)
+        self.assertNotIn("object_data.world", shader)
+        self.assertNotIn("object_data.normal_rows", shader)
+        walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
+        self.assertIn("view_id == 3 && NativeSkinSceneEnabled()", walk)
+
     def test_receiver_is_native_and_draw_consumes_a_retained_packet(self):
         source = (ROOT / "src/gpu/scene/native_shadow_receiver_bridge.cpp").read_text()
         self.assertIn("REXCVAR_DEFINE_BOOL(bd_native_shadow_receiver, true", source)
@@ -262,7 +281,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("0x63B8D67932573E51", scene)
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         submit = direct.split("bool SubmitNativeRigidScene(", 1)[1].split("void PrepareNativeRigidBatchDraw(", 1)[0]
-        self.assertLess(submit.index("PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled())"), submit.index("PrepareNativeRigidSceneForObject"))
+        self.assertLess(submit.index("PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled(), NativeSkinSceneEnabled())"), submit.index("PrepareNativeRigidSceneForObject"))
         self.assertLess(submit.index("pending.push_back("), submit.index("StageNativeItem("))
         self.assertIn("item->regression = geometry->id == 0x258694267A8DBAEEull", submit)
         self.assertIn("scene_family_emitted += instances", direct)

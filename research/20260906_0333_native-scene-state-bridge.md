@@ -5306,3 +5306,35 @@ evidence. Full host159/run984 archived; current978 retains skin emission and
 reload storage-stop evidence. Next actual renderer log979 (not an assumed985),
 only after storage reconciliation and for missing skin reload/pixels or a new
 connected consumer. Full details20260908_1143_native-skinned-shadow-consumer.md.
+
+### 2026-09-08 ordinary skin scene connection (source07c4623 plus work)
+
+Prior turn made progress: native shadow emission evidence and pushed07c4623.
+At11:57:02 preflight free79040143360B, no live renderer/compiler/test producer;
+existing attachment logs316904B/194files. Previous game outputs remain accounted
+for in the preceding entry; unresolved drive-wide activity is not attributed to
+the game. No runtime retry, cache deletion, new raw/image or budget increase.
+Reuse the same trees and cumulative floor62509998080B. Planned CPU output71
+(32MiB free-drop), CPU46(8MiB), GPU71(64MiB)/rigid26(32MiB), host161(192MiB),
+one job at a time. Expected final fixture/host growth below2MiB; overlap bounded
+by the existing supervisor and10MiB aggregate logs. Preserve passing/failure
+evidence until replacements pass, then remove only superseded build/test logs.
+New shaders and the shared queue/pose connection need fresh CPU/GPU/host tests;
+live ordinary skin scene/reload/pixels stay pending until actually exercised.
+
+Output71/PID37940 built; CPU46/PID34868/session82342 terminated at CTest30s
+after old fixture assertion (missing owned shader metadata). Corrected fixture
+output72/PID32380 and CPU47/PID32320 pass,0.55s. GPU71/PID8168 compiled both
+new scene shaders/shared skin headers. Rigid26/PID22224 rejected the new fixture
+asset's unsorted semantic order; corrected GPU72/PID30468 and rigid27 pass154
+cases,1.95s, validation0/0, no raw/images. Host161/PID32304/session30288 passed,
+codegen0written/no guest objects.384 Python checks pass. Exact hashes and
+coverage in20260908_1210_native-skin-scene-shading.md.
+Pre-runtime12:08 free78997954560B; existing game GLCache429851081+410176B
+unchanged, fixture-cache03e9307f1e996973 now803634+1856B (no initial delta claimed).
+Texture fixture82900615B (+93993), GPU20052610B (+151959), EXE49078272B
+(+30720), PDB111747072B (+53248). Removed16 verified superseded build/test logs
+98827B logical, free78997434368->78997544960B (+110592B observed). No assets,
+profiles, images, game logs or active trees removed. Current log aggregate341974B
+versus initial316904B (+25070). Selected retained growth354990B excluding new
+shader headers/other objects/source/Git/system activity. Same cumulative limits.

@@ -44,6 +44,8 @@ struct NativeRigidScenePlan {
   // Pending recipes are not drawable until finalization installs a current
   // ticket and repacks all three light slots at the actual submission position.
   std::optional<NativeSceneLightRecipe> light_recipe;
+  std::shared_ptr<const NativeInstancePose> skin_pose;
+  std::optional<NativeBounds> skin_bounds;
 };
 struct NativeRigidSceneSubmission {
   uint64_t instance = 0, model_generation = 0;
@@ -83,9 +85,9 @@ inline bool FinalizeNativeRigidSceneLights(std::span<NativeRigidScenePlan> plans
 // from authored recipes, before a missing pose/texture can choose legacy drawing.
 inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
     const NativeModelMaterialProgram &program,
-    const std::optional<PrimitivePolicyInputs> &inputs, bool deferred = false) {
+    const std::optional<PrimitivePolicyInputs> &inputs, bool deferred = false, bool skin = false) {
   const bool ordinary_deferred = deferred && inputs && inputs->phase == 0 && inputs->pass_mode == 0;
-  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, ordinary_deferred);
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, ordinary_deferred, skin, {}, skin);
   if (admission.route != NativeRigidCasterRoute::Native) return admission;
   const auto unsupported = SelectedNativeRigidShadow(program)
       ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
@@ -121,8 +123,8 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       program.ranges.size() != program.geometries.size() || program.materials.size() != program.ranges.size() ||
       packet.primitive >= program.ranges.size() ||
       !packet.geometry || packet.geometry != program.geometries[packet.primitive] ||
-      !packet.material || packet.material != program.materials[packet.primitive] || program.ranges[packet.primitive].skin ||
-      !packet.shader.vertex_bones || *packet.shader.vertex_bones ||
+      !packet.material || packet.material != program.materials[packet.primitive] ||
+      !packet.shader.vertex_bones || *packet.shader.vertex_bones > 3 ||
       packet.shader.texture_layers > 3 || !packet.shader.vertex_colour ||
       !packet.features || packet.features->reflection || packet.features->normal_mapping ||
       (!packet.lights && !light_recipe) || (light_recipe && !light_recipe->update) ||
@@ -132,9 +134,21 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       packet.receiver_shadow == NativeShadowPolicy::Unknown) return refuse("native primitive owners or shader features unavailable");
   if (packet.policy.alpha_test && (!cutout || !cutout->blend.alphaBlendEnable))
     return refuse("owned cutout reference, comparison or enabled blend factors unavailable");
-  const auto &geometry = packet.geometry;
+  const bool skinned = *packet.shader.vertex_bones != 0;
+  const auto &range = program.ranges[packet.primitive];
+  if (bool(range.skin) != skinned || range.shader.vertex_bones != packet.shader.vertex_bones)
+    return refuse("skin binding or influence identity mismatch");
+  if (skinned && (!range.skin->count || !packet.pose || FindNativeInstanceNode(*packet.pose,packet.node) != &program ||
+      program.skin_geometries.size() != program.ranges.size() || !program.skin_geometries[packet.primitive]))
+    return refuse("owned skin geometry or exact pose unavailable");
+  const auto &geometry = skinned ? program.skin_geometries[packet.primitive] : packet.geometry;
   const uint32_t layers = packet.shader.texture_layers;
-  const auto vertex_input = layers == 3 ? geometry->layered_rigid_vertex_input : geometry->rigid_vertex_input;
+  const auto vertex_input = skinned
+      ? (layers == 3 ? geometry->skin_scene_layered_vertex_input : geometry->skin_scene_vertex_input)
+      : (layers == 3 ? geometry->layered_rigid_vertex_input : geometry->rigid_vertex_input);
+  const auto skin_bounds = skinned ? TransformNativeSkinBounds(geometry->skin_bounds,packet.pose->transforms) : std::nullopt;
+  if (skinned && (geometry->skin_influences != *packet.shader.vertex_bones || !skin_bounds))
+    return refuse("skin influence layout or animated bounds unavailable");
   if (!geometry->canonical_vertices || !vertex_input || geometry->stream_mask != 1 ||
       !geometry->streams[0].buffer.ref || !geometry->index.buffer.ref || !geometry->count ||
       geometry->count % 3 || !geometry->strides[0] || geometry->strides[0] > 255)
@@ -166,7 +180,10 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   const auto &uv = packet.textures.uv;
   const auto &uv2 = packet.textures.secondary_uv;
   const auto offset = [](float u, float v) { return RigidFloat4{1.f/512,1.f/512,1.f/512+u,1.f/512+v}; };
-  auto object = BuildRigidObject(packet.world, vector(packet.material_values[0]),
+  // Skin matrices already map joint-local vertices to world; no second object
+  // transform or unused inverse-transpose requirement survives this boundary.
+  const RenderMatrix identity{1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
+  auto object = BuildRigidObject(skinned ? identity : packet.world, vector(packet.material_values[0]),
       packet.features->specular ? vector(packet.material_values[1]) : RigidFloat4{}, offset(uv[0],uv[1]), flags,
       {offset(uv[2],uv[3]), offset(uv2[0],uv2[1])}, layers ? layers-1 : 0);
   NativeRigidPassInputs inputs;
@@ -194,6 +211,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   NativeRigidScenePlan plan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
       packet.policy.cull, packet.policy.direct};
   plan.primitive = packet.primitive;
+  if (skinned) { plan.skin_pose = packet.pose; plan.skin_bounds = skin_bounds; }
   plan.light_recipe = std::move(light_recipe);
   if (packet.policy.alpha_test) {
     plan.blend = cutout->blend;

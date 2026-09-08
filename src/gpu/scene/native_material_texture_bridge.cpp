@@ -242,7 +242,7 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
   refusal = "whole-node ordinary scene family unavailable";
-  const auto admission = PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs, NativeRigidDeferredEnabled());
+  const auto admission = PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs, NativeRigidDeferredEnabled(), NativeSkinSceneEnabled());
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });

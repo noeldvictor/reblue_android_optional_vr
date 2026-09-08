@@ -38,8 +38,9 @@ struct NativeRigidBatchItem {
   const NativeRigidPassGPU &Pass() const { return water ? water->input.pass_data : input.pass_data; }
   bool Cutout() const { return !water && (input.object_data.flags.x & RigidCutout); }
   bool Ready(uint32_t expected_frame, uint32_t expected_slot) const {
-    if (skin_pose && (water || view != 1 || !geometry || !geometry->skin_shadow_vertex_input ||
-        (Cutout() && !geometry->skin_shadow_cutout_vertex_input) ||
+    if (skin_pose && (water || (view != 1 && view != 3) || !geometry ||
+        (view == 1 && (!geometry->skin_shadow_vertex_input || (Cutout() && !geometry->skin_shadow_cutout_vertex_input))) ||
+        (view == 3 && !(input.object_data.flags.y == 3 ? geometry->skin_scene_layered_vertex_input : geometry->skin_scene_vertex_input)) ||
         !geometry->skin_influences || geometry->skin_bounds.empty() || !world_bounds || !world_bounds->Valid() ||
         skin_pose->instance != instance || skin_pose->model_generation != model_generation ||
         !skin_pose->model || skin_pose->model->Generation() != model_generation ||

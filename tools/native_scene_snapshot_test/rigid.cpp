@@ -42,9 +42,10 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
   return result;
 }
 void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true,
-         uint32_t deferred = 0, uint32_t skin = 0) {
+         uint32_t deferred = 0, uint32_t skin = 0, bool skin_scene = false) {
   Need(!deferred || (mode == 19 && !stale && restore), "Deferred ordering fixture scope");
-  Need(!skin || (skin <= 3 && (mode == 1 || mode == 4 || mode >= 37) && !stale && !deferred),"Skin caster fixture scope");
+  Need(!skin_scene || (skin && mode <= 22),"Skin scene fixture scope");
+  Need(!skin || (skin <= 3 && (skin_scene || mode == 1 || mode == 4 || mode >= 37) && !stale && !deferred),"Skin caster fixture scope");
   const bool cutout = (mode >= 12 && mode < 23) || mode == 40, untextured = mode == 10 || mode == 21;
   const bool shadow_cutout = mode >= 23, shadow_untextured = mode == 31 || mode == 36 || mode == 38;
   const bool cutout_receiver = mode >= 37;
@@ -153,7 +154,12 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   Need(bool(placement), "Rigid fixture storage alignment bound");
   const uint64_t scene_offset = placement->Offset(1), shadow_offset = placement->Offset(scene_offset+placement->bytes);
   std::vector<uint8_t> storage_bytes(shadow_offset+placement->bytes,0xCD); // poison prefix catches element/byte confusion
-  std::memcpy(storage_bytes.data()+scene_offset,scene_instances.data(),placement->bytes);
+  auto uploaded_scene_instances = scene_instances;
+  if (skin_scene) for (auto &instance : uploaded_scene_instances) {
+    instance.object_data.world.rows[3].x = 999;
+    for (auto &row : instance.object_data.normal_rows) row = {99,99,99,99};
+  }
+  std::memcpy(storage_bytes.data()+scene_offset,uploaded_scene_instances.data(),placement->bytes);
   auto uploaded_shadow_instances = shadow_instances;
   if (skin) for (auto &instance : uploaded_shadow_instances) instance.object_data.world.rows[3].x = 999;
   std::memcpy(storage_bytes.data()+shadow_offset,uploaded_shadow_instances.data(),placement->bytes);
@@ -165,8 +171,8 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
       {.3f,.4f,1,0},{xy[i][0],xy[i][1],-xy[i][1],xy[i][0]},
       {.8f,.6f,.4f,.5f},{xy[i][1],-xy[i][0],0,0}};
   auto vb = Upload(device, vertices.data(), sizeof(vertices), RenderBufferFlag::VERTEX);
-  std::unique_ptr<RenderBuffer> skin_vb, skin_palettes, skin_ranges;
-  NativePipelineHandle skin_program;
+  std::unique_ptr<RenderBuffer> skin_vb, skin_palettes, skin_ranges, skin_scene_palettes;
+  NativePipelineHandle skin_program, skin_scene_program;
   uint32_t skin_stride = 0, skin_vertex_bytes = 0;
   const uint32_t palette_offset = uint32_t(std::max<uint64_t>(64,alignment));
   const uint32_t range_offset = uint32_t(std::max<uint64_t>(16,alignment));
@@ -174,8 +180,12 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     NativeMeshData asset;
     asset.indices = {0,1,2,0,2,3};
     const bool textured_skin = shadow_cutout && !shadow_untextured;
-    const uint32_t prefix = textured_skin ? 16 : 0;
-    if (textured_skin) asset.attributes.push_back({MeshSemantic::TexCoord,0,0});
+    const uint32_t prefix = skin_scene ? 48 : textured_skin ? 16 : 0;
+    if (textured_skin || skin_scene) asset.attributes.push_back({MeshSemantic::TexCoord,0,0});
+    if (skin_scene) {
+      asset.attributes.push_back({MeshSemantic::TexCoord,2,16});
+      asset.attributes.push_back({MeshSemantic::Color,0,32});
+    }
     for (auto semantic : {MeshSemantic::SkinPosition,MeshSemantic::SkinNormal})
       for (uint32_t n = 0; n < skin; ++n) asset.attributes.push_back({semantic,n,uint32_t(asset.attributes.size()*16)});
     asset.attributes.push_back({MeshSemantic::SkinJoints,0,uint32_t(asset.attributes.size()*16)});
@@ -188,31 +198,51 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     for (uint32_t v = 0; v < 4; ++v) {
       const auto &p = vertices[v].position;
       const RigidFloat4 positions[]{{p.x+.25f,p.y,p.z,0},{p.y,p.x,p.z,0},{-p.x,p.y,p.z,0}};
-      if (textured_skin) std::memcpy(asset.streams[0].bytes.data()+v*skin_stride,&vertices[v].uv,16);
+      if (textured_skin || skin_scene) std::memcpy(asset.streams[0].bytes.data()+v*skin_stride,&vertices[v].uv,16);
+      if (skin_scene) {
+        std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+16,&vertices[v].secondary_uv,16);
+        std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+32,&vertices[v].colour,16);
+        const RigidFloat4 normals[]{{.3f,.4f,1,0},{.4f,.3f,1,0},{-.3f,.4f,1,0}};
+        for (uint32_t n = 0; n < skin; ++n)
+          std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+(skin+n)*16,&normals[n],16);
+      }
       for (uint32_t n = 0; n < skin; ++n)
         std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+n*16,&positions[n],16);
       std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+skin*32,&joints,16);
       std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+skin*32+16,&weights,16);
     }
+    Need(ValidateNativeMesh(asset),"Canonical skin asset schema");
     auto skin_input = NativeSkinShadowVertexInput(asset,inputs,textured_skin);
     skin_program = CreateNativeSkinShadowProgram(device,skin_input,textured_skin);
     Need(bool(skin_program),"Production native skin caster shader");
+    if (skin_scene) {
+      const auto scene_input = NativeSkinSceneVertexInput(asset,inputs,detail_layers == 2);
+      skin_scene_program = CreateNativeSkinSceneProgram(device,scene_input);
+      Need(bool(skin_scene_program),"Production native skin scene shader");
+    }
     skin_vb = Upload(device,asset.streams[0].bytes.data(),skin_vertex_bytes,RenderBufferFlag::VERTEX);
     std::vector<uint8_t> palette_bytes(palette_offset+instance_count*3*sizeof(RigidMatrix),0xCD);
     std::vector<uint8_t> range_bytes(range_offset+instance_count*sizeof(RigidUint4),0xCD);
-    for (uint32_t i = 0; i < instance_count; ++i) {
-      const auto world = shadow_instances[i].object_data.world;
+    const auto make_palette = [](const RigidMatrix &world) {
       std::array<RigidMatrix,3> palette{world,world,world};
       std::swap(palette[0].rows[0],palette[0].rows[1]);
       palette[1].rows[0] = {-world.rows[0].x,-world.rows[0].y,-world.rows[0].z,0};
       palette[2].rows[3].x -= .25f*world.rows[0].x;
       palette[2].rows[3].y -= .25f*world.rows[0].y;
       palette[2].rows[3].z -= .25f*world.rows[0].z;
+      return palette;
+    };
+    auto scene_palette_bytes = palette_bytes;
+    for (uint32_t i = 0; i < instance_count; ++i) {
+      const auto palette = make_palette(shadow_instances[i].object_data.world);
+      const auto scene_palette = make_palette(scene_instances[i].object_data.world);
       const RigidUint4 range{i*3,3,0,0};
       std::memcpy(palette_bytes.data()+palette_offset+i*sizeof(palette),palette.data(),sizeof(palette));
+      std::memcpy(scene_palette_bytes.data()+palette_offset+i*sizeof(scene_palette),scene_palette.data(),sizeof(scene_palette));
       std::memcpy(range_bytes.data()+range_offset+i*sizeof(range),&range,sizeof(range));
     }
     skin_palettes = Upload(device,palette_bytes.data(),uint32_t(palette_bytes.size()),RenderBufferFlag::STORAGE);
+    if (skin_scene) skin_scene_palettes = Upload(device,scene_palette_bytes.data(),uint32_t(scene_palette_bytes.size()),RenderBufferFlag::STORAGE);
     skin_ranges = Upload(device,range_bytes.data(),uint32_t(range_bytes.size()),RenderBufferFlag::STORAGE);
     asset = {}; skin_input.reset(); // native shader/buffers outlive producer data
   }
@@ -253,7 +283,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     const RenderTexture *pointer = details[n].get(); fb.colorAttachments = &pointer;
     detail_fbs[n] = device.createFramebuffer(fb); Need(bool(detail_fbs[n]), "Rigid detail framebuffer");
   }
-  NativeRigidDescriptorSchema schema;
+  NativeRigidDescriptorSchema schema(skin_scene);
   std::array<std::unique_ptr<RenderDescriptorSet>, 3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]), "Rigid descriptors"); }
   NativeRigidDescriptorSchema shadow_schema(skin != 0);
@@ -267,6 +297,10 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     const RenderBufferStructuredView range_view(sizeof(RigidUint4),range_offset/sizeof(RigidUint4));
     shadow_set->setBuffer(1,skin_palettes.get(),instance_count*3*sizeof(RigidMatrix),&joints_view);
     shadow_set->setBuffer(2,skin_ranges.get(),instance_count*sizeof(RigidUint4),&range_view);
+    if (skin_scene) {
+      sets[0]->setBuffer(1,skin_scene_palettes.get(),instance_count*3*sizeof(RigidMatrix),&joints_view);
+      sets[0]->setBuffer(2,skin_ranges.get(),instance_count*sizeof(RigidUint4),&range_view);
+    }
   }
   // Match the real queue's legal inactive descriptors too: these point at the
   // owned depth image but must never supply a material sample for disabled layers.
@@ -301,9 +335,10 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
       caster_samplers->setSampler(n,detail2_sampler.get()); // phase1 wrap, not scene clamp
     }
   }
-  const RenderInputSlot slot(0, sizeof(Vertex));
+  const RenderInputSlot slot(0, skin_scene ? skin_stride : sizeof(Vertex));
   RenderGraphicsPipelineDesc pipeline_desc;
-  ApplyNativePipelineProgram(*programs.scene, pipeline_desc);
+  const auto &scene_program = skin_scene ? skin_scene_program : programs.scene;
+  ApplyNativePipelineProgram(*scene_program, pipeline_desc);
   pipeline_desc.inputSlots = &slot; pipeline_desc.inputSlotsCount = 1;
   pipeline_desc.renderTargetCount = 1; pipeline_desc.renderTargetFormat[0] = colour_desc.format;
   pipeline_desc.renderTargetBlend[0] = cutout ? RenderBlendDesc::AlphaBlend() : RenderBlendDesc::Copy();
@@ -387,7 +422,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   commands->setFramebuffer(scene_fb.get());
   commands->clearColor(0,cutout ? RenderColor(background[0],background[1],background[2],background[3]) : RenderColor(0,0,0,0));
   commands->clearDepthStencil(true,false,1,0);
-  bindings.layout = programs.scene->Layout(); bindings.sets[0] = sets[0].get();
+  bindings.layout = scene_program->Layout(); bindings.sets[0] = sets[0].get();
   bindings.set_count = 3;
   for (uint32_t n=1;n<3;++n) bindings.sets[n] = sets[n].get();
   Need(ApplyGraphicsBindings(*commands,bindings,binding_state), "Rigid scene bind");
@@ -396,7 +431,8 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   // Controls deliberately omit restoration and must produce blank pixels;
   // restored cases use the production helper and the unchanged two-eye oracle.
   commands->setPipeline(scene_pipeline.get());
-  commands->setVertexBuffers(0,&vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
+  const auto scene_vertex_view = skin_scene ? caster_vertex_view : vertex_view;
+  commands->setVertexBuffers(0,&scene_vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
   if (foreign_pipeline) commands->setPipeline(foreign_pipeline.get());
   if (foreign_vb) {
     const RenderVertexBufferView foreign_view({foreign_vb.get(),0},sizeof(collapsed_vertices));
@@ -407,7 +443,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     commands->setIndexBuffer(&foreign_view);
   }
   if (restore) Need(ApplyImmediateGeometryBindings(*commands,scene_pipeline.get(),0,
-      {&vertex_view,1},{&slot,1},&index_view), "Immediate geometry handoff");
+      {&scene_vertex_view,1},{&slot,1},&index_view), "Immediate geometry handoff");
   if (deferred) {
     const std::array<float,1> compatibility{20};
     const std::array<DeferredInsertion,1> native{{{10,0}}};
@@ -485,7 +521,8 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     const auto &matrix = object_reference.world.rows;
     const float world_z = .5f+matrix[3].z;
     const LitVector position=LitVec(2*(x+.5f)/size-1-(eye?.0625f:0),1-2*(y+.5f)/size,world_z);
-    const LitVector normal=LitNormalize(LitVec(.3f/matrix[0].x,.4f/matrix[1].y,1));
+    const LitVector normal=LitNormalize(skin_scene ? LitVec(.3f*matrix[0].x,.4f*matrix[1].y,1)
+                                                 : LitVec(.3f/matrix[0].x,.4f/matrix[1].y,1));
     const auto camera=LitVec(reference.cameras[eye].x,reference.cameras[eye].y,reference.cameras[eye].z);
     const auto view=LitNormalize(LitSubtract(camera,position));
     const float asset_x=(position.x-matrix[3].x)/matrix[0].x, asset_y=(position.y-matrix[3].y)/matrix[1].y;
@@ -600,7 +637,7 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     }
   }
   std::cout<<"PASS production native rigid shaders: mode="<<mode<<" stale="<<stale<<" restored="<<restore<<" deferred="<<deferred
-           <<" skin="<<skin<<" eyes=2 pixels=128 max_error="<<maximum_error
+           <<" skin="<<skin<<" skin-scene="<<skin_scene<<" eyes=2 pixels=128 max_error="<<maximum_error
            <<"; instances="<<instance_count<<" scene cutout="<<cutout<<" shadow cutout="<<shadow_cutout
            <<"; cutout receiver lit/shadowed/filtered="<<lit_receivers<<'/'<<shadowed_receivers<<'/'<<filtered_receivers
            <<"; native indexed indirect; nonzero storage/command offsets; sampled views=2D_ARRAY layer=0 shadow=D32_S8; raw bytes=0\n";
@@ -615,4 +652,6 @@ void CheckNativeRigid(plume::RenderDevice &device) {
   for(uint32_t deferred=1;deferred<=3;++deferred) Run(device,19,0,true,deferred);
   for(uint32_t skin=1;skin<=3;++skin)
     for (uint32_t mode : {1u,4u,37u,38u,39u,41u,42u,43u,44u,45u}) Run(device,mode,0,true,0,skin);
+  for(uint32_t skin=1;skin<=3;++skin)
+    for(uint32_t mode=0;mode<=22;++mode) Run(device,mode,0,true,0,skin,true);
 }

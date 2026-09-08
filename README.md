@@ -89,9 +89,13 @@ Host160's cold-field window emits and fence-retires 13,200 native skin primitive
 over 300 frames. Its run stopped during reload at the disk-growth guard, before
 the requested game image. Full skin reload, game-pixel and stereo acceptance
 remain pending; host159/run984 is the last complete strict regression run.
-Skinned scene shading, native animation production and remaining rendering
-adapters are still open. No measured speedup or full native character/frame
-completion is claimed.
+Ordinary skinned scene shading is now connected and host/CPU/GPU-tested:
+154 Vulkan cases include69 new skin scene cases. It reuses the owned poses,
+materials, animated bounds, indirect queue and fences. Its live scene/reload
+and game-pixel checks are pending; technique-1 scene shading, native animation
+production and remaining rendering adapters are still open. No measured speedup
+or full native character/frame completion is claimed.
+[Scene connection and its verification limits](research/20260908_1210_native-skin-scene-shading.md).
 [Connection, live evidence and remaining gates](research/20260908_1143_native-skinned-shadow-consumer.md).
 
 ### How much is left?

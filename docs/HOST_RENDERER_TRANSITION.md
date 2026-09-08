@@ -687,10 +687,19 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    requested image. Full skin reload/game-pixel/stereo qualification remains open.
    The reached native node consumer bypasses its original node/interpreter/replay
    and bone-register draw path; object/visual setup and animation producers remain.
-   Next qualify the changed consumer's reload and pixels after reconciling runtime
-   storage, then extend this same geometry/palette/material ownership to skinned
-   scene shading and native animation, removing their remaining replay/register
-   consumers. No full character/frame completion or speedup is established.
+   **Ordinary skin scene connection (host161):** native joint-local position and
+   normal shaders now share the material/light/image owners, animated culling,
+   ordered/deferred plans, indirect batches and pose-retaining frame fences.
+   CPU47 and host161 pass; GPU27 passes154 cases including69 new skin scene
+   cases (1..3 influences, layers, lighting, cutouts, distinct instances, both-eye
+   pixels, validation0/0).384 Python checks pass. This is not yet live scene
+   reachability/pixel/reload acceptance. Technique1 scene shading, wind and other
+   specialized materials, native animation and remaining replay/register
+   producers remain open. Next qualify the connected scene/shadow consumers'
+   reload and game pixels under the unchanged runtime storage limits, then
+   connect the remaining character shading and native animation using these
+   same owners. No full character/frame completion or speedup is established.
+   [Scene connection and verification](../research/20260908_1210_native-skin-scene-shading.md).
    [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).
    [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).
    [Exact contract and evidence](../research/20260908_1410_native-skin-assets.md).

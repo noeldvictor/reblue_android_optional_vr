@@ -30,6 +30,8 @@
 
 REXCVAR_DECLARE(bool, bd_occlusion_cull);
 REXCVAR_DECLARE(bool, bd_occlusion_diag);
+REXCVAR_DEFINE_BOOL(bd_native_skin_scene, true, kCvarGroup,
+    "Native ordinary skin scene shading from owned vertices, normals and poses; requires native scene path.");
 REXCVAR_DEFINE_BOOL(bd_native_skin_shadow, true, kCvarGroup,
     "Native phase1 opaque/cutout skin casters from owned vertices, poses and images; requires native shadow path.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
@@ -70,6 +72,8 @@ struct NativeRigidDrawStore {
   uint32_t water_reported_frame = 0;
   uint64_t skin_submitted = 0, skin_emitted = 0, skin_retired = 0;
   uint32_t skin_reported_frame = 0;
+  uint64_t skin_scene_submitted = 0, skin_scene_emitted = 0, skin_scene_retired = 0;
+  uint32_t skin_scene_reported_frame = 0;
   uint64_t submitted = 0, suppressed = 0, retired = 0;
   uint32_t reported_frame = 0;
   uint64_t emitted = 0, scene_submitted = 0, scene_emitted = 0, scene_retired = 0, scene_suppressed = 0;
@@ -115,6 +119,7 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
 bool NativeRigidShadowEnabled() { return REXCVAR_GET(bd_native_rigid_shadow); }
 bool NativeSkinShadowEnabled() { return NativeRigidShadowEnabled() && REXCVAR_GET(bd_native_skin_shadow); }
 bool NativeRigidSceneEnabled() { return REXCVAR_GET(bd_native_rigid_scene); }
+bool NativeSkinSceneEnabled() { return NativeRigidSceneEnabled() && REXCVAR_GET(bd_native_skin_scene); }
 bool NativeRigidDeferredEnabled() { return NativeRigidSceneEnabled() && REXCVAR_GET(bd_native_rigid_deferred); }
 bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
                              const std::optional<PrimitivePolicyInputs> &inputs,
@@ -273,7 +278,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   if (!NativeRigidSceneEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
-  const auto admission = PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled());
+  const auto admission = PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled(), NativeSkinSceneEnabled());
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
   Require(admission.route == NativeRigidCasterRoute::Native, "scene family or object pass policy unavailable");
   const char *refusal = "native scene object preparation failed";
@@ -295,7 +300,7 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
   require(NativeRigidSceneEnabled() && submission.instance && submission.model_generation &&
       submission.frame == FrameStatFrameCount() && !plans.empty() && plans.size() <= 4096,
       "stale or incomplete owned scene submission");
-  // No active object scope, pose, source model, shader-register import or camera
+  // No active object scope, source model lookup, shader-register import or camera
   // lookup survives this boundary. Resolve Keep at consumption, not at capture.
   require(plans.front().light_recipe.has_value(), "owned light action unavailable");
   const auto ticket = ResolveNativeSceneLights(*plans.front().light_recipe);
@@ -337,8 +342,10 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
     });
     if (program == store.programs.end()) {
       require(store.programs.size() < 16, "native program capacity reached");
-      auto shaders = CreateNativeRigidPrograms(*s.device, plan.vertex_input);
-      require(shaders.scene && shaders.shadow, "native shader creation failed");
+      NativeRigidPrograms shaders;
+      if (plan.skin_pose) shaders.scene = CreateNativeSkinSceneProgram(*s.device,plan.vertex_input);
+      else shaders = CreateNativeRigidPrograms(*s.device, plan.vertex_input);
+      require(shaders.scene && (plan.skin_pose || shaders.shadow), "native shader creation failed");
       store.programs.push_back({plan.vertex_input, std::move(shaders)});
       program = store.programs.end()-1;
     }
@@ -386,11 +393,12 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
     draw.reorderable = !plan.blend.alphaBlendEnable;
     require(draw.bindings.Valid(), "invalid native scene descriptor contract");
     item->geometry = geometry; item->input = {plan.object,plan.pass};
+    item->skin_pose = plan.skin_pose;
     item->model_generation = submission.model_generation; item->instance = submission.instance;
     item->regression = geometry->id == 0x258694267A8DBAEEull;
     item->albedo = plan.albedo; item->shadow = plan.shadow;
     item->scene_depth = commands->DepthOwner();
-    item->world_bounds = geometry->bounds
+    item->world_bounds = plan.skin_pose ? plan.skin_bounds : geometry->bounds
         ? TransformNativeBounds(*geometry->bounds,std::bit_cast<RenderMatrix>(plan.object.world)) : std::nullopt;
     pending.push_back({std::move(draw),std::move(item)});
   }
@@ -403,6 +411,7 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
   }
   bool family_multi = pending.size() > 1 && !submission.regression_node;
   for (auto &entry : pending) {
+    store.skin_scene_submitted += bool(entry.item->skin_pose);
     if (!entry.item->regression) {
       ++store.scene_family_primitives;
       store.scene_family_layered += entry.item->input.object_data.flags.y > 1;
@@ -414,6 +423,11 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
   store.scene_submitted += pending.size();
   store.scene_family_multi_nodes += family_multi;
   const auto frame = FrameStatFrameCount();
+  if (store.skin_scene_submitted && frame-store.skin_scene_reported_frame >= 300) {
+    BD_INFO("[native-skin-scene] frame {} submitted {} emitted {} fence-retired {}; owned skin positions/normals and pose, no bone-register draw",
+        frame,store.skin_scene_submitted,store.skin_scene_emitted,store.skin_scene_retired);
+    store.skin_scene_reported_frame = frame;
+  }
   if (submission.regression_node &&
       (store.scene_reported_generation != submission.model_generation || frame-store.scene_reported_frame >= 300)) {
     BD_INFO("[native-rigid-scene] frame {} submitted {} emitted {} suppressed {} fence-retired {}; node {} instance {} generation {}; visibility pending {} culled {} retired-culled {} resources-retired {}; owned packet and native program, no node interpreter/template/replay",
@@ -690,7 +704,7 @@ void ResolveNativeRigidEmission(NativeRigidDrawStore &store, std::span<const Nat
       ++cutouts.emitted;
       cutouts.textured_emitted += (item->input.object_data.flags.x & RigidAlbedo) != 0;
     }
-    store.skin_emitted += visible && bool(item->skin_pose);
+    if (item->skin_pose && visible) ++(render_view == 3 ? store.skin_scene_emitted : store.skin_emitted);
   }
   if (items[0]->water) {
     if (visible) store.water_emitted += instances; else store.water_culled += instances;
@@ -748,7 +762,7 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   for (const auto &record : store.records[slot]) {
     BatchRequire(record->output.Retire(), "native record retired with pending or duplicate output classification");
     const bool visible = record->output.Visible();
-    store.skin_retired += visible && bool(record->skin_pose);
+    if (record->skin_pose && visible) ++(record->view == 3 ? store.skin_scene_retired : store.skin_retired);
     if (record->water) { ++store.water_retired; continue; }
     if (visible && record->Cutout()) {
       auto &cutouts = record->view == 3 ? store.scene_cutouts : store.shadow_cutouts;

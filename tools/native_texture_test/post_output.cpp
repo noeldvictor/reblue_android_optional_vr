@@ -1187,12 +1187,88 @@ void RigidScenePacket() {
   packet.textures.owns_uv = true; packet.textures.uv = {.25f,-.5f,0,0};
   packet.receiver_shadow = NativeShadowPolicy::Receive;
   packet.samplers[0] = NativeMaterialSampler2D{{},MaterialSampleAddress::Wrap,MaterialSampleAddress::Clamp};
+  program.ranges[0].shader = packet.shader;
   const auto build = [&] { return PrepareNativeRigidScene(program,packet,receiver); };
   auto plan = build(); assert(plan && plan->draw && plan->cull == PrimitiveCull::Back);
   assert(plan->object.flags.x == 63 && plan->object.uv_scale_offset.x == 1.f/512);
   assert(plan->object.uv_scale_offset.z == .25f+1.f/512 && plan->object.uv_scale_offset.w == -.5f+1.f/512);
   assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo[0] == albedo);
   auto good = packet;
+  {
+    // The ordinary scene plan must retain exact model/pose ownership through
+    // deferred staging and the shared skin batch, not a borrowed render scope.
+    auto skin_geometry = std::make_shared<NativeGeometry>(*geometry);
+    skin_geometry->skin_influences = 1;
+    skin_geometry->skin_bounds = {{1,{{-1,-1,-1},{1,1,1}}}};
+    // CPU resource tokens; the real layouts/programs are exercised by GPU tests.
+    skin_geometry->skin_scene_vertex_input = geometry->rigid_vertex_input;
+    skin_geometry->skin_scene_layered_vertex_input = geometry->layered_rigid_vertex_input;
+    ModelMaterialImport source;
+    source.source_mesh = 100; source.program = program;
+    source.program.ranges[0].shader = good.shader;
+    source.program.ranges[0].shader.vertex_bones = 1;
+    source.program.ranges[0].skin = DecodeNativeSkinBinding(std::array<uint16_t,1>{1});
+    source.program.skin_geometries = {skin_geometry};
+    source.program.shadow_policies = {NativeShadowPolicy::Receive}; source.source_bindings.resize(1);
+    ModelMaterialRegistry models;
+    const ModelNodeSourceBinding node{0,100};
+    assert(models.Publish(1,{source},std::span(&node,1)));
+    auto model = models.FindModel(1);
+    NativeInstanceRegistry instances;
+    const auto id = instances.Create(model->Generation(),model);
+    std::array<RenderMatrix,2> transforms{{{},identity}};
+    transforms[1][12] = 7; // unused node0 is singular; joint1 is a valid palette
+    assert(instances.Publish(id,1,transforms));
+    auto skinned = good; skinned.pose = instances.Read(id,1); skinned.world = transforms[0];
+    skinned.shader.vertex_bones = 1;
+    const auto *owned = model->FindNode(0);
+    const auto prepare = [&] { return PrepareNativeRigidScene(*owned,skinned,receiver); };
+    PrimitivePolicyInputs policy;
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy).route == NativeRigidCasterRoute::Legacy);
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy,false,true).route == NativeRigidCasterRoute::Native);
+    for (uint32_t mode : {1u,2u,3u}) {
+      policy.pass_mode = mode;
+      assert(PrepareNativeRigidSceneAdmission(*owned,policy,true,true).route != NativeRigidCasterRoute::Native);
+    }
+    policy.pass_mode = 0; policy.technique = 1;
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy,true,true).route != NativeRigidCasterRoute::Native);
+    auto retained = prepare();
+    assert(retained && retained->geometry == skin_geometry && retained->skin_pose == skinned.pose &&
+        retained->skin_bounds && retained->skin_bounds->min[0] < 6 && retained->skin_bounds->max[0] > 8 &&
+        std::bit_cast<RenderMatrix>(retained->object.world) == identity);
+    auto pose = skinned.pose;
+    skinned.pose.reset(); assert(!prepare()); skinned.pose = pose;
+    auto wrong_pose = std::make_shared<NativeInstancePose>(*pose); wrong_pose->model_generation++;
+    skinned.pose = wrong_pose; assert(!prepare()); skinned.pose = pose;
+    skinned.shader.vertex_bones = 2; assert(!prepare()); skinned.shader.vertex_bones = 1;
+    skin_geometry->skin_influences = 2; assert(!prepare()); skin_geometry->skin_influences = 1;
+    skin_geometry->skin_scene_vertex_input.reset(); assert(!prepare());
+    skin_geometry->skin_scene_vertex_input = geometry->rigid_vertex_input;
+    skinned.shader.texture_layers = 3; skinned.textures.image_mask = 7;
+    for (uint32_t n = 1; n < 3; ++n) { skinned.textures.images[n] = skinned.textures.images[0]; skinned.samplers[n] = skinned.samplers[0]; }
+    auto layered_skin = prepare(); assert(layered_skin && layered_skin->vertex_input == skin_geometry->skin_scene_layered_vertex_input);
+    skin_geometry->skin_scene_layered_vertex_input.reset(); assert(!prepare());
+    skin_geometry->skin_scene_layered_vertex_input = geometry->layered_rigid_vertex_input;
+    transforms[1][12] = 20; assert(instances.Publish(id,1,transforms));
+    skinned.pose = instances.Read(id,1);
+    assert(prepare()->skin_bounds->min[0] < 19 && retained->skin_pose->transforms[1][12] == 7);
+    NativeRigidBatchItem item;
+    int token = 0; OutputFramebuffer fb;
+    item.geometry = retained->geometry; item.skin_pose = retained->skin_pose;
+    item.world_bounds = retained->skin_bounds; item.input = {retained->object,retained->pass};
+    item.instance = id; item.model_generation = model->Generation(); item.frame = 7; item.slot = 0; item.view = 3;
+    item.pipeline = reinterpret_cast<RenderPipeline *>(&token); item.layout = reinterpret_cast<RenderPipelineLayout *>(&token);
+    item.framebuffer = &fb; item.shadow = item.scene_depth = depth;
+    item.shadow_sampler = reinterpret_cast<RenderSampler *>(&token);
+    item.albedo = retained->albedo; item.albedo_samplers.fill(item.shadow_sampler);
+    assert(item.Ready(7,0));
+    auto missing = item; missing.skin_pose.reset(); assert(!missing.Ready(7,0));
+    missing = item; missing.instance++; assert(!missing.Ready(7,0));
+    NativeRigidSceneSubmission delayed{id,model->Generation(),0,7,false,{*retained}};
+    models.Retire(1); instances.Retire(id); source = {}; model.reset(); skinned = {}; pose.reset(); retained.reset();
+    assert(item.Ready(7,0) && delayed.plans[0].skin_pose->transforms[1][12] == 7);
+    assert(item.output.Record() && item.output.Resolve(true) && item.output.Retire() && !item.output.Retire());
+  }
   {
     // Production packet preparation can outlive the object scope without
     // resolving an unseeded Keep or retaining a pose/source lookup key.

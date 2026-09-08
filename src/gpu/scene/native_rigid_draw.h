@@ -12,6 +12,7 @@ struct NativeRigidSceneSubmission;
 struct NativeWaterSceneSubmission;
 bool NativeRigidShadowEnabled();
 bool NativeSkinShadowEnabled();
+bool NativeSkinSceneEnabled();
 bool NativeRigidSceneEnabled();
 bool NativeRigidDeferredEnabled();
 // Called before the per-node interpreter/replay/capture, after host culling.

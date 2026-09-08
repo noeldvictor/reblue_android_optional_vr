@@ -37,6 +37,29 @@ NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device,
                                               NativeVertexInputHandle input);
 NativePipelineHandle CreateNativeSkinShadowProgram(plume::RenderDevice &device, NativeVertexInputHandle input,
                                                   bool cutout = false);
+NativePipelineHandle CreateNativeSkinSceneProgram(plume::RenderDevice &device, NativeVertexInputHandle input);
+
+inline NativeVertexInputHandle NativeSkinSceneVertexInput(const NativeMeshData &mesh,
+    NativeVertexInputLibrary &library, bool layered = false) {
+  const auto influences = NativeMeshSkinInfluences(mesh.attributes);
+  if (!influences || !ValidateNativeMesh(mesh) || mesh.streams[0].stride > 255) return {};
+  std::array<plume::RenderInputElement,11> elements{};
+  const MeshSemantic semantics[]{MeshSemantic::SkinPosition,MeshSemantic::SkinNormal,
+      MeshSemantic::SkinJoints,MeshSemantic::SkinWeights,MeshSemantic::TexCoord,MeshSemantic::Color,MeshSemantic::TexCoord};
+  const char *names[]{"POSITION","NORMAL","BLENDINDICES","BLENDWEIGHT","TEXCOORD","COLOR","TEXCOORD"};
+  const uint32_t count = layered ? 11 : 10;
+  for (uint32_t n = 0; n < count; ++n) {
+    const uint32_t kind = n < 6 ? n/3 : n-4;
+    const uint32_t index = n < 6 ? n%3 : n == 10 ? 2 : 0;
+    const uint32_t fetch_index = n < 6 && index >= influences ? 0 : index;
+    const auto a = std::find_if(mesh.attributes.begin(),mesh.attributes.end(),[&](const auto &a) {
+      return a.semantic == semantics[kind] && a.index == fetch_index;
+    });
+    if (a == mesh.attributes.end()) return {};
+    elements[n] = {names[kind],index,n,plume::RenderFormat::R32G32B32A32_FLOAT,0,a->offset};
+  }
+  return library.Resolve(std::span(elements).first(count),1,{});
+}
 
 inline NativeVertexInputHandle NativeSkinShadowVertexInput(const NativeMeshData &mesh,
                                                           NativeVertexInputLibrary &library, bool cutout = false) {
