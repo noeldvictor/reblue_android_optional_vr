@@ -692,13 +692,21 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    ordered/deferred plans, indirect batches and pose-retaining frame fences.
    CPU47 and host161 pass; GPU27 passes154 cases including69 new skin scene
    cases (1..3 influences, layers, lighting, cutouts, distinct instances, both-eye
-   pixels, validation0/0).384 Python checks pass. This is not yet live scene
-   reachability/pixel/reload acceptance. Technique1 scene shading, wind and other
-   specialized materials, native animation and remaining replay/register
-   producers remain open. Next qualify the connected scene/shadow consumers'
-   reload and game pixels under the unchanged runtime storage limits, then
-   connect the remaining character shading and native animation using these
-   same owners. No full character/frame completion or speedup is established.
+   pixels, validation0/0).387 Python checks pass. Host161's12:15 run (PID22748,
+   reused log969, not the historical969) passes the full strict cold/reload/mixed
+   chain and fresh skin-shadow windows,13200 emissions/fences per300frames in
+   each field epoch. Ordinary skin scene draws emit/fence-retire5661 primitives
+   during each opening event, then remain flat in interactive fields; the new
+   separate scene gate correctly stays Pending. One1920x1080/105571B inspected
+   window shows the player/ground shadow and terrain; no character parity,
+   stable sequence or both-eye qualification is established. Technique1 scene
+   shading, wind and other specialized materials, native animation and remaining
+   replay/register producers remain open. Next connect representative ongoing
+   character shading (including the distinct technique1 contract) through these
+   owners, using the reached event consumer as regression coverage; do not retry
+   unchanged code to turn zero post-event scene emissions into a passing gate.
+   Preserve all existing visual failures and the complete desktop acceptance.
+   No full character/frame completion or speedup is established.
    [Scene connection and verification](../research/20260908_1210_native-skin-scene-shading.md).
    [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).
    [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).

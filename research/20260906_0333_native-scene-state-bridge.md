@@ -5338,3 +5338,48 @@ Texture fixture82900615B (+93993), GPU20052610B (+151959), EXE49078272B
 profiles, images, game logs or active trees removed. Current log aggregate341974B
 versus initial316904B (+25070). Selected retained growth354990B excluding new
 shader headers/other objects/source/Git/system activity. Same cumulative limits.
+
+Source checkpointa83d076 pushed before live integration. One changed-consumer
+run planned with the existing full strict reload/mixed chain and skin-shadow
+gate; ordinary scene counters inspected separately, not inferred from shadow
+counts. Explicit skin-scene cvar added to temporary profile. Same180s/800KiB/
+192MiB free-drop supervisor; at most one110KiB PrintWindow JPEG only after the
+full requested gate, no raw/perf/persistence. Exact owner profile restored in
+finally. Prior GLCache baseline is now measured, no global cache eviction.
+
+Initial runtime preflight rejected before profile/producer mutation: diagnostic
+used79412702B plus931840B text/image reservation exceeded75MiB by1701342B
+(plus retained WER metadata). No limit raised. Lossless bounded archival:
+
+-941/945/948/956 input1821508B ->267783B, saved1553725B logical;
+  free78986665984->78988144640B. ZIP retained-native-runtime-941-945-948-956.zip
+  SHA25675EBF996355F93369C068E26D96B552E046E9310E0E220214861350ECA824C0C.
+  Verified plaintext entry hashes941 F177A5A1AF65403CBAE585E18474BBD86997BA74614E376A12832947751B4C36;
+  945 BBBB860A54C78D6E802C66D0C2B08C254BA9337BC30B1E1C73370C13DAE1CD8E;
+  948 BB9A0485A1939C7EDBC405D6E927583377FFFEB4F4E76C90780F566194841D9A;
+  956 8C17A3C0598796A990280E026F3EC5447C933D249AA013C95EF690132748CD5B.
+-977/978 input663826B ->128749B, saved535077B logical;
+  free78987997184->78988533760B. ZIP retained-native-runtime-977-978-20260908.zip
+  SHA256522363052544836A2FB7BF9F744223515253F3E4F8C1D197FE4CAC69218AF2A5.
+  Verified entry hashes977 D5E88698F93EE29B9C5FFE52D88BAF33F8F1C9A729640A5D062893DCAAC8E268;
+  current11:37 skin978 0848E2709BA5F32D8BA15B38C4198C490FA586A18895622A0291F4F555E07067.
+
+All archived logs fully recoverable, including unresolved visual failures.
+Together with16 obsolete build logs,2187629B logical reclaimed this continuation;
+do not recredit previous1267507B cleanup. No assets/saves/raw/failed images removed.
+
+One actual live run: host161/PID22748/session6707,12:15:08..12:17:09 success.
+Reused filename969, distinguish from historical969. Full strict cold/reload/mixed
+chain and skin-shadow windows pass:93/144->207/385,13200 skin-shadow emissions/
+fences per300frames each field epoch. Scene skin reached during both opening
+events (5661 emitted/retired each), then flat post-event. Separate scene verifier
+is correctly Pending;387 Python tests pass. Exact116B owner profile restored,
+24 effective settings. Log570640B, JPEG105571B1920x1080 inspected; raw0/perf0/
+new game cache0/HLSL0. Binary/log/image hashes and visual limits in1210 report.
+Final12:18:59 free78979936256B,60207104B less than initial79040143360B drive-wide.
+Selected retained change354990+570640+105571-2088802=-1057601B. Other objects,
+shader headers/source/Git/system separate; game GLCache delta69389B measured,
+ending429920374+410272B. Image aggregate10408682B/12files,77078B headroom.
+No owned producer remains. Keep host161/output72/CPU47/GPU72/rigid27, mesh18/16;
+current969 and image are new integration/visual-limit evidence. Historical
+host159/run984 is no longer the latest full strict run. No new raw approval.

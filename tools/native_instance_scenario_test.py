@@ -13,7 +13,7 @@ from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
 from native_instance_scenario import verify_cutout_family
-from native_instance_scenario import verify_skin_shadow
+from native_instance_scenario import verify_skin_shadow, verify_skin_scene
 from native_instance_scenario import observe_occlusion
 from native_instance_scenario import verify_frame_probe
 from native_instance_scenario import (
@@ -844,6 +844,41 @@ class SkinShadowScenarioTest(unittest.TestCase):
                     module.verify_rigid_epoch(first, skin_shadow=True)
                     module.verify_rigid_epoch(second, skin_shadow=True)
             module.verify_rigid_epoch("\n".join(self.rows()), skin_shadow=True)
+
+
+class SkinSceneScenarioTest(unittest.TestCase):
+    def text(self):
+        return "\n".join(SkinShadowScenarioTest().rows()).replace("[native-skin-shadow]", "[native-skin-scene]").replace(" model 38 instance 73;", " owned skin")
+
+    def test_fresh_separate_scene_consumption(self):
+        self.assertEqual(verify_skin_scene(self.text())["emitted_delta"], 50)
+        with self.assertRaises(Pending): verify_skin_scene("\n".join(SkinShadowScenarioTest().rows()))
+        with self.assertRaises(Pending): verify_skin_shadow(self.text())
+
+    def test_stale_missing_fences_failures_and_limits(self):
+        text = self.text()
+        for bad in (text.replace("bg41_01", "bg42_01"), text.replace("retired 151", "retired 101"),
+                    text.replace("emitted 152", "emitted 102").replace("retired 151", "retired 101")):
+            with self.assertRaises(Pending): verify_skin_scene(bad)
+        for bad in (text.replace("retired 151", "retired 153"), text.replace("frame 150", "frame 99"),
+                    text + "\n[error] late failure", text + "\n[native-rigid-scene] admitted packet refused",
+                    "[native-skin-scene] invalid\n" + text, "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_skin_scene(bad)
+
+    def test_each_reload_epoch_requires_scene_not_shadow_only(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in ("verify_rigid_epoch", "verify_skin_scene"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for first, second in ((cold, self.text()), (self.text(), new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(first, skin_scene=True)
+                    module.verify_rigid_epoch(second, skin_scene=True)
+            module.verify_rigid_epoch(self.text(), skin_scene=True)
 
 
 class CutoutFamilyScenarioTest(unittest.TestCase):

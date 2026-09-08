@@ -78,23 +78,19 @@ and other unadmitted families still use the legacy producer. Game water/reflecti
 pixels, HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
 [Completed image connection, verification and remaining work](research/20260908_1345_native-water-images.md).
 
-**Characters (2026-09-08, native skin shadows now emitting in-game):** owned skin
-geometry, animated bounds and pose palettes feed the shared native shadow queue
-and frame fences. Cutout image/UV/sampler support and checked technique-1 texture
-participation are connected; missing or volume-effect inputs remain refused.
-Mesh/ownership tests and the host build pass. All 85 Vulkan pixel cases pass,
-including 30 skin cases covering one-to-three influences, cutouts and overlapping
-instances; Vulkan validation reports zero errors/warnings. All 383 Python checks pass.
-Host160's cold-field window emits and fence-retires 13,200 native skin primitives
-over 300 frames. Its run stopped during reload at the disk-growth guard, before
-the requested game image. Full skin reload, game-pixel and stereo acceptance
-remain pending; host159/run984 is the last complete strict regression run.
-Ordinary skinned scene shading is now connected and host/CPU/GPU-tested:
-154 Vulkan cases include69 new skin scene cases. It reuses the owned poses,
-materials, animated bounds, indirect queue and fences. Its live scene/reload
-and game-pixel checks are pending; technique-1 scene shading, native animation
-production and remaining rendering adapters are still open. No measured speedup
-or full native character/frame completion is claimed.
+**Characters (2026-09-08, scene and shadow skin consumers connected):** native
+geometry, animated bounds, joint-local normals and retained poses share the
+material owners, indirect queue and frame fences. Host/CPU tests and 154 Vulkan
+pixel cases pass (69 new skin scene cases); validation reports zero errors/warnings.
+All 387 Python checks pass.
+Host161's strict cold/reload run passes, including 13,200 native skin-shadow
+emissions and fence retirements per 300-frame field window. Ordinary skin scene
+draws emit/retire 5,661 primitives during each opening event, but stop advancing
+afterward: the interactive-field skin-scene gate correctly remains pending.
+One inspected 1920x1080 frame shows the character and ground shadows; it is not
+character parity, sequence or stereo qualification. Technique-1 scene shading,
+native animation and remaining rendering adapters are still open. No measured
+speedup or full native character/frame completion is claimed.
 [Scene connection and its verification limits](research/20260908_1210_native-skin-scene-shading.md).
 [Connection, live evidence and remaining gates](research/20260908_1143_native-skinned-shadow-consumer.md).
 

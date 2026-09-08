@@ -47,10 +47,10 @@ Two fixture defects were corrected without weakening checks: CPU46's old rigid
 setup lacked owned influence metadata and asserted at1191 (30s CTest timeout);
 GPU26's new scene asset placed Color before TexCoord2 and failed canonical
 schema validation before the new pixel cases. CPU47/GPU27 replace these failures.
-Live skin scene reachability, game pixels, independent reload and stereo are
-pending. Host160's cold native skin-shadow emission remains historical evidence,
-not proof for the changed binary. Host159/run984 remains the last full strict
-regression. Prior visual failures remain unqualified.
+At source checkpointa83d076, live skin scene reachability, game pixels, independent
+reload and stereo were pending. Host160's cold native skin-shadow emission remains historical evidence,
+not proof for the changed binary. Host159/run984 was the last full strict
+regression before the integration below. Prior visual failures remain unqualified.
 
 SHA256:
 
@@ -70,3 +70,53 @@ Removed16 superseded agent build/test logs after replacement passes:98827B
 logical, free78997434368->78997544960B (+110592B observed). Current compiler,
 CPU47, GPU27 and all required runtime/visual failure evidence remain. The removed
 fixture setup failures are explained above and reproducible from their tests.
+
+## Live integration after a83d076 was pushed
+
+An initial preflight rejected diagnostic overlap before changing the profile or
+launching a process. The existing hash-verifying2MiB-bounded archive operator
+then losslessly archived941/945/948/956 and977/978, preserving complete failed
+visual/causal/baseline logs. Savings1553725+535077B logical; exact entries and
+archive SHA256 identities are in the cumulative ledger. No cap was increased.
+
+Host161/PID22748/session6707 ran12:15:08..12:17:09, terminal success. Its log
+filename is reused969, NOT the earlier969:570640B, SHA256
+8EA740240A774B8F126D3F2C9C06804A87FECAE45AE139BB10276DD168749E91.
+All24 settings took effect; raw/perf/persistence off, exact116B profile restored
+(SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0).
+The complete strict cold/reload/mixed/receiver/material/lighting chain passed:
+old generation93/instance144 -> new207/385, actual source and GPU retirement.
+Fresh native skin-shadow windows add13200 submissions/emissions/fence retirements
+per300frames independently in each epoch; reloaded4601..4901. This closes the
+previous disk-stopped shadow reload gate, not every scene's shadow acceptance.
+
+Native skin scene consumption is now real: frame876 first29 submissions;
+frame1176 has5661 submitted/emitted/retired, during the opening event. After
+reload frame3701 totals11322, another5661 emitted/retired in the opening event.
+Counters remain flat in later interactive-field windows. Consequently the new
+`--rigid-reload --skin-scene` verifier returns Pending, not a false pass from
+startup/shadow counts. Three new tests check separate scene/shadow consumption,
+freshness, fences, resets, failures and independent epoch requirements;387 total
+Python tests pass. No per-character identity or ongoing scene coverage inferred.
+
+The requested PrintWindow JPEG (native_skin_shadow_window.jpg) is1920x1080,
+105571B, SHA256F46CE583DC3BA3BCAA26BCC47E0AC54DBCCE451EC79EE69B65DBE75FA373B574.
+Inspected: player, ground shadow, terrain, fence and foliage are visible, without
+a blank/cyan frame. The background remains dark with some black speckling;
+attribution/parity is unqualified. The picture was after the scene skin counters
+stopped, so the visible hero is NOT proved to use the new ordinary scene shader.
+This is single-frame sanity evidence, not stable motion, authored skin/cutout
+parity or stereo. Existing941/948/956 visual failures remain protected.
+
+Next: use the real ordinary event consumer as regression coverage while moving
+ongoing character/technique1 shading and animation to these same owners. Keep
+the separate interactive scene gate; do not rerun unchanged code to pass it.
+
+Ending12:18:59 free78979936256B (73.56GiB),60207104B less drive-wide than the
+11:57 baseline. Total actual logical cleanup2187629B, counted once. Selected
+retained files net-1057601B after fixture growth, log archival,570640B new log
+and105571B image. New shader headers/other objects/source/Git/system activity
+are separate. Existing game GLCache grew69389B measured (429920374+410272B
+ending); no new game cache/HLSL/raw payload. Image aggregate10408682B/12files,
+77078B left under10MiB. No owned producer remains. No new capture fits by
+assuming another110KiB allowance; reclaim eligible image overlap first.
