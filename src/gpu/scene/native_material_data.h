@@ -103,6 +103,7 @@ struct NativeMaterialRange {
   bool shadow_uses_texture = false;
   NativeMaterialFeatureRecipe features;
   std::array<NativeSamplerAddress, 5> sampler_addresses = MaterialSamplerEntry();
+  NativeSamplerAddress environment_address{MaterialSampleAddress::Wrap,MaterialSampleAddress::Wrap};
   // Unknown until a bone-index command; an explicit empty binding is unskinned.
   std::optional<NativeSkinBinding> skin;
   uint32_t index_count = 0;

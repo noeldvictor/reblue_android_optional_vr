@@ -78,6 +78,37 @@ void TestNativeMaterialTextures() {
           ranges.back().texture_assignment_end == 3,
           "reflection writer invalidates ordinary ownership, repetition/disable do not rebind");
 
+  {
+    // Run977's actual water has a normal-map command, not an unsupported shader
+    // family. Own its table selection and independently preserve legacy sorted
+    // scratch semantics; a normal disable is not an actual image unbind.
+    const uint16_t normal[]{0x0501,0x1000,1,0,0x6402,0x0501,0x1000,1,3,
+        0x05ff,0x1000,1,6,0x0502,0x1000,1,9,0xff};
+    std::vector<NativeMaterialRange> normal_ranges;
+    std::vector<MaterialImageAssignment> normal_steps;
+    Require(DecodeMeshMaterials(normal,normal_ranges,&normal_steps) && normal_steps.size() == 4,
+        "normal repeat is elided even after another channel4 command");
+    Require(normal_steps[0].source == MaterialImageSource::NormalTable && normal_steps[2].selector == 255,
+        "normal disable remains an explicit sorted producer action");
+    MaterialTextureInputs<Image> normal_inputs;
+    normal_inputs.overrides = {{1,5,{},true,Bind(901)}};
+    normal_inputs.late_images = {{1,0,{},true,Bind(902)}};
+    std::vector<Values> normal_values;
+    auto normal_lookup = [](uint8_t value) { return Bind(100+value); };
+    Require(ComposeMaterialTextures(std::span<const MaterialImageAssignment>(normal_steps),
+        std::span<const NativeMaterialRange>(normal_ranges),normal_inputs,normal_lookup,normal_values),"normal composition");
+    Require(normal_values[0].images[4] == 101 && normal_values[1].images[4] == 102 &&
+        normal_values[2].images[4] == 102 && normal_values[3].images[4] == 102,
+        "normal bypasses overrides; repeats and disable preserve the preceding actual bind");
+    // An authored alpha texture binds between normal commands in phase1. Every
+    // later normal selector maps to0 and is elided before it can replace that.
+    normal_steps[1].shadow_alpha = true;
+    normal_steps[1].channel = 0;
+    Require(ComposeMaterialTextures(std::span<const MaterialImageAssignment>(normal_steps),
+        std::span<const NativeMaterialRange>(normal_ranges),normal_inputs,normal_lookup,normal_values,4096,true),"shadow normal composition");
+    for (const auto &value : normal_values) Require(value.images[4] == 100,"phase1 normal uses selector0 once");
+  }
+
   // The real import helper consumes bounded host-endian fields once. Erasing
   // every source word afterwards does not invalidate the owned values.
   constexpr uint32_t visual = 10000, early = 20000, late = 30000;

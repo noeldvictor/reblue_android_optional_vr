@@ -6,9 +6,12 @@
  */
 #pragma once
 #include <cstdint>
+#include <span>
 struct PPCContext;
 namespace bd::gpu::scene {
 struct NativeRigidSceneSubmission;
+struct NativeWaterDeferred;
+bool StageNativeDeferredWater(uint32_t visual, std::span<const NativeWaterDeferred> water);
 // Temporary source bridge only: removes delayed plans from the submission and
 // retains them without allocating/copying a compatibility render-list entry.
 bool StageNativeDeferredScene(uint32_t visual, NativeRigidSceneSubmission &submission);

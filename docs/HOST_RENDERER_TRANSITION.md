@@ -508,10 +508,30 @@ generation94 fully retires before208 submits.377 Python checks and deferred CPU
 tests pass. No new images, HDR/game-stereo or authored bottom/snapshot qualification.
 [Source contracts, causal regression and evidence](../research/20260908_1236_native-water-visual.md).
 
-Next connected work: remove water's source-list construction, including per-entry
-sampler/world/state dispatch. Reuse the now-connected
-publication/queue, water update/refraction setup and existing instance/model owners.
-Replace the temporary sorted-entry, source feature and getter imports with native
+Native water producer connection (2026-09-08, host151/run978): admitted whole nodes
+now bypass the command interpreter and source-list allocation. The existing shared
+queue owns pose/model leases, primitive identity, sort depth, alpha/cull, light recipes
+and image leases; late material production still occurs at its ordered consumption
+point. Load-time recipes now capture normal-table commands and environment samplers.
+Run977 identified the actual normal-map command that blocked eligibility; focused
+CPU tests cover normal repetition, disable/Keep and phase1 selection before retry.
+Run978 passes strict cold/reload/mixed checks. Fresh ready-field water queue windows
+1800..2100 and4200..4500 each stage/consume300 records. GPU windows1563..1863 and
+4250..4550 each submit/retire300, with282/272 emissions respectively. Old water
+generation94 fully retires before208 submits. Latest queue3111 paired records;
+later GPU3162 submitted/3065 emitted/3160 retired.377 Python checks, material and
+post-output CPU behavior fixtures and incremental host build pass. No new game
+pixels/HDR/stereo qualification; unchanged shader evidence is reused.
+The opaque per-record bridge still retains source image keys for checked outgoing
+mixed-frame exports and a visual key for late material production. This is not an
+entirely source-free queue or frame. Special image overrides, direct/skinned and
+other unadmitted producers remain explicit legacy families.
+[Producer verification and storage](../research/20260906_0333_native-scene-state-bridge.md#native-water-deferred-producer-2026-09-08-source681f1fd-plus-edits).
+
+Next connected work: remove remaining water producer/late-material image and state
+adapters, including outgoing sampler/world/state exports when their mixed consumers
+no longer need them. Reuse the connected publication/queue, water update/refraction
+setup and existing instance/model owners. Replace remaining source feature and getter imports with native
 producer inputs while preserving late aliases, Bind/Keep and snapshot ordering;
 do not freeze them at the initial walk or recreate owners. Complete image-role
 production for currently unavailable cases, not a permanent fallback family.

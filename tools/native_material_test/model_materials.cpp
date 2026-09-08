@@ -57,6 +57,13 @@ void TestNativeModelMaterials() {
         if (v != 3) expected[channel].v = modes[v];
       }
       Require(ranges[2].sampler_addresses == expected, "all payloads preserve axes independently");
+      NativeSamplerAddress environment{MaterialSampleAddress::Wrap,MaterialSampleAddress::Wrap};
+      if (channel == 5) {
+        if (u != 3) environment.u = modes[u];
+        if (v != 3) environment.v = modes[v];
+      }
+      Require(ranges[0].environment_address == NativeSamplerAddress{MaterialSampleAddress::Wrap,MaterialSampleAddress::Wrap} &&
+          ranges[2].environment_address == environment,"environment axes are explicit and independent of ordinary channels");
       auto before = ranges;
       Require(!DecodeMeshMaterials(std::span(commands).first(std::size(commands) - 1), ranges) &&
           ranges[2].sampler_addresses == before[2].sampler_addresses, "truncated sampler decode is transactional");

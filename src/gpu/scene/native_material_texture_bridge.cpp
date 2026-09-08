@@ -16,6 +16,10 @@
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/scene/deferred_consumer.h"
+#include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/native_water_material_bridge.h"
+#include "gpu/scene/reflection_texture_import.h"
+#include "gpu/frame_stats.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/native_fog_bridge.h"
@@ -138,6 +142,13 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
         !selected || *selected != *table || !offset || !fallback || !render_view) { ++stats.unsupported; return; }
     if (*phase == 1 && (!NativeRigidShadowEnabled() || *render_view != 1)) return;
     auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture);
+    static uint32_t water_scope_examples = 0;
+    if (*render_view == 3 && IsDeferredWaterResource(*visual,Word) && water_scope_examples < 3) {
+      ++water_scope_examples;
+      BD_INFO("[native-water-producer-scope] type {} phase {} material inputs {} special route {} pose {} model {}",
+          Word(uint64_t(*visual)+3000).value_or(~0u),*phase,inputs.has_value(),
+          Word(uint64_t(*visual)+3128).value_or(~0u),bool(pose),bool(FindLoadedNativeModel(*graph)));
+    }
     if (!inputs) { ++stats.unsupported; return; }
     auto publication = std::make_unique<NativeObjectTextureState>();
     publication->model = FindLoadedNativeModel(*graph);
@@ -626,5 +637,123 @@ void NativeMaterialTextureReport() {
       policy_stats.plans, policy_stats.known, policy_stats.unknown, policy_stats.direct,
       policy_stats.deferred, policy_stats.suppressed, policy_stats.reads, policy_stats.missing,
       policy_stats.checked, policy_stats.wrong, policy_stats.draws, policy_stats.changed, policy_stats.refreshes);
+}
+bool StageNativeWaterForObject(const NativeInstancePose &pose, uint32_t node) {
+  auto *scope = current;
+  if (!NativeRigidSceneEnabled() || !NativeRigidDeferredEnabled() || !scope ||
+      scope->pose.get() != &pose || scope->model != pose.model || scope->render_view != 3 ||
+      !scope->policy_inputs || scope->policy_inputs->phase != 0 || scope->policy_inputs->pass_mode != 0 ||
+      !NativeWaterModelShaderOnly(scope->policy_inputs->technique) ||
+      !IsDeferredWaterResource(scope->visual,Word)) return false;
+  const auto *program = FindNativeInstanceNode(pose,node);
+  const auto *mesh = program ? PrepareMaterialMesh(*program) : nullptr;
+  static uint32_t producer_examples = 0;
+  if (producer_examples < 4) {
+    ++producer_examples;
+    BD_INFO("[native-water-producer-input] instance {} generation {} node {} program {} ranges {} policies {} overrides {} late {} special {}",
+        pose.instance,pose.model_generation,node,program && program->valid,program ? program->ranges.size() : 0,
+        mesh ? mesh->policies.size() : 0,scope->inputs.overrides.size(),scope->inputs.late_images.size(),scope->inputs.special_selector.has_value());
+    if (program && mesh) for (size_t i=0;i<std::min<size_t>(4,program->ranges.size());++i) {
+      const auto &range = program->ranges[i];
+      const auto geometry = i < program->geometries.size() ? program->geometries[i] : nullptr;
+      const auto policy = i < mesh->policies.size() ? mesh->policies[i] : NativePrimitivePolicy{};
+      BD_INFO("[native-water-producer-input] primitive {} known {} deferred {} skin {} bones {} normal {} environment {} geometry {} canonical {} water {}",
+          i,policy.routing_known,policy.deferred,range.skin.has_value(),range.shader.vertex_bones ? int(*range.shader.vertex_bones) : -1,
+          range.features.normal_mapping_requested,uint32_t(range.reflection.source),bool(geometry),
+          geometry && geometry->canonical_vertices,geometry && bool(geometry->water_vertex_input));
+    }
+  }
+  // Whole-node classification precedes publication. Direct/skinned/volume and
+  // special image writers need their own connected producers, never partial
+  // sibling substitution. These are explicit remaining families.
+  if (!program || !program->valid || !mesh || program->ranges.empty() ||
+      mesh->policies.size() != program->ranges.size() ||
+      program->geometries.size() != program->ranges.size() ||
+      program->shadow_policies.size() != program->ranges.size() ||
+      !scope->inputs.overrides.empty() || !scope->inputs.late_images.empty() ||
+      scope->inputs.special_selector) return false;
+  for (size_t i=0;i<program->ranges.size();++i) {
+    const auto &range = program->ranges[i];
+    const auto &geometry = program->geometries[i];
+    if (!mesh->policies[i].routing_known || !mesh->policies[i].deferred ||
+        range.skin || !range.shader.vertex_bones || *range.shader.vertex_bones ||
+        range.reflection.source == ReflectionTextureSource::Unknown ||
+        !geometry || !geometry->canonical_vertices || !geometry->water_vertex_input) return false;
+  }
+  const auto require = [](bool value, const char *reason) {
+    if (!value) { BD_ERROR("[native-water-producer] {}",reason); throw std::runtime_error(reason); }
+  };
+  require(node < pose.transforms.size() && scope->alpha_inputs && scope->deferred_inputs,
+      "Native water producer lost pose/alpha/depth ownership");
+  std::vector<uint32_t> references;
+  require(ComposeMaterialAlphaReferences(program->ranges,mesh->policies,*scope->alpha_inputs,references),
+      "Native water whole-node alpha references unavailable");
+  const auto camera = FindNativePassCamera(3);
+  const auto lighting = FindNativeLightingPass(3);
+  const auto lights = lighting ? CaptureNativeSceneLights(pose.instance,pose.model_generation,node,lighting->inputs) : std::nullopt;
+  const auto sources = ReadReflectionTextureImport(Word);
+  require(camera && lights && sources,"Native water pass/light/table producer unavailable");
+  std::vector<NativeWaterDeferred> pending;
+  pending.reserve(program->ranges.size());
+  std::array<uint32_t,6> images{};
+  images[5] = sources->pass_default;
+  size_t cursor = 0;
+  for (uint32_t i=0;i<program->ranges.size();++i) {
+    const auto &range = program->ranges[i];
+    const auto &policy = mesh->policies[i];
+    // The outgoing legacy sorted binder uses explicit table selections, not
+    // a preceding draw's images. The native water shader has its own image
+    // roles; these wrappers exist only until mixed-frame state consumers retire.
+    while (cursor < range.texture_assignment_end) {
+      const auto &assignment = program->texture_assignments[cursor++];
+      if (assignment.channel >= images.size()) continue;
+      if (assignment.source == MaterialImageSource::Unknown) {
+        require(assignment.channel == 5,"Native water unknown image writer");
+        continue; // folded environment recipe below owns this selection
+      }
+      const auto source = SelectReflectionTextureImport(*sources,
+          {ReflectionTextureSource::Table,assignment.selector,true},Word);
+      require(source.has_value(),"Native water outgoing table selection unavailable");
+      images[assignment.channel] = *source;
+    }
+    const auto environment = SelectReflectionTextureImport(*sources,range.reflection,Word);
+    require(environment.has_value(),"Native water environment selection unavailable");
+    images[5] = *environment;
+    auto bridge = std::make_shared<NativeWaterProducerBridge>();
+    bridge->visual = scope->visual;
+    bridge->object_mode = range.winding == PrimitiveWinding::TwoSided ? 2 :
+        scope->policy_inputs->pass_cull == PrimitiveCull::Back ? 1 :
+        scope->policy_inputs->pass_cull == PrimitiveCull::Front ? 0 : 2;
+    for (uint32_t slot=0;slot<images.size();++slot) {
+      if (images[slot]) {
+        bridge->texture_sources[slot] = images[slot];
+        const auto *texture = ResolveGuestTexture(images[slot]);
+        bridge->image_leases[slot] = CaptureNativeTexture(texture);
+        require(texture && bridge->image_leases[slot].primary,
+            "Native water outgoing image owner unavailable");
+      }
+      const auto axes = slot == 5 ? range.environment_address : range.sampler_addresses[slot];
+      // The sorted producer's scratch starts zero, including channel3; unlike
+      // direct sampling this is an explicit wrapping export, not inherited UV.
+      bridge->addresses[slot] = {axes.u == MaterialSampleAddress::Unknown ? 0u : uint32_t(axes.u),
+                                axes.v == MaterialSampleAddress::Unknown ? 0u : uint32_t(axes.v)};
+    }
+    DeferredDepthRecipe depth;
+    if (scope->deferred_inputs->fixed && policy.shadow_allowed) {
+      depth.kind = DeferredDepthRecipe::Kind::Fixed;
+      depth.fixed_depth = scope->deferred_inputs->fixed_depth;
+    } else {
+      require(program->bounds.has_value(),"Native water model bounds unavailable");
+      depth.centre = {(*program->bounds)[0],(*program->bounds)[1],(*program->bounds)[2]};
+      depth.radius = (*program->bounds)[3];
+    }
+    const auto key = EvaluateDeferredDepth(depth,pose.transforms[node],camera->view);
+    require(key.has_value(),"Native water sort key unavailable");
+    const auto &env = bridge->image_leases[5];
+    pending.push_back({scope->pose,node,i,FrameStatFrameCount(),references[i],*key,policy.cull,
+        policy.shadow_allowed,env.cube ? env.cube : env.primary,*lights,std::move(bridge)});
+  }
+  require(StageNativeDeferredWater(scope->visual,pending),"Native water deferred staging refused");
+  return true;
 }
 } // namespace bd::gpu::scene

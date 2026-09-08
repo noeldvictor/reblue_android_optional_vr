@@ -1817,9 +1817,75 @@ void SceneCommands() {
   }
 }
 } // namespace
+void CheckNativeWaterDeferredQueue() {
+  using namespace bd::gpu::scene;
+  const RenderMatrix identity{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+  ModelMaterialImport source;
+  source.source_mesh = 100;
+  source.program.valid = true;
+  source.program.ranges.resize(2); source.program.materials.resize(2);
+  source.program.shadow_policies.resize(2,NativeShadowPolicy::Receive);
+  source.source_bindings.resize(2);
+  auto geometry = std::make_shared<NativeGeometry>(); geometry->id = 17;
+  source.program.geometries = {geometry,geometry};
+  ModelMaterialRegistry models;
+  const ModelNodeSourceBinding node{0,100};
+  assert(models.Publish(10,{source},std::span(&node,1)));
+  auto model = models.FindModel(10);
+  auto pose = std::make_shared<NativeInstancePose>(NativeInstancePose{23,model->Generation(),model,{identity}});
+  NativeWaterDeferred water{pose,0,0,7,123,-2,PrimitiveCull::Front,true,{},{{},9},{}};
+  assert(water.Valid(7) && !water.Valid(8));
+  NativeDeferredQueue queue;
+  const NativeWaterDeferred good = water;
+  for (uint32_t fault=0;fault<8;++fault) {
+    water = good;
+    if (fault == 0) water.pose.reset();
+    if (fault == 1) water.node = 1;
+    if (fault == 2) water.primitive = 2;
+    if (fault == 3) water.frame = 8;
+    if (fault == 4) water.depth = std::numeric_limits<float>::quiet_NaN();
+    if (fault == 5) water.lights.update = 0;
+    if (fault == 6) water.cull = PrimitiveCull(3);
+    std::array siblings{good,water};
+    assert(!queue.StageWater(siblings,fault == 7 ? 5139 : 0,7) && queue.Entries().empty());
+  }
+  water = good;
+  assert(!queue.TakeWater(0));
+  assert(queue.StageWater(std::span(&water,1),1,7));
+  NativeRigidScenePlan rigid{};
+  rigid.draw = rigid.deferred = true; rigid.depth = -2; rigid.light_recipe = NativeSceneLightRecipe{{},9};
+  NativeRigidSceneSubmission mixed{31,model->Generation(),0,7,false,{rigid}};
+  assert(!queue.Stage(mixed,0,7) && queue.Stage(mixed,1,7));
+  water.primitive = 1;
+  assert(queue.StageWater(std::span(&water,1),2,7));
+  assert(queue.Entries().size() == 3 && queue.Entries()[0].Identity() == good.Identity());
+  std::vector<DeferredInsertion> insertions;
+  for (const auto &entry : queue.Entries()) insertions.push_back(entry.order);
+  std::vector<DeferredSelection> order;
+  const float legacy[]{-2,-2};
+  assert(MergeDeferredWork(legacy,insertions,order));
+  assert(order.size() == 5 && !order[0].native && order[1].native && order[2].native &&
+      !order[3].native && order[4].native && order[4].index == 2);
+  models.Retire(10);
+  assert(models.Publish(10,{source},std::span(&node,1)));
+  assert(models.FindModel(10)->Generation() != good.Identity().model_generation);
+  source = {}; model.reset(); pose.reset(); water = {}; // no source storage at consumption
+  assert(!queue.BeginDrain(8) && queue.BeginDrain(7));
+  assert(!queue.BeginDrain(7) && !queue.EndDrain() && !queue.Take(0));
+  assert(!queue.StageWater(std::span(&good,1),2,7));
+  auto first = queue.TakeWater(0);
+  assert(first && !queue.TakeWater(0) && first->Program()->geometries[0] == geometry &&
+      first->pose->transforms[0] == identity && first->alpha_reference == 123 && first->lights.update == 9);
+  assert(!queue.TakeWater(1) && queue.Take(1) && !queue.Take(1));
+  assert(!queue.EndDrain());
+  const auto last = queue.TakeWater(2);
+  assert(last && last->primitive == 1 && queue.EndDrain() && queue.Entries().empty());
+  assert(!queue.EndDrain());
+}
 void CheckScreenshotContracts();
 int main() {
   CheckScreenshotContracts();
+  CheckNativeWaterDeferredQueue();
   native_occlusion_tests::Run();
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   TypedImageLeases();

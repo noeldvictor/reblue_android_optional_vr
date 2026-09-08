@@ -57,6 +57,7 @@
 #include "gpu/scene/native_primitive_policy_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/native_water_material_bridge.h"
 #include "gpu/scene/host_frustum_bridge.h"
 #include "gpu/scene/node_tag.h"
 #include "gpu/shadow_fit.h"
@@ -380,7 +381,9 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             ctx.r6.u64 = ctx_va;
             if (!(view_id == 1 && instance_pose &&
                   SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)) &&
-                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index, shadow_policy, ctx.r1.u32)))
+                !(view_id == 3 && instance_pose &&
+                  (StageNativeWaterForObject(*instance_pose,index) ||
+                   SubmitNativeRigidScene(*instance_pose, index, shadow_policy, ctx.r1.u32))))
               bdSceneNodeDrawSingle(ctx, base);
             // Diagnostic only: per-node light callbacks publish during the draw.
             if (instance_pose && REXCVAR_GET(bd_native_materials_verify))

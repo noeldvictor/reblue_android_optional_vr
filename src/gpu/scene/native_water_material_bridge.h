@@ -8,8 +8,23 @@
 #include "gpu/scene/native_visual_inputs.h"
 #include "gpu/scene/native_selected_lights.h"
 #include "gpu/scene/native_material_data.h"
+#include "gpu/scene/native_water_deferred.h"
+
+namespace bd::gpu { struct GuestTexture; }
 
 namespace bd::gpu::scene {
+// Temporary outgoing compatibility state only. No geometry, copied shader
+// register block or source matrix is retained. Native GPU inputs use the owned
+// pose/model/image leases in NativeWaterDeferred, never these resource wrappers.
+struct NativeWaterProducerBridge {
+  uint32_t visual = 0;
+  uint8_t object_mode = 2;
+  std::array<uint32_t,6> texture_sources{};
+  std::array<std::array<uint32_t,2>,6> addresses{};
+  std::array<NativeTextureBinding,6> image_leases;
+};
+static_assert(sizeof(NativeWaterProducerBridge) <= 512);
+bool StageNativeWaterForObject(const NativeInstancePose &pose, uint32_t node);
 struct NativeWaterMaterialOutput {
   NativeWaterMaterial material;
   NativeMaterialObjectInputs object;
@@ -37,6 +52,7 @@ private:
 class NativeWaterMaterialScope {
 public:
   NativeWaterMaterialScope(uint32_t entry, uint32_t visual, NativeVisualIdentity identity);
+  explicit NativeWaterMaterialScope(NativeWaterDeferred pending);
   NativeWaterMaterialScope(const NativeWaterMaterialScope &) = delete;
   NativeWaterMaterialScope &operator=(const NativeWaterMaterialScope &) = delete;
   bool Draw(uint32_t stack, uint8_t *base, bool stencil_pending, int32_t &depth_write);
@@ -48,5 +64,6 @@ private:
   NativeVisualIdentity identity_;
   NativeWaterMaterialPublication publication_;
   NativeSelectedLights lights_{};
+  std::optional<NativeWaterDeferred> pending_;
 };
 } // namespace bd::gpu::scene

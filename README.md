@@ -58,22 +58,23 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest connected checkpoint (2026-09-08, host147/run975):** admitted game water
-now also bypasses visual callbacks, sharing the existing native receiver/class/blend
-scope. Its completed material output owns late object inputs; the obsolete callback
-capture side channel is removed. Model/resource callbacks, translated shader selection
-and legacy geometry binding/drawing were already bypassed on this route.
-CPU tests, 377 source/scenario checks and strict desktop cold/reload checks pass.
-The latest samples show 3,109 balanced native water visual scopes, 3,159 direct
-materials, 3,066 emitted draws and 3,157 fence-retired packets, with no admission
-refusals. An initial type-8-only admission missed the actual type-5 water visual;
-that failed reachability case is preserved, with a source-derived fix and regression.
+**Latest connected checkpoint (2026-09-08, host151/run978):** admitted game water
+now bypasses the node command interpreter and source render-list allocation,
+using retained native model/pose records in the existing sorted queue. Its native
+visual/material/draw connection remains in place. Ordered normal-map selection
+and environment sampler inputs are now captured by the load-owned material recipe.
+CPU behavior tests, 377 source/scenario checks and strict desktop cold/reload checks
+pass. Fresh water staging and consumption advance equally in both ready-field
+epochs: 3,111 records at the last queue sample. The later GPU sample reports 3,162
+submissions, 3,065 emitted draws and 3,160 fence-retired packets; the previous water
+generation retires before the reloaded one submits.
 These are repeated draws, not unique assets or a speedup measurement. The unchanged
 20-case two-eye GPU water fixture remains shader evidence, not game-stereo proof.
-Source-list construction, per-entry state/world/sampler exports, parameter descriptors
-and image getters remain adapters. Game water/reflection pixels, HDR art parity and
-authored shore/refraction/stereo coverage are still unqualified.
-[Shared visual connection and remaining work](research/20260908_1236_native-water-visual.md).
+Outgoing mixed-frame image/state/world/sampler exports, late parameter descriptors
+and image getters remain adapters; special-image and other unadmitted families still
+use the legacy producer. Game water/reflection pixels, HDR art parity and authored
+shore/refraction/stereo coverage remain unqualified.
+[Producer verification and storage record](research/20260906_0333_native-scene-state-bridge.md#native-water-deferred-producer-2026-09-08-source681f1fd-plus-edits).
 
 ### How much is left?
 

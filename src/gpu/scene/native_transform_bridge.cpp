@@ -103,7 +103,7 @@ std::optional<Publication> Refuse(size_t reason, uint32_t address = 0) {
   return {};
 }
 std::optional<Publication> Prepare(PPCContext &ctx,
-                                   const float *view_override) {
+                                   const float *view_override, const RenderMatrix *world_override = nullptr) {
   if (!Range(kMatrices, 197) || !Range(kDevice, 4))
     return Refuse(0);
   if (bd::mem::load<uint32_t>(kCallback) != kDefaultCallback) {
@@ -116,6 +116,11 @@ std::optional<Publication> Prepare(PPCContext &ctx,
                                                &inputs.projection};
   Publication result;
   for (uint32_t i = 0; i < 3; ++i) {
+    if (!i && world_override) {
+      inputs.world = *world_override;
+      result.update[0] = true;
+      continue;
+    }
     const auto address = addresses[i] ? addresses[i] : kMatrices + i * 64;
     // Cross-aliases into another cache slot have sequential write semantics in
     // the old entry point. Refuse before any effects instead of changing them.
@@ -246,6 +251,16 @@ void Publish(const Publication &publication) {
 
 const RenderTransforms *GetNativeRenderTransforms() {
   return native_transforms ? &*native_transforms : nullptr;
+}
+
+bool PublishNativeWorld(const RenderMatrix &world) {
+  if (!REXCVAR_GET(bd_native_transforms)) return false;
+  PPCContext context{};
+  const auto publication = Prepare(context,nullptr,&world);
+  if (!publication || publication->nonfinite_mask) return false;
+  Publish(*publication);
+  Report();
+  return true;
 }
 
 void UpdateRenderTransforms(PPCContext &ctx, uint8_t *base,

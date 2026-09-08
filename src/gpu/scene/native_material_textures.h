@@ -16,7 +16,7 @@ namespace bd::gpu::scene {
 // Channels are the temporary shader interface; table selectors are import
 // recipes, never persistent image identities. An unknown writer invalidates
 // ownership of its channel instead of pretending the last table image survived.
-enum class MaterialImageSource : uint8_t { Table, Unknown };
+enum class MaterialImageSource : uint8_t { Table, Unknown, NormalTable };
 struct MaterialImageAssignment {
   MaterialImageSource source = MaterialImageSource::Table;
   uint8_t channel = 0, selector = 0;
@@ -76,6 +76,7 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
   state.secondary_uv = inputs.initial_uv;
   state.owns_uv = inputs.owns_uv;
   std::array<bool, 2> uv_overridden{};
+  bool shadow_normal_seen = false;
   size_t cursor = 0;
   for (const auto &range : ranges) {
     if (range.texture_assignment_end < cursor || range.texture_assignment_end > assignments.size())
@@ -84,7 +85,16 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
       const auto step = assignments[cursor++];
       if (step.channel >= 16) return false;
       MaterialImageSelection<Image> selected;
-      if (step.source == MaterialImageSource::Table) {
+      if (step.source == MaterialImageSource::NormalTable) {
+        if (step.channel != 4) return false;
+        // Normal commands bypass visual/animation overrides. Phase1 maps every
+        // command to selector0 BEFORE repeated-command elision. A phase0 disable
+        // leaves the actual binding intact, though the old sorted scratch still
+        // records its independent lookup255 for the outgoing entry binder.
+        selected = shadow_phase ? (shadow_normal_seen ? MaterialImageSelection<Image>{MaterialImageAction::Keep} : lookup(0)) :
+            step.selector == 255 ? MaterialImageSelection<Image>{MaterialImageAction::Keep} : lookup(step.selector);
+        shadow_normal_seen = true;
+      } else if (step.source == MaterialImageSource::Table) {
         bool early_image = false, uv_match = false;
         if (!inputs.skip_overrides) {
           for (const auto &entry : inputs.overrides) {

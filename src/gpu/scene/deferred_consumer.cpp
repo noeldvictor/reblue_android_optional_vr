@@ -92,6 +92,7 @@ struct Stats {
 thread_local Stats stats;
 thread_local NativeDeferredQueue native_queue;
 thread_local uint64_t native_staged = 0, native_consumed = 0;
+thread_local uint64_t water_staged = 0, water_consumed = 0;
 thread_local uint64_t native_visual_begins = 0, native_visual_ends = 0, native_effect_reads = 0;
 thread_local uint64_t water_visual_begins = 0, water_visual_ends = 0;
 thread_local uint32_t water_visual_types = 0;
@@ -112,9 +113,12 @@ void Report() {
   stats.frame = frame;
   BD_INFO("[native-deferred] frame {} staged {} consumed {} pending {}; owned sorted packets, late authored imports and compatibility exports remain",
       frame, native_staged, native_consumed, native_queue.Entries().size());
+  if (water_staged)
+    BD_INFO("[native-water-deferred] frame {} staged {} consumed {}; no node interpreter or source list entries; outgoing mixed-frame image/state adapters remain",
+        frame,water_staged,water_consumed);
   BD_INFO("[native-deferred-effects] frame {} begins {} ends {} reads {}; ordinary native scopes dispatch no guest callbacks",
       frame, native_visual_begins, native_visual_ends, native_effect_reads);
-  BD_INFO("[native-deferred-inputs] frame {} batches {} visuals {} refreshes {}; native instance identities and writer-ordered values, no per-entry source sidecar",
+  BD_INFO("[native-deferred-inputs] frame {} batches {} visuals {} refreshes {}; native instance identities and writer-ordered values",
       frame, native_input_batches, native_input_visuals, native_input_refreshes);
   if (water_visual_begins)
     BD_INFO("[native-water-visual] frame {} begins {} ends {}; type mask {}; shared native receiver/class/blend scope, no visual callbacks",
@@ -534,6 +538,18 @@ void RecordDeferredConsumerFallback() {
 }
 
 bool HasNativeDeferredScene() { return !native_queue.Entries().empty(); }
+bool StageNativeDeferredWater(uint32_t visual, std::span<const NativeWaterDeferred> water) {
+  if (!NativeRigidDeferredEnabled() || !REXCVAR_GET(bd_native_deferred_consumer) || !NativeListMode() ||
+      !IsDeferredWaterResource(visual,CheckedWord) || water.empty()) return false;
+  const auto preceding = CheckedWord(kList+20);
+  const auto identity = FindNativeVisualIdentity(visual);
+  if (!preceding || !ReadNativeDeferredVisualInputs(identity,visual,CheckedWord)) return false;
+  for (const auto &plan : water) if (plan.Identity() != identity || !plan.bridge) return false;
+  if (!native_queue.StageWater(water,*preceding,FrameStatFrameCount())) return false;
+  water_staged += water.size(); // ordinary rigid counters retain their effect-read conservation contract
+  water_visual_types |= 1u << Read<uint32_t>(visual+3000);
+  return true;
+}
 bool StageNativeDeferredScene(uint32_t visual, NativeRigidSceneSubmission &submission) {
   if (!NativeRigidDeferredEnabled() || !REXCVAR_GET(bd_native_deferred_consumer) || !NativeListMode()) return false;
   const auto mode = CheckNativeDeferredContract(visual, CheckedWord);
@@ -562,7 +578,7 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   NativeVisualInputScope visual_inputs;
   std::vector<NativeVisualIdentity> requested;
   for (const auto &entry : native_queue.Entries())
-    requested.push_back({entry.submission.instance, entry.submission.model_generation});
+    requested.push_back(entry.Identity());
   if (NativeRigidSceneEnabled() && NativeListMode()) {
     for (const auto &entry : entries) {
       const auto visual = Read<uint32_t>(entry.address + 272);
@@ -648,17 +664,15 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     // Legacy identity resolution is confined to its compatibility boundary. A
     // native item derives its key from the retained submission, never a VA.
     const auto next_visual = item.native ? 0 : Read<uint32_t>(entry + 272);
-    const auto next_identity = item.native ? NativeVisualIdentity{
-        native_queue.Entries()[item.index].submission.instance,
-        native_queue.Entries()[item.index].submission.model_generation} : FindNativeVisualIdentity(next_visual);
+    const auto next_identity = item.native ? native_queue.Entries()[item.index].Identity() : FindNativeVisualIdentity(next_visual);
     const bool same_visual = identity && next_identity ? identity == next_identity :
         !identity && !next_identity && visual == next_visual;
     ++stats.entries;
     PPCRegister entry_reg{}, visual_reg{};
     entry_reg.u32 = entry;
     visual_reg.u32 = same_visual ? next_visual : 0;
-    const bool water_entry = !item.native && NativeRigidSceneEnabled() && NativeListMode() &&
-        IsDeferredWaterResource(next_visual, CheckedWord);
+    const bool water_entry = item.native ? native_queue.Entries()[item.index].water.has_value() :
+        NativeRigidSceneEnabled() && NativeListMode() && IsDeferredWaterResource(next_visual, CheckedWord);
     if (item.native || water_entry) CloseDeferredCompatibilityCapture();
     else if (bdRenderListEntryHook(entry_reg, visual_reg)) {
       ++stats.replayed;
@@ -683,6 +697,18 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
           !visual_inputs.Read(identity, FrameStatFrameCount()) ||
           CheckedWord(kVisualContext + 36) != 0)
         throw std::runtime_error("Native deferred visual transition no longer ordinary");
+      if (water_entry) {
+        auto pending = native_queue.TakeWater(item.index);
+        if (!pending) throw std::runtime_error("Native water deferred work consumed twice");
+        NativeWaterMaterialScope water(std::move(*pending));
+        if (!water.Draw(ctx.r1.u32,base,false,depth_write))
+          throw std::runtime_error("Accepted native water lost its material producer");
+        // Its outgoing exports supersede these legacy loop elision keys. The
+        // next legacy item must publish its own values even when keys repeat.
+        alpha = winding = UINT32_MAX; sidedness = 127;
+        ++water_consumed;
+        continue;
+      }
       auto submission = native_queue.Take(item.index);
       const auto effects = ReadNativeDeferredEffects(identity);
       if (!submission || !effects)

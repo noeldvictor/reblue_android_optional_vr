@@ -19,6 +19,7 @@
 #include "gpu/scene/native_alpha_bridge.h"
 #include "gpu/scene/native_blend_bridge.h"
 #include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_transform_bridge.h"
 #include "gpu/scene/deferred_surface.h"
 #include "gpu/scene/refraction_material_import.h"
 #include "gpu/scene/shader_parameter_import.h"
@@ -36,6 +37,7 @@ REX_EXTERN(__imp__sub_82454720);
 REX_EXTERN(__imp__sub_82455150);
 REX_EXTERN(bdShaderConstantFlush);
 REX_EXTERN(bdSetRenderState);
+REX_EXTERN(bdSetSamplerState);
 REX_EXTERN(sub_8221D2C8);
 REXCVAR_DECLARE(bool, bd_native_scene_textures);
 
@@ -233,27 +235,35 @@ NativeWaterMaterialScope::NativeWaterMaterialScope(uint32_t entry, uint32_t visu
   entry_ = entry; visual_ = visual; identity_ = identity; frame_ = FrameStatFrameCount();
   ++stats.water_candidates;
 }
+NativeWaterMaterialScope::NativeWaterMaterialScope(NativeWaterDeferred pending) : pending_(std::move(pending)) {
+  Check(pending_->Valid(FrameStatFrameCount()) && pending_->bridge);
+  identity_ = pending_->Identity(); frame_ = pending_->frame; visual_ = pending_->bridge->visual;
+  Check(FindNativeVisualIdentity(visual_) == identity_);
+  ++stats.water_candidates;
+}
 bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_pending, int32_t &depth_write) {
   if (!identity_) return false;
   PPCContext context{};
   context.r1.u64 = stack; context.r3.u64 = visual_;
   constexpr uint32_t engine = (uint32_t(-32034) << 16) - 19936;
+  const auto technique = pending_ ? Word(uint64_t(visual_)+3000) : Word(uint64_t(entry_)+248);
   const auto unavailable = [&] {
     ++stats.water_unavailable;
     if (stats.water_unavailable == 1 || FrameStatFrameCount()-stats.water_refusal_frame >= 300) {
       BD_INFO("[native-water-admission] unavailable before material: technique {} instance {} generation {} frame {}",
-          Word(uint64_t(entry_)+248).value_or(~0u),identity_.instance,identity_.model_generation,frame_);
+          technique.value_or(~0u),identity_.instance,identity_.model_generation,frame_);
       stats.water_refusal_frame = FrameStatFrameCount();
     }
     return false;
   };
   if (!REXCVAR_GET(bd_native_scene_textures) || stencil_pending || Word(kPhase) != 3 ||
-      !Range(entry_,816) || !Word(engine+16) ||
-      !CheckNativeWaterModelContract(visual_,ReadWord(uint64_t(entry_)+248),Word) || !Ready(context,true))
+      (!pending_ && !Range(entry_,816)) || !Word(engine+16) || !technique ||
+      !CheckNativeWaterModelContract(visual_,*technique,Word) || !Ready(context,true))
     return unavailable();
   const auto lighting = FindNativeLightingPass(3);
-  const auto node = ReadWord(uint64_t(entry_)+252);
-  const auto recipe = lighting ? CaptureNativeSceneLights(identity_.instance,identity_.model_generation,node,lighting->inputs) : std::nullopt;
+  const auto node = pending_ ? pending_->node : ReadWord(uint64_t(entry_)+252);
+  const auto recipe = pending_ ? std::optional(pending_->lights) :
+      lighting ? CaptureNativeSceneLights(identity_.instance,identity_.model_generation,node,lighting->inputs) : std::nullopt;
   const auto ticket = recipe ? ResolveNativeSceneLights(*recipe) : std::nullopt;
   if (!ticket) return unavailable();
   lights_ = ticket->lights; // copied once, not resolved/committed again after the writer
@@ -267,8 +277,8 @@ bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_
     bool BeginLights() { return CommitNativeSceneLights(ticket,uint32_t(saved_stack)); }
     void PublishModelFlags() {
       // Re-read after the light exporter, which can alias source parameters.
-      Check(CheckNativeWaterModelContract(material,ReadWord(uint64_t(scope.entry_)+248),Word));
-      bd::mem::store<uint32_t>(engine+16,ReadWord(uint64_t(scope.entry_)+240));
+      Check(CheckNativeWaterModelContract(material,scope.pending_ ? ReadWord(uint64_t(material)+3000) : ReadWord(uint64_t(scope.entry_)+248),Word));
+      bd::mem::store<uint32_t>(engine+16,scope.pending_ ? 0 : ReadWord(uint64_t(scope.entry_)+240));
       PPCContext preflight{};
       preflight.r3.u64 = material; preflight.r1.u64 = saved_stack;
       Check(Ready(preflight,true)); // never fall back after the first light publication
@@ -284,8 +294,9 @@ bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_
       if (!scope.Submit(false)) throw std::runtime_error("Native water lost an owned input after material participation");
     }
     void ExportDepthIntent() {
-      if (ReadWord(uint64_t(material)+3000) == 8) bd::mem::store<uint8_t>(scope.entry_+295,0);
-      const int32_t next = bd::mem::load<int8_t>(scope.entry_+295);
+      const bool force_off = ReadWord(uint64_t(material)+3000) == 8;
+      if (force_off && !scope.pending_) bd::mem::store<uint8_t>(scope.entry_+295,0);
+      const int32_t next = scope.pending_ ? (!force_off && scope.pending_->shadow_allowed) : bd::mem::load<int8_t>(scope.entry_+295);
       if (next != depth_write) { depth_write = next; State(48,uint32_t(next)); }
     }
     void FinishWater() {
@@ -296,6 +307,25 @@ bool NativeWaterMaterialScope::Draw(uint32_t stack, uint8_t *base, bool stencil_
       ++stats.direct_ends;
     }
   } adapter(context,base,*this,*ticket,depth_write);
+  if (pending_) {
+    Check(pending_->Valid(frame_) && FindNativeVisualIdentity(visual_) == identity_);
+    const auto &outgoing = *pending_->bridge;
+    for (uint32_t slot=0;slot<6;++slot) if (outgoing.texture_sources[slot]) {
+      auto *texture = ResolveGuestTexture(outgoing.texture_sources[slot]);
+      Check(texture && CaptureNativeTexture(texture) == outgoing.image_leases[slot]);
+      for (uint32_t axis=0;axis<2;++axis) {
+        context.r3.u64 = slot; context.r4.u64 = axis*4; context.r5.u64 = outgoing.addresses[slot][axis];
+        bdSetSamplerState(context,base); // outgoing state only; native water owns its six samplers
+      }
+      Video::SetTexture(slot,texture);
+    }
+    adapter.State(100,pending_->alpha_reference);
+    Check(PublishNativeWorld(pending_->pose->transforms[pending_->node]));
+    constexpr uint32_t object_mode = (uint32_t(-32036)<<16)-5536;
+    const auto cull = pending_->cull;
+    bd::mem::store<uint8_t>(object_mode,outgoing.object_mode);
+    adapter.State(56,cull == PrimitiveCull::Back ? 6 : cull == PrimitiveCull::Front ? 2 : 0);
+  }
   const bool consumed = ConsumeNativeWaterMaterial(adapter);
   if (!consumed) return unavailable();
   Report();
@@ -307,8 +337,9 @@ void NativeWaterMaterialScope::Publish(uint32_t visual, std::optional<NativeWate
   // This is the original sorted image producer's explicit slot5 selection,
   // copied after the resource writer's possible aliases. Null means unowned
   // inheritance, not permission to borrow the previous draw's cube.
-  const auto source = Word(uint64_t(entry_) + 372);
-  if (source && *source) {
+  const auto source = pending_ ? std::optional<uint32_t>{} : Word(uint64_t(entry_) + 372);
+  if (pending_) output->environment = pending_->environment;
+  else if (source && *source) {
     const auto image = CaptureNativeTexture(ResolveGuestTexture(*source));
     output->environment = image.cube ? image.cube : image.primary;
   }
@@ -329,15 +360,26 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
     return false;
   };
   const auto output = publication_.Read(identity_, FrameStatFrameCount());
-  if (!output || entry != entry_ || stencil_pending || Word(kPhase) != 3 ||
+  if (!output || stencil_pending || Word(kPhase) != 3) return refuse("completed material or scene pass");
+  std::shared_ptr<const NativeInstancePose> pose;
+  std::shared_ptr<const ModelMaterialImport> mesh;
+  const NativeModelMaterialProgram *owned_program = nullptr;
+  uint32_t node = 0;
+  std::optional<size_t> primitive;
+  if (pending_) {
+    if (!pending_->Valid(frame_) || pending_->Identity() != identity_) return refuse("retained native water ownership");
+    pose = pending_->pose; node = pending_->node; primitive = pending_->primitive;
+    owned_program = pending_->Program();
+  } else {
+  if (entry != entry_ ||
       Word(uint64_t(entry)+244) != visual_ || Word(uint64_t(entry)+272) != visual_ ||
       !Range(entry,816) || bd::mem::load<int8_t>(entry+289) > 0 ||
       bd::mem::load<int8_t>(entry+292) != 0) return refuse("completed material or regular sorted surface");
   const auto graph = Word(uint64_t(visual_)+2620), palette = Word(uint64_t(entry)+268);
-  const auto node = ReadWord(uint64_t(entry)+252);
+  node = ReadWord(uint64_t(entry)+252);
   if (!graph || !*graph || !palette || !*palette) return refuse("model/palette import");
-  const auto pose = FindNativeInstancePose(visual_,*graph,*palette);
-  const auto mesh = FindLoadedNativeModelNodeImport(*graph,node);
+  pose = FindNativeInstancePose(visual_,*graph,*palette);
+  mesh = FindLoadedNativeModelNodeImport(*graph,node);
   if (!pose || !mesh || pose->instance != identity_.instance || pose->model_generation != identity_.model_generation ||
       node >= pose->transforms.size() || FindNativeInstanceNode(*pose,node) != &mesh->program) return refuse("native pose/model node owner");
   // The entry is still an import adapter, never the native transform owner.
@@ -345,7 +387,6 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
   for (uint32_t i=0; i<16; ++i)
     if (pose->transforms[node][i] != ReadFloat(uint64_t(entry)+16+i*4)) return refuse("sorted world differs from completed native pose");
   const auto &program = mesh->program;
-  std::optional<size_t> primitive;
   for (size_t i=0; i<program.ranges.size(); ++i) {
     if (!ModelPrimitiveMatches(program.ranges[i],mesh->source_bindings[i],ReadWord(uint64_t(entry)+384),
         ReadWord(uint64_t(entry)+380),bd::mem::load<uint16_t>(entry+284),uint32_t(bd::mem::load<uint16_t>(entry+280))+2)) continue;
@@ -353,6 +394,9 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
     primitive = i;
   }
   if (!primitive) return refuse("load-owned primitive association");
+  owned_program = &mesh->program;
+  }
+  const auto &program = *owned_program;
   const auto &geometry = program.geometries[*primitive];
   if (!geometry || !geometry->id || !geometry->canonical_vertices || !geometry->water_vertex_input ||
       geometry->stream_mask != 1 || !geometry->strides[0] || geometry->strides[0] > 255 ||
@@ -399,7 +443,7 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
       .65f/float(receiver->image->shape.width),0};
   pass.fog = *fog;
   pass.lights = lights_;
-  const auto receive = bd::mem::load<uint8_t>(entry+295);
+  const auto receive = pending_ ? uint8_t(pending_->shadow_allowed) : bd::mem::load<uint8_t>(entry+295);
   if (receive > 1 || program.shadow_policies[*primitive] == NativeShadowPolicy::Unknown) return refuse("owned shadow participation");
   const uint32_t flags = (features->diffuse ? WaterDiffuse : 0) | (features->fog ? WaterFog : 0) |
       (receive && program.shadow_policies[*primitive] == NativeShadowPolicy::Receive ? WaterShadow : 0);
@@ -412,11 +456,16 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
   plan.geometry = geometry; plan.input = *input; plan.images = std::move(images); plan.blend = *blend;
   plan.depth_write = ReadWord(uint64_t(visual_)+3000) == 8 ? false : bool(receive);
   plan.alpha_to_coverage = alpha->alpha_to_coverage;
+  if (pending_) {
+    plan.cull = pending_->cull == PrimitiveCull::Back ? plume::RenderCullMode::BACK :
+        pending_->cull == PrimitiveCull::Front ? plume::RenderCullMode::FRONT : plume::RenderCullMode::NONE;
+  } else {
   const auto winding = bd::mem::load<uint16_t>(entry+286);
   if (winding != 0x1000 && winding != 0x2000 && winding != 0x3000) return refuse("explicit winding policy");
   const auto face = DeferredFaces(winding == 0x2000,winding == 0x3000 ? 2 : bd::mem::load<uint8_t>(entry+288));
   plan.cull = face == DeferredCullFace::Back ? plume::RenderCullMode::BACK :
       face == DeferredCullFace::Front ? plume::RenderCullMode::FRONT : plume::RenderCullMode::NONE;
+  }
   // Explicit native water sampling policy: repeating animated normals, clamped
   // screen/depth/cube inputs and the existing comparison sun filter. No fetch bits.
   for (uint32_t role=0; role<6; ++role) {

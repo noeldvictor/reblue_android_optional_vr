@@ -15,4 +15,7 @@ void UpdateRenderTransforms(PPCContext &ctx, uint8_t *base,
                             const float *view_override = nullptr);
 // Latest producer-owned values, not a readback of the engine getter matrix.
 const RenderTransforms *GetNativeRenderTransforms();
+// Native scene producer; only the outgoing compatibility getters/constants
+// are exported. No source matrix, scratch allocation or original call.
+bool PublishNativeWorld(const RenderMatrix &world);
 } // namespace bd::gpu::scene

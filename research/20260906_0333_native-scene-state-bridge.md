@@ -4908,3 +4908,113 @@ runtime evidence and diagnosed reachability case. First80130662400 to cleanup
 No new scoped cache/perf files. No allowances reset/expanded. Next host148/game976,
 deferred9/test4. Continue native list producer ownership and real image-role/
 game-pixel/stereo coverage, not a repeat of the completed visual-admission probe.
+
+### Native water deferred producer (2026-09-08, source681f1fd plus edits)
+
+Same cumulative3GiB exception/floor62,509,998,080B and unchanged reserve,
+diagnostic/log/raw/image limits. First measured free80,126,369,792B; no live
+renderer/build/compiler/test producer. CPU tree78,361,684B/132files and attachment
+logs297,077B/186files match the prior checkpoint. No downloads, assets/cooking,
+raws/images or binary copies.377 artifact-free Python checks pass. Native water
+staging/consumption now share the existing deferred queue; runtime reachability
+and mixed-frame outgoing-state correctness are unverified, not a delivered gate.
+
+Planned bounded CPU build62/test38 (host_post_output_test),32/16MiB free-drop,
+300/30s; host148192MiB/300s. Reuse unchanged shaders and GPU fixture evidence.
+Game976 only after checks pass:180s/800KiB/192MiB, strict cold/reload chain,
+zero captures/perf/dumps and exact profile restoration. Its new observation is
+native water producer records staged and consumed without source list entries,
+with fresh emissions/retirement and neighboring legacy comparisons. Full game
+pixel/stereo and authored image-role qualification remain pending. Preserve
+replacement overlap and failures; retire only superseded successful outputs
+after their replacements are verified. No storage allowances reset or expanded.
+
+CPU62/PID27448 failed on Windows max macro expansion; corrected kRecordBytes,
+CPU63/PID24108 and test38/PID29676 pass. Host148/PID34560/session22369 and
+149/PID27236 pass, codegen0/no guest objects. Run976/PID31932/session32890
+terminal09:10:25 after127s, strict cold/reload/mixed chain passed but NO water
+producer records staged. This does not qualify source-list removal.531733B,
+SHA2560A98E18569D4251538E61EB4837F73D3C6BFD626C4360C437342B0623357E052.
+Existing water visual/material/draw path still passes: frame4559 submitted3180,
+emitted3092/culled86/retired3178, zero admission refusals; type5 scopes3120 paired
+at4500.0 raws/22 settings/exact116B profile restored. Host149 EXE
+4AA97120396AC22ADEA1C84002C86323CE61D725511DA5987B51E80D34628068; PDB
+6C2B9EDE1036797E2F180F2A076CEDBF485E212292FB48269DDDFA4F94C71471.
+CPU63 BC3FBD064DA10B3536ECB777746B53922E82B9EFCA8296D7CCEFA4B940A278DE.
+
+Host150/PID31508 pass adds bounded producer eligibility/scope diagnostics; no
+new renderer behavior claimed. Material42/PID36108 and test40/PID29212 pass,
+including exhaustive environment-sampler axes. Next run977 preflight stopped
+at75MiB diagnostic overlap BEFORE profile writes/launch. No process existed.
+Resolved by retiring11 explicit superseded successful outputs after976 replaced
+975's strict/visual/material/draw purposes and CPU63/test38 replaced61/test37:
+hash-verified975 plus host147/148/149 and CPU61/test37 stdout/stderr.538809B
+logical; free80125444096 ->80125997056B (+552960 interval), counted once.
+Old full text retired; reports/hashes remain. Keep current150,CPU63/test38,
+material42/test40, failure62, causal976/974 and all other protected failures,
+GPU/image/raw evidence. Next977 observes bounded eligibility inputs and can
+stop as soon as that causal evidence arrives; it is not another full gate retry.
+
+977/PID29572/session89160 observed type5, node1/instance145/generation94, one
+known deferred canonical water primitive, no skin/bones/overrides, but normal
+mapping requested. This missing ordered normal-table selection caused refusal.
+Stopped owned renderer after collecting causal inputs, terminal09:16:07 after82s;
+wrapper exit1 is incomplete gate by design, not a qualified run. Profile restored;
+353801B causal log retained. No new raw/image allowance. Decoder now owns the
+normal-table action including repeated-command elision, disable/Keep and phase1
+selector0 behavior; source-list export remains distinct from actual binding.
+Material43/PID34572+test41/PID36976 and CPU64/PID27688+test39/PID38204 pass.
+Host151/PID33228/session97704 pass; no guest compilation/codegen writes. EXE
+6A5BC4842555A640D5975A5AAFD9C6D8242F100A841FC56C7B2FB3B2B8A2AC73;
+PDB2EDCF42D26A2A86DB57D47578EC5D101F5C4B1B41B04BC988A2248D200CFB7D1.
+
+Lossless archival replaces protected causal974, not discarding evidence.
+541432B source, bounded600KiB compression overlap; initial96KiB retained estimate
+was low, actual108282B fits128KiB and the unchanged aggregate limits. Source was
+preserved at the first size check. Then verified the sole ZIP payload name,
+length and SHA25661056EE...004B8 before removing only the redundant original.
+Retained-water-visual-974.zip SHA256
+713BC52D0B39C79D9AD412DE9872E88468C373F8FDC73370655EE51299DA0666.
+Net retained reduction433150B; original-removal free interval80122474496 ->
+80123019264B (+544768; archive creation already consumed space). Count once.
+Next978 uses the same180s/800KiB/192MiB strict capture-free gate, now testing
+the corrected normal-selection producer and actual water staging/consumption.
+
+978/PID38132/session65677 terminal09:25:16 after129s; wrapper exit0. Strict cold,
+reload, movement and mixed-consumer checks pass. Actual new queue evidence is
+separate from the rigid parser: ready-field1800..2100 stages/consumes1137->1437;
+reload4200..4500 stages/consumes2811->3111. No source-list entry or node command
+interpreter is used for these admitted water nodes. GPU1563..1863 submits901->1201,
+emits885->1167, retires899->1199; reload4250..4550 submits2862->3162,
+emits2793->3065, retires2860->3160. Generation94 finishes1661 retired before
+generation208's first submission1662. Rigid mixed4200..4500 stages/consumes9450
+additional records with9450 effect reads,5436 legacy draws and10872 material bridges.
+The new water counters are intentionally separate; no strict parser was weakened.
+All22 settings took effect,0 raws,116B owner profile restored exactly; SHA256
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+978 log538293B SHA256786501B09EC52DEBC7CB50EAC75657AA7FFCA941D5317BDC90751D747F975A94.
+Causal977 log353801B SHA256D5E88698F93EE29B9C5FFE52D88BAF33F8F1C9A729640A5D062893DCAAC8E268.
+
+The source list is removed only for admitted regular whole-node water producers.
+Special/early/late-image overrides and direct/skinned families remain legacy.
+The bounded opaque bridge owns outgoing source image keys plus checked native
+leases, not source geometry/world/register copies; a visual key still feeds the
+late material adapter. Mixed neighbors still need image/sampler/alpha/world/cull
+exports. No full-frame, game-pixel, HDR, authored shore/snapshot or stereo claim.
+Unchanged GPU67/water14 shader evidence is reused, not restamped game acceptance.
+
+Commit preflight rechecked377 artifact-free guards, existing CPU64/output39 and
+material43/test41 passes, and the host151 link. No additional build/run/capture.
+Current CPU texture tree79049778B/132files (+688094); material tree8402235B/41files
+(no initial measurement this bundle, so no attributed delta). EXE48992256B and
+PDB111308800B (+221696 combined); attachment logs309706B/202files (+12629).
+Current976/977/978 plus archival974 total1532109B versus prior974/9751071310B
+(+460799). Selected measured retained growth1383218B, excluding unknown material
+tree delta and source/Git files; preserves causal failures and the new integration.
+Earlier cleanup538809B plus net archival reduction433150B reclaimed971959B once;
+no additional deletion at commit preflight. Terminal runtime free80121798656B
+versus first80126369792B:4571136B less free drive-wide, not all task-attributed.
+All producers terminal; budgets unchanged. Preserve current151/CPU64/output39,
+material43/test41/978, causal976/977 and archived974 plus other protected evidence.
+Next host152/game979 only for a named new implementation or coverage observation,
+not to repeat the established water eligibility gate.

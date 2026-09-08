@@ -48,6 +48,7 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
   NativeMaterialRange current;
   bool shadow_alpha = false;
   int last_reflection_command = -1;
+  int last_normal_command = -1;
   constexpr float byte_scale = 1.0f / 255.0f;
   for (size_t cursor = 0; cursor < commands.size();) {
     const uint16_t command = commands[cursor++];
@@ -122,8 +123,8 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
       }
     } else if ((command & 0xff00) == 0x0700 || (command & 0xff00) == 0x0800) {
       const uint32_t channel = (command & 0xff00) == 0x0800 ? 4 : (command >> 4) & 15;
-      if (channel < current.sampler_addresses.size()) {
-        auto &address = current.sampler_addresses[channel];
+      if (channel <= current.sampler_addresses.size()) {
+        auto &address = channel == 5 ? current.environment_address : current.sampler_addresses[channel];
         constexpr MaterialSampleAddress modes[]{MaterialSampleAddress::Wrap, MaterialSampleAddress::Mirror, MaterialSampleAddress::Clamp};
         const auto u = (command >> 2) & 3, v = command & 3;
         // Encoding3 preserves each axis independently; repeated commands still
@@ -149,8 +150,12 @@ bool DecodeMeshMaterials(std::span<const uint16_t> commands,
     } else if ((command & 0xff00) == 0x0300) {
       current.features.diffuse = (command & 0xff) ? MaterialDiffuseMode::Enabled : MaterialDiffuseMode::Disabled;
     } else if ((command & 0xff00) == 0x0500) {
-      // Repeats cannot change this folded value; the pass gate is live.
-      current.features.normal_mapping_requested = (command & 0xff) != 255;
+      const uint8_t value = command & 0xff;
+      current.features.normal_mapping_requested = value != 255;
+      if (last_normal_command != value) {
+        assignments.push_back({MaterialImageSource::NormalTable,4,value});
+        last_normal_command = value;
+      }
     } else if ((command & 0xff00) == 0x0400) {
       const uint8_t shininess = command & 0xff;
       // The interpreter skips a repeated power command, even if an RGB
