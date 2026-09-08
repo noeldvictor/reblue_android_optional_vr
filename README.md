@@ -185,11 +185,20 @@ GPU-zeroed commands do not count as visible output.
 
 **Visual acceptance failed:** the saved window image shows the title logo, despite
 the field/camera/movement log context. Keep it as failure evidence; do not infer
-whether this is stale window capture or a presentation defect yet. Next, tie the
-existing renderer-owned screenshot readback to an identified presented frame
-before another game run. Controlled culling pixels, the tree gap, full scene/
+whether this is stale window capture or a presentation defect yet. Controlled
+culling pixels, the tree gap, full scene/
 stereo coverage and speedup remain unqualified.
 [Runtime connection, checks and image discrepancy](research/20260907_2256_current-depth-runtime.md).
+
+**Frame-provenance follow-up (2026-09-08):** screenshot buffers now retire at the
+real GPU slot fence, retaining frame/request/source identities. Eight Vulkan
+pixel cases pass. Host125/run963 passes strict cold/reload checks and records
+frame5070, but its truncated JPEG is rejected rather than accepted as pixels.
+Host126 fixes bounded JPEG output-length tracking and colour subsampling;
+350 Python checks and the full-resolution encode/decode fixture pass. That
+encoder fix has not yet had a new game-image run. Next: obtain a valid bounded
+post-gamma image, then resolve the original title-logo discrepancy.
+[Frame ownership, encoder correction and remaining gate](research/20260908_0006_native-frame-provenance.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

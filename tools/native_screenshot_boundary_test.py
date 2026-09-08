@@ -36,7 +36,10 @@ class ScreenshotBoundaryTest(unittest.TestCase):
                          "!recorded_ || collected_"):
             self.assertIn(required, source)
         encoder = (ROOT / "src/gpu/screenshot_jpeg.cpp").read_text()
-        self.assertIn("InitializeFromMemory(encoded.data(),DWORD(encoded.size()))", encoder)
+        self.assertIn("count > bytes_.size()-position_", encoder)
+        self.assertIn("stream->Size()", encoder)
+        self.assertIn("stream->Overflowed()", encoder)
+        self.assertNotIn("stream->Seek({},STREAM_SEEK_CUR", encoder)
         self.assertIn("SetSize(capture.width,capture.height)", encoder)
         self.assertNotIn("InitializeFromFilename", encoder)
 

@@ -237,16 +237,33 @@ distinct proof. The run terminates normally and restores the exact owner profile
 
 The captured97,976 B window JPEG **fails visual acceptance**: title-logo pixels
 conflict with the logged interactive field/movement context. No cause or fix is
-claimed. Keep945 as last accepted mono pixels and956's tree-gap evidence. Before
-another boot, reuse `gpu/screenshot.*`/`ServiceOnPresent` to obtain a bounded
-renderer-owned, frame-identified post-gamma image, with actual fence/lifetime and
-storage guards. It must distinguish stale window capture from a wrong presented
+claimed. Keep945 as last accepted mono pixels and956's tree-gap evidence.
+`gpu/screenshot.*`/`ServiceOnPresent` now retain frame/request/source identities
+and collect at the actual slot fence, replacing present-counter retirement.
+Eight production-readback Vulkan cases pass, including padded row widths and
+later source writes/release. The existing scenario checker validates matching
+frame/fence/JPEG receipts separately from reload and visual acceptance.
+
+Host125/run963 passes the strict cold/reload chain and records post-gamma
+frame5070, but the saved65,536 B JPEG is truncated; strict decode refuses it.
+No pixels qualify and962 remains unexplained. Host126 now uses a fixed-capacity
+output stream with distinct written extent, overflow refusal, complete JPEG
+markers and explicit4:4:4 chroma.350 Python checks and the expanded CPU fixture
+pass:153,370 B full-resolution JPEG fully decodes, block-centre colour error4
+within the unchanged limit12. Tiny-image tests had missed the larger boundary.
+No new game run has used that encoder correction.
+
+Next: obtain the valid, bounded renderer-owned post-gamma image with host126
+after reserving additional image overlap and preserving963's truncated export.
+Do not overwrite its fixed probe paths or boot until the existing archive fits.
+That observation must distinguish stale window capture from a wrong presented
 frame; repeating PrintWindow or relaxing context checks cannot answer that.
 Do not build another capture/renderer framework or make the selected asset a
 permanent ceiling on scene ownership. Current-depth controlled pixels, broader
 scene/animation/event/both-eye gates and Quest readiness remain open.
 [Current-depth GPU contract and integration findings](../research/20260907_2209_native-depth-visibility.md).
 [Runtime receipts, live checks and image discrepancy](../research/20260907_2256_current-depth-runtime.md).
+[Frame ownership, encoder correction and remaining gate](../research/20260908_0006_native-frame-provenance.md).
 
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB

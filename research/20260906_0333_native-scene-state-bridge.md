@@ -4066,3 +4066,63 @@ there. Planned run963 retains at most800 KiB log +110 KiB JPEG +64 B request,
 300 s/192 MiB/free-floor limits, no raw/perf/dump/asset outputs, original profile
 restored in guaranteed cleanup. The new observation is the actual post-gamma
 frame/source/fence, needed to distinguish962's stale-window/presentation cases.
+
+Run963/PID36428/session57817,23:53:46..23:55:56, terminal1 after the complete strict
+cold/reload chain passed (old generation93/instance144 ->207/384). The bounded
+request `1 4983 5103` produced frame5070/slot0 input0170E4397050 output017046440570,
+descriptor99,1920x1080 at the actual fence. JPEG decode correctly refused the
+65,536 B truncated output; no pixel acceptance or962 diagnosis. Retain the
+535,227 B log (SHA256DF96F670913A3F5FEA1AD64332AD9BB4D9E136371A0930D902FF3BDD9B116780),
+JPEG (SHA256F0402D31CD1A085747F697E27AA789E47D9092AEA38DEC30C9BBCECA88C12772)
+and11 B request. Original116 B profile restored to SHA256
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+
+CPU-only causal follow-up, not another game run: output44/PID33360 builds the
+1920x1080 patterned encoding case. CPU27/PID37920/session72353 fails its
+>64 KiB output assertion under the old encoder (CTest30 s timeout terminates
+the assert dialog; no fixture remains live). Existing tiny32x16 encoder test
+had missed this boundary. Replace seek-cursor length with bounded write-extent
+tracking, sticky overflow refusal and JPEG SOI/EOI checks; exercise full decoded
+pixels as well as tail/length. Plan output45/CPU28 with the same32 MiB/300 s/30 s
+bounds, no image exports; then host126 only if the fixture passes. No second
+game producer until both build and an independently fitting image budget exist.
+
+Correction to the initial regression interpretation: output45 builds the new
+bounded stream, but CPU28 exits8 because the16-pixel-block pattern produces only
+57,462 valid encoded bytes. Its >64 KiB expectation was incorrect; CPU27's
+assertion alone therefore did not reproduce963's cause. Strengthen the pattern
+to8-pixel blocks (do not lower the byte-boundary requirement), then repeat the
+bounded CPU fixture as output46/CPU29. The live truncated JPEG is still the
+authoritative failure. No game retry or pixel claim follows the failed fixture.
+
+Output46/CPU29 reaches full-image decode but fails the unchanged12-channel-level
+block-centre error limit; CTest terminates the assertion at30 s. Keep that
+failure. Microsoft's WIC JPEG codec defaults to4:2:0 chroma subsampling; test an
+explicit4:4:4 setting without changing the case, quality sequence, byte cap or
+colour threshold. Output47/CPU30 retain the same32 MiB/30 s fixture bounds;
+failure reporting now prints extent and maximum error then exits instead of
+leaving a Windows assertion dialog. No additional game/image run.
+
+Output47/PID29472 terminal0; CPU30/PID36840 terminal0 in0.58 s:153,370 B JPEG,
+complete1920x1080 decode, maximum block-centre RGB error4 (unchanged limit12),
+full tail and small-budget refusals pass. The fixture uses256 KiB for the detailed
+pattern; live output remains110 KiB and its fit is still unproven.350 Python
+checks pass. Host126/PID33008/session31734 terminal0, stampa6727b6 dirty,
+codegen0 written/1 module current, no guest objects. EXE48,760,320 B SHA256
+44C7F7719115FAF6512AE3AC4E7996072EA03BEA2DF66B4DA3D7CB986B966773;
+PDB109,948,928 B SHA256DFFFD90D8349248BEA7DD33A762B36A9C7246A7F2DCC5033AAB28EA5551D37CD.
+
+After replacement proof, removed12 superseded output43..46/CPU26/host125
+stdout/stderr logs,17,196 logical B. Keep CPU27/28/29 failure text, current
+output47/CPU30/host126 and the distinct screenshot/visibility/rigid GPU proofs.
+Total logical cleanup this continuation1,236,381 B; originals960/961 remain
+losslessly recoverable, PNG pixels identical, removed build/test logs reproducible.
+Final measured free79,948,947,456 B, down4,325,376 B from this continuation's first
+reading; not an isolated physical cleanup measurement. Texture fixture73,703,715 B
+is237,645 B larger; GPU fixture unchanged14,961,203 B; attachment logs266,448 B
+(162 files). New963 log/JPEG/request total600,774 B. Those selected retained
+diagnostic scopes, including archive and PNG savings, net373,929 B smaller;
+host objects, source/Git and unrelated volume activity are separate. All owned
+producers terminal; exact owner profile restored. Image total10,378,927 B leaves
+106,833 B, short of the next110 KiB reservation. No additional game run or raw
+capture; preserve963 and preflight a distinct next export before launching.
