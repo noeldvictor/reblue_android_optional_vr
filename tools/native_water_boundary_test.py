@@ -83,6 +83,23 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         for required in ("TransformNativeBounds", "1.5 * std::abs", "std::nextafter"):
             self.assertIn(required, bounds)
 
+    def test_dynamic_images_retain_actual_live_producer_views(self):
+        paths = ("src/gpu/scene/native_scene_snapshot_bridge.cpp", "src/gpu/hooks/native_deferred_visuals.cpp",
+                 "src/gpu/scene/native_scene_pass_bridge.cpp", "src/gpu/scene/native_shadow_pass_bridge.cpp",
+                 "src/gpu/resolve.cpp")
+        for path in paths:
+            self.assertIn("NativeImageLease::From(", (ROOT / path).read_text())
+        water = (ROOT / "src/gpu/scene/native_water_scene.h").read_text()
+        self.assertIn("NativeImageLease planar, snapshot, bottom, shadow", water)
+        self.assertIn("lease.ArrayView()", water)
+        for forbidden in ("NativeTargetImageHandle", "GuestTexture", "textureView", "static_pointer_cast",
+                          "AcquireNativePostImage", "AcquireNativeTargetImage", "copyTexture"):
+            self.assertNotIn(forbidden, water)
+        fixture = (ROOT / "tools/native_scene_snapshot_test/water.cpp").read_text()
+        self.assertIn("NativePostImagePool snapshot_pool", fixture)
+        self.assertIn("NativeImageLease::From(snapshot)", fixture)
+        self.assertIn("Queued water prevents a new snapshot writer", fixture)
+
 
 if __name__ == "__main__":
     unittest.main()

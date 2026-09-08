@@ -243,8 +243,7 @@ bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
     }
   } else {
     framebuffer = AcquireNativeSceneFramebuffer({color->nativeTarget, depth->nativeTarget}, density_map);
-    source_images = {NativeImageLease{color->nativeTarget, color->nativeTarget->Sampled()},
-        NativeImageLease{depth->nativeTarget, depth->nativeTarget->Sampled()}};
+    source_images = {NativeImageLease::From(color->nativeTarget), NativeImageLease::From(depth->nativeTarget)};
     if (!framebuffer || !source_images[0] || !source_images[1]) {
       ReleaseResourceAdapter(color->selfVa);
       ReleaseResourceAdapter(depth->selfVa);
@@ -412,7 +411,7 @@ bool End(PPCContext &ctx, uint32_t source) {
   SceneImage sampled_color, sampled_depth;
   if (depth_output) {
     const NativeImageLease depth_image = pass.resolves ?
-        NativeImageLease{pass.resolves, pass.resolves->Sampled(1.f).depth} : pass.source_images[1];
+        NativeImageLease::From(pass.resolves, 1) : pass.source_images[1];
     if (Video::CanPublishNativeImage(depth_image, depth_output)) {
       Check(Video::PublishNativeImage(depth_image, depth_output),
             "Native depth image lost its preflighted getter");

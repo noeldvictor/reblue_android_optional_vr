@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/host_post_output.h"
+#include "gpu/native_image_lease.h"
 #include "gpu/scene/fenced_asset_cache.h"
 #include <algorithm>
 #include <memory>
@@ -31,6 +32,9 @@ struct NativePostImage {
   }
 };
 using NativePostImageHandle = std::shared_ptr<const NativePostImage>;
+inline NativeImageLease NativeImageLease::From(const NativePostImageHandle &source) {
+  return source ? NativeImageLease{source, source->Output().image, source->view.get()} : NativeImageLease{};
+}
 
 // Serialized by the renderer lock. An outstanding reader or writer prevents
 // another write lease of the same physical image. Pool-only images can be reused

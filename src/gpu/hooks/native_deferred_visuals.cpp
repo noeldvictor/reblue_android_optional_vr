@@ -121,7 +121,7 @@ struct Adapter {
     }
     if (!source) return false;
     snapshot = AcquireNativePostImage(source.width, source.height, source.layers);
-    const NativeImageLease lease{snapshot, snapshot ? snapshot->Output().image : SampledImage{}};
+    const auto lease = NativeImageLease::From(snapshot);
     constexpr auto extent = NativeImageExtentPolicy::AdoptSource;
     if (!snapshot || !Video::CanPublishNativeImage(lease, destination, extent)) return false;
     {

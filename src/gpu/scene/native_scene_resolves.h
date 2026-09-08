@@ -56,4 +56,9 @@ void FinishNativeSceneResolves(VideoState &s, const NativeSceneResolves &images)
 void DrainNativeSceneResolvesLocked(VideoState &s, uint32_t slot);
 void MarkUnusedNativeSceneResolvesLocked(VideoState &s, uint32_t slot);
 } // namespace scene
+inline NativeImageLease NativeImageLease::From(const scene::NativeSceneResolveHandle &source, uint32_t role) {
+  if (!source || role > 1) return {};
+  const auto sampled = source->Sampled(1.f);
+  return {source, role ? sampled.depth : sampled.scene, source->views[role].get()};
+}
 } // namespace bd::gpu

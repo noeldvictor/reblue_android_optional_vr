@@ -7,6 +7,7 @@
 #include "gpu/scene/native_water_material_source.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_scene_snapshot.h"
+#include "gpu/native_post_images.h"
 #include "gpu/draw_bindings.h"
 #include <plume_vulkan.h>
 #include <cstring>
@@ -226,8 +227,29 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   const Indexed indexed{6,2,0,0,1}; // poison instance zero detects ignored firstInstance
   auto indirect = Upload(device,&indexed,sizeof(indexed),RenderBufferFlag::INDIRECT);
   auto colour = MakeImage(device,2), depth = MakeImage(device,2,false,true);
-  std::array<Image,6> images{MakeImage(device,1),MakeImage(device,2),MakeImage(device,2),
+  std::array<Image,6> images{MakeImage(device,1),MakeImage(device,2),Image{},
       MakeImage(device,2),MakeImage(device,6,true),MakeImage(device,1,false,true)};
+  // Same bounded owner/pool and typed view handoff as the live snapshot
+  // producer. A queued reader must prevent pool overwrite, not just deletion.
+  NativePostImagePool snapshot_pool(uint64_t(size)*size*2*8,1);
+  const NativePostRecipe snapshot_recipe{size,size,2};
+  auto snapshot = snapshot_pool.Acquire(snapshot_recipe,[&] {
+    auto result = std::make_shared<NativePostImage>();
+    result->recipe = snapshot_recipe; result->descriptor = 0;
+    auto desc = RenderTextureDesc::ColorTarget(size,size,RenderFormat::R16G16B16A16_FLOAT);
+    desc.arraySize = 2; result->image = device.createTexture(desc);
+    Need(bool(result->image),"Water pooled snapshot image");
+    RenderTextureViewDesc view;
+    view.format = desc.format; view.dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+    view.mipLevels = 1; view.arraySize = 2;
+    result->view = result->image->createTextureView(view);
+    const auto *image = result->image.get();
+    RenderFramebufferDesc fb; fb.colorAttachments = &image; fb.colorAttachmentsCount = 1; fb.viewMask = 3;
+    result->framebuffer = device.createFramebuffer(fb);
+    Need(result->view && result->framebuffer,"Water pooled snapshot view/framebuffer");
+    return result;
+  });
+  Need(bool(snapshot),"Water pooled snapshot lease");
   NativeWaterDescriptorSchema schema;
   std::array<std::unique_ptr<RenderDescriptorSet>,3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]),"Water descriptors"); }
@@ -291,7 +313,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     commands->clearColor(0,RenderColor(.125f,.25f+.25f*eye,.5f,1),&full,1);
   }
   scene->Bind(*commands);
-  Need(CopySceneSnapshot(*commands,*scene,images[2].owner->Sampled()),"Water ordered native snapshot");
+  Need(CopySceneSnapshot(*commands,*scene,snapshot->Output().image),"Water ordered native snapshot");
   scene->Bind(*commands); Need(!scene->ApplyClear(*commands),"Water snapshot resume must not clear");
   commands->clearColor(0,blend ? RenderColor(.125f,.25f,.5f,1) : RenderColor(9,8,7,1)); // must NOT change retained snapshot samples
   // Retire the producer owners before the draw. The real batch representation
@@ -305,7 +327,8 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   std::array<const NativeRigidBatchItem *,2> pointers{&items[0],&items[1]};
   for (uint32_t n = 0; n < 2; ++n) {
     auto water = std::make_shared<NativeWaterBatchData>(); water->input = instances[n+1];
-    water->images = {bump,environment,images[1].owner,images[2].owner,images[3].owner,images[5].owner};
+    water->images = {bump,environment,NativeImageLease::From(images[1].owner),NativeImageLease::From(snapshot),
+        NativeImageLease::From(images[3].owner),NativeImageLease::From(images[5].owner)};
     water->samplers = {bump_sampler.get(),sampler.get(),sampler.get(),sampler.get(),sampler.get(),sun_sampler.get()};
     auto &item = items[n]; item.water = std::move(water); item.geometry = geometry;
     item.world_bounds = NativeWaterWorldBounds(*geometry,item.water->input);
@@ -317,12 +340,15 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   }
   const std::weak_ptr<const NativeGeometry> weak_geometry = geometry;
   const std::weak_ptr<const NativeTextureGpu> weak_bump = bump;
-  const std::weak_ptr<const NativeTargetImage> weak_snapshot = images[2].owner;
-  geometry.reset(); bump.reset(); environment.reset();
+  const std::weak_ptr<const NativePostImage> weak_snapshot = snapshot;
+  geometry.reset(); bump.reset(); environment.reset(); snapshot.reset();
   // Producer references retire now; framebuffer/view command resources from
   // the setup clears independently remain pinned until THEIR submission fence.
   for (auto &image : images) image.owner.reset();
   Need(!weak_geometry.expired() && !weak_bump.expired() && !weak_snapshot.expired(),"Queued water retains retired producers");
+  Need(!snapshot_pool.Acquire(snapshot_recipe,[]() -> NativePostImageHandle {
+    throw std::runtime_error("Queued water snapshot must prevent pooled overwrite before allocation");
+  }),"Queued water prevents a new snapshot writer");
   if (mode == 0) {
     std::array<NativeWaterInstanceGPU,2> packed{};
     packed[0].object_data.material.tint.x = 123;
@@ -338,10 +364,13 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     Need(NativeRigidBatchLength(pointers,17,1) == 1,"Water second-eye camera batch barrier");
     *changed = *saved.water; changed->images.snapshot = changed->images.planar;
     Need(items[1].Ready(17,1) && NativeRigidBatchLength(pointers,17,1) == 1,"Water ordered snapshot publication batch barrier");
-    changed->images.bottom.reset();
+    changed->images.bottom = {};
     Need(!items[1].Ready(17,1) && !PackNativeWaterBatch(pointers,packed,17,1),"Water missing native image owner refuses");
     *changed = *saved.water; changed->input.image_layers.y = 1;
     Need(!items[1].Ready(17,1),"Water declared image layers must match retained image");
+    *changed = *saved.water;
+    changed->images.snapshot = {saved.water->images.snapshot.owner,saved.water->images.snapshot.image};
+    Need(!items[1].Ready(17,1),"Water image-only lease cannot borrow an adapter sampling view");
     items[1] = saved; items[1].water.reset();
     Need(!SameNativeRigidBatch(items[0],items[1]),"Water and rigid GPU ABIs never mix");
     items[1] = saved;
@@ -415,6 +444,9 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   // the fence; this fixture checks the same receipt/lease boundary, not a game run.
   for (auto &image : images) { image.framebuffers.clear(); image.layer_views.clear(); }
   sets = {}; items = {};
+  snapshot_pool.MarkUnused(1); snapshot_pool.AfterFence(0,[](const auto &) {});
+  Need(!weak_snapshot.expired(),"Water snapshot pool requires its recorded retirement fence");
+  snapshot_pool.AfterFence(1,[](const auto &) {});
   Need(weak_geometry.expired() && weak_bump.expired() && weak_snapshot.expired(),"Water image/geometry leases release after fence");
   auto &native_buffer = *static_cast<VulkanBuffer *>(readback.get());
   Need(vmaInvalidateAllocation(native_buffer.device->allocator,native_buffer.allocation,0,VK_WHOLE_SIZE) == VK_SUCCESS,"Water readback invalidate");

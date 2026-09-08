@@ -17,6 +17,7 @@ struct SampledImage {
   plume::RenderFormat format = plume::RenderFormat::UNKNOWN;
   uint32_t descriptor_index = ~uint32_t{0};
   uint32_t samples = 0;
+  bool operator==(const SampledImage &) const = default;
   explicit operator bool() const {
     return texture && layout && width && height && layers && layers <= 2 &&
         format != plume::RenderFormat::UNKNOWN && descriptor_index != ~uint32_t{0} && samples == 1;

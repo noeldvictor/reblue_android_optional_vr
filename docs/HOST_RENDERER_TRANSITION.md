@@ -402,6 +402,18 @@ regressions pass. The fixture does not execute `DrawQueueFlush`, and no game
 producer calls the new submission entry yet. No new live family is converted.
 [Queue evidence and limitations](../research/20260908_0509_native-water-queue.md).
 
+Image handoff checkpoint (host139): all live native target/shadow, post,
+scene-snapshot and resolved-depth publishers use typed `NativeImageLease::From`
+handoffs retaining their own full-array sampling views. The water queue now
+consumes these leases directly, including pooled post images and resolve owners;
+it no longer requires dynamic inputs to be `NativeTargetImage` allocations.
+Image-only leases cannot supply an adapter-owned view. CPU tests cover retained
+resolve outputs/source-framebuffer lifetime, distinct roles, shape and pool reuse;
+16 two-eye GPU cases now sample the real post-image pool with queued-reader
+overwrite refusal. Host139 and371 Python checks pass. No live water admission
+or additional converted family is claimed.
+[Image-owner connection evidence](../research/20260908_0940_native-water-image-leases.md).
+
 Next connected work: publish completed water values and image owners from the
 ordered material writer and admit the family into the existing mixed scene
 consumer, calling `SubmitNativeWaterScenePackets`. Reuse the current
@@ -413,8 +425,9 @@ fixtures plus fresh water consumption/retirement and mixed cold/reload checks.
 Publish completed material values with native instance/generation identity after
 the resource writer, not a draw-time descriptor lookup. The current import copies
 final parameter destinations; it is not yet installed in a frame-bounded owner.
-Connect real image leases to the queue's retained roles; keep producer command
-framebuffers/resolve owners alive through their fences too. Load-owned tangent
+Supply the new typed image leases at the ordered material producer; the queue's
+image-owner mismatch is resolved. Keep producer command framebuffers/resolve
+owners alive through their fences too. Load-owned tangent
 and displacement metadata now exist; apply displaced bounds before live walk
 culling as well as queued visibility. Do not recreate these owners/helpers.
 The shader supports per-eye cameras/image layers; their actual game producers,

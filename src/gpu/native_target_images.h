@@ -40,6 +40,9 @@ struct NativeTargetImage {
   }
 };
 using NativeTargetImageHandle = std::shared_ptr<const NativeTargetImage>;
+inline NativeImageLease NativeImageLease::From(const NativeTargetImageHandle &source) {
+  return source ? NativeImageLease{source, source->Sampled(), source->view.get()} : NativeImageLease{};
+}
 
 // Serialized by the renderer lock. Identity is a native image generation, not
 // a resource header or address. Source pass pins serialize persistent writes;

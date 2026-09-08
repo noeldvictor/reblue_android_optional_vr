@@ -166,7 +166,7 @@ bool Begin(PPCContext &ctx, uint8_t *base, uint32_t source) {
       {dimension, dimension, 1, plume::RenderFormat::D32_FLOAT_S8_UINT, 1});
   if (!depth)
     return false;
-  const NativeImageLease image{depth->nativeTarget, depth->nativeTarget->Sampled()};
+  const auto image = NativeImageLease::From(depth->nativeTarget);
   if (output && !Video::CanPublishNativeImage(image, output)) {
     ReleaseResourceAdapter(depth->selfVa);
     return false; // unsupported output, before observable pass publication

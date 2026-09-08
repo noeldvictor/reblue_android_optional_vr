@@ -6,6 +6,7 @@
 #include "gpu/native_image_lease.h"
 #include "gpu/post_sequence.h"
 #include "gpu/scene/native_scene_framebuffer.h"
+#include "gpu/scene/native_scene_resolves.h"
 #include "gpu/scene/native_scene_commands.h"
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_rigid_shadow.h"
@@ -179,16 +180,17 @@ void PoolOwnership() {
   }
   auto first = acquire(recipe);
   assert(first && first->Output() && first->Output().image.descriptor_index == 0);
-  auto reader = first; first.reset();
+  auto reader = NativeImageLease::From(first); first.reset();
+  assert(reader.ArrayView() && reader.image.texture && reader.image.layers == 1);
   auto second = acquire(recipe);
-  assert(second && second->image != reader->image && lives.size() == 2);
+  assert(second && second->image.get() != reader.image.texture && lives.size() == 2);
   assert(!acquire(recipe)); // neither live published/read lease can be overwritten
   assert(pool.Stats().bytes == 2048 && pool.Stats().refused == 1);
   pool.MarkUnused(0); pool.AfterFence(0, retire);
   assert(pool.Stats().resident == 2); // even a proven fence does not invalidate readers
-  const auto *old = reader->image.get();
-  reader->layout = RenderTextureLayout::SHADER_READ;
-  reader.reset();
+  const auto *old = reader.image.texture;
+  *reader.image.layout = RenderTextureLayout::SHADER_READ;
+  reader = {};
   first = acquire(recipe);
   assert(first->image.get() == old && lives.size() == 2);
   assert(first->layout == RenderTextureLayout::UNKNOWN); // next writer must issue a barrier
@@ -328,7 +330,8 @@ void NativeTargetOwnership() {
   assert(first->layout == RenderTextureLayout::UNKNOWN);
   ImageLayoutRecord adapter;
   adapter.Bind(first->layout);
-  NativeImageLease getter{first, first->Sampled()};
+  auto getter = NativeImageLease::From(first);
+  assert(getter.ArrayView() == sampling);
   adapter = RenderTextureLayout::SHADER_READ;
   assert(*getter.image.layout == RenderTextureLayout::SHADER_READ);
   first.reset();
@@ -360,8 +363,9 @@ void NativeTargetOwnership() {
     auto target = acquire(id++, recipe);
     assert(target && target->Sampled().samples == samples && target->Sampled().layers == layers);
     assert(store.Stats().bytes == uint64_t(8 * 4 * 8 * layers * samples));
-    NativeImageLease sampled{target, target->Sampled()};
+    auto sampled = NativeImageLease::From(target);
     assert(bool(sampled) == (samples == 1)); // MSAA is never an ordinary sampled-image lease
+    assert(bool(sampled.ArrayView()) == (samples == 1));
     sampled = {}; target.reset(); store.MarkUnused(0); store.AfterFence(0, retire);
   }
   assert(!store.Acquire(id, shape, [] { return NativeTargetImageHandle{}; }));
@@ -381,6 +385,62 @@ struct SceneFramebuffer : OutputFramebuffer {
     for (uint32_t i = 0; i < 2; ++i) if (present[i]) assert(!sources[i].expired());
   }
 };
+void TypedImageLeases() {
+  using namespace bd::gpu::scene;
+  assert(!NativeImageLease::From(NativePostImageHandle{}).ArrayView());
+  assert(!NativeImageLease::From(NativeTargetImageHandle{}).ArrayView());
+  assert(!NativeImageLease::From(NativeSceneResolveHandle{},0).ArrayView());
+  // Both outputs share a control block but NOT a sampled role. Retaining either
+  // must keep the resolve framebuffer and its source attachments alive too.
+  for (uint32_t layers : {1u,2u}) {
+    auto resolves = std::make_shared<NativeSceneResolves>();
+    resolves->sources.width = 16; resolves->sources.height = 8; resolves->sources.layers = layers;
+    resolves->sources.samples = 4;
+    resolves->sources.color_format = RenderFormat::R16G16B16A16_FLOAT;
+    resolves->sources.depth_format = RenderFormat::D32_FLOAT_S8_UINT;
+    for (uint32_t role = 0; role < 2; ++role) {
+      auto source = std::make_shared<NativeTargetImage>();
+      source->image = std::make_unique<SceneSource>();
+      resolves->source_owners[role] = source;
+      resolves->images[role] = std::make_unique<SceneSource>();
+      resolves->views[role] = std::make_unique<RenderTextureView>();
+      resolves->descriptors[role] = role;
+    }
+    resolves->framebuffer = std::make_unique<SceneFramebuffer>(resolves->source_owners);
+    auto colour = NativeImageLease::From(resolves,0), depth = NativeImageLease::From(resolves,1);
+    assert(colour.ArrayView() == resolves->views[0].get() && depth.ArrayView() == resolves->views[1].get());
+    assert(colour.owner == depth.owner && colour != depth && colour == NativeImageLease::From(resolves,0));
+    assert(colour.image.layers == layers && depth.image.layers == layers && colour.image.samples == 1);
+    assert(colour.image.format == resolves->sources.color_format && depth.image.format == resolves->sources.depth_format);
+    assert(!NativeImageLease::From(resolves,2) && !NativeImageLease::From(resolves,UINT32_MAX));
+    NativeImageLease image_only{colour.owner,colour.image};
+    assert(image_only && !image_only.ArrayView() && image_only != colour);
+    image_only = {};
+    // The generation is the retained allocation, not merely a copied descriptor
+    // number or equal dimensions. The shared live layout also remains observed.
+    auto other = std::make_shared<NativePostImage>();
+    other->recipe = {16,8,layers}; other->descriptor = colour.image.descriptor_index;
+    other->image = std::make_unique<SceneSource>(); other->view = std::make_unique<RenderTextureView>();
+    auto different = NativeImageLease::From(other);
+    assert(different.ArrayView() && different != colour);
+    different = {};
+    other->view.reset();
+    assert(!NativeImageLease::From(other).ArrayView()); // incomplete owner is not a sampler
+    other.reset();
+    const std::weak_ptr<const NativeSceneResolves> weak = resolves;
+    const std::weak_ptr<const NativeTargetImage> source = resolves->source_owners[0];
+    const auto *colour_view = colour.ArrayView(), *depth_view = depth.ArrayView();
+    ImageLayoutRecord adapter; adapter.Bind(resolves->layouts[0]);
+    resolves.reset();
+    adapter = RenderTextureLayout::SHADER_READ;
+    assert(!weak.expired() && !source.expired() && *colour.image.layout == RenderTextureLayout::SHADER_READ);
+    assert(colour.ArrayView() == colour_view && depth.ArrayView() == depth_view);
+    adapter.Unbind(); colour = {};
+    assert(!weak.expired() && !source.expired() && depth.ArrayView() == depth_view);
+    depth = {};
+    assert(weak.expired() && source.expired());
+  }
+}
 void SceneFramebufferOwnership() {
   using namespace bd::gpu::scene;
   assert(!NativeSceneFramebuffer{}.Matches(nullptr, nullptr));
@@ -1662,6 +1722,7 @@ int main() {
   CheckScreenshotContracts();
   native_occlusion_tests::Run();
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
+  TypedImageLeases();
   SceneFramebufferOwnership();
   DepthOnlyCommands();
   CameraAndRigidCaster();

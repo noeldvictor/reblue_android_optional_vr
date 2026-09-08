@@ -4611,3 +4611,43 @@ baseline). Ending free80,209,928,192B (~74.70GiB),3,272,704B below first reading
 drive-wide movement includes other object/metadata/source/Git/system activity.
 All producers terminal. Queue source/fixtures built; live water admission and
 full authored/pixel/sequence/stereo acceptance remain unqualified.
+
+### Native water typed image handoff (2026-09-08, sourcef0fa499 dirty)
+
+Same cumulative exception/floor62,509,998,080B,20GiB reserve and raw/image/log
+gates. First measured free80,193,146,880B; producer preflight80,192,454,656B.
+Selected existing fixture/log totals matched the preceding ledger exactly;
+inter-turn drive movement is unattributed system/source/Git activity, not new
+capture or duplicate agent jobs. An authoritative process check found no live
+renderer/CMake/Ninja/CTest/compiler. No game launch/profile edits, assets, recook,
+capture, shader regeneration or new build trees. The existing supervisor enforced
+32MiB per CPU/GPU build,16MiB per test and192MiB for the host build,300s/30s
+timeouts and10MiB cumulative logs. These caps do not reset the original budget.
+
+CPU output57/PID35536 and test33/PID31072 pass0.48s. GPU61/PID7280 and water9/
+PID38340 pass16two-eye cases1.14s,validation0/0. Host139/PID34368/session14299
+terminal0,0codegen writes/deletions/no guest objects.371Python checks pass.
+All producers terminal; detailed scope/hashes are in
+20260908_0940_native-water-image-leases.md. Existing116B profile SHA256 remains
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+No new water game consumer, pixels or full-frame/stereo qualification claimed.
+
+Current CPU fixture77,893,587B/132files, growth203,139B; GPU fixture18,229,755B/
+19files, growth442,206B. Host EXE/PDB combined growth9,216B. Existing products
+replaced in place, no archived binary copies; other host object/metadata/source/
+Git bytes are separate. Keep these products for connected material/scene work.
+
+After passing replacements, removed10explicit superseded successful log files:
+GPU build60,water8,CPU output build56/test32,host138 stdout/stderr.8,059B logical;
+immediate free80,190,410,752->80,190,427,136B,16,384B physical interval gain,
+counted once. Full old stdout text is retired, checks regenerable and previous
+reports retain their outcomes. Keep current61/water9/CPU57+33/host139, first
+shader52, prior rigid20 and live host134 evidence. CPU29 timeout/build52 and
+all other unresolved failures remain protected. No originals, profiles, assets,
+active build trees or historical raw/image captures were removed.
+
+Logs312,819B/176files:37,258B gross new minus8,059B removed =29,199B net growth.
+Selected fixture/log/EXE/PDB retained growth683,760B (~0.65MiB), needed for current
+owner/fixture evidence. Ending free80,190,427,136B (~74.68GiB),2,719,744B below
+first reading; drive-wide activity is not all attributable to these outputs.
+Raw/image/OS diagnostic totals unchanged. No capture allowance reused or expanded.

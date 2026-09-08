@@ -764,7 +764,7 @@ bool Video::CanPublishNativePostOutput(GuestTexture *dst) {
 }
 bool Video::PublishNativePostOutput(const NativePostImageHandle &source, GuestTexture *dst) {
   if (!source || !source->Output()) return false;
-  return PublishNativeImage({source, source->Output().image}, dst, true);
+  return PublishNativeImage(NativeImageLease::From(source), dst, true);
 }
 bool Video::CanPublishNativeImage(const NativeImageLease &source, GuestTexture *dst, NativeImageExtentPolicy extent) {
   auto &s = state();

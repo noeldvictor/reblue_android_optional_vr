@@ -51,7 +51,7 @@ class NativeSceneBoundaryTest(unittest.TestCase):
         self.assertLess(end.index("FinishNativeSceneResolves(s, *pass.resolves)"), end.index("const NativeImageLease depth_image"))
         depth = end.split("const NativeImageLease depth_image", 1)[1].split("++stats.outputs", 1)[0]
         native, compatibility = depth.split("} else {", 1)
-        self.assertIn("pass.resolves->Sampled(1.f).depth", native)
+        self.assertIn("NativeImageLease::From(pass.resolves, 1)", native)
         self.assertIn("Video::CanPublishNativeImage(depth_image, depth_output)", native)
         self.assertIn("Video::PublishNativeImage(depth_image, depth_output)", native)
         self.assertIn("++stats.native_depth_publications", native)
@@ -127,11 +127,11 @@ class NativeSceneBoundaryTest(unittest.TestCase):
         self.assertIn("getSampleCountsSupported(shape.format) & shape.samples", allocator)
         self.assertIn("desc.arraySize = shape.layers", allocator)
         self.assertIn("shape.format, descriptor, shape.samples", owner)
-        self.assertIn("NativeImageLease{color->nativeTarget, color->nativeTarget->Sampled()}", self.bridge)
+        self.assertIn("NativeImageLease::From(color->nativeTarget)", self.bridge)
         end = self.bridge.split("bool End(", 1)[1].split("} // namespace", 1)[0]
         self.assertNotIn("BorrowPostImage(", end)
         self.assertIn("HostPostInputs{pass.source_images[0].image, pass.source_images[1].image, exposure}", end)
-        self.assertIn("pass.resolves->Sampled(1.f).depth} : pass.source_images[1]", end)
+        self.assertIn("NativeImageLease::From(pass.resolves, 1) : pass.source_images[1]", end)
         self.assertLess(end.index("DrawQueueFlush(s.command_list)"), end.index("s.command_list->setFramebuffer(nullptr)"))
         self.assertLess(end.index("s.command_list->setFramebuffer(nullptr)"), end.index("Video::PublishNativeImage("))
         frame = (root / "src/gpu/frame_ring.cpp").read_text(encoding="utf-8")

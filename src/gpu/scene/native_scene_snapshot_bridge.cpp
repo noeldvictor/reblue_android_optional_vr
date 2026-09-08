@@ -100,7 +100,7 @@ bool TrySnapshot(PPCContext &ctx) {
     if (!source) { ++stats.shape_refusals; return false; }
   }
   const auto snapshot = AcquireNativePostImage(source.width, source.height, source.layers);
-  const NativeImageLease lease{snapshot, snapshot ? snapshot->Output().image : SampledImage{}};
+  const auto lease = NativeImageLease::From(snapshot);
   // The getter was originally allocated at a fixed design-canvas size. The
   // native scene now owns the snapshot extent, including both stereo layers.
   constexpr auto extent = NativeImageExtentPolicy::AdoptSource;

@@ -120,7 +120,7 @@ class NativePostBoundaryTest(unittest.TestCase):
         body = self.resolve.split("bool Video::PublishNativePostOutput(", 1)[1].split("bool Video::PublishSceneOutput(", 1)[0]
         for name in ("copyTexture", "CopySurfaceToTexture", "HostResourceHeap", "CreateHostTexture", "AllocateSlot", "sourceSurface ="):
             self.assertNotIn(name, body)
-        self.assertIn("PublishNativeImage({source, source->Output().image}, dst, true)", body)
+        self.assertIn("PublishNativeImage(NativeImageLease::From(source), dst, true)", body)
         self.assertIn("dst->nativeImage = lease", body)
         self.assertIn("dst->descriptorIndex = image.descriptor_index", body)
         self.assertIn("dst->format = image.format", body)
