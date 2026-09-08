@@ -502,7 +502,8 @@ void RecordPresentPass(VideoState &s, GuestTexture *rt, GuestTexture *chosen,
   s.command_list->drawInstanced(3, 1, 0, 0);
 
   // One-shot screenshot of the post-gamma game frame, before the overlay.
-  ServiceOnPresent(s, back, back_fb, swap_w, swap_h);
+  ServiceOnPresent(s, back, back_fb, swap_w, swap_h,
+      uint64_t(reinterpret_cast<uintptr_t>(rt->texture)), gamma_src_desc);
 
   // Overlays (the F3 menu) cover the whole window, not the letterboxed rect.
   s.command_list->setViewports(plume::RenderViewport(

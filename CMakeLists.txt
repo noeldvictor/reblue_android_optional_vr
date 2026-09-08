@@ -322,7 +322,7 @@ foreach(target IN LISTS REBLUE_TARGETS)
         reblue_generated
         ${REBLUE_RECOMP_LIB})
     if(WIN32)
-        target_link_libraries(${target} PRIVATE winmm ole32 uuid winhttp shell32)
+        target_link_libraries(${target} PRIVATE winmm ole32 uuid winhttp shell32 windowscodecs)
     endif()
 endforeach()
 

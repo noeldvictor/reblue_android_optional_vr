@@ -14,6 +14,8 @@ set(reblue_backend_only
     gpu/frag_census.cpp
     gpu/vertex_pull.cpp
     gpu/shadow_fit.cpp
+    gpu/screenshot.cpp
+    gpu/screenshot_readback.cpp
     gpu/native_depth_visibility.cpp
     gpu/native_occlusion_program.cpp
     gpu/frame_ring.cpp

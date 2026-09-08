@@ -9,7 +9,8 @@
  */
 #pragma once
 
-#include <rex/types.h>
+#include <cstdint>
+#include <cstddef>
 #include <vector>
 
 namespace plume {
@@ -25,9 +26,11 @@ namespace bd::gpu {
 
 // Tightly packed RGBA8 image (alpha forced opaque). Empty == capture failed.
 struct Capture {
-  u32 width = 0;
-  u32 height = 0;
-  std::vector<u8> rgba; // width*height*4, row-major, no padding
+  uint32_t width = 0;
+  uint32_t height = 0;
+  std::vector<uint8_t> rgba; // width*height*4, row-major, no padding
+  uint64_t request = 0, frame = 0, input = 0, output = 0;
+  uint32_t descriptor = ~0u;
 };
 
 // UI thread: latch a one-shot capture of the next presented frame.
@@ -44,7 +47,10 @@ Capture TakeScreenshot();
 void CancelScreenshot();
 
 // UI thread: encode an RGBA capture to PNG bytes via miniz. Empty on failure.
-std::vector<u8> EncodePng(const Capture &c);
+std::vector<uint8_t> EncodePng(const Capture &c);
+// Desktop diagnostic encoder: bounded in-memory output, no resize or disk write.
+// Returns empty if unsupported, malformed or unable to fit at the fixed qualities.
+std::vector<uint8_t> EncodeJpeg(const Capture &c, size_t maximum_bytes);
 
 // Render thread: called once per Present, after the gamma pass and before the
 // ImGui overlay, with the swapchain back texture (COLOR_WRITE) and its bound
@@ -52,6 +58,9 @@ std::vector<u8> EncodePng(const Capture &c);
 // map. When it records a copy it briefly unbinds the framebuffer for the copy
 // and rebinds back_fb so the overlay draws normally.
 void ServiceOnPresent(VideoState &s, plume::RenderTexture *back,
-                      plume::RenderFramebuffer *back_fb, u32 width, u32 height);
+                      plume::RenderFramebuffer *back_fb, uint32_t width, uint32_t height,
+                      uint64_t input, uint32_t descriptor);
+// Renderer lock; called only at the real slot-fence retirement boundary.
+void CollectScreenshotAfterFence(VideoState &s, uint32_t slot);
 
 } // namespace bd::gpu

@@ -1431,7 +1431,9 @@ void SceneCommands() {
   }
 }
 } // namespace
+void CheckScreenshotContracts();
 int main() {
+  CheckScreenshotContracts();
   native_occlusion_tests::Run();
   OutputContract(); PoolOwnership(); SharedLayoutAndLease(); NativeTargetOwnership();
   SceneFramebufferOwnership();

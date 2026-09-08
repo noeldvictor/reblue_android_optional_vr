@@ -3983,3 +3983,37 @@ module up to date; no guest objects rebuilt. End free79,974,555,648 B is34,443,2
 below the first reading, a drive-wide change not wholly attributed to the counted
 files. All owned producers terminal;339 Python checks and diff check pass.
 Original cumulative exception/floor and all protected raw/data remain unchanged.
+
+### Frame-identified screenshot ownership continuation (2026-09-07 23:32)
+
+Previous turn made progress: f7ad261 records host123/run962's strict reload and
+current-depth output proof, while retaining the title-logo image discrepancy.
+4c890ad/f7ad261 remain local after security rejection; no new push authority.
+First measured free79,956,594,688 B, texture fixture72,286,199 B/129, GPU fixture
+14,550,168 B/15, attachment logs269,518 B; no owned producer live. Source edits
+only so far, no profile/image/raw/cache/asset change. The intervening volume
+delta is not assigned to the unchanged scoped artifacts.
+
+Reuse the existing screenshot consumer and actual frame-slot fence; remove
+present-counter retirement, preserve frame/request/source identity and add a
+default-off one-shot bounded JPEG probe. Existing CPU/GPU fixtures exercise the
+production readback and installed Windows encoder, with no disk images. Plan
+output43/CPU26 and GPU48/screenshot1,32 MiB per-producer overlap/free-drop guard,
+300 s wrapper/30 s CTest/5 s GPU fence; estimated added fixture objects/PDB under
+4 MiB combined and text under64 KiB. Then host124,192 MiB/300 s guard and stop on
+unexpected guest objects. The same original3 GiB exception,62,509,998,080 B floor,
+100 MiB diagnostics and10 MiB attachment logs apply. Retire superseded logs only
+after replacement proof; preserve962 text/image,945 baseline,956 gap and open
+failures. No game boot until fixture/host and new image-overlap preflight pass;
+74,640 B image headroom cannot cover another110 KiB image yet. No new raw allowance.
+
+Checkpoint verification recovered before the owner's commit/push request:
+output43 and CPU26 passed the request/size and real JPEG round-trip fixture;
+344 Python checks passed. GPU48 built, and screenshot1 passed all eight exact
+pixel/frame-identity cases on RTX3060 with zero validation errors/warnings and
+zero disk images. Host124 failed compiling `src/gpu/screenshot.cpp:24`: the
+new cvar references undeclared `kCvarGroup`. No replacement host executable or
+new game run is qualified. This remains a WIP source/fixture checkpoint;
+the live supervisor/request receipt integration and renderer-owned image gate
+are pending, and run962's image discrepancy remains unresolved. No additional
+build, game run or capture was launched for the commit/push request.

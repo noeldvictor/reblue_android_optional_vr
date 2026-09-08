@@ -28,6 +28,7 @@
 #include "gpu/gpu_timing.h"
 #include "gpu/occlusion.h"
 #include "gpu/frag_census.h"
+#include "gpu/screenshot.h"
 #include "gpu/host_resource_heap.h"
 #include "gpu/native_texture_mirror.h"
 #include "gpu/scene/native_texture_gpu.h"
@@ -202,6 +203,7 @@ void DrainSlot(VideoState &s, u32 slot) {
   {
     std::lock_guard lock(s.mutex);
     s.framebuffer_graveyard[slot].clear();
+    CollectScreenshotAfterFence(s, slot);
     scene::DrainNativeRigidDrawsLocked(s, slot);
     DrainNativePostImagesLocked(s, slot);
     scene::DrainNativeTextureGpuLocked(s, slot);
