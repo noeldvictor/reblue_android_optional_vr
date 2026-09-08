@@ -813,7 +813,8 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    mixing now feed the same native skeleton/instance consumers. Broader
    bdAnimationUpdate scope prepares all six physical slots before direct
    whole-layer/subtree calls; original clocks/collision/effects remain intact.
-   Named/exclusion rules and nonzero Euler modes still refuse explicitly.
+   At host172, named/exclusion rules and nonzero Euler modes still refuse
+   explicitly; the named-input extension below supersedes that named-rule limit.
    Layer composition preserves lone-channel semantics and in-place union-flags
    ordering in the temporary outgoing adapter; native math stays source-free.
    Material55/CPU53, shared output83/CPU55,408 guards and host172 pass, no guest
@@ -825,8 +826,18 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    plus>=256 cubic gate FAILS. Earlier repeated-cubic call-count criterion is now
    observed, not advancing/interior-key or diverse-motion qualification. Retain
    new979/980 failures; neither ordinary matching calls nor startup totals prove
-   full field/reload/skin/pixels. Two selected imports remain unclassified.
-   Next recover those refused clip contracts and own named/excluded/dense routes,
+   full field/reload/skin/pixels.
+   **Named inputs/importer extension:** host173 owns bounded inline model names,
+   direct-search versus weighted-prune filters, constant timestamp handling and
+   scale-tail hold. Material56/CPU54, output84/CPU56 and409 guards pass. Run981
+   records4002 matching samples/wrong0, filtered/subtree0, and identifies both
+   refused preparations as the SAME duplicate-descriptor clip, not two clips or
+   exhausted residency. First-match descriptor canonicalization now passes
+   material57/CPU55 and409 guards, including243 descriptor patterns x6 unique
+   model traversal orders. Its host rebuild/live admission remain pending;
+   named/excluded routes still need actual live coverage. Duplicate model names,
+   nonzero Euler modes and nonzero entry depth still refuse explicitly.
+   Next verify the changed importer and own dense routes,
    then connect native channels through slot clocks/completed handoff to retire
    outgoing scratch. Choose an actual authored layer/subtree transition before
    another live probe, with advancing source-clock/interior-key observations;
@@ -834,6 +845,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    persistent cooking, outgoing48-byte channels/palettes and full desktop/both-eye
    gates remain. Preserve975's reload and971/962's pixel failures; defaults
    unchanged, no Quest work.
+   [Named/importer source contracts and checkpoint](../research/20260906_0333_native-scene-state-bridge.md#2026-09-08-named-animation-inputs-and-importer-contracts-after52a9510).
    [Weighted/layer contracts and scoped verification](../research/20260908_1824_native-animation-layers.md).
    [Selected residency, evidence and storage](../research/20260908_1745_selected-motion-residency.md).
    [Original runtime connection](../research/20260908_1653_loaded-animation-sampling.md).

@@ -7,6 +7,7 @@
 #include "gpu/scene/native_transform.h"
 #include <algorithm>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace bd::gpu::scene {
@@ -51,6 +52,13 @@ struct NativeJointChannels {
   bool translated = false, rotated = false, scaled = false, reset_parent = false;
 };
 
+struct NativeJointName {
+  std::array<char,16> bytes{};
+  uint8_t length=16; // unavailable; an empty, terminated name is independently valid
+  bool Valid() const { return length < bytes.size(); }
+  std::string_view View() const { return {bytes.data(),Valid() ? length : size_t(0)}; }
+};
+
 // Parent is a preorder ordinal, pose_index a model-local joint identity. No
 // pointers, resource wrappers, guest flags or source-address identity survives.
 struct NativeSkeletonJoint {
@@ -61,6 +69,7 @@ struct NativeSkeletonJoint {
   // Blending reads authored rest values even when the base transform disables
   // that channel. Availability is independent of base-transform activation.
   NativeJointChannels blend_rest;
+  NativeJointName animation_name;
 };
 
 inline bool ValidNativeSkeleton(std::span<const NativeSkeletonJoint> joints) {

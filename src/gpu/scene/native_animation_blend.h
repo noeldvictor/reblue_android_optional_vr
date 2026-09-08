@@ -118,4 +118,46 @@ inline std::optional<std::vector<uint8_t>> SelectNativeAnimationSubtree(
   }
   return selected;
 }
+
+struct NativeAnimationFilter {
+  std::string_view included;
+  std::span<const std::string_view> excluded;
+  // Direct keyed sampling searches descendants even before a name matches.
+  // Weighted traversal prunes an unmatched branch instead; neither is a hash test.
+  bool search_descendants=false;
+};
+struct NativeAnimationSelection {
+  std::vector<uint8_t> headers, channels;
+};
+inline std::optional<NativeAnimationSelection> SelectNativeAnimationNodes(
+    std::span<const NativeSkeletonJoint> joints, uint32_t pose, bool single_subtree,
+    const NativeAnimationFilter &filter) {
+  auto scope=SelectNativeAnimationSubtree(joints,pose,single_subtree);
+  if (!scope || filter.included.size() >= 16 || filter.excluded.size() > 30) return {};
+  for (auto name : filter.excluded) if (name.size() >= 16) return {};
+  NativeAnimationSelection result{std::vector<uint8_t>(joints.size()),std::vector<uint8_t>(joints.size())};
+  std::vector<uint8_t> descend(joints.size());
+  for (size_t n=0; n<joints.size(); ++n) {
+    if (!(*scope)[n]) continue;
+    const auto &joint=joints[n];
+    const bool scoped_parent=joint.parent != kNativeSkeletonRoot && (*scope)[joint.parent];
+    if (scoped_parent && !descend[joint.parent]) continue;
+    bool selected=true, excluded=false;
+    if (!filter.included.empty()) {
+      selected=scoped_parent && result.channels[joint.parent];
+      if (!selected) {
+        if (!joint.animation_name.Valid()) return {};
+        selected=joint.animation_name.View() == filter.included;
+      }
+    } else if (!filter.excluded.empty()) {
+      if (!joint.animation_name.Valid()) return {};
+      excluded=std::ranges::find(filter.excluded,joint.animation_name.View()) != filter.excluded.end();
+      selected=!excluded;
+    }
+    result.channels[n]=selected;
+    result.headers[n]=!excluded && (filter.search_descendants || selected);
+    descend[n]=!excluded && (filter.search_descendants || selected);
+  }
+  return result;
+}
 } // namespace bd::gpu::scene

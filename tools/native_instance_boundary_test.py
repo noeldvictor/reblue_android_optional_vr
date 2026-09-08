@@ -31,7 +31,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "emplace", "Publish(", "loading_owner"):
             self.assertNotIn(forbidden, sampler)
         self.assertIn("asset=store.assets.Find(ctx.r5.u32)", sampler)
-        self.assertIn("ApplyKeyedAsset(*asset,model->AnimationTargets()", sampler)
+        self.assertIn("ApplyKeyedLayer(*asset,model->AnimationTargets()", sampler)
         self.assertLess(sampler.index("throw std::runtime_error"), sampler.index("auto *output"))
 
     def test_selected_slots_prepare_owned_curves_before_sampling_with_bounded_refusals(self):
@@ -41,7 +41,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         slot = self.animation_bridge.split("void PrepareSlot(", 1)[1].split("bool Sample(", 1)[0]
         self.assertIn("SelectedSlotSource(visual,slot,Word)", slot)
         self.assertIn("store.assets.Prepare", slot)
-        self.assertIn("ReadKeyedAsset(address,budget,Word)", slot)
+        self.assertIn("ReadKeyedAsset(address,budget,", slot)
+        self.assertIn("store.prepare_refused <= 4", slot)
         self.assertIn("budget <= entry.failed_budget", self.animation_asset)
         self.assertIn("candidate.resident.use_count() == 1", self.animation_asset)
         self.assertIn("TestSelectedAnimationResidency()", self.animation_test)
@@ -64,6 +65,16 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertLess(mix.index("throw std::runtime_error"), mix.index("auto *output="))
         self.assertIn("REX_HOOK_RAW(sub_82284BE0)", self.animation_bridge)
         self.assertIn("TestLayerMixing()", self.animation_test)
+
+    def test_named_sampling_uses_owned_model_names_and_bounded_source_filter(self):
+        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("bool Mix(", 1)[0]
+        self.assertIn("std::array<NativeJointName,30> excluded_names", sampler)
+        self.assertIn("ReadJointName(kSamplerState+8,Word)", sampler)
+        self.assertIn("filter,!preserve)", sampler)
+        self.assertIn("selected->channels[n]", sampler)
+        self.assertIn("Word(kSamplerState+24) == *depth", sampler)
+        self.assertIn("TestNamedAnimationSelection()", self.animation_test)
+        self.assertIn("TestConstantTimesAndScaleTail()", self.animation_test)
 
     def test_animation_assets_retire_with_both_loader_types_and_pinned_bytes_remain_charged(self):
         for name in ("sub_8217BD00", "sub_8217C580"):

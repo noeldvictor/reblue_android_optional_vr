@@ -6271,3 +6271,115 @@ operator accounting77952422B, same75MiB stop/100MiB diagnostics and cumulative
 floor62509998080B. README/active queue updated once for connected172 scope.
 Local source/test/docs commit is authorized; external push remains denied from
 the preceding user turn, with no new payload/destination approval supplied.
+
+### 2026-09-08 named animation inputs and importer contracts after52a9510
+
+Previous goal turn progress: connected weighted/layer math, tests and scoped
+live comparisons; full goal remains active. Clean main ahead14 on entry; push
+restriction unchanged, no upload retry. Main read guest-source/devloop/disk
+policy, current queue/evidence and relevant model ownership frontier. No live
+renderer/build producer found; first free63746904064B. New bundle owns bounded
+inline joint names and direct-search versus weighted-prune name/exclusion masks,
+corrects ignored constant timestamps and bounded scale-tail import eligibility,
+and adds bounded import failure provenance to classify the two live refusals.
+Same model/clip/instance owners and8MiB clip budget; strict comparisons retained.
+
+Source audit: weighted traversal8228A090(file23:10240) fully reread, direct
+bdAnimKeyframeSample routing/control flow(file89:9299..10452), dispatchers
+82289888(file50:9867) and8228A3E8(file43:9917), scale82288B38(file101:10014),
+and controller exclusion writer(file53:2841..2950). Inline node names are16
+bytes at+64; controller clamps exclusion pointers at0x82DBEC70 to30. Included
+name wins over exclusions; direct calls ignore exclusions. Direct traversal
+writes headers/searches children even without a matching parent; weighted
+traversal prunes that branch and writes neither header nor channels. Depth0 is
+the admitted outer boundary; nonzero depth/Euler modes remain explicit refusals.
+Constant helpers ignore key timestamp; scale holds final key after its bounded
+scan, unlike T/R's terminal bracket requirement. Do not assume these explain
+the live refusals until new provenance identifies the actual failing input.
+
+409 artifact-free checks PASS0.232s. Before builds,18:43:46 free63509061632B:
+237842432B unexplained drive growth since turn entry. Scoped out inventory since
+18:31 finds0 modified output files/0B; no project producer was launched. CIM
+process query denied under sandbox; ordinary process inspection is available.
+Treat unrelated/unattributed drive use against the same cumulative floor rather
+than resetting/ignoring it; no user data cleanup. The current reserve still fits
+bounded verification, and all supervisors enforce live free-space limits.
+
+Plan material56/CPU54 and shared output84/CPU56, then host173 after CPU success.
+Reuse trees/wrapper:64MiB fixture/8MiB CPU/192MiB host free-drop,300s timeout,
+10MiB aggregate build logs and floor62509998080B. Expected each fixture<16MiB
+peak/<16KiB logs, host<192MiB peak; no guest object/shader rebuild, raw/perf/
+cache/images0 new. Retire only prior55/53 and83/55 text after replacements pass;
+retain host171/979 andhost172/980 unresolved scenario coverage. No runtime
+probe yet; any new run needs new import-stage observation, full400KiB overlap
+preflight, same75MiB aggregate stop and exact profile restoration.
+
+Material56/PID29700 PASS;CPU54/PID24184 PASS0.12s/CTest0.13s. Output84/
+PID34072 PASS;CPU56/PID33332 PASS0.48s/CTest0.51s. Host173/PID30060/
+session5331 terminal0; codegen0writes/no guest objects/shaders, shared-name
+representation consumers and bridge rebuilt. End build free63507972096B.
+
+New observation for981: after>=4000 strictly matching samples, inspect all
+bounded prepare-refused trace lines (maximum4) and current refusal count. This
+classifies validation stage/track/channel/key plus first unreadable word for
+the selected inputs and checks expanded importer admission. It is not another
+attempt at979/980's absent subtree or insufficient mix coverage. Added explicit
+ImportAnimationProbe to the existing ignored operator; cannot combine it with
+weighted/mix/cubic observation requests.60s maximum,400KiB text/192MiB free-drop,
+same75MiB stop and exact owner-profile restoration. No new raw/perf/cache/images;
+operator syntax parsed and profile hash verified unchanged before launch.
+
+Run981/PID27356/session75290 terminal18:50:16,exit1 diagnostic-observed stop,
+not scene/motion qualification. At frame1138 sampled/checked4002,wrong0;
+weighted104,mixed/checked8,cubic6,filtered/subtree0. Both refused preparations
+are the SAME source25A973FC, budgets7890912 and8116992, stage model-bindings,
+no missing word. Asset importer constructs dense indices itself, so this stage's
+failure is duplicate authored descriptor hashes, not exhausted residency or
+unreadable data. Earlier "two clips" interpretation is unsupported: two attempts
+at one source. Constant-time/scale-tail fixes are independently valid source
+contracts, but do not explain this duplicate-name refusal.
+
+New connected correction: with unique admitted MODEL hashes, the direct cursor
+and weighted full scan both choose each name's first descriptor. Canonicalize
+the loaded asset to first-match tracks; skip shadowed duplicate curve payloads,
+retain unique dense native track indices and the same exact residency budget.
+Duplicate model names still refuse; do not guess that separate binding contract.
+CPU regression tests unreadable shadowed data, source destruction, exact budget,
+243 descriptor-name sequences x6 model traversal orders against an independent
+original-cursor reference. Log at most4 successful duplicate canonicalizations,
+so the next observation can prove actual formerly refused input import.
+Plan material57/CPU55 then host174 (private animation headers/bridge only;
+shared output84 remains valid), existing limits. New981 failure evidence stays
+until this changed first-match contract is verified; no unchanged retry.
+
+Cleanup already completed after56/54 and84/56 PASS:55/53 and83/55's eight
+superseded text files3839B; free63507972096->63507980288,8192B observed reclaim.
+No asset/profile/raw deletion. Runtime981 log remains current provenance;
+full hash/accounting follows after its terminal output is inspected.
+
+User-requested Git checkpoint,2026-09-08 19:01: material57/PID34768 had already
+completed0 before interruption. Ran only the existing fixture:CPU55/PID37340
+terminal0 at18:59:40, test0.12s/CTest0.14s;409 artifact-free guards PASS0.234s.
+No new build/game/capture launched. Host174 and changed-importer live probe
+remain pending; host173 is NOT the first-match-canonicalization binary.
+Current material57 EXE1125376B, SHA256
+0CC7013D2BAE86D3A270E0B9B62FE0329D439C66A9344805D054D20071BD000B.
+Run981 log116936B, SHA256
+E88359852BA237E6C51ECCEFC34778D4AED124F44738332CE1DBB4FEF497A8A1;
+preserve its causal refusal evidence until the new importer is verified live.
+Owner profile hash independently matches the original
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+No renderer/compiler/build/test producer was active on checkpoint entry.
+
+CPU55 wrote2027B stdout/0B stderr; supervisor enforced8MiB free-drop, the same
+cumulative floor and10MiB log cap. After checking replacements57/55, removed
+only56/54's four superseded text logs2623B; exact literal paths validated,
+no recursive deletion. Free63506051072->63506059264,8192B observed reclaimed.
+Earlier8192B cleanup is separate, not recredited. These reproducible logs are
+deleted, not recoverable from Git; no game data/assets/profiles/failures removed.
+Build/test log aggregate after cleanup421834B/212. Checkpoint-entry free
+63506685952B, post-cleanup63506059264B (59.14GiB): net626688B drive-wide growth,
+not all attributable to this task: CPU stdout is2027B; source/Git/CTest/system
+activity is separate from that measured file subtotal. No raw/image producer.
+README/queue now distinguish implemented filters, CPU-verified canonicalization
+and outstanding live/desktop gates. Stage only this source/test/docs bundle.

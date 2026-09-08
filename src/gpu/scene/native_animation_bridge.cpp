@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_animation_source.h"
+#include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/frame_stats.h"
@@ -42,7 +43,7 @@ struct Store {
   NativeAnimationResidency assets;
   uint64_t loaded = 0, load_refused = 0, sampled = 0, whole = 0, preserved = 0, checks = 0, wrong = 0;
   uint64_t cubic = 0, registered = 0, prepare_refused = 0, weighted = 0, subtree = 0;
-  uint64_t mixed = 0, mix_checks = 0;
+  uint64_t mixed = 0, mix_checks = 0, filtered = 0, canonicalized = 0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -65,10 +66,10 @@ void Report(Store &store) {
   const auto frame = FrameStatFrameCount();
   if (frame-store.frame < 300) return;
   uint64_t unavailable = 0; for (auto count : store.missing) unavailable += count;
-  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; registered {} catalog {} prepare-refused {}; weighted {} subtree {}; mixed {} mix-checked {}; owned keys/layers, original slot clocks and outgoing channel adapter remain",
+  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; registered {} catalog {} prepare-refused {}; weighted {} subtree {}; mixed {} mix-checked {}; filtered {}; owned keys/layers, original slot clocks and outgoing channel adapter remain",
       frame,store.loaded,store.load_refused,store.assets.ResidentCount(),store.assets.Bytes(),
       store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic,
-      store.registered,store.assets.Size(),store.prepare_refused,store.weighted,store.subtree,store.mixed,store.mix_checks);
+      store.registered,store.assets.Size(),store.prepare_refused,store.weighted,store.subtree,store.mixed,store.mix_checks,store.filtered);
   store.frame = frame;
 }
 bool Unavailable(Missing reason) {
@@ -105,8 +106,18 @@ void PrepareSlot(uint32_t visual, uint32_t slot) {
   if (!source || !*source) return;
   auto &store = Clips(); std::lock_guard lock(store.mutex);
   store.assets.Prepare(*source,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
-    auto asset = animation_source::ReadKeyedAsset(address,budget,Word);
+    animation_source::ImportTrace trace;
+    uint64_t missing_word=0;
+    auto asset = animation_source::ReadKeyedAsset(address,budget,[&](uint64_t word) {
+      const auto value=Word(word); if (!value && !missing_word) missing_word=word; return value;
+    },&trace);
     ++(asset ? store.loaded : store.prepare_refused);
+    if (!asset && store.prepare_refused <= 4)
+      BD_INFO("[native-animation-prepare-refused] source {:08X} budget {} stage {} track {} channel {} key {} missing-word {:X}; original source retained",
+          address,budget,trace.stage,trace.track,trace.channel,trace.key,missing_word);
+    if (asset && trace.unique_names < trace.descriptors && ++store.canonicalized <= 4)
+      BD_INFO("[native-animation-canonicalized] source {:08X} descriptors {} unique {} bytes {}; first-match curves owned; no duplicate payloads",
+          address,trace.descriptors,trace.unique_names,asset->RetainedBytes());
     return asset;
   });
 }
@@ -150,12 +161,31 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
     root_pose=*index;
     partial_subtree=single_subtree || Word(uint64_t(graph)+16) != ctx.r4.u32;
   }
-  const auto exclusion = Word(kSamplerState+4), name = Word(kSamplerState+8), depth = Word(kSamplerState+24);
-  // Named/excluded subtrees have authored traversal side effects not owned yet.
+  const auto exclusion = Word(kSamplerState+4), depth = Word(kSamplerState+24);
+  const auto included=skeleton_source::ReadJointName(kSamplerState+8,Word);
   const auto euler_mode=Word(0x827A7EE4); // byte +2: source qZ*qY*qX mode is zero
-  if (!exclusion || *exclusion || !name || (*name >> 24) || !depth || *depth ||
+  if (!exclusion || !included.Valid() || !depth || *depth ||
       !euler_mode || ((*euler_mode >> 8) & 255))
     return Unavailable(Missing::Restrictions);
+  const bool direct=!preserve || (weight == 1 && !single_subtree && !*exclusion);
+  std::array<NativeJointName,30> excluded_names;
+  std::array<std::string_view,30> excluded_views;
+  size_t excluded_count=0;
+  // Direct keyed sampling ignores exclusions; an included name takes priority
+  // in weighted traversal. The controller caps this temporary pointer table at30.
+  if (!direct && included.View().empty()) {
+    if (*exclusion > excluded_names.size()) return Unavailable(Missing::Restrictions);
+    for (uint32_t n=0; n<*exclusion; ++n) {
+      const auto pointer=Word(0x82DBEC70+uint64_t(n)*4);
+      if (!pointer) return Unavailable(Missing::Restrictions);
+      if (!*pointer) continue;
+      auto &name=excluded_names[excluded_count];
+      name=skeleton_source::ReadJointName(*pointer,Word);
+      if (!name.Valid()) return Unavailable(Missing::Restrictions);
+      excluded_views[excluded_count++]=name.View();
+    }
+  }
+  const NativeAnimationFilter filter{included.View(),std::span(excluded_views).first(excluded_count),direct};
   std::shared_ptr<const NativeAnimationAsset> asset;
   { auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(ctx.r5.u32); }
   if (!asset) return Unavailable(Missing::Asset);
@@ -172,15 +202,14 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
     const auto *input = bd::mem::at<const be_u32>(destination);
     for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) records[n][word] = input[n*12+word];
   }
-  const bool applied=preserve ? animation_source::ApplyKeyedLayer(*asset,model->AnimationTargets(),
-      model->Skeleton(),seconds,weight,root_pose,single_subtree,records) :
-      animation_source::ApplyKeyedAsset(*asset,model->AnimationTargets(),seconds,false,records);
+  const bool applied=animation_source::ApplyKeyedLayer(*asset,model->AnimationTargets(),
+      model->Skeleton(),seconds,weight,root_pose,single_subtree,records,filter,!preserve);
   if (!applied)
     return Unavailable(Missing::Sampling);
-  const auto selected=SelectNativeAnimationSubtree(model->Skeleton(),root_pose,single_subtree);
+  const auto selected=SelectNativeAnimationNodes(model->Skeleton(),root_pose,single_subtree,filter);
   bool used_cubic=false;
   for (size_t n=0; n<model->Skeleton().size(); ++n) {
-    if (preserve && (!selected || !(*selected)[n])) continue;
+    if (!selected || !selected->channels[n]) continue;
     const auto *track=asset->FindTrack(model->AnimationTargets()[model->Skeleton()[n].pose_index]);
     used_cubic |= track && track->splines && (track->splines->translation.active ||
         track->splines->rotation.active || track->splines->scale.active);
@@ -199,6 +228,10 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
       if (same && !equal) { first_joint = n; first_word = word; }
       same &= equal;
     }
+    const bool state_same=Word(kSamplerState) == 0u && Word(kSamplerState+24) == *depth &&
+        Word(kSamplerState+4) == (preserve ? 0u : *exclusion);
+    if (!state_same) BD_ERROR("[native-animation-state-drift] sampler traversal state did not return to its authored boundary");
+    same &= state_same;
     auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.checks;
     if (!same) {
       ++store.wrong;
@@ -214,7 +247,8 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   if (preserve) bd::mem::store<uint32_t>(kSamplerState+4,0);
   auto &store=Clips(); std::lock_guard lock(store.mutex);
   ++store.sampled; ++(preserve ? store.preserved : store.whole); store.cubic += used_cubic;
-  store.weighted += preserve && weight != 1; store.subtree += partial_subtree; Report(store);
+  store.weighted += preserve && weight != 1; store.subtree += partial_subtree;
+  store.filtered += !filter.included.empty() || !filter.excluded.empty(); Report(store);
   return true;
 }
 bool Mix(PPCContext &ctx, uint8_t *base) {

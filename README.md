@@ -139,11 +139,17 @@ Run980 records **13,858 matching samples and 23 matching layer mixes, zero
 mismatches**, including 113 weighted and 382 cubic samples. The repeated-cubic
 call-count criterion is reached, but the requested 256-mix gate fails; no subtree
 calls were observed. Advancing/interior-key motion, full field/reload and pixels
-remain unqualified. Two selected-clip imports still refuse for unclassified reasons.
-Named/excluded and dense families, slot clocks, dormant source-backed catalog,
+remain unqualified. Host173/run981 identifies the two import refusals as retries
+of one clip with duplicate descriptor names: 4,002 matching samples, zero drift.
+Named/excluded traversal and constant-time/scale-tail import rules are now
+connected and CPU-tested, but filtered calls were not observed live. First-match
+descriptor canonicalization passes material57/CPU55 and 409 source/scenario
+checks; its host rebuild and live verification are still pending.
+Dense families, slot clocks, dormant source-backed catalog,
 persistent cooking and outgoing channel/palette adapters remain. Defaults are
-unchanged; prior reload and pixel failures stay open. The next live scenario must
-exercise actual layer/subtree transitions, not repeat this boot unchanged.
+unchanged; prior reload and pixel failures stay open. Verify the changed importer,
+then exercise actual layer/subtree transitions, not repeat an unchanged boot.
+[Named/importer checkpoint and exact verification limits](research/20260906_0333_native-scene-state-bridge.md#2026-09-08-named-animation-inputs-and-importer-contracts-after52a9510).
 [Weighted/layer connection, scoped evidence and remaining gates](research/20260908_1824_native-animation-layers.md).
 [Selected-motion residency, runtime evidence and next work](research/20260908_1745_selected-motion-residency.md).
 [Clip math/source contract and regressions](research/20260908_1612_native-animation-clips.md).

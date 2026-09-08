@@ -10,6 +10,20 @@
 #include <unordered_set>
 
 namespace bd::gpu::scene::skeleton_source {
+template <class ReadWord>
+NativeJointName ReadJointName(uint64_t address, ReadWord &&read) {
+  NativeJointName name;
+  if (!address || address > UINT32_MAX-15) return name;
+  for (uint8_t n=0; n<name.bytes.size(); ++n) {
+    const auto byte_address=address+n;
+    const auto word=read(byte_address & ~uint64_t(3));
+    if (!word) return name;
+    name.bytes[n]=char(*word >> ((3-(byte_address&3))*8));
+    if (!name.bytes[n]) { name.length=n; return name; }
+  }
+  return name; // Never read beyond the inline 16-byte authored field.
+}
+
 template <size_t N, class ReadWord>
 bool Floats(uint64_t address, std::array<float,N> &out, ReadWord &&read) {
   for (size_t n=0; n<N; ++n) {
@@ -58,6 +72,7 @@ std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, Read
     const auto index = read(source), flags = read(source+8), child = read(source+56), sibling = read(source+60);
     if (!index || !flags || !child || !sibling || *index >= kMaxNativeJoints || (*flags & 0x00600000)) return {};
     NativeSkeletonJoint joint; joint.pose_index = *index; joint.parent = item.parent;
+    joint.animation_name=ReadJointName(source+64,read);
     if (animation_targets) {
       const auto name = read(source+4);
       if (!name) return {};

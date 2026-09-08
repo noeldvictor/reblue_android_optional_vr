@@ -121,7 +121,6 @@ void TestAnimationRefusals() {
   refuse([](auto &s){s.Half(0x3010,uint16_t(-1));},"negative source key time refuses");
   refuse([](auto &s){s.Half(0x3000,1);},"missing predecessor is not synthesized");
   refuse([](auto &s){s.Half(0x3020,59);},"missing terminal bracket cannot authorize an extra source key");
-  refuse([](auto &s){s.Word(0x205A,0xBB776655);},"ambiguous descriptor hash refuses");
   ClipSource source;
   auto bad=bindings; bad[1].pose_index=2;
   auto read=[&](uint64_t address){ return source.Read(address); };
@@ -582,10 +581,156 @@ void TestLayerMixing() {
   Require(channels && EvaluateNativeSkeleton(skeleton,*channels,JointIdentity(),pose) && pose[0][12] == 2,
           "mixed layer records connect to the production native hierarchy consumer");
 }
+void TestConstantTimesAndScaleTail() {
+  for (uint16_t type : {2,3}) {
+    ClipSource source;
+    source.Half(0x1006,type);
+    // Make every enabled channel constant, with ignored negative timestamps.
+    for (uint32_t count : {0x2054u,0x2056u,0x2058u}) source.Half(count,1);
+    for (uint32_t key : {0x3000u,0x4000u,0x5000u,0x6000u}) source.Half(key,65535);
+    source.words.erase(0x5000); // T timestamp/pad can be unavailable entirely.
+    auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);});
+    Require(asset.has_value(),"constant channels do not read or validate ignored timestamps");
+    source.words.clear(); std::vector<NativeJointChannels> channels;
+    Require(asset->Clip().Sample(.75f,channels) && channels[1].translation == JointVector{1,2,3} &&
+            channels[2].scale == JointVector{1,1,1} && asset->FindTrack(0xAA998877)->translation.front().seconds == 0,
+            "constant source-free values hold for type2 and type3 with canonical native time");
+  }
+  ClipSource source;
+  source.Half(0x6010,10); source.Half(0x6020,20);
+  auto clip=Import(source); source.words.clear();
+  std::vector<NativeJointChannels> channels;
+  Require(clip && clip->Sample(.9f,channels) && channels[2].scale == JointVector{5,5,5},
+          "bounded scale scan holds a terminal key before clip end without importing an imaginary key");
+  source=ClipSource{}; source.words.erase(0x302c);
+  animation_source::ImportTrace trace;
+  uint64_t first_missing=0;
+  Require(!animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address) {
+    const auto value=source.Read(address); if (!value && !first_missing) first_missing=address; return value;
+  },&trace) && std::string_view(trace.stage) == "key-value" && trace.track == 2 && trace.channel == 0 &&
+          trace.key == 2 && first_missing == 0x302c,"import refusal records bounded validation stage and exact missing word");
+  source=ClipSource{};
+  Require(animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);},&trace).has_value() &&
+          std::string_view(trace.stage) == "complete","reused diagnostic cannot mislabel a successful import");
+}
+void TestNamedAnimationSelection() {
+  ClipSource source;
+  auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);});
+  Require(asset.has_value(),"named selection clip admission");
+  std::array<NativeSkeletonJoint,4> skeleton;
+  constexpr std::array labels{std::string_view("root"),std::string_view("arm"),std::string_view("finger"),std::string_view("other")};
+  constexpr std::array poses{2u,0u,1u,3u}, parents{kNativeSkeletonRoot,0u,1u,kNativeSkeletonRoot};
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u,0x12345678u};
+  for (size_t n=0; n<skeleton.size(); ++n) {
+    auto &joint=skeleton[n]; joint.pose_index=poses[n]; joint.parent=parents[n];
+    for (size_t b=0; b<=labels[n].size(); ++b) source.Byte(0x9000+n*16+b,b == labels[n].size() ? 0 : uint8_t(labels[n][b]));
+    joint.animation_name=skeleton_source::ReadJointName(0x9000+n*16,[&](uint64_t address){return source.Read(address);});
+    Require(joint.animation_name.Valid() && joint.animation_name.View() == labels[n],"bounded owned inline joint name import");
+    joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+    joint.blend_rest.translation={10,20,30};
+  }
+  source.words.clear(); // Filters and model names cannot borrow source storage.
+  const NativeAnimationFilter direct{"arm",{},true}, weighted{"arm",{},false};
+  auto selected=SelectNativeAnimationNodes(skeleton,2,false,direct);
+  Require(selected && selected->headers == std::vector<uint8_t>{1,1,1,1} &&
+          selected->channels == std::vector<uint8_t>{0,1,1,0},"direct named traversal searches through unmatched parents and writes their headers");
+  selected=SelectNativeAnimationNodes(skeleton,2,false,weighted);
+  Require(selected && selected->headers == std::vector<uint8_t>{0,0,0,0} &&
+          selected->channels == std::vector<uint8_t>{0,0,0,0},"weighted named traversal prunes unmatched parents, not a deep name search");
+  std::vector<animation_source::ChannelRecord> records(4);
+  for (auto &record : records) { record.fill(0x7fc01234); record[0]=64; }
+  const auto before=records;
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,1,2,false,records,direct) &&
+          records[2][0] == 64 && records[2][1] == names[2] && records[2][2] == before[2][2] &&
+          records[0][0] == (64|1) && std::bit_cast<float>(records[0][2]) == 1 &&
+          records[1][0] == 64 && records[1][1] == names[1],"named direct application preserves filtered channels but updates traversal headers");
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,1,2,false,records,direct,true) &&
+          records[2][0] == 0 && records[2][1] == names[2] && records[2][2] == 0 && records[0][0] == 1,
+          "whole reset clears filtered bytes before the same named direct traversal");
+  records=before;
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,2,false,records,weighted) && records == before,
+          "weighted unmatched branch leaves even names/dirty flags untouched");
+  constexpr std::array exclusions{std::string_view("arm")};
+  const NativeAnimationFilter excluded{{},exclusions,false}, priority{"arm",exclusions,false};
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,0,true,records,priority) &&
+          std::bit_cast<float>(records[0][2]) == 5.5f && records[2] == before[2] && records[3] == before[3],
+          "explicit included name overrides exclusions and forced subtree never reaches outside records");
+  records=before;
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,2,false,records,excluded) &&
+          records[0] == before[0] && records[1] == before[1] && std::bit_cast<float>(records[2][2]) == 6,
+          "excluded node and its descendants remain byte-identical while other roots animate");
+  auto invalid=skeleton; invalid[0].animation_name=NativeJointName{};
+  Require(!SelectNativeAnimationNodes(invalid,2,false,direct) && SelectNativeAnimationNodes(invalid,2,false,{}),
+          "missing optional name refuses only consumers requiring name comparisons");
+  std::array<std::string_view,31> excessive;
+  Require(!SelectNativeAnimationNodes(skeleton,2,false,{{},excessive,false}),"exclusion allocation/traversal stays within the actual30-entry source cap");
+  unsigned reads=0;
+  auto read=[&](uint64_t address){++reads; return source.Read(address);};
+  Require(!skeleton_source::ReadJointName(UINT32_MAX-14,read).Valid() && reads == 0,"inline name address cannot wrap");
+  for (uint32_t n=0; n<16; ++n) source.Byte(0x9000+n,'x');
+  Require(!skeleton_source::ReadJointName(0x9000,read).Valid(),"unterminated inline name never reads adjacent node fields");
+  source.Byte(0x900f,0);
+  Require(skeleton_source::ReadJointName(0x9000,read).View().size() == 15,"full bounded15-byte authored name is preserved");
+}
+void TestFirstMatchAnimationDescriptors() {
+  ClipSource source;
+  source.Half(0x1008,4); source.Word(0x206c+18,0xBB776655);
+  // Shadowed descriptor has no readable channel pointers/counts at all.
+  bool read_shadowed=false;
+  auto read=[&](uint64_t address) {
+    read_shadowed |= address>=0x206c && address<0x207c;
+    return source.Read(address);
+  };
+  animation_source::ImportTrace trace;
+  auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,read,&trace);
+  Require(asset && !read_shadowed && trace.descriptors == 4 && trace.unique_names == 3 &&
+          asset->FindTrack(0xBB776655)->translation[0].value == JointVector{1,2,3},
+          "duplicate names keep first descriptor and never touch shadowed curve storage");
+  const auto bytes=asset->RetainedBytes();
+  Require(animation_source::ReadKeyedAsset(0x1000,bytes,read).has_value() &&
+          !animation_source::ReadKeyedAsset(0x1000,bytes-1,read),"canonical target/key capacity obeys exact aggregate budget");
+  source.words.clear();
+  constexpr std::array model_names{0xAA998877u,0xBB776655u,0xCC332211u};
+  std::vector<animation_source::ChannelRecord> output;
+  Require(animation_source::ApplyKeyedAsset(*asset,model_names,.25f,false,output) &&
+          std::bit_cast<float>(output[1][2]) == 1,"canonical named asset applies after source destruction");
+
+  // Independent original cursor reference: 243 descriptor-name sequences and
+  // all six unique model traversal orders. The cursor advances only on an exact
+  // current-position match; weighted traversal always scans from zero.
+  for (unsigned pattern=0; pattern<243; ++pattern) {
+    source.words.clear(); source.Word(0x1000,0x2000); source.Half(0x1004,30);
+    source.Half(0x1006,2); source.Half(0x1008,5); source.Word(0x100c,std::bit_cast<uint32_t>(1.0f));
+    unsigned digits=pattern; std::array<uint32_t,5> descriptor_names;
+    for (uint32_t n=0; n<5; ++n) {
+      descriptor_names[n]=digits%3+1; digits/=3;
+      const auto record=0x2000+n*36, key=0x4000+n*16;
+      source.Word(record,key); source.Word(record+4,0); source.Word(record+8,0);
+      source.Half(record+12,1); source.Half(record+14,0); source.Half(record+16,0);
+      source.Word(record+18,descriptor_names[n]); source.Vector(key,0,{float(n+1),0,0});
+    }
+    asset=animation_source::ReadKeyedAsset(0x1000,128*1024,read);
+    Require(asset.has_value(),"duplicate descriptor sequence imports as an owned first-match asset");
+    std::array<uint32_t,3> order{1,2,3};
+    do {
+      size_t cursor=0;
+      for (auto name : order) {
+        size_t found=cursor;
+        while (found<descriptor_names.size() && descriptor_names[found] != name) ++found;
+        const auto *track=asset->FindTrack(name);
+        Require((found == descriptor_names.size()) == (track == nullptr),"canonical binding matches original cursor presence");
+        if (track) Require(track->translation.front().value[0] == float(found+1),"first-match binding equals direct cursor and weighted scan for unique model names");
+        if (found == cursor) ++cursor;
+      }
+    } while (std::next_permutation(order.begin(),order.end()));
+  }
+}
 } // namespace
 void TestAnimationClips() {
   TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
   TestWeightedChannels(); TestWeightedLayerConsumption(); TestOwnedBlendRest();
   TestLayerMixing();
+  TestConstantTimesAndScaleTail(); TestNamedAnimationSelection();
+  TestFirstMatchAnimationDescriptors();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }
