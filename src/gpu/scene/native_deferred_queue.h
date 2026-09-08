@@ -28,6 +28,13 @@ private:
   bool draining_ = false;
 public:
   std::span<const Entry> Entries() const { return entries_; }
+  std::vector<NativeVisualIdentity> OrdinaryIdentities() const {
+    std::vector<NativeVisualIdentity> identities;
+    for (const auto &entry : entries_) if (!entry.water) identities.push_back(entry.Identity());
+    std::sort(identities.begin(),identities.end());
+    identities.erase(std::unique(identities.begin(),identities.end()),identities.end());
+    return identities;
+  }
   bool Stage(NativeRigidSceneSubmission &submission, uint32_t preceding, uint32_t frame) {
     if (draining_ || !submission.instance || !submission.model_generation ||
         submission.frame != frame || submission.plans.empty() || submission.plans.size() > 4096 ||

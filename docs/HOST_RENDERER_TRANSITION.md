@@ -756,13 +756,37 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    shadows add 13,200 each. Old 93/144 retires before 207/419. 394 Python checks pass.
    This proves live consumption, not visual motion, achieved 60 FPS or speedup.
    Next qualify renderer-owned motion/pixels under the existing storage gate;
-   native animation evaluation remains implementation work. The known
+   ordinary native evaluation is connected below; animation channels and late
+   writers remain implementation work. The known
    title/window discrepancy still precludes another unchanged PrintWindow run.
    Original animation evaluation/collision/effect side effects, conditional
    source-palette copying, secondary palettes and legacy interpolation remain.
    Do not restamp host164/run971 as verification of this source.
    [Render-pose connection, verification and remaining gates](../research/20260908_1440_native-render-poses.md).
    [Fresh interpolation/reload evidence and storage](../research/20260908_1505_native-render-pose-live.md).
+   **Ordinary native skeleton evaluation (host167, opt-in):** load-owned joint
+   hierarchy/TRS/pre/post rotations and update-time channels now drive native
+   whole-pose evaluation through the existing instance owner, completed handoff,
+   interpolation/culling and skin consumers. Root ABI, parent-scale compensation,
+   rotation order, source destruction and lifetime/budget fixtures pass;402 Python
+   checks, material46/CPU44, output81/CPU53 and host167 pass, no guest/shader build.
+   Host166/run974 reaches36331 matching evaluations with zero unavailable/drift;
+   fresh cold1879..2179 and reload4157..4457 add2904/2640 checked publications.
+   Its full chain FAILS because water-only scopes/inputs polluted ordinary
+   counters. Host167 partitions accounting by family, keeping shared publication
+   and rendering unchanged; strict verifier and old failed evidence are retained.
+   Run975 verifies the corrected cold-field boundary, but does not complete its
+   title/reload scenario: a260432us input-poll gap resets the strict900-emission
+   readiness window at843, then a natural field exit interrupts the next window.
+   Preserve975; do not retry unchanged code or relax readiness to claim PASS.
+   Native skeleton math has scoped live comparison evidence, not full integration
+   or motion pixels. Normal defaults remain unchanged. Next recover/own animation
+   curves/channel inputs and remaining late-writer/secondary/view-dependent bone
+   contracts through these owners; investigate the exact readiness interruption
+   before another reload probe. Original collision/effect side effects, outgoing
+   palettes/completed source copy, unsupported bone routes and full desktop
+   sequence/both-eye gates remain. No speedup/full host frame or Quest claim.
+   [Skeleton contract, live scopes and preserved failures](../research/20260908_1544_native-skeleton-evaluation.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass
    scheduling and presentation. Remove guest rendering, register/resource

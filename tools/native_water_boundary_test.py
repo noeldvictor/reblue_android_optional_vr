@@ -146,6 +146,18 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         self.assertLess(scope.index("publication.ReadAfterWriter"), scope.index("BeginDeferredMaterialCompatibility"))
         self.assertIn("if (!requested.empty())", consumer) # water-only batches also publish
 
+    def test_water_only_batch_does_not_claim_ordinary_receipts(self):
+        consumer = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
+        for required in ("auto requested = native_queue.OrdinaryIdentities()",
+                         "const auto ordinary_inputs = requested.size()",
+                         "if (ordinary_inputs) { ++native_input_batches; native_input_visuals += ordinary_inputs; }",
+                         "if (ordinary_inputs) native_input_refreshes += visual_inputs.Refreshes()",
+                         "if (water) ++water_visual_begins;\n    else ++native_visual_begins;",
+                         "if (water) ++water_visual_ends;\n    else ++native_visual_ends;"):
+            self.assertIn(required, consumer)
+        self.assertLess(consumer.index("const auto ordinary_inputs"), consumer.index("requested.push_back(entry.Identity())"))
+        self.assertLess(consumer.index("requested.push_back(entry.Identity())"), consumer.index("visual_inputs.Begin(requested"))
+
     def test_native_water_preserves_sorted_alpha_and_coverage(self):
         native = (ROOT / "src/gpu/scene/native_water_inputs.h").read_text()
         pixel = (ROOT / "src/gpu/shaders/hlsl/native_water_ps.hlsl").read_text()

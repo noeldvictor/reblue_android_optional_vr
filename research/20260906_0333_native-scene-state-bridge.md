@@ -5756,3 +5756,115 @@ Selected retained growth182215B for updated fixture artifacts and current logs.
 Ending measured free63962222592B (~59.57GiB), net decline892928B from15:30:26;
 drive-wide activity is not attributed to selected files. Source/Git bytes are
 separate. No assets, saves, profiles, build trees, images or raw evidence removed.
+
+### 2026-09-08 native skeleton host integration after17f5c33
+
+Previous turn is progress: committed source connection and passing C++ fixtures.
+Push approval remains unanswered; no retry.15:34:04 free63957352448B,15:37:04
+63954649088B, no observed compiler/game process; no rapid drive-wide decline.
+Plan existing material46/CPU44 (64/8MiB guards), then host166 (192MiB guard)
+for grouped ABI/source-boundary tests and the opt-in producer. Same300s bounded
+wrapper,10MiB logs and cumulative floor62509998080B; no guest rebuild/new tree.
+Keep current45/43 evidence until replacement passes. Host/PDB peak estimate
+under192MiB including link overlap; shaders unchanged, no GPU fixture needed.
+No game or pixels queued yet; a later runtime preflight must separately prove
+full log overlap fits and preserve exact profile bytes. New raw/image allowance0.
+
+Material46/PID29280 passes, launch63949291520B/end63949275136B. CPU44/PID31804
+passes0.14s (CTest0.16s), launch63949271040B/end63949266944B. Host166/PID28036/
+session87870 terminal0, launch63949262848B/end63948251136B; codegen0written,
+no guest object compilation.400 artifact-free Python checks pass. Host EXE
+49138688B SHA25620666DA6D6F939A10EBE0E68F53D218D3CBC777C8C5F0A0EBEA70DA111AB8BF9;
+PDB112095232B SHA25648E9D305FBC26874BC1368591A70DBAE0CC9B94DF5E2D12C377ACE30CAAF32BD.
+Material EXE723456B SHA256138295188EEE037458683475B095512A35D9E3D634E21123072B9A5201F4EBB7.
+Native root ABI now has a production decoder exercised by the existing fixture;
+noncommuting pre/selected/post rotations and source-free ownership guards pass.
+Bounded unsupported reasons and first drift component explain an unsuccessful
+admission without weakening original comparison.400 checks include a new strict
+--skeleton gate for each independent ready-field epoch; zero/startup-only native
+production, missing comparisons, failed publication and drift cannot pass.
+
+Plan one180s normal mono/MSAA/native-post run of host166, temporary60FPS cap,
+bd_native_skeleton=true plus original material comparison and the full existing
+render-pose/skin scene+shadow/reload chain. This tests reachable ordinary native
+hierarchy production, not motion pixels or full animation ownership. Reuse the
+operator with new SkeletonVerify guard; parser passes. Exact116B owner profile
+hash remains2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+Keep800KiB log/192MiB free-drop, full75MiB diagnostic overlap preflight and exact
+profile restoration/owned-process shutdown. No image/raw/perf/cache allowance,
+no PrintWindow retry or changing normal defaults. Retain all prior failures.
+
+Run974/PID36188/session23424 terminal1 at15:45:17, started15:42:49. Preflight
+diagnostics76995532B plus819200B log reservation fits75MiB; free63945359360B,
+floor63744032768B. Original116B profile restored exactly. Log551337B SHA256
+CA9C48D1A60FBFBB982582B3655B78078B55B9DF9EF0695E57FDFF8B15C677AB retained as
+failure evidence. Native evaluation/publication/comparison reaches36331 with
+zero unavailable/drift and both interactive fields, but the complete gate FAILS
+ordinary deferred scope/input conservation; this is not full integration PASS.
+Exact cause: frame600 reports ordinary consumed/effect reads0 but begins/ends1
+and input batch/visual/refresh1; separate water receipts show one water packet
+and one water scope. Those water events incorrectly incremented ordinary counters.
+Fix partitions ordinary scope receipts and deduplicated ordinary input identities
+from water while preserving the SAME all-family publication and rendering path.
+Existing strict verifier unchanged; add water-only/mixed/duplicate queue fixtures
+and a causal scenario regression before retry. Preserve974 and old visual failures.
+
+Before974, removed six superseded material45/CPU43/host165 logs only after
+46/44/166 passed:6233B logical, measured63945875456->63945883648B (+8192B).
+All prior results remain recorded; fixtures/builds rerunnable, old text no longer
+retained. Logs408099B/198. No other outputs removed; do not recredit earlier cleanup.
+Next reuse output81/CPU53 under64/8MiB guards, then host167 under192MiB guard;
+same floor/budgets, no guest/shader build or new tree. No second game until the
+causal fixture passes and runtime preflight includes retained974 plus new log.
+
+Output81/PID32120 passes, launch63942201344B/end63941668864B. CPU53/PID34572
+passes0.62s (CTest0.64s), launch63939268608B/end63939264512B. Host167/PID26384
+terminal0, launch63939264512B/end63939235840B; only the affected consumer object
+and host link, codegen0written, no guest objects/shader changes.402 artifact-free
+checks pass; strict deferred verifier unchanged. New regression reproduces974's
+water-only contamination as a failure and accepts zero ordinary receipts while
+separate water counters advance. All-family input publication stays intact.
+Retry once with the same full SkeletonVerify chain and unchanged800KiB/180s/
+192MiB/75MiB-overlap limits. Retain974 failure plus current host166 build evidence;
+new preflight must include all retained bytes, not treat a retry as a reset.
+
+Run975/PID35800/session69324 terminal1 at15:55:29 after the180s guard, not a
+successful early operator stop. An attempted sandbox Stop-Process was denied;
+the later approved identity check found the renderer already absent. Supervisor
+finally restored the exact116B profile. Launch15:52:26 diagnostics77547774B plus
+819200B log reservation fits75MiB, free63936864256B/floor63735537664B. Log531187B
+SHA2564E7BFEE8952482F056934299C9C75E2928109D2708D5CE62C16AAAC9BB603517 retained.
+No skeleton drift/unavailability. Corrected cold ordinary scope/input counters
+pass their unchanged gate, but full reload remains FAIL: readiness window starts
+at selected scene755/shadow756; a260432us poll gap resets walking at1598/1599,
+only843 of900 new emissions. It restarts at1617/1618, then natural stage exit
+interrupts at1860/1861. Source93 retires and stage changes tobg01_01 without the
+required title request/return. No full PASS or threshold relaxation; no unchanged
+retry. This is a distinct readiness/scenario failure, not a skeleton mismatch.
+
+After81/53 passed, removed four exact superseded output80/CPU52 logs:1526B
+logical, measured63937064960->63937069056B (+4096B). Retain current fixtures,
+host166 failure-build evidence, host167 and every runtime/pixel failure.
+Plan checksum-verified lossless archive of973+974 (1101858B combined) under the
+existing2MiB analysis-overlap guard; keep975 plaintext. Delete only those two
+original text logs after exact ZIP entry length/SHA validation. All original
+bytes remain recoverable, no pixels/raws removed and no new diagnostic budget.
+
+Archive completed:225232B SHA256
+38FD30CF1FD4088BD75930E0B51D2926B7D14FBEE108ECB522EC26DC3CC8B144. Both original
+entry hashes match; exact973/974 plaintext removed, all content recoverable.
+Logical876626B saved, actual start63933194240B/pre-delete63932968960B/end
+63934074880B: operation net reclaim880640B (deletion phase1105920B, not additive).
+Including the two distinct build-log cleanups this turn:884385B logical removed,
+892928B measured reclaimed; no earlier cleanup counted again.
+
+15:59:13 free63931260928B (~59.54GiB),26091520B below15:34:04 drive-wide.
+Selected retained growth1086956B: material+27058B, texture fixture+529787B,
+EXE+36864B, PDB+286720B, build logs+629B and retained runtime logs/archive+205898B.
+These are changed current artifacts, not duplicated trees; other object/source/
+Git/system activity is separate. Runtime diagnostics77202335B, build logs409004B/
+200, images unchanged10434657B/13. No raw/perf/new cache files from either run.
+Exact owner profile hash verified again; no observed renderer/compiler/test
+producer. No next run queued. Keep975 timing/field-exit failure, archived974
+accounting failure and all prior visual evidence. Research/active queue/README
+record scoped progress and pending full reload/motion/both-eye/Quest gates.

@@ -21,6 +21,22 @@ bool Floats(uint64_t address, std::array<float,N> &out, ReadWord &&read) {
   return true;
 }
 
+// bdBoneInitSkinned's by-value root: five BE register pairs (r6..r10),
+// followed by six float words at caller SP+88. No PPC context in native math.
+template <class ReadWord>
+std::optional<RenderMatrix> ReadRoot(const std::array<uint64_t,5> &pairs,
+    uint32_t stack, ReadWord &&read) {
+  RenderMatrix root;
+  for (size_t n=0; n<pairs.size(); ++n) {
+    root[n*2] = std::bit_cast<float>(uint32_t(pairs[n]>>32));
+    root[n*2+1] = std::bit_cast<float>(uint32_t(pairs[n]));
+  }
+  std::array<float,6> tail;
+  if (!Floats(uint64_t(stack)+88,tail,read)) return {};
+  std::copy(tail.begin(),tail.end(),root.begin()+10);
+  return JointAffine(root) ? std::optional(root) : std::nullopt;
+}
+
 // NodeProcess copies the 80-byte base or 104-byte extended node, then relocates
 // +56/+60. bdAnimBoneEvaluate reads these same authored TRS/pre/post fields.
 // Camera-facing nodes need a separate owned view contract, never identity math.

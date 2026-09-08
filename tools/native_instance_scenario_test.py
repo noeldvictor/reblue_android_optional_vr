@@ -13,7 +13,7 @@ from native_instance_scenario import verify_receiver_setup
 from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
 from native_instance_scenario import verify_cutout_family
-from native_instance_scenario import verify_skin_shadow, verify_skin_scene, verify_render_poses
+from native_instance_scenario import verify_skin_shadow, verify_skin_scene, verify_render_poses, verify_skeleton
 from native_instance_scenario import observe_occlusion
 from native_instance_scenario import verify_frame_probe
 from native_instance_scenario import (
@@ -846,6 +846,51 @@ class RenderPoseScenarioTest(unittest.TestCase):
             module.verify_rigid_epoch("\n".join(self.rows()),render_poses=True)
 
 
+class SkeletonScenarioTest(unittest.TestCase):
+    def rows(self):
+        rows = scenario()
+        for index, frame in ((2,100), (4,150)):
+            rows[index] = (f"[native-skeleton] frame {frame} evaluated {frame+1} update poses {frame} "
+                           f"unavailable {frame//10}; checked {frame+2} wrong 0;")
+        return rows
+
+    def test_fresh_native_production_and_original_comparisons(self):
+        self.assertEqual(verify_skeleton("\n".join(self.rows())), dict(
+            first_frame=100,last_frame=150,evaluated_delta=50,published_delta=50,checked_delta=50,unavailable_delta=5))
+
+    def test_stale_wrong_scene_and_unpublished_updates_do_not_qualify(self):
+        rows = self.rows(); text = "\n".join(rows)
+        for bad in (text.replace("bg41_01", "bg42_01"), text + "\n[native-material-context] mode Loading",
+                    text.replace("update poses 150", "update poses 100"),
+                    text.replace("evaluated 151", "evaluated 101").replace("update poses 150", "update poses 100"),
+                    "\n".join([rows[2],rows[4]] + scenario()[::2])):
+            with self.assertRaises(Pending): verify_skeleton(bad)
+
+    def test_drift_bad_accounting_reset_and_runtime_errors_fail(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("wrong 0", "wrong 1"), text.replace("update poses 150", "update poses 152"),
+                    text.replace("checked 152", "checked 0"), text.replace("frame 150", "frame 99"),
+                    text + "\n[native-skeleton-drift] wrong", text + "\n[error] late failure",
+                    text + "\n[native-instances] producer publication failed: failure",
+                    "[native-skeleton] invalid\n" + text, "x"*(MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_skeleton(bad)
+
+    def test_each_reload_epoch_requires_native_evaluation(self):
+        import native_instance_scenario as module
+        from unittest.mock import patch
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for name in vars(module).copy():
+                if (name == "verify" or name.startswith("verify_")) and name not in ("verify_rigid_epoch", "verify_skeleton"):
+                    stack.enter_context(patch.object(module, name))
+            cold, new, _ = split_rigid_reload(RigidReloadScenarioTest.sample())
+            for first, second in ((cold,"\n".join(self.rows())),("\n".join(self.rows()),new)):
+                with self.assertRaises(Pending):
+                    module.verify_rigid_epoch(first,skeleton=True)
+                    module.verify_rigid_epoch(second,skeleton=True)
+            module.verify_rigid_epoch("\n".join(self.rows()),skeleton=True)
+
+
 class SkinShadowScenarioTest(unittest.TestCase):
     def rows(self):
         rows = scenario()
@@ -1083,6 +1128,21 @@ class RigidDeferredScenarioTest(unittest.TestCase):
         # the newly connected native-identity handoff, even in a ready field.
         with self.assertRaises(ValueError): verify_rigid_deferred(self.effect_text(), require_inputs=True)
         self.assertEqual(verify_rigid_deferred(text, require_effects=True), verify_rigid_deferred(self.effect_text(), require_effects=True))
+
+    def test_water_only_loading_receipt_preserves_ordinary_conservation(self):
+        # run974/frame600: water had one consumed packet and its own input/scope;
+        # ordinary packets/effect reads were still zero. Neither water counter
+        # belongs in the ordinary receipt. Do not relax the verifier for it.
+        opening = (self.host(1,1) + "\n[native-deferred] frame 10 staged 0 consumed 0 pending 0;\n"
+                   "[native-water-deferred] frame 10 staged 1 consumed 1;\n"
+                   "[native-deferred-effects] frame 10 begins 0 ends 0 reads 0;\n"
+                   "[native-deferred-inputs] frame 10 batches 0 visuals 0 refreshes 0;\n"
+                   "[native-water-visual] frame 10 begins 1 ends 1; type mask 32;\n")
+        self.assertEqual(verify_rigid_deferred(opening+self.input_text(),require_inputs=True),
+                         verify_rigid_deferred(self.input_text(),require_inputs=True))
+        for bad in (opening.replace("begins 0 ends 0", "begins 1 ends 1"),
+                    opening.replace("batches 0 visuals 0 refreshes 0", "batches 1 visuals 1 refreshes 1")):
+            with self.assertRaises(ValueError): verify_rigid_deferred(bad+self.input_text(),require_inputs=True)
 
     def test_bad_native_input_publications_cannot_qualify(self):
         text = self.input_text()

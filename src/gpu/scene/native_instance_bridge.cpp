@@ -43,6 +43,13 @@ REX_EXTERN(__imp__sub_8213F5E8);
 namespace bd::gpu::scene {
 namespace {
 static_assert(kVisualBoneContainer == instance_source::kPaletteContainer);
+enum class SkeletonMissing : size_t {
+  Scope, Publication, UpdateLane, SourceMatch, ChildStop, Model, Topology, Palette,
+  Channels, Root, Evaluation, Count
+};
+constexpr std::array skeleton_missing_names{"scope", "publication", "update lane", "source match",
+    "child stop", "model", "topology", "palette", "channels", "root", "evaluation"};
+static_assert(skeleton_missing_names.size() == size_t(SkeletonMissing::Count));
 struct Store {
   std::mutex mutex;
   NativeInstanceRegistry instances;
@@ -50,6 +57,7 @@ struct Store {
   uint64_t imports = 0, refused = 0, reads = 0, unavailable = 0, checked = 0, wrong = 0;
   uint64_t handoffs = 0, handoff_missing = 0;
   uint64_t skeleton_updates = 0, skeleton_published = 0, skeleton_unavailable = 0, skeleton_checks = 0, skeleton_wrong = 0;
+  std::array<uint64_t, size_t(SkeletonMissing::Count)> skeleton_missing{};
   uint32_t miss_examples = 0;
   uint32_t drift_examples = 0;
   uint32_t frame = 0;
@@ -100,42 +108,55 @@ struct SkeletonEvaluationScope {
 };
 bool EvaluateOwnedBones(PPCContext &ctx, uint8_t *base) {
   auto *scope = active_skeleton_evaluation;
-  if (!scope || !rex::system::XThread::GetCurrentThread()) return false;
+  uint32_t count = 0; size_t joints = 0;
+  auto unavailable = [&](SkeletonMissing reason) {
+    auto &store = Instances(); std::lock_guard lock(store.mutex);
+    ++store.skeleton_unavailable;
+    if (++store.skeleton_missing[size_t(reason)] <= 2)
+      BD_INFO("[native-skeleton-unavailable] {} visual {:08X} graph {:08X} palette {:08X} channels {:08X} count {} joints {}; original whole call retained",
+          skeleton_missing_names[size_t(reason)], scope ? scope->visual : 0,
+          ctx.r4.u32,ctx.r3.u32,ctx.r5.u32,count,joints);
+    return false;
+  };
+  if (!scope || !rex::system::XThread::GetCurrentThread()) return unavailable(SkeletonMissing::Scope);
   const auto publication = instance_source::ReadPublication(
       scope->visual, rex::system::XThread::GetCurrentThreadId(), Word);
+  if (!publication) return unavailable(SkeletonMissing::Publication);
+  count = publication->count;
+  if (publication->lane != 0) return unavailable(SkeletonMissing::UpdateLane);
+  if (publication->graph != ctx.r4.u32 || publication->palette != ctx.r3.u32)
+    return unavailable(SkeletonMissing::SourceMatch);
   const auto excluded_child = Word(0x82DC99DC); // source's optional child-walk stop node
-  if (!publication || publication->lane != 0 || publication->graph != ctx.r4.u32 ||
-      publication->palette != ctx.r3.u32 || !excluded_child || *excluded_child) return false;
+  if (!excluded_child || *excluded_child) return unavailable(SkeletonMissing::ChildStop);
   const auto model = FindLoadedNativeModel(publication->graph);
-  if (!model || model->Skeleton().empty() || model->Skeleton().size() != publication->count ||
-      !Range(publication->palette, uint64_t(publication->count)*sizeof(RenderMatrix))) return false;
+  if (!model) return unavailable(SkeletonMissing::Model);
+  joints = model->Skeleton().size();
+  if (!joints || joints != count) return unavailable(SkeletonMissing::Topology);
+  if (!Range(publication->palette, uint64_t(count)*sizeof(RenderMatrix))) return unavailable(SkeletonMissing::Palette);
   const auto channels = skeleton_source::ReadChannels(ctx.r5.u32, publication->count, Word);
-  if (!channels) return false;
-  // bdBoneInitSkinned receives its root by value: r6..r10 plus caller+88..111.
-  RenderMatrix root;
-  const std::array<uint64_t,5> pairs{ctx.r6.u64,ctx.r7.u64,ctx.r8.u64,ctx.r9.u64,ctx.r10.u64};
-  for (size_t n=0; n<pairs.size(); ++n) {
-    root[n*2] = std::bit_cast<float>(uint32_t(pairs[n]>>32));
-    root[n*2+1] = std::bit_cast<float>(uint32_t(pairs[n]));
-  }
-  std::array<float,6> tail;
-  if (!skeleton_source::Floats(uint64_t(ctx.r1.u32)+88,tail,Word)) return false;
-  std::copy(tail.begin(),tail.end(),root.begin()+10);
+  if (!channels) return unavailable(SkeletonMissing::Channels);
+  const auto root = skeleton_source::ReadRoot(
+      {ctx.r6.u64,ctx.r7.u64,ctx.r8.u64,ctx.r9.u64,ctx.r10.u64},ctx.r1.u32,Word);
+  if (!root) return unavailable(SkeletonMissing::Root);
   std::vector<RenderMatrix> pose;
-  if (!EvaluateNativeSkeleton(model->Skeleton(),*channels,root,pose)) return false;
+  if (!EvaluateNativeSkeleton(model->Skeleton(),*channels,*root,pose)) return unavailable(SkeletonMissing::Evaluation);
   if (REXCVAR_GET(bd_native_materials_verify)) {
     __imp__bdBoneInitSkinned(ctx,base);
     const auto *original = bd::mem::at<const be_f32>(publication->palette);
-    bool same = true;
+    bool same = true; size_t first_joint = 0, first_component = 0;
     for (size_t n=0; n<pose.size(); ++n) for (size_t c=0; c<16; ++c) {
       const float expected = original[n*16+c], actual = pose[n][c];
-      same &= std::isfinite(expected) && std::abs(actual-expected) <= 1e-4f*std::max(1.0f,std::abs(expected));
+      const bool equal = std::isfinite(expected) && std::abs(actual-expected) <= 1e-4f*std::max(1.0f,std::abs(expected));
+      if (same && !equal) { first_joint = n; first_component = c; }
+      same &= equal;
     }
     auto &store = Instances(); std::lock_guard lock(store.mutex);
     ++store.skeleton_checks;
     if (!same) {
       ++store.skeleton_wrong;
-      BD_ERROR("[native-skeleton-drift] visual {:08X} model {}: evaluated pose differs from original; no replacement/fallback", scope->visual,model->Generation());
+      BD_ERROR("[native-skeleton-drift] visual {:08X} model {} joint {} component {} native {} original {}; evaluated pose differs, no replacement/fallback",
+          scope->visual,model->Generation(),first_joint,first_component,
+          pose[first_joint][first_component],float(original[first_joint*16+first_component]));
       throw std::runtime_error("Native skeleton source comparison failed");
     }
   }
@@ -469,8 +490,6 @@ REX_HOOK_RAW(bdVisualObjectInitBones) {
 REX_HOOK_RAW(bdBoneInitSkinned) {
   if (REXCVAR_GET(bd_native_instances) && REXCVAR_GET(bd_native_skeleton)) {
     if (bd::gpu::scene::EvaluateOwnedBones(ctx,base)) return;
-    auto &store = bd::gpu::scene::Instances(); std::lock_guard lock(store.mutex);
-    ++store.skeleton_unavailable;
   }
   __imp__bdBoneInitSkinned(ctx,base);
 }

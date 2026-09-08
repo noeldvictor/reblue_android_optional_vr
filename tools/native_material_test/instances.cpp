@@ -218,6 +218,46 @@ void TestSkeleton() {
     const auto found = words.find(p);
     return found == words.end() ? std::nullopt : std::optional(found->second);
   };
+  const RenderMatrix root{1.1f,.2f,.3f,0, -.4f,1.3f,.5f,0, .6f,-.7f,1.4f,0, 12,34,56,1};
+  std::array<uint64_t,5> pairs;
+  for (size_t n=0; n<pairs.size(); ++n)
+    pairs[n] = (uint64_t(std::bit_cast<uint32_t>(root[n*2]))<<32) | std::bit_cast<uint32_t>(root[n*2+1]);
+  for (size_t n=10; n<16; ++n) words[0x5000+88+(n-10)*4] = std::bit_cast<uint32_t>(root[n]);
+  Require(skeleton_source::ReadRoot(pairs,0x5000,read) == root,
+          "by-value root preserves register pair endianness and six caller stack words");
+  words.erase(0x5000+108);
+  Require(!skeleton_source::ReadRoot(pairs,0x5000,read) && !skeleton_source::ReadRoot(pairs,0xfffffff0,read),
+          "root tail truncation and stack address overflow refuse");
+
+  // Noncommuting rotations and an off-axis parent verify the complete chain,
+  // using an independent double-precision scalar matrix product as the oracle.
+  auto product = [](const RenderMatrix &a, const RenderMatrix &b) {
+    RenderMatrix result{};
+    for (size_t r=0; r<4; ++r) for (size_t c=0; c<4; ++c) {
+      double sum = 0;
+      for (size_t k=0; k<4; ++k) sum += double(a[r*4+k])*b[k*4+c];
+      result[r*4+c] = float(sum);
+    }
+    return result;
+  };
+  NativeSkeletonJoint authored;
+  authored.translation = {3,4,5}; authored.scale = {-2,0,3};
+  authored.before_rotation = JointEulerRotation({.3f,-.7f,.1f});
+  authored.rotation = JointEulerRotation({-.2f,.4f,.8f});
+  authored.after_rotation = JointEulerRotation({.5f,.6f,-.9f});
+  NativeJointChannels animated;
+  std::vector<RenderMatrix> composed;
+  auto local = JointIdentity(); local[12]=3; local[13]=4; local[14]=5;
+  auto scaling = JointIdentity(); scaling[0]=-2; scaling[5]=0; scaling[10]=3;
+  for (bool dynamic_rotation : {false,true}) {
+    animated.rotated = dynamic_rotation; animated.rotation = {.2f,-.3f,.1f,.7f};
+    const auto rotation = dynamic_rotation ? JointRotation(animated.rotation) : authored.rotation;
+    const auto expected = product(scaling,product(authored.after_rotation,
+        product(rotation,product(authored.before_rotation,product(local,root)))));
+    Require(EvaluateNativeSkeleton({&authored,1},{&animated,1},root,composed), "complete authored/native rotation chain evaluates");
+    for (size_t c=0; c<16; ++c) Require(near(composed[0][c],expected[c]),
+        "pre/selected/post rotation order, non-unit quaternion and zero/negative scale are preserved");
+  }
   // Reordered IDs, a child and a root sibling: parent ordinals are not pose IDs.
   for (uint32_t p : {0x1000,0x2000,0x3000}) {
     words[p+8] = 1|8; words[p+56] = words[p+60] = 0;

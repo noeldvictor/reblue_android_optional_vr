@@ -2245,6 +2245,7 @@ void CheckNativeWaterDeferredQueue() {
   water = good;
   assert(!queue.TakeWater(0));
   assert(queue.StageWater(std::span(&water,1),1,7));
+  assert(queue.OrdinaryIdentities().empty()); // run974: water-only is not an ordinary input batch
   NativeRigidScenePlan rigid{};
   rigid.draw = rigid.deferred = true; rigid.depth = -2; rigid.light_recipe = NativeSceneLightRecipe{{},9};
   NativeRigidSceneSubmission mixed{31,model->Generation(),0,7,false,{rigid}};
@@ -2252,6 +2253,16 @@ void CheckNativeWaterDeferredQueue() {
   water.primitive = 1;
   assert(queue.StageWater(std::span(&water,1),2,7));
   assert(queue.Entries().size() == 3 && queue.Entries()[0].Identity() == good.Identity());
+  assert(queue.OrdinaryIdentities() == std::vector<NativeVisualIdentity>({{31,mixed.model_generation}}));
+  {
+    NativeDeferredQueue repeated;
+    NativeRigidSceneSubmission same{31,mixed.model_generation,0,7,false,{rigid,rigid}};
+    assert(repeated.Stage(same,0,7) && repeated.StageWater(std::span(&good,1),0,7));
+    assert(repeated.OrdinaryIdentities() == std::vector<NativeVisualIdentity>({{31,mixed.model_generation}}));
+    NativeRigidSceneSubmission next{32,mixed.model_generation,0,7,false,{rigid}};
+    assert(repeated.Stage(next,0,7));
+    assert(repeated.OrdinaryIdentities() == std::vector<NativeVisualIdentity>({{31,mixed.model_generation},{32,mixed.model_generation}}));
+  }
   std::vector<DeferredInsertion> insertions;
   for (const auto &entry : queue.Entries()) insertions.push_back(entry.order);
   std::vector<DeferredSelection> order;

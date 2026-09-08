@@ -13,6 +13,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.draw = (root / "src/gpu/scene/host_draw.cpp").read_text(encoding="utf-8")
         cls.layout = (root / "src/gpu/scene/guest_scene.h").read_text(encoding="utf-8")
         cls.source = (root / "src/gpu/scene/native_instance_source.h").read_text(encoding="utf-8")
+        cls.skeleton = (root / "src/gpu/scene/native_skeleton.h").read_text(encoding="utf-8")
+        cls.loader = (root / "src/gpu/scene/native_material.cpp").read_text(encoding="utf-8")
 
     def test_palette_container_matches_both_original_producer_and_release(self):
         self.assertIn("kVisualBoneContainer = 0xA48", self.layout)
@@ -34,6 +36,29 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
     def test_core_has_no_source_or_render_api_dependency(self):
         for forbidden in ("PPCContext", "REX_", "bd::mem", "GuestBuffer", "NodeTag", "ofstream"):
             self.assertNotIn(forbidden, self.core)
+
+    def test_skeleton_is_load_owned_and_evaluated_before_outgoing_palette_writes(self):
+        self.assertIn("skeleton_source::ReadSkeleton", self.loader)
+        self.assertIn("skeleton ? std::move(*skeleton)", self.loader)
+        for forbidden in ("PPCContext", "REX_", "bd::mem", "ReadWord", "source_model"):
+            self.assertNotIn(forbidden, self.skeleton)
+        producer = self.bridge.split("bool EvaluateOwnedBones(", 1)[1].split("void PublishEvaluatedPose", 1)[0]
+        self.assertIn("skeleton_source::ReadChannels", producer)
+        self.assertIn("skeleton_source::ReadRoot", producer)
+        self.assertIn("publication->lane != 0", producer)
+        self.assertLess(producer.index("EvaluateNativeSkeleton("), producer.index("auto *output ="))
+        self.assertLess(producer.index("if (REXCVAR_GET(bd_native_materials_verify))"), producer.index("__imp__bdBoneInitSkinned"))
+        self.assertLess(producer.index("throw std::runtime_error"), producer.index("auto *output ="))
+
+    def test_evaluated_update_reuses_instance_owner_without_advancing_completed_history(self):
+        publication = self.bridge.split("void PublishEvaluatedPose(", 1)[1].split("void Retire(", 1)[0]
+        self.assertIn("found->second.model_generation != scope.model->Generation()", publication)
+        self.assertIn("store.instances.Publish(found->second.instance,0,scope.pose)", publication)
+        for forbidden in ("bd::mem", "ObserveRenderTick", "ReadRender", ".Transfer("):
+            self.assertNotIn(forbidden, publication)
+        hook = self.bridge.split("REX_HOOK_RAW(bdVisualObjectInitBones)", 1)[1].split("REX_HOOK_RAW(bdBoneInitSkinned)", 1)[0]
+        self.assertLess(hook.index("SkeletonEvaluationScope"), hook.index("__imp__bdVisualObjectInitBones"))
+        self.assertLess(hook.index("Attach(visual)"), hook.index("PublishEvaluatedPose(evaluation)"))
 
     def test_render_timing_is_owned_after_handoff_and_shared_by_native_consumers(self):
         handoff = self.bridge.split("void Handoff(", 1)[1].split("} // namespace", 1)[0]

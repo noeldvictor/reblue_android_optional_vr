@@ -488,8 +488,8 @@ struct NativeDeferredVisualScope {
     // producer preserves descriptor writes before the late authored colour read.
     if (PrepareEffectParticipants(*this) != 2 || !PublishNativeDeferredBlend(uint32_t(inputs.blend)))
       throw std::runtime_error("Native deferred effect production failed");
-    ++native_visual_begins;
-    water_visual_begins += water;
+    if (water) ++water_visual_begins;
+    else ++native_visual_begins;
   }
   int32_t Count() const { return count; }
   int32_t Begin(int32_t index) {
@@ -515,8 +515,9 @@ struct NativeDeferredVisualScope {
     ValidateRoster(); Write<uint8_t>(participants[index] + 5, value);
   }
   void Finish() {
-    ValidateRoster(); FinishEffectParticipants(*this); ++native_visual_ends;
-    water_visual_ends += water;
+    ValidateRoster(); FinishEffectParticipants(*this);
+    if (water) ++water_visual_ends;
+    else ++native_visual_ends;
   }
 };
 
@@ -576,8 +577,11 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   if (HasNativeDeferredScene() && (!NativeRigidDeferredEnabled() || !NativeListMode()))
     throw std::runtime_error("Native deferred pass changed before consumption");
   NativeVisualInputScope visual_inputs;
-  std::vector<NativeVisualIdentity> requested;
-  for (const auto &entry : native_queue.Entries())
+  // Ordinary receipts conserve ordinary packets/effect reads. Water still
+  // participates in the SAME input publication, but has separate scope counts.
+  auto requested = native_queue.OrdinaryIdentities();
+  const auto ordinary_inputs = requested.size();
+  for (const auto &entry : native_queue.Entries()) if (entry.water)
     requested.push_back(entry.Identity());
   if (NativeRigidSceneEnabled() && NativeListMode()) {
     for (const auto &entry : entries) {
@@ -608,7 +612,7 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     requested.erase(std::unique(requested.begin(), requested.end()), requested.end());
     if (!visual_inputs.Begin(requested, FrameStatFrameCount()))
       throw std::runtime_error("Native deferred authored batch handoff unavailable");
-    ++native_input_batches; native_input_visuals += requested.size();
+    if (ordinary_inputs) { ++native_input_batches; native_input_visuals += ordinary_inputs; }
   }
   std::vector<float> legacy_depths;
   std::vector<DeferredInsertion> insertions;
@@ -795,7 +799,7 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   std::memset(bd::mem::at<uint8_t>(pool), 0, kDeferredEntryBytes);
   ResetDeferredDepthImports();
   if (!native_queue.EndDrain()) throw std::runtime_error("Native deferred packets were not fully consumed");
-  native_input_refreshes += visual_inputs.Refreshes();
+  if (ordinary_inputs) native_input_refreshes += visual_inputs.Refreshes();
   if (!depth_write)
     bridge.State(48, 1);
   bridge.State(60, 0);

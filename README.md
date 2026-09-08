@@ -113,10 +113,22 @@ add 1,287 and 951 interpolated poses, with shared reads advancing and zero
 refusals. Native skin scene/shadow emission and fence retirement also pass.
 The scenario tooling now passes 394 Python checks. These counts do not prove
 visual smoothness, achieved 60 FPS or a speedup; motion/pixel verification remains
-pending. Original animation evaluation, conditional source-palette copying,
+pending. Original animation channels/unconverted evaluation, conditional source-palette copying,
 secondary palettes and unconverted rendering families remain.
 [Render-pose connection, verification and remaining gates](research/20260908_1440_native-render-poses.md).
 [Live interpolation/reload evidence and storage](research/20260908_1505_native-render-pose-live.md).
+
+**Native skeleton evaluation (2026-09-08, host167; opt-in):** load-owned ordinary
+skinned hierarchies and checked animation channels now feed host whole-pose math
+and the existing native instance/render consumers. 402 source/scenario checks,
+expanded C++ fixtures and the host build pass. Run974 reached 36,331 matching
+native evaluations, with fresh production in both fields and zero unavailable
+cases, but failed an ordinary/water accounting check. That bug is corrected;
+run975 passes the corrected cold-field check but fails the strict reload scenario
+after a readiness-window reset and natural field exit. Neither run is full
+integration acceptance. Animation curves, special bones, late writers, source
+palette adapters and motion/both-eye pixels remain; normal defaults stay unchanged.
+[Contract, scoped live evidence and remaining failures](research/20260908_1544_native-skeleton-evaluation.md).
 
 ### How much is left?
 
@@ -406,7 +418,7 @@ or lifecycle acceptance. All acceptance switches remain off in the normal profil
 | --- | --- | --- |
 | Assets | Versioned native meshes/textures/materials, canonical rigid vertices, load-owned associations, bounded caches | Source-free consumers, remaining layouts, compact formats and bounded streaming |
 | Scene and materials | Owned instance/primitive/light packets, multi-primitive native casters, live scene/textured-shadow cutouts through reload, native indirect draws and selected-object lifetime proof | Tree-gap pixel investigation, layered/inherited-light coverage, representative multi-instance groups, remaining source producers/material families and lifecycle coverage |
-| Characters | Explicit joint bindings and current palette gathering | Native skeleton/skin assets, animation/pose production and full GPU skinning ownership |
+| Characters | Cooked joint-local skin assets, load-owned skeletons, opt-in native hierarchy evaluation, timed poses and native GPU scene/shadow skinning | Animation curves, special bones, late writers/source palettes, complete character lifecycles and motion/both-eye pixels |
 | Frame, shadows, reflections | Native scene/post images, primary shadow lifecycle, pass scheduling and ordinary MSAA resolves | Remaining camera/light/participant producers, receivers, secondary shadows and reflection recipes |
 | Effects and UI | Native post effects, effect lifecycle and sorted/deferred/immediate submission | Authored data/vertex producers, remaining callbacks, UI ownership and event coverage |
 | Desktop VR | Layered multiview presentation and headless OpenXR runtime | Complete host frame and representative both-eye/animated-effect qualification |

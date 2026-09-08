@@ -1033,6 +1033,35 @@ def verify_render_poses(text):
                 blends_delta=b[2]-a[2], reused_delta=b[3]-a[3], snaps_delta=b[4]-a[4])
 
 
+def verify_skeleton(text):
+    """Fresh native update production and original comparisons, not full animation ownership."""
+    if len(text.encode("utf-8")) > MAX_LOG_BYTES:
+        raise ValueError("skeleton diagnostic exceeds 400 KiB")
+    tag = "[native-skeleton]"
+    metric = re.compile(re.escape(tag) + r" frame (\d+) evaluated (\d+) update poses (\d+) unavailable (\d+); checked (\d+) wrong (\d+);")
+    contexts, metrics = [], []
+    for index, line in enumerate(text.splitlines()):
+        if re.search(r"\[(?:error|critical)\]|\[native-(?:skeleton|instance)-drift\]|producer publication failed", line):
+            raise ValueError("runtime failure or native evaluated-pose mismatch/publication failure")
+        if "[native-material-context]" in line:
+            contexts.append((index, line))
+        match = metric.search(line)
+        if tag in line and not match:
+            raise ValueError("malformed native skeleton evidence")
+        if match:
+            values = tuple(map(int, match.groups()))
+            if values[5] or values[2] > values[1] or values[4] < values[1]:
+                raise ValueError("skeleton mismatch, impossible publication or missing original comparison")
+            if metrics and any(b < a for a, b in zip(metrics[-1][1], values)):
+                raise ValueError("skeleton counters or frame reset inside a reload epoch")
+            metrics.append((index, values))
+    a, b = recent_field_samples(contexts, metrics)
+    if b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1, 2, 4)):
+        raise Pending("need fresh native skeleton evaluations, update publications and original comparisons")
+    return dict(first_frame=a[0], last_frame=b[0], evaluated_delta=b[1]-a[1],
+                published_delta=b[2]-a[2], checked_delta=b[4]-a[4], unavailable_delta=b[3]-a[3])
+
+
 def _verify_skin(text, kind, identity):
     """Fresh native skin emission and fences; not pixel or per-character proof."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
@@ -1065,7 +1094,7 @@ def _verify_skin(text, kind, identity):
 
 def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_family=False, cutout_family=False,
                        rigid_deferred=False, deferred_effects=False, deferred_inputs=False, skin_shadow=False, skin_scene=False,
-                       render_poses=False):
+                       render_poses=False, skeleton=False):
     verify(text)
     verify_texture_tables(text, comparison=False)
     verify_vertex_inputs(text, require_pulling=True)
@@ -1090,6 +1119,8 @@ def verify_rigid_epoch(text, receiver_setup=False, scene_lights=False, caster_fa
         verify_skin_scene(text)
     if render_poses:
         verify_render_poses(text)
+    if skeleton:
+        verify_skeleton(text)
     if rigid_deferred or deferred_effects or deferred_inputs:
         verify_rigid_deferred(text, require_effects=deferred_effects, require_inputs=deferred_inputs)
 
@@ -1134,6 +1165,7 @@ def main():
     parser.add_argument("--skin-shadow", action="store_true", help="fresh native skin emissions and fence retirement in each requested epoch; pixels separately required")
     parser.add_argument("--skin-scene", action="store_true", help="fresh native skin scene emissions and fence retirement in each requested epoch; pixels separately required")
     parser.add_argument("--render-poses", action="store_true", help="fresh native interpolation and shared pose reads in each requested epoch; pixels separately required")
+    parser.add_argument("--skeleton", action="store_true", help="fresh native skeleton update production and original comparisons in each requested epoch; remaining animation adapters and pixels separate")
     parser.add_argument("--fog", action="store_true")
     parser.add_argument("--primitive-shader", action="store_true")
     parser.add_argument("--lighting-pass", action="store_true")
@@ -1176,8 +1208,8 @@ def main():
             return 0
         if args.rigid_reload:
             cold, text, reload = split_rigid_reload(text)
-            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs, args.skin_shadow, args.skin_scene, args.render_poses)
-            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs, args.skin_shadow, args.skin_scene, args.render_poses)
+            verify_rigid_epoch(cold, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs, args.skin_shadow, args.skin_scene, args.render_poses, args.skeleton)
+            verify_rigid_epoch(text, args.receiver_setup, args.scene_lights, args.caster_family, args.cutout_family, args.rigid_deferred, args.deferred_effects, args.deferred_inputs, args.skin_shadow, args.skin_scene, args.render_poses, args.skeleton)
         result = verify(text)
         tables = verify_texture_tables(text, comparison=not args.texture_tables_normal) if (
             args.texture_tables or args.texture_tables_normal) else None
@@ -1207,6 +1239,7 @@ def main():
         skin_shadow = verify_skin_shadow(text) if args.skin_shadow else None
         skin_scene = verify_skin_scene(text) if args.skin_scene else None
         render_poses = verify_render_poses(text) if args.render_poses else None
+        skeleton = verify_skeleton(text) if args.skeleton else None
         fog = verify_fog(text) if args.fog else None
         primitive_shader = verify_primitive_shader(text) if args.primitive_shader else None
         lighting_pass = verify_lighting_pass(text) if args.lighting_pass else None
@@ -1235,6 +1268,8 @@ def main():
         print("PASS: native skin scene emission and fences (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in skin_scene.items()))
     if render_poses is not None:
         print("PASS: native render-pose interpolation and shared reads (pixels separately required) " + ", ".join(f"{k}={v}" for k,v in render_poses.items()))
+    if skeleton is not None:
+        print("PASS: native skeleton evaluation and source comparison (animation adapters and pixels separately required) " + ", ".join(f"{k}={v}" for k,v in skeleton.items()))
     if tables is not None:
         print("PASS: post-event native texture tables " + ", ".join(f"{k}={v}" for k, v in tables.items()))
     if vertex_inputs is not None:
