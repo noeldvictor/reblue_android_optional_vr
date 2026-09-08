@@ -235,10 +235,17 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         for text in ("ComposeToonSurface", "AdjustToonAmbient", "AdjustToonLight", "max(10.f,object_data.specular.w)",
                      "object_data.texture_colours[2]", "RigidIgnoreTextureAlpha"):
             self.assertIn(text, shader)
-        # Live admission intentionally stays closed until an exact authored
-        # Toon input producer supplies this API. No shader-register fallback.
+        # Authored visual/scene inputs and classified siblings feed the same
+        # admission for pre-culling and submission. No shader-register fallback.
         bridge = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
-        self.assertIn("scope->policy_inputs->technique != 0", bridge)
+        self.assertIn("ReadNativeToonSurface(*visual, Word)", bridge)
+        self.assertIn("FindNativePassCamera(scope->render_view),scope->toon", bridge)
+        self.assertIn("toon && mesh ? std::span<const NativePrimitivePolicy>(mesh->policies)", bridge)
+        source = (ROOT / "src/gpu/scene/native_toon_source.h").read_text()
+        for required in ("+3652", "+3660", "+3668", "scene+132", "3752+n*16", "x+y : x*y"):
+            self.assertIn(required, source)
+        for forbidden in ("device", "g_PSC", "PublishNativeShaderParameters", "ReadVS"):
+            self.assertNotIn(forbidden, source)
         for path in ("native_toon_surface.h", "native_toon_shading.h"):
             text = (ROOT / "src/gpu/scene" / path).read_text()
             for forbidden in ("g_PSC", "g_VSC", "BD_SHARED", "BOOL_BIT", "bd::mem::", "PPCContext"):
@@ -300,7 +307,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("0x63B8D67932573E51", scene)
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         submit = direct.split("bool SubmitNativeRigidScene(", 1)[1].split("void PrepareNativeRigidBatchDraw(", 1)[0]
-        self.assertLess(submit.index("PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled(), NativeSkinSceneEnabled())"), submit.index("PrepareNativeRigidSceneForObject"))
+        self.assertLess(submit.index("FindNativeSceneAdmissionForObject(pose,node,inputs)"), submit.index("PrepareNativeRigidSceneForObject"))
         self.assertLess(submit.index("pending.push_back("), submit.index("StageNativeItem("))
         self.assertIn("item->regression = geometry->id == 0x258694267A8DBAEEull", submit)
         self.assertIn("scene_family_emitted += instances", direct)

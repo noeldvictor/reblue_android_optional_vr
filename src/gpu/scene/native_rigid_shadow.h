@@ -51,7 +51,7 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
     const NativeModelMaterialProgram &program,
     const std::optional<PrimitivePolicyInputs> &inputs, bool scene_cutouts = false,
     bool shadow_deferred = false, bool skin = false,
-    std::span<const NativePrimitivePolicy> owned_policies = {}, bool skin_scene = false) {
+    std::span<const NativePrimitivePolicy> owned_policies = {}, bool skin_scene = false, bool toon_scene = false) {
   if (!program.valid || program.ranges.empty() || program.ranges.size() > 4096 ||
       program.ranges.size() != program.geometries.size()) return {};
   const auto unsupported = SelectedNativeRigidShadow(program)
@@ -67,13 +67,14 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
   }
   if (!inputs) return {};
   const bool toon_shadow = skin && inputs->technique == 1 && inputs->phase == 1 && inputs->pass_mode == 0;
-  if ((inputs->technique != 0 && !toon_shadow) || inputs->phase > 1)
+  const bool toon_surface = toon_scene && skin_scene && inputs->technique == 1 && inputs->phase == 0 && inputs->pass_mode == 0;
+  if ((inputs->technique != 0 && !toon_shadow && !toon_surface) || inputs->phase > 1)
     return {unsupported,{},"unconverted technique/phase"};
   if (skinned && ((inputs->phase != 1 && !(skin_scene && inputs->phase == 0)) || inputs->pass_mode != 0))
     return {unsupported,{},"unconverted skin pass mode"};
   // Texture classification comes from the exact object scope's owned base
   // table and early overrides. A missing image must never mean ordinary.
-  bool needs_owned = toon_shadow;
+  bool needs_owned = toon_shadow || toon_surface;
   if (inputs->texture_effects)
     for (const auto &step : program.policy_steps)
       needs_owned |= step.operation == PrimitivePolicyOperation::Texture;

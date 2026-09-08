@@ -85,9 +85,10 @@ inline bool FinalizeNativeRigidSceneLights(std::span<NativeRigidScenePlan> plans
 // from authored recipes, before a missing pose/texture can choose legacy drawing.
 inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
     const NativeModelMaterialProgram &program,
-    const std::optional<PrimitivePolicyInputs> &inputs, bool deferred = false, bool skin = false) {
-  const bool ordinary_deferred = deferred && inputs && inputs->phase == 0 && inputs->pass_mode == 0;
-  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, ordinary_deferred, skin, {}, skin);
+    const std::optional<PrimitivePolicyInputs> &inputs, bool deferred = false, bool skin = false,
+    std::span<const NativePrimitivePolicy> policies = {}, bool toon = false) {
+  const bool ordinary_deferred = deferred && inputs && inputs->technique == 0 && inputs->phase == 0 && inputs->pass_mode == 0;
+  auto admission = PrepareNativeRigidCasterAdmission(program, inputs, true, ordinary_deferred, skin, policies, skin, toon);
   if (admission.route != NativeRigidCasterRoute::Native) return admission;
   const auto unsupported = SelectedNativeRigidShadow(program)
       ? NativeRigidCasterRoute::Refused : NativeRigidCasterRoute::Legacy;
@@ -102,6 +103,10 @@ inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
   }
   return admission;
 }
+// Exact object/pose/pass publication supplies texture classification and Toon
+// eligibility to both animated pre-culling and the actual scene submission.
+NativeRigidCasterAdmission FindNativeSceneAdmissionForObject(const NativeInstancePose &pose,
+    uint32_t node, const std::optional<PrimitivePolicyInputs> &inputs);
 inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     const NativeModelMaterialProgram &program,
     const NativeObjectPrimitive<NativeTextureBinding> &packet,

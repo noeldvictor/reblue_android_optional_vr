@@ -104,6 +104,10 @@ std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
   }
   const auto special_mode = read(object + 3680), special_selector = read(object + 3712);
   if (!special_mode || !special_selector) return {};
+  if (*mode == 1 && *special_mode == 0) {
+    result.tint_selector = *special_selector;
+    if (!floats(object+3716,result.tint)) return {};
+  }
   if (*special_mode == 1) {
     const auto active = read(object + 3748);
     if (!active) return {};

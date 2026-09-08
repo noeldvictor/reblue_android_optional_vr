@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_material_texture_source.h"
+#include "gpu/scene/native_toon_source.h"
 #include "gpu/scene/native_material_alpha_source.h"
 #include "gpu/scene/native_alpha_bridge.h"
 #include "gpu/scene/native_blend_bridge.h"
@@ -48,6 +49,7 @@ struct NativeObjectTextureState {
   NativeModelRenderHandle model;
   std::shared_ptr<const NativeInstancePose> pose;
   std::optional<NativeMaterialObjectInputs> object;
+  std::optional<NativeToonSurface> toon;
   std::optional<NativeSelectedLights> lights;
   std::optional<NativeNodeSelectedLights> node_lights;
   std::optional<NativeFogLayers> fog;
@@ -156,6 +158,7 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     if (pose && pose->model == publication->model) publication->pose = std::move(pose);
     if (*phase == 0) {
       publication->object = ReadMaterialObjectInputs(*visual, Word);
+      publication->toon = ReadNativeToonSurface(*visual, Word);
       publication->fog = FindNativeFogLayers();
       publication->fog_revision = NativeFogRevision();
       // Per-node light selections execute later than this scope. Do not snapshot
@@ -238,11 +241,11 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
   refusal = "fresh ordinary object scope unavailable";
   if (!scope || scope->pose.get() != &pose || scope->model != pose.model ||
       scope->render_view != 3 || !scope->policy_inputs || scope->policy_inputs->phase != 0 ||
-      scope->policy_inputs->technique != 0) return {};
+      (scope->policy_inputs->technique != 0 && !scope->toon)) return {};
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
   refusal = "whole-node ordinary scene family unavailable";
-  const auto admission = PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs, NativeRigidDeferredEnabled(), NativeSkinSceneEnabled());
+  const auto admission = FindNativeSceneAdmissionForObject(pose,node,scope->policy_inputs);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });
@@ -409,6 +412,19 @@ NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
 }
 } // namespace
 
+NativeRigidCasterAdmission FindNativeSceneAdmissionForObject(const NativeInstancePose &pose,
+    uint32_t node, const std::optional<PrimitivePolicyInputs> &inputs) {
+  const auto *program = FindNativeInstanceNode(pose,node);
+  if (!program) return {};
+  const auto *scope = current;
+  const bool exact = scope && !scope->shadow_phase && scope->render_view == 3 &&
+      scope->pose.get() == &pose && scope->model == pose.model && scope->policy_inputs == inputs;
+  const auto *mesh = exact ? PrepareMaterialMesh(*program) : nullptr;
+  const bool toon = exact && scope->toon.has_value();
+  return PrepareNativeRigidSceneAdmission(*program,inputs,NativeRigidDeferredEnabled(),NativeSkinSceneEnabled(),
+      toon && mesh ? std::span<const NativePrimitivePolicy>(mesh->policies) : std::span<const NativePrimitivePolicy>{},toon);
+}
+
 std::span<const NativePrimitivePolicy> FindNativeShadowPoliciesForObject(
     const NativeInstancePose &pose, uint32_t node, const PrimitivePolicyInputs &inputs) {
   const auto *scope = current;
@@ -483,7 +499,7 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
       SelectNativeObjectLights(scope->lights, scope->node_lights, node),
       NativeFogIsCurrent(scope->fog_revision) ? scope->fog : std::nullopt,
       FindNativeLightingPass(scope->render_view), FindNativeSamplerFilters(scope->render_view),
-      FindNativePassCamera(scope->render_view));
+      FindNativePassCamera(scope->render_view),scope->toon);
   object_stats.packets += result.has_value();
   return result;
 }

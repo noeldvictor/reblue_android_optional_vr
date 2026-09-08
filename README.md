@@ -91,11 +91,15 @@ One inspected 1920x1080 frame shows the character and ground shadows; it is not
 character parity, sequence or stereo qualification. Technique-1 scene shading,
 native animation and remaining rendering adapters are still open. No measured
 speedup or full native character/frame completion is claimed.
-Native Toon surface inputs now feed the shared rigid/skin GPU path in fixtures:
-345 Vulkan cases and 388 Python checks pass, and host162 builds. The live
-technique-1 input producer is not connected yet, so ongoing characters still
-use that compatibility route. No new in-game or stereo qualification is claimed.
-[Toon consumer and remaining producer](research/20260908_1237_native-toon-surface.md).
+Native Toon authored inputs now connect to the shared rigid/skin GPU path:
+scene/object lighting adjustments and ordered texture tints feed owned packets,
+whole-node admission and animated pre-culling. Host164 and the expanded C++
+fixture pass, as do 388 Python checks; the unchanged shaders retain their
+345-case Vulkan evidence. This new connection has **not been run in-game**:
+fresh post-event scene draws, reloads and pixels remain pending. Fur, outline,
+lattice deformation and sorted Toon families remain on the compatibility route.
+No new in-game or stereo qualification is claimed.
+[Authored Toon connection and pending live gate](research/20260908_1318_native-toon-producer.md).
 [Scene connection and its verification limits](research/20260908_1210_native-skin-scene-shading.md).
 [Connection, live evidence and remaining gates](research/20260908_1143_native-skinned-shadow-consumer.md).
 

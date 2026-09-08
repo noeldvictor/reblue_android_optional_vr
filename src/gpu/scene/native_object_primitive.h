@@ -42,7 +42,8 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
     const NativeMaterialObjectInputs &object, const MaterialTextureValues<Image> &textures,
     const NativePrimitivePolicy &policy, std::optional<NativeSelectedLights> lights = {},
     std::optional<NativeFogLayers> fog = {}, std::optional<NativeLightingPass> lighting = {},
-    std::optional<NativeSamplerFilterPass> filters = {}, std::optional<RenderCamera> camera = {}) {
+    std::optional<NativeSamplerFilterPass> filters = {}, std::optional<RenderCamera> camera = {},
+    std::optional<NativeToonSurface> toon = {}) {
   const auto *program = pose ? FindNativeInstanceNode(*pose, node) : nullptr;
   if (!program || !program->valid || primitive >= program->ranges.size() ||
       primitive >= program->geometries.size() || primitive >= program->materials.size() ||
@@ -66,6 +67,21 @@ std::optional<NativeObjectPrimitive<Image>> BuildNativeObjectPrimitive(
   result.receiver_shadow = program->shadow_policies[primitive];
   result.material_mask = ComposeNativeMaterialAsset(result.material->asset, object.colour,
       object.writes_shininess, result.material_values);
+  if (toon) {
+    result.surface = NativeSceneSurface::Toon;
+    result.toon = std::move(toon);
+    result.toon->texture_colours = textures.colours;
+    // Visual begin initializes the exponent to zero; when object power writes
+    // are disabled it stays zero. Otherwise an omitted command can inherit a
+    // preceding node's value and remains unknown. RGB ownership is independent
+    // of the ordinary family's specular-enable bit, not a guessed black colour.
+    const auto &material = result.material->asset.properties;
+    if (material.has_specular_colour && (!object.writes_shininess || material.has_shininess)) {
+      for (uint32_t c=0;c<3;++c) result.material_values[1][c] = material.specular_colour[c];
+      result.material_values[1][3] = object.writes_shininess ? float(material.shininess) : 0.f;
+      result.material_mask |= kNativeSpecular;
+    }
+  }
   return result;
 }
 } // namespace bd::gpu::scene

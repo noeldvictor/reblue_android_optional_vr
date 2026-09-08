@@ -44,12 +44,15 @@ template <class Image> struct MaterialTextureInputs {
   std::vector<MaterialTextureOverride<Image>> late_images;
   std::optional<uint32_t> special_selector;
   MaterialImageSelection<Image> special_image;
+  std::optional<uint32_t> tint_selector;
+  std::array<float,4> tint{};
 };
 template <class Image> struct MaterialTextureValues {
   std::array<Image, 16> images{};
   uint16_t image_mask = 0;
   std::array<float, 4> uv{}, secondary_uv{};
   bool owns_uv = false;
+  std::array<std::array<float,4>,3> colours{{{1,1,1,1},{1,1,1,1},{1,1,1,1}}};
   bool operator==(const MaterialTextureValues &) const = default;
 };
 
@@ -77,6 +80,7 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
   state.owns_uv = inputs.owns_uv;
   std::array<bool, 2> uv_overridden{};
   bool shadow_normal_seen = false;
+  std::optional<uint8_t> tinted_channel;
   size_t cursor = 0;
   for (const auto &range : ranges) {
     if (range.texture_assignment_end < cursor || range.texture_assignment_end > assignments.size())
@@ -119,6 +123,20 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
           selected = {MaterialImageAction::Keep};
         } else if (!early_image) {
           selected = lookup(step.selector);
+          // bdSceneNodeDrawSingle 822802DC resets all three to white. Only
+          // the late table path reaches 82281A74/82281A98; early image binds
+          // preserve the previous tint. The source has ONE last-tinted channel,
+          // not an independently reset flag per layer.
+          if (!shadow_phase && inputs.tint_selector) {
+            if (*inputs.tint_selector == step.selector) {
+              if (step.channel >= state.colours.size()) return false;
+              state.colours[step.channel] = inputs.tint;
+              tinted_channel = step.channel;
+            } else if (tinted_channel == step.channel) {
+              state.colours[step.channel] = {1,1,1,1};
+              tinted_channel.reset();
+            }
+          }
           if (inputs.special_selector == step.selector &&
               inputs.special_image.action != MaterialImageAction::Keep)
             selected = inputs.special_image;

@@ -13,6 +13,8 @@
 #include "gpu/scene/native_reflection_pass.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_toon_source.h"
+#include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_deferred_queue.h"
 #include "gpu/scene/native_deferred_effects.h"
 #include "gpu/scene/native_rigid_program.h"
@@ -1272,6 +1274,19 @@ void RigidScenePacket() {
     }
     policy.pass_mode = 0; policy.technique = 1;
     assert(PrepareNativeRigidSceneAdmission(*owned,policy,true,true).route != NativeRigidCasterRoute::Native);
+    const auto ordinary_policies = PrepareNativeRigidSceneAdmission(*owned,PrimitivePolicyInputs{},false,true).policies;
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy,false,true,{},true).route != NativeRigidCasterRoute::Native);
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy,false,true,ordinary_policies,true).route == NativeRigidCasterRoute::Native);
+    auto bad_policies = ordinary_policies; bad_policies[0].routing_known = false;
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy,false,true,bad_policies,true).route != NativeRigidCasterRoute::Native);
+    bad_policies = ordinary_policies; bad_policies[0].alpha_test = !bad_policies[0].alpha_test;
+    assert(PrepareNativeRigidSceneAdmission(*owned,policy,false,true,bad_policies,true).route == NativeRigidCasterRoute::Refused);
+    NativeMaterialObjectInputs authored_object; authored_object.colour = {1,1,1,1};
+    auto authored = BuildNativeObjectPrimitive(skinned.pose,0,0,authored_object,good.textures,
+        ordinary_policies[0],good.lights,good.fog,good.lighting,{},good.camera,NativeToonSurface{});
+    assert(authored && authored->surface == NativeSceneSurface::Toon && authored->toon &&
+        !(authored->material_mask & kNativeSpecular)); // omitted RGB must not become black
+    assert(authored->material_values[1][3] == 0 && authored->toon->texture_colours == good.textures.colours);
     auto retained = prepare();
     assert(retained && retained->geometry == skin_geometry && retained->skin_pose == skinned.pose &&
         retained->skin_bounds && retained->skin_bounds->min[0] < 6 && retained->skin_bounds->max[0] > 8 &&
@@ -2181,7 +2196,69 @@ void CheckNativeWaterDeferredQueue() {
   assert(!queue.EndDrain());
 }
 void CheckScreenshotContracts();
+void CheckToonProducer() {
+  using namespace bd::gpu::scene;
+  constexpr uint32_t visual = 0x10000, scene = 0x82783A58, table = 0x20000;
+  std::unordered_map<uint64_t,uint32_t> words{{visual+3000,1},{visual+3652,0},{visual+3660,0},
+      {visual+3668,0},{scene,table},{table+8,0x82174648},{scene+132,0}};
+  const auto read = [&](uint64_t address) -> std::optional<uint32_t> {
+    const auto it = words.find(address); return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  const auto disabled = ReadNativeToonSurface(visual,read);
+  assert(disabled && disabled->diffuse_add == LightingVector{} && disabled->ambient_add == LightingVector{} &&
+      disabled->diffuse_scale == LightingVector({1,1,1,1}) && !disabled->ignore_texture_alpha);
+  words[scene+132] = 1; assert(!ReadNativeToonSurface(visual,read));
+  for (uint32_t n=0;n<4;++n) for (uint32_t c=0;c<4;++c) {
+    words[scene+68+n*16+c*4] = std::bit_cast<uint32_t>(float(n+1));
+    words[visual+3752+n*16+c*4] = std::bit_cast<uint32_t>(float(c+2));
+  }
+  const auto owned = ReadNativeToonSurface(visual,read);
+  assert(owned && owned->diffuse_add == LightingVector({3,4,5,6}) &&
+      owned->ambient_add == LightingVector({4,5,6,7}) && owned->diffuse_scale == LightingVector({6,9,12,15}) &&
+      owned->ambient_scale == LightingVector({8,12,16,20}));
+  for (uint32_t flag : {3652u,3660u,3668u}) {
+    words[visual+flag] = 1; assert(!ReadNativeToonSurface(visual,read)); words[visual+flag] = 0;
+  }
+  for (uint32_t n=0;n<4;++n) {
+    const auto address = visual+3752+n*16+12, saved = words[address];
+    words[address] = 0x7f800000; assert(!ReadNativeToonSurface(visual,read)); words[address] = saved;
+  }
+  words[table+8]++; assert(!ReadNativeToonSurface(visual,read)); words[table+8]--;
+  assert(!ReadNativeToonSurface(visual+1,read) && !ReadNativeToonSurface(UINT32_MAX-3,read));
+  words.clear(); assert(owned->ambient_scale[3] == 20 && !ReadNativeToonSurface(visual,read));
+
+  MaterialTextureInputs<int> inputs; inputs.tint_selector = 7; inputs.tint = {.2f,.4f,.6f,.8f};
+  struct Range { uint32_t texture_assignment_end; };
+  const std::array<Range,6> ranges{{{1},{2},{3},{4},{5},{6}}};
+  const std::array<MaterialImageAssignment,6> steps{{
+      {MaterialImageSource::Table,0,7},{MaterialImageSource::Table,1,7},
+      {MaterialImageSource::Table,0,8},{MaterialImageSource::Table,1,8},
+      {MaterialImageSource::Table,0,7},{MaterialImageSource::Table,0,9}}};
+  std::vector<MaterialTextureValues<int>> values;
+  const auto lookup = [](uint8_t selector) { return MaterialImageSelection<int>{MaterialImageAction::Bind,selector}; };
+  assert(ComposeMaterialTextures(std::span<const MaterialImageAssignment>(steps),std::span<const Range>(ranges),inputs,lookup,values));
+  const std::array<float,4> white{1,1,1,1};
+  assert(values[0].colours[0] == inputs.tint && values[0].colours[1] == white);
+  assert(values[2].colours[0] == inputs.tint && values[2].colours[1] == inputs.tint); // one last-tinted channel
+  assert(values[3].colours[1] == white && values[3].colours[0] == inputs.tint);
+  assert(values[5].colours[0] == white);
+  inputs.overrides.push_back({9,1,{},true,{MaterialImageAction::Bind,99}});
+  assert(ComposeMaterialTextures(std::span<const MaterialImageAssignment>(steps),std::span<const Range>(ranges),inputs,lookup,values));
+  assert(values[5].images[0] == 99 && values[5].colours[0] == inputs.tint); // early bind skips reset
+  assert(ComposeMaterialTextures(std::span<const MaterialImageAssignment>(steps),std::span<const Range>(ranges),inputs,lookup,values,4096,true));
+  assert(values[0].colours[0] == white); // shadow has no colour dependency
+  words[visual+3000] = 1; words[visual+3128] = 0;
+  words[visual+3440] = 1; words[visual+3560] = 0; words[visual+3572] = 0;
+  words[visual+3680] = 0; words[visual+3712] = 7;
+  for (uint32_t n=0;n<4;++n) {
+    words[visual+3444+n*4] = 0; words[visual+3716+n*4] = std::bit_cast<uint32_t>(inputs.tint[n]);
+  }
+  const auto imported = ReadMaterialTextureInputs<int>(visual,read,lookup);
+  assert(imported && imported->tint_selector == 7 && imported->tint == inputs.tint);
+  words[visual+3716] = 0x7fc00000; assert(!ReadMaterialTextureInputs<int>(visual,read,lookup));
+}
 int main() {
+  CheckToonProducer();
   CheckScreenshotContracts();
   CheckNativeWaterDeferredQueue();
   native_occlusion_tests::Run();

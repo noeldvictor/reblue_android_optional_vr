@@ -278,7 +278,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   if (!NativeRigidSceneEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
-  const auto admission = PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled(), NativeSkinSceneEnabled());
+  const auto admission = FindNativeSceneAdmissionForObject(pose,node,inputs);
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
   Require(admission.route == NativeRigidCasterRoute::Native, "scene family or object pass policy unavailable");
   const char *refusal = "native scene object preparation failed";

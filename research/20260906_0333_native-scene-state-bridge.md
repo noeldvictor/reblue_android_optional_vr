@@ -5427,3 +5427,66 @@ EXE49085952B (+7680), PDB111755264B (+8192), attachment logs408056B/194files
 for new surface/ABI evidence; other objects/shader headers/source/Git/driver/
 system activity separate. No raw/image growth or budget reset. Prior host161
 runtime969 remains the live evidence, not restamped as a run ofhost162.
+
+### 2026-09-08 authored Toon object connection (after f1808f1)
+
+Previous goal turn made progress: implemented/tested shared Toon GPU consumer,
+now committed/pushed f1808f1. Source tracing identifies the actual visual begin
+sub_82174648, not the generic descriptor hypothesis: scene/object remaps and an
+explicit disabled identity branch. Node setup/texture commands own ordered tints;
+ordinary texture classification excludes volume-only ignore-alpha. This bundle
+connects those inputs, Toon specular, whole-node admission and animated pre-cull
+to the existing packet/indirect/fence path. Fur/outline/lattice and deferred Toon
+remain unconverted; no new shader, asset format, cook, tool or parameter cache.
+
+13:04:01 preflight free78730932224B, no compiler/game/test producer observed.
+Same cumulative3GiB exception/floor62509998080B and all capture/log limits.
+Retained texture82988826B, GPU20177662B, host EXE49085952B/PDB111755264B,
+attachment logs408056B. Prior drive-wide change is not attributed to source edits.
+Plan output74/CPU49, host163, one producer at a time; wrapper300s/CTest30s,
+32/8/192MiB free-drop respectively,10MiB cumulative logs. Selected retained
+growth estimate below2MiB; host link overlap bounded by supervisor. GPU shader
+unchanged, reuse345-case evidence. Preserve prior passing logs until replacements
+pass, then remove superseded logs. Any live run needs a separate profile/output
+preflight under this same ledger; no raw/image producer approved by this entry.
+
+Output74/PID33980 linked unsuccessfully: the new packet behavior test reached
+ComposeNativeMaterialAsset, absent from this fixture target. Added its actual
+production implementation/dependency, not a stub. Output75/PID37720 and CPU49/
+PID38256 pass0.53s. Host163/PID30828/session97878 passes, codegen0written and no
+guest objects. Further review corrected omitted specular RGB ownership: a prior
+node may have authored it, so it must not become guessed black; object-disabled
+power alone has the visual-begin zero contract. Final-source rebuild output76/
+PID29240 was stopped by32MiB free-drop guard after object compilation, before
+link completion. All these producers are terminal; no game launched/profile write.
+
+13:10..13:11 storage investigation: current free78489706496B; fixture85137350B,
+host49090560B/111763456B,29 recently replaced host objects34530370B total (not
+delta). No compiler/game remains or recent top-level compiler TEMP payloads;
+pagefile allocated2048MiB/current437MiB, with no prior size baseline. Drive-wide
+growth cannot all be assigned to these files or specifically to pagefile. No
+unrelated process/cache was stopped/deleted. The wrapper now prints its actual
+producer-start free/floor and checks final free too; historical preflight is not
+necessarily its launch baseline. Resume completed CPU object with64MiB overlap,
+then CPU50/host164 under8/192MiB; still the same cumulative limit/floor, not a new
+exception. CPU target now retains two real material objects; expected selected
+growth revised below4MiB. No repeat of already compiled GPU shaders.
+
+Final output77/PID28576 passes: launch/end free78485852160B,64MiB guard.
+CPU50/PID31228 passes0.54s/CTest0.56s; launch/end free78485684224B.
+Host164/PID21712/session92675 passes, no guest objects/codegen0written;
+actual launch free78484983808B, end78481334272B (3649536B drop).
+All producers terminal. Owner requested commit/push before the next game run;
+no new live/profile/image work. Final388 artifact-free Python checks pass.
+See20260908_1318_native-toon-producer.md for exact source/evidence/pending gates.
+
+13:14 cleanup removed14 exact superseded attachment logs: output73/74/75,
+CPU48/49,host162/163 stdout+stderr, after replacement passes. Logical13234B;
+measured free78481440768->78481469440B (+28672B). Retain output76 storage failure,
+current77/50/164, prior GPU75/rigid28 and all game/pixel/failure evidence.
+No assets, profiles, active trees or unrelated outputs removed; no old credit.
+13:18 free78473715712B,257216512B less than13:04 drive-wide. Selected retained
+texture85137417B (+2148591), EXE49090560B (+4608), PDB111763456B (+8192),
+attachment406877B/196files (-1179): net+2160212B for real material-linked fixture
+and current evidence. Other host objects/source/Git/system activity separate;
+no raw/image growth or budget reset. Live post-event scene/reload/pixels pending.

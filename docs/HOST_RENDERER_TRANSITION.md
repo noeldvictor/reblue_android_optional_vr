@@ -707,17 +707,21 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    unchanged code to turn zero post-event scene emissions into a passing gate.
    Preserve all existing visual failures and the complete desktop acceptance.
    No full character/frame completion or speedup is established.
-   **Native Toon surface consumer (host162):** explicit owned light/ambient
+   **Native Toon surface consumer (host162), authored connection (host164):** explicit owned light/ambient
    adjustments, texture tints and alpha policy now feed scene plans and the
    shared rigid/skin GPU program. CPU48 passes; GPU28 passes345 cases including
-   191 added Toon/mixed cases, validation0/0;388 Python checks pass. The live
-   technique1 producer/admission is still closed: next identify and publish its
-   actual authored inputs and lattice eligibility, then admit the complete
-   classified node and require fresh post-event scene/reload/pixel evidence.
-   Do not infer live conversion from fixtures, import shader rows or guess the
-   missing adjustments. Host161/run969 remains the last live strict regression;
-   host162 has not been run in-game.
-   [Native Toon contract, evidence and exact remaining producer](../research/20260908_1237_native-toon-surface.md).
+   191 added Toon/mixed cases, validation0/0;388 Python checks pass. Host164 now
+   connects authored scene/object remaps and ordered texture tints to owned
+   packets, classified whole-node admission and animated pre-culling. CPU50 and
+   the host build pass; shaders are unchanged. Missing specular RGB remains
+   unknown, not guessed black. Fur/outline/lattice and sorted Toon stay excluded.
+   Next require fresh native skin-scene emission and fence retirement independently
+   in both post-event reload epochs, then inspect current renderer pixels under
+   the existing storage budget. Host164 has not been run in-game; no new live
+   conversion, character parity, sequence or stereo acceptance is claimed.
+   Host161/run969 remains the last character live strict regression.
+   [Authored connection, source correction and pending gate](../research/20260908_1318_native-toon-producer.md).
+   [Earlier GPU contract and fixture evidence](../research/20260908_1237_native-toon-surface.md).
    [Scene connection and verification](../research/20260908_1210_native-skin-scene-shading.md).
    [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).
    [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).

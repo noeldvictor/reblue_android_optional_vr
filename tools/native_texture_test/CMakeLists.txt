@@ -133,6 +133,7 @@ target_include_directories(host_post_images_test PRIVATE ../../src ../../thirdpa
 target_compile_features(host_post_images_test PRIVATE cxx_std_23)
 add_test(NAME host_post_images COMMAND host_post_images_test)
 add_executable(host_post_output_test post_output.cpp screenshot.cpp ../../src/gpu/scene/native_model_materials.cpp
+    ../../src/gpu/scene/native_material_asset.cpp ../../src/gpu/scene/native_material_data.cpp
     ../../src/gpu/screenshot_jpeg.cpp)
 target_include_directories(host_post_output_test PRIVATE ../../src ../../thirdparty/plume)
 target_compile_features(host_post_output_test PRIVATE cxx_std_23)

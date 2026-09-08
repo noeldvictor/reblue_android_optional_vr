@@ -297,7 +297,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
               std::any_of(program->ranges.begin(),program->ranges.end(),[](const auto &range) {
                 return range.shader.vertex_bones && *range.shader.vertex_bones;
               }) && ((view_id == 3 && NativeSkinSceneEnabled() &&
-                  PrepareNativeRigidSceneAdmission(*program,shadow_policy,NativeRigidDeferredEnabled(),true).route == NativeRigidCasterRoute::Native) ||
+                  FindNativeSceneAdmissionForObject(*instance_pose,index,shadow_policy).route == NativeRigidCasterRoute::Native) ||
                 (view_id == 1 && NativeSkinShadowEnabled() && PrepareNativeRigidShadowAdmission(*program,shadow_policy,true,
                   shadow_policy && (shadow_policy->technique == 1 || shadow_policy->texture_effects)
                       ? FindNativeShadowPoliciesForObject(*instance_pose,index,*shadow_policy)
