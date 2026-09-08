@@ -17,7 +17,7 @@
 #include <rex/ppc/context.h>
 
 REXCVAR_DEFINE_BOOL(bd_native_animation, false, kCvarGroup,
-    "Load-owned keyed animation sampling for ordinary native skeletons; pending desktop qualification.");
+    "Load-owned keyed/cubic animation sampling for ordinary native skeletons; pending desktop qualification.");
 REXCVAR_DECLARE(bool, bd_native_instances);
 REXCVAR_DECLARE(bool, bd_native_skeleton);
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
@@ -39,6 +39,7 @@ struct Store {
   std::mutex mutex;
   NativeAnimationResidency assets;
   uint64_t loaded = 0, load_refused = 0, sampled = 0, whole = 0, preserved = 0, checks = 0, wrong = 0;
+  uint64_t cubic = 0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -61,9 +62,9 @@ void Report(Store &store) {
   const auto frame = FrameStatFrameCount();
   if (frame-store.frame < 300) return;
   uint64_t unavailable = 0; for (auto count : store.missing) unavailable += count;
-  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; owned type2 keys, original slot clocks/layers and outgoing channel adapter remain",
+  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; owned keys, original slot clocks/layers and outgoing channel adapter remain",
       frame,store.loaded,store.load_refused,store.assets.Size(),store.assets.Bytes(),
-      store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong);
+      store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic);
   store.frame = frame;
 }
 bool Unavailable(Missing reason) {
@@ -133,6 +134,10 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   }
   if (!animation_source::ApplyKeyedAsset(*asset,model->AnimationTargets(),seconds,preserve,records))
     return Unavailable(Missing::Sampling);
+  const bool used_cubic = std::ranges::any_of(model->AnimationTargets(),[&](uint32_t name) {
+    const auto *track = asset->FindTrack(name);
+    return track && track->splines && (track->splines->translation.active || track->splines->rotation.active || track->splines->scale.active);
+  });
   if (REXCVAR_GET(bd_native_materials_verify)) {
     if (preserve) __imp__sub_8228A3E8(ctx,base); else __imp__sub_82289888(ctx,base);
     const auto *original = bd::mem::at<const be_u32>(destination);
@@ -161,7 +166,7 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   bd::mem::store<uint32_t>(kSamplerState,0);
   if (preserve) bd::mem::store<uint32_t>(kSamplerState+4,0);
   auto &store=Clips(); std::lock_guard lock(store.mutex);
-  ++store.sampled; ++(preserve ? store.preserved : store.whole); Report(store);
+  ++store.sampled; ++(preserve ? store.preserved : store.whole); store.cubic += used_cubic; Report(store);
   return true;
 }
 } // namespace

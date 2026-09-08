@@ -7,15 +7,34 @@
 #include "gpu/scene/native_skeleton.h"
 #include <numbers>
 #include <optional>
+#include <memory>
+#include <limits>
 
 namespace bd::gpu::scene {
 struct NativeAnimationKey {
   float seconds = 0;
   JointVector value{};
 };
+struct NativeAnimationSplineKey {
+  float seconds = 0, value = 0, tangent = 0; // tangent per second; rotation in turns
+  bool linear_to_next = false; // authored short angular segment, not global unwrap
+};
+struct NativeAnimationSplineChannel {
+  std::array<std::vector<NativeAnimationSplineKey>,3> axes;
+  float key_epsilon = 0;
+  bool active = false;
+};
+struct NativeAnimationSplines {
+  NativeAnimationSplineChannel translation, rotation, scale;
+};
 struct NativeAnimationTrack {
   uint32_t pose_index = 0;
   std::vector<NativeAnimationKey> translation, rotation, scale;
+  std::unique_ptr<const NativeAnimationSplines> splines;
+  bool Animated() const {
+    return translation.size()>1 || rotation.size()>1 || scale.size()>1 ||
+        (splines && (splines->translation.active || splines->rotation.active || splines->scale.active));
+  }
   // Rotation keys are Euler turns in [-.5,.5]. Power-of-two turn fractions
   // preserve exact half-turn ties; rounded radians can reverse their arc.
   // Interpolate each authored axis, convert to radians, compose qZ * qY * qX.
@@ -58,6 +77,25 @@ public:
         // beginning: never synthesize a predecessor before authored storage.
         if (keys->size() > 1 && keys->front().seconds != 0) return {};
       }
+      if (track.splines) {
+        if (!account(1,sizeof(NativeAnimationSplines))) return {};
+        const auto &splines = *track.splines;
+        if ((splines.translation.active && !track.translation.empty()) ||
+            (splines.rotation.active && !track.rotation.empty()) ||
+            (splines.scale.active && !track.scale.empty())) return {};
+        for (const auto *channel : {&splines.translation,&splines.rotation,&splines.scale}) {
+          if (!std::isfinite(channel->key_epsilon) || channel->key_epsilon < 0) return {};
+          for (const auto &axis : channel->axes) {
+            if ((!channel->active && !axis.empty()) || !account(axis.capacity(),sizeof(NativeAnimationSplineKey))) return {};
+            float previous = -std::numeric_limits<float>::infinity();
+            for (const auto &key : axis) {
+              if (!std::isfinite(key.seconds) || key.seconds <= previous || !std::isfinite(key.value) ||
+                  !std::isfinite(key.tangent) || (channel == &splines.rotation && std::abs(key.value) > .5f)) return {};
+              previous = key.seconds;
+            }
+          }
+        }
+      }
     }
     return NativeAnimationClip(joints,duration,std::move(tracks),bytes);
   }
@@ -72,13 +110,17 @@ public:
     std::vector<NativeJointChannels> channels(joints_);
     for (const auto &track : tracks_) {
       auto &channel = channels[track.pose_index];
-      channel.translated = !track.translation.empty();
-      channel.rotated = !track.rotation.empty();
-      channel.scaled = !track.scale.empty();
-      if (channel.translated) channel.translation = SampleCurve(track.translation,seconds,false);
-      if (channel.scaled) channel.scale = SampleCurve(track.scale,seconds,false);
+      const auto *splines = track.splines.get();
+      const bool cubic_translation = splines && splines->translation.active;
+      const bool cubic_rotation = splines && splines->rotation.active;
+      const bool cubic_scale = splines && splines->scale.active;
+      channel.translated = cubic_translation || !track.translation.empty();
+      channel.rotated = cubic_rotation || !track.rotation.empty();
+      channel.scaled = cubic_scale || !track.scale.empty();
+      if (channel.translated) channel.translation = cubic_translation ? SampleSpline(splines->translation,seconds) : SampleCurve(track.translation,seconds,false);
+      if (channel.scaled) channel.scale = cubic_scale ? SampleSpline(splines->scale,seconds) : SampleCurve(track.scale,seconds,false);
       if (channel.rotated) {
-        auto angles = SampleCurve(track.rotation,seconds,true);
+        auto angles = cubic_rotation ? SampleSpline(splines->rotation,seconds) : SampleCurve(track.rotation,seconds,true);
         for (auto &angle : angles) angle *= 2*std::numbers::pi_v<float>;
         const float x=angles[0]*.5f, y=angles[1]*.5f, z=angles[2]*.5f;
         channel.rotation = MultiplyJointQuaternions(
@@ -93,6 +135,43 @@ public:
   }
 
 private:
+  static JointVector SampleSpline(const NativeAnimationSplineChannel &channel, float seconds) {
+    JointVector result{};
+    for (size_t axis=0; axis<3; ++axis) {
+      const auto &keys = channel.axes[axis];
+      if (keys.empty()) continue; // a missing authored scalar curve evaluates to zero
+      const auto next = std::upper_bound(keys.begin(),keys.end(),seconds,
+          [](float time,const auto &key){return time < key.seconds;});
+      if (next == keys.begin()) { result[axis]=keys.front().value; continue; }
+      const auto &previous = *(next-1);
+      const float elapsed = seconds-previous.seconds;
+      if (next == keys.end() || elapsed < channel.key_epsilon || elapsed == 0) {
+        result[axis]=previous.value; continue;
+      }
+      const float span = next->seconds-previous.seconds;
+      float a=previous.value,b=next->value,ta=previous.tangent,tb=next->tangent;
+      if (previous.linear_to_next) {
+        if (b-a < -.5f) b += 1;
+        if (b-a > .5f) a += 1;
+        ta=tb=(b-a)/span;
+      }
+      // Cubic Hermite, keeping the source's fused accumulation order. Tangents
+      // are native derivatives, not packed decoder state or per-frame samples.
+      const float inverse=1/span, square=elapsed*elapsed;
+      const float normalized_square=square*(inverse*inverse);
+      const float square_over_span=square*inverse;
+      const float cube_over_span2=normalized_square*elapsed;
+      const float end_tangent=cube_over_span2-square_over_span;
+      const float cube=cube_over_span2*inverse;
+      const float triple=normalized_square*3, twice=cube*2;
+      const float start_tangent=(end_tangent-square_over_span)+elapsed;
+      const float start_value=((twice-triple)+1)*a;
+      const float first=float(std::fma(double(start_tangent),double(ta),double(start_value)));
+      const float second=float(std::fma(double(triple-twice),double(b),double(first)));
+      result[axis]=float(std::fma(double(end_tangent),double(tb),double(second)));
+    }
+    return result;
+  }
   NativeAnimationClip(size_t joints, float duration, std::vector<NativeAnimationTrack> tracks, size_t bytes)
       : joints_(joints), duration_(duration), bytes_(bytes), tracks_(std::move(tracks)) {}
   static JointVector SampleCurve(std::span<const NativeAnimationKey> keys, float seconds, bool angular) {

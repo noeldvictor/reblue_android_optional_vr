@@ -35,10 +35,52 @@ std::optional<uint16_t> Half(uint64_t address, ReadWord &&read) {
   return uint16_t(*word >> ((address & 2) ? 0 : 16));
 }
 
+// The source decoder's compact float flushes exponent-zero values to signed
+// zero and treats exponent31 as finite. It is not IEEE binary16 at the boundary.
+inline float CompactFloat(uint16_t bits) {
+  const uint32_t sign = uint32_t(bits & 0x8000)<<16;
+  if (!(bits & 0x7c00)) return std::bit_cast<float>(sign);
+  return std::bit_cast<float>(sign | (uint32_t((bits & 0x7c00)+0x1c000)<<13) | (uint32_t(bits & 0x3ff)<<13));
+}
+
+template <class ReadWord>
+std::optional<NativeAnimationSplineChannel> ReadSplineChannel(uint32_t source, bool angular,
+    float samples_per_tick, size_t maximum_bytes, size_t &used, ReadWord &&read) {
+  NativeAnimationSplineChannel result;
+  result.active = true; result.key_epsilon = float(.0001/samples_per_tick);
+  for (unsigned axis=0; axis<3; ++axis) {
+    const auto count = Word(uint64_t(source)+axis*8,read), data = Word(uint64_t(source)+axis*8+4,read);
+    if (!count || !data) return {};
+    if (!*data) continue; // disabled scalar is zero, even if its unused count is nonzero
+    if (!*count || *count > 65536 || uint64_t(*data)+uint64_t(*count)*8 > uint64_t(UINT32_MAX)+1 ||
+        *count > (maximum_bytes-used)/sizeof(NativeAnimationSplineKey)) return {};
+    auto &keys = result.axes[axis]; keys.reserve(*count);
+    if (keys.capacity() > (maximum_bytes-used)/sizeof(NativeAnimationSplineKey)) return {};
+    used += keys.capacity()*sizeof(NativeAnimationSplineKey);
+    int previous_frame = -32769;
+    for (uint32_t n=0; n<*count; ++n) {
+      const uint64_t address = uint64_t(*data)+n*8;
+      const auto frame = Half(address,read), value = Half(address+2,read);
+      const auto tangent = *count > 1 ? Word(address+4,read) : std::optional<uint32_t>(0);
+      if (!frame || !value || !tangent || int16_t(*frame) <= previous_frame) return {};
+      NativeAnimationSplineKey key;
+      key.seconds = (float(int16_t(*frame))*(1.0f/30.0f))/samples_per_tick;
+      key.value = angular ? float(int16_t(*value))*0x1p-16f : CompactFloat(*value);
+      key.tangent = std::bit_cast<float>(*tangent)*samples_per_tick;
+      if (angular) key.tangent *= 0x1p-16f;
+      if (angular && !keys.empty() && int16_t(*frame)-previous_frame == 1) keys.back().linear_to_next = true;
+      keys.push_back(key); previous_frame = int16_t(*frame);
+    }
+  }
+  return result;
+}
+
 // sub_82198FF8 relocates 36-byte records, sub_821995B8/99628 swap exactly
 // count keys (not count+1). sub_82288680 supplies samples per 30Hz logic tick.
 // Type 2: T/S = {s16 frame,pad,f32 xyz}, R = {s16 frame,s16 xyz angle}.
-// Type 3 compressed curves and dense types 0/1 need distinct source contracts.
+// Type3 nonconstant channels contain three {u32 count,ptr} scalar descriptors;
+// each relocated scalar key is {s16 frame,compact value,f32 tangent}. Constants
+// retain the type2 layout. Dense types0/1 remain a distinct unsupported contract.
 template <class ReadWord>
 std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
     std::span<const JointBinding> bindings, size_t maximum_bytes, ReadWord &&read) {
@@ -47,7 +89,7 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
   const uint64_t header = source;
   const auto records = Word(header,read), timing = Word(header+12,read);
   const auto duration = Half(header+4,read), type = Half(header+6,read), count = Half(header+8,read);
-  if (!records || !*records || !timing || !duration || !type || *type != 2 || !count ||
+  if (!records || !*records || !timing || !duration || !type || (*type != 2 && *type != 3) || !count ||
       *count > kMaxNativeJoints || uint64_t(*records)+uint64_t(*count)*36 > uint64_t(UINT32_MAX)+1) return {};
   const float rate = std::bit_cast<float>(*timing)*30;
   if (!std::isfinite(rate) || rate <= 0) return {};
@@ -74,12 +116,24 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
     const auto binding = mapping.find(*hash);
     if (binding == mapping.end()) continue;
     NativeAnimationTrack track; track.pose_index = binding->second;
+    std::unique_ptr<NativeAnimationSplines> splines;
     for (unsigned channel=0; channel<3; ++channel) {
       const auto address = Word(record+channel*4,read);
       const auto keys_count = Half(record+12+channel*2,read);
       if (!address || !keys_count) return {};
       // Null channel means absent even if its unused count is nonzero.
       if (!*address) continue;
+      if (*type == 3 && *keys_count != 1) {
+        if (!splines) {
+          if (sizeof(NativeAnimationSplines) > maximum_bytes-used) return {};
+          used += sizeof(NativeAnimationSplines);
+          splines = std::make_unique<NativeAnimationSplines>();
+        }
+        auto curve = ReadSplineChannel(*address,channel == 1,std::bit_cast<float>(*timing),maximum_bytes,used,read);
+        if (!curve) return {};
+        (channel == 0 ? splines->translation : channel == 1 ? splines->rotation : splines->scale) = std::move(*curve);
+        continue;
+      }
       if (!*keys_count || *keys_count > (maximum_bytes-used)/sizeof(NativeAnimationKey)) return {};
       const uint64_t stride = channel == 1 ? 8 : 16;
       if (uint64_t(*address)+uint64_t(*keys_count)*stride > uint64_t(UINT32_MAX)+1) return {};
@@ -112,6 +166,7 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
       // don't import adjacent bytes as an imaginary count+1 key.
       if (keys.size() > 1 && keys.back().seconds < float(*duration)/30) return {};
     }
+    track.splines = std::move(splines);
     tracks.push_back(std::move(track));
   }
   return NativeAnimationClip::Create(bindings.size(),float(*duration)/30,std::move(tracks),maximum_bytes);
@@ -123,7 +178,7 @@ template <class ReadWord>
 std::optional<NativeAnimationAsset> ReadKeyedAsset(uint32_t source, size_t maximum_bytes, ReadWord &&read) {
   const auto records = Word(source,read);
   const auto type = Half(uint64_t(source)+6,read), count = Half(uint64_t(source)+8,read);
-  if (!records || !*records || !type || *type != 2 || !count || !*count || *count > kMaxNativeJoints ||
+  if (!records || !*records || !type || (*type != 2 && *type != 3) || !count || !*count || *count > kMaxNativeJoints ||
       uint64_t(*records)+uint64_t(*count)*36 > uint64_t(UINT32_MAX)+1 ||
       maximum_bytes < sizeof(NativeAnimationAsset)+size_t(*count)*sizeof(NativeAnimationAsset::Target)) return {};
   std::vector<JointBinding> bindings;
@@ -165,7 +220,7 @@ inline bool ApplyKeyedAsset(const NativeAnimationAsset &asset, std::span<const u
     if (channel.translated) { record[0] |= 1; put(channel.translation,2); }
     if (channel.rotated) { record[0] |= 2; put(channel.rotation,5); }
     if (channel.scaled) { record[0] |= 4; put(channel.scale,9); }
-    if (track->translation.size()>1 || track->rotation.size()>1 || track->scale.size()>1) record[0] |= 128;
+    if (track->Animated()) record[0] |= 128;
   }
   records = std::move(output); return true;
 }

@@ -6017,3 +6017,44 @@ the only new game probe has explicitly limited admission evidence.
 outputs. Full renderer goal remains active/incomplete; no Quest or new capture
 allowance. README and active queue distinguish connected source, passing CPU/
 build evidence, initial live admission and pending full desktop acceptance.
+
+### 2026-09-08 compressed animation afterc087272
+
+Previous goal turn is progress: owned keyed load/runtime connection. Push remains
+blocked; automatic continuation is not specific external-upload approval. Extend
+the existing clip asset/sampler with native cubic Hermite channels from type3
+motion data, not a new per-tick decoder or resampled disk representation.
+17:03:47 free63747432448B. Read detailed disk policy and reused current operator/
+ledger. Scoped outputs unchanged: material9249678B/43, logs415038B/206, newest
+runtime976/39663B; no observed game/compiler/test producer. The drive-wide
+105381888B decline since prior post-commit free63852814336B is not explained by
+these unchanged outputs; keep enforced cumulative/per-job floors, no cleanup
+credit or budget reset. Existing runtime77248032B, images10434657B/13, raw0 new.
+
+Plan material51/CPU49 (64/8MiB free-drop,300s, estimate<8MiB peak,<16KiB logs),
+then connected host169 (192MiB free-drop,300s). Keep current50/48 until replacement
+passes; keep48/46 half-turn failure. No shader/guest rebuild, new tree, asset,
+capture, perf/cache or download. A few decoder constants were read in memory
+from the owned XEX; no decrypted file, image or session key was written/printed.
+
+Commit-request checkpoint: material51/CPU49 passed, then material52/CPU50 passed
+with asymmetric tangent fixtures (CPU0.12s, CTest0.14s). Host169 completed with
+exit0: animation bridge/version consumers and host link only; codegen0 writes,
+no guest objects or shader rebuild. Existing405 artifact-free guards passed
+before the final fixture-only tangent adjustment. No game run or capture was
+started for this checkpoint; run976 is still only the earlier type2 admission.
+The new cubic counter is observational, not live qualification. Next probe must
+require repeated bound cubic sampling and retain the strict original comparison.
+
+Recovered type3 contract: sub_82199178/82199240/821994F8 relocate three scalar
+count/pointer pairs per nonconstant channel; scalar keys are8B signed-frame,
+compact-value and float-tangent records. sub_823B8758/823B8608 and
+sub_8272EAF8/EB38/EB40/EC00/EDC8/EED0 establish timebase, endpoint hold, near-key
+tolerance, compact-float expansion and Hermite evaluation. Adjacent angular keys
+use a short linear arc; longer segments preserve authored tangents without global
+unwrapping. The importer retains owned native seconds/turns/derivatives, not guest
+decoder scratch. Strict live clock/interior-key precision remains unverified.
+Normal defaults, weighted/subtree/layer fallbacks and previous failure evidence
+are unchanged. Latest bounded host-build free-space receipt63756955648B; no
+cleanup/reclaimed-byte claim. This user-requested Git checkpoint starts no new
+build, runtime probe, capture or cleanup.

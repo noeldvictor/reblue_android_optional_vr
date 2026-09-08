@@ -803,8 +803,15 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    This is NOT sustained field/reload/nonconstant-animation/pixel qualification;
    whole-reset live reachability and live retirement are also pending. Four
    refusal examples identify compressed type3, not every one of992 refusals.
-   Next own compressed tracks and weighted/subtree/layer application through
-   these same assets/consumers, extending source-clock/interior-key comparison.
+   **Compressed curve checkpoint (host169; live pending):** type3 per-axis cubic
+   keys now import into the same immutable assets and runtime channel consumer,
+   retaining the8MiB residency cap. Material52/CPU50 and host169 pass. Tests cover
+   all65,536 compact-float encodings, asymmetric Hermite tangents, multiple rates,
+   angular short-segment rules, source destruction and allocation/refusal bounds.
+   No cubic live comparison has run; run976 remains type2 admission evidence only.
+   Next verify repeated actual cubic consumption with strict source-clock/interior-
+   key comparison, then own weighted/subtree/layer application through these same
+   assets/consumers. Do not let another type2-only sample satisfy the cubic gate.
    Types0/1, slots, late writers/special bones, persistent clip cooking, outgoing
    channels/palettes and full desktop/both-eye gates remain. Preserve975's reload
    and971/962's pixel failures; no unchanged retry or Quest work. Defaults stay

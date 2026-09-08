@@ -255,10 +255,92 @@ void TestLoadedAnimationAssets() {
   residency.Invalidate(0x1000);
   source.Half(0x1006,3);
   Require(!import() && !residency.Find(0x1000) && reloaded->Duration() == 1,
-          "unsupported replacement invalidates lookup while prior native lease remains immutable");
+          "malformed compressed replacement invalidates lookup while prior native lease remains immutable");
+}
+ClipSource CubicSource(float rate = 1) {
+  ClipSource source;
+  source.Half(0x1006,3); source.Word(0x100c,std::bit_cast<uint32_t>(rate));
+  auto key = [&](uint32_t address, int16_t frame, uint16_t value, float tangent) {
+    source.Half(address,uint16_t(frame)); source.Half(address+2,value);
+    source.Word(address+4,std::bit_cast<uint32_t>(tangent));
+  };
+  for (uint32_t table : {0x7000,0x7100,0x7200})
+    for (unsigned axis=0; axis<3; ++axis) { source.Word(table+axis*8,0); source.Word(table+axis*8+4,0); }
+  for (unsigned channel=0; channel<3; ++channel) {
+    source.Word(0x2048+channel*4,0x7000+channel*0x100); source.Half(0x2054+channel*2,2);
+  }
+  source.Word(0x7000,3); source.Word(0x7004,0x8000);
+  key(0x8000,0,0,3); key(0x8008,15,0x4400,-2); key(0x8010,30,0x4000,7); // T: 0 -> 4 -> 2, asymmetric tangents
+  source.Word(0x7008,1); source.Word(0x700c,0x8100);
+  key(0x8100,9,0xc000,std::numeric_limits<float>::quiet_NaN()); // constant -2, unused tangent
+  source.Word(0x7010,UINT32_MAX); // null Z ignores inactive count
+  source.Word(0x7110,3); source.Word(0x7114,0x8200);
+  key(0x8200,0,30000,500); key(0x8208,1,uint16_t(-30000),0); key(0x8210,30,30000,0);
+  source.Word(0x7200,2); source.Word(0x7204,0x8300);
+  key(0x8300,0,0x3c00,2); key(0x8308,30,0x4200,2); // S: 1 -> 3, derivative 2 / authored sec
+  for (uint32_t offset : {8,16}) { source.Word(0x7200+offset,1); source.Word(0x7204+offset,0x8400); }
+  key(0x8400,-7,0x3c00,0); // cubic keys may precede the start; constant holds
+  return source;
+}
+void TestCompressedAnimations() {
+  for (uint32_t bits=0; bits<=65535; ++bits) {
+    const int exponent=(bits>>10)&31;
+    float expected=exponent ? std::ldexp(1.0f+float(bits&1023)/1024,exponent-15) : 0;
+    if (bits&0x8000) expected=-expected;
+    Require(std::bit_cast<uint32_t>(animation_source::CompactFloat(uint16_t(bits))) == std::bit_cast<uint32_t>(expected),
+            "all compact-float bit patterns match independent finite/flush-to-zero reference");
+  }
+  auto hermite = [](double a,double b,double ta,double tb,double duration,double phase) {
+    const double square=phase*phase,cube=square*phase;
+    return (2*cube-3*square+1)*a+(cube-2*square+phase)*duration*ta+
+        (-2*cube+3*square)*b+(cube-square)*duration*tb;
+  };
+  for (float rate : {1.0f,2.0f,3.0f,10.0f}) {
+    auto source=CubicSource(rate);
+    auto read=[&](uint64_t address){return source.Read(address);};
+    auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,read);
+    Require(asset && asset->FindTrack(0xAA998877)->splines,"type3 loads owned per-axis cubic keys into existing clip asset");
+    const auto bytes=asset->RetainedBytes();
+    Require(animation_source::ReadKeyedAsset(0x1000,bytes,read).has_value() &&
+            !animation_source::ReadKeyedAsset(0x1000,bytes-1,read),"cubic key/spline allocations debit exact residency budget");
+    source.words.clear();
+    std::vector<NativeJointChannels> channels;
+    for (unsigned step=0; step<=60; ++step) {
+      const float authored_seconds=float(step)/60;
+      Require(asset->Clip().Sample(authored_seconds/rate,channels),"native cubic sampling after source destruction");
+      const auto &sample=channels[2];
+      const float expected=authored_seconds<=.5f ? float(hermite(0,4,3,-2,.5,authored_seconds*2)) :
+          float(hermite(4,2,-2,7,.5,(authored_seconds-.5)*2));
+      Require(Near(sample.translation[0],expected) && sample.translation[1] == -2 && sample.translation[2] == 0 &&
+              Near(sample.scale[0],1+2*authored_seconds) && sample.scale[1] == 1 && sample.scale[2] == 1,
+              "cubic translation/scale match independent Hermite basis across rates and segments");
+      Require(sample.translated && sample.rotated && sample.scaled && !channels[0].rotated,
+              "constant and compressed channels coexist with exact activation");
+    }
+    Require(asset->Clip().Sample((.5f/30)/rate,channels) && Near(channels[2].rotation[2],1),
+            "adjacent packed angular keys override tangents and take the short arc");
+    Require(asset->Clip().Sample((1.0f/30)/rate,channels) && channels[2].rotation[2]<0,
+            "exact cubic angular endpoint preserves authored sign");
+    Require(asset->Clip().Sample((15.5f/30)/rate,channels) && Near(channels[2].rotation[2],0),
+            "long angular segments preserve authored cubic path instead of globally unwrapping");
+    constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u};
+    std::vector<animation_source::ChannelRecord> records;
+    Require(animation_source::ApplyKeyedAsset(*asset,names,.25f/rate,false,records) && records[2][0] == (128|7),
+            "compressed motion reaches the existing runtime channel application and dirty contract");
+  }
+  auto refuse=[](auto mutate,const char *message) {
+    auto source=CubicSource(); mutate(source);
+    Require(!animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);}),message);
+  };
+  refuse([](auto &s){s.Word(0x7000,0);},"nonnull empty scalar curve cannot read an imaginary predecessor");
+  refuse([](auto &s){s.Word(0x7000,65537);},"cubic key count bounded before allocation");
+  refuse([](auto &s){s.Half(0x8008,0);},"duplicate cubic times refuse transactionally");
+  refuse([](auto &s){s.Word(0x8004,0x7fc00000);},"active cubic tangent must be finite");
+  refuse([](auto &s){s.words.erase(0x8014);},"truncated cubic key refuses before source retirement");
+  refuse([](auto &s){s.Word(0x7004,UINT32_MAX-6);},"cubic key address overflow refused");
 }
 } // namespace
 void TestAnimationClips() {
-  TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets();
+  TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestCompressedAnimations();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

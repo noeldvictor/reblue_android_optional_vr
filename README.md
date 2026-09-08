@@ -136,7 +136,10 @@ native skeleton/instance consumers. CPU ownership/retirement tests,405 source/
 scenario checks and the desktop build pass. Run976 imports69 clips and verifies
 one real sampling call against the original before a deliberate diagnostic stop.
 **This is initial admission, not sustained field/reload or motion-pixel proof.**
-Compressed type3 clips appear among refused loads; compressed/dense families,
+The following host169 checkpoint adds owned type3 cubic curves through the same
+load/sampling path. CPU tests pass, including all65,536 compact-float encodings,
+asymmetric tangents and multiple rates; the desktop build passes. **No live run
+has verified cubic sampling yet.** Dense families, compressed live qualification,
 weighted/subtree/layer application, slot clocks and outgoing channel/palette
 adapters remain. Normal defaults are unchanged; earlier reload and pixel failures
 remain unresolved.
