@@ -33,6 +33,8 @@ REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
     "Fail-closed native opaque and phase1 cutout rigid caster families; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
     "Fail-closed native mono opaque/cutout rigid scene families with zero-to-three texture layers; no node interpreter/template warm-up.");
+REXCVAR_DEFINE_BOOL(bd_native_rigid_deferred, false, kCvarGroup,
+    "Connect ordinary rigid sorted packets to the mixed native consumer; pending live qualification.");
 namespace bd::gpu::scene {
 struct NativeRigidDrawStore {
   struct Batch {
@@ -104,6 +106,7 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
 }
 bool NativeRigidShadowEnabled() { return REXCVAR_GET(bd_native_rigid_shadow); }
 bool NativeRigidSceneEnabled() { return REXCVAR_GET(bd_native_rigid_scene); }
+bool NativeRigidDeferredEnabled() { return NativeRigidSceneEnabled() && REXCVAR_GET(bd_native_rigid_deferred); }
 bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
                              const std::optional<PrimitivePolicyInputs> &inputs) {
   if (!NativeRigidShadowEnabled()) return false;
@@ -224,7 +227,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   if (!NativeRigidSceneEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
-  const auto admission = PrepareNativeRigidSceneAdmission(*model, inputs);
+  const auto admission = PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled());
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
   Require(admission.route == NativeRigidCasterRoute::Native, "scene family or object pass policy unavailable");
   const char *refusal = "native scene object preparation failed";
@@ -232,6 +235,8 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   Require(plans.has_value() && !plans->empty(), refusal);
   NativeRigidSceneSubmission submission{pose.instance, pose.model_generation, node,
       FrameStatFrameCount(), SelectedNativeRigidShadow(*model), std::move(*plans)};
+  Require(StageNativeRigidSceneDeferredForObject(submission), "native deferred staging refused");
+  if (submission.plans.empty()) return true;
   return SubmitNativeRigidScenePackets(std::move(submission), stack);
 }
 bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32_t stack) {

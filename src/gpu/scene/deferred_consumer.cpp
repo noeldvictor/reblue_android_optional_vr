@@ -16,6 +16,13 @@
 #include "gpu/scene/deferred_shader_bridge.h"
 #include "gpu/scene/deferred_surface.h"
 #include "gpu/scene/deferred_work.h"
+#include "gpu/scene/native_deferred_queue.h"
+#include "gpu/scene/native_deferred_contract.h"
+#include "gpu/scene/native_rigid_draw.h"
+#include "gpu/scene/native_blend_bridge.h"
+#include "gpu/scene/native_alpha_bridge.h"
+#include "gpu/scene/native_shadow_receiver_bridge.h"
+#include "gpu/scene/guest_scene.h"
 #include "gpu/scene/host_draw.h"
 #include "gpu/scene/shader_parameter_import.h"
 #include <algorithm>
@@ -23,6 +30,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <rex/ppc/context.h>
+#include <rex/cvar.h>
 #include <rex/system/function_dispatcher.h>
 #include <stdexcept>
 #include <vector>
@@ -41,6 +49,7 @@ void D3DDevice_SetStreamSource(PPCContext &, uint8_t *);
 void D3DDevice_SetVertexDeclaration(PPCContext &, uint8_t *);
 }
 bool bdRenderListEntryHook(PPCRegister &, PPCRegister &);
+REXCVAR_DECLARE(bool, bd_native_deferred_consumer);
 
 namespace bd::gpu::scene {
 namespace {
@@ -76,6 +85,12 @@ struct Stats {
   uint32_t frame = 0;
 };
 thread_local Stats stats;
+thread_local NativeDeferredQueue native_queue;
+// Source identities never enter the owned queue or native draw consumer. This
+// bounded sidecar disappears when the last visual-transition adapter retires.
+struct VisualTransition { uint32_t visual, blend_mode; };
+thread_local std::vector<VisualTransition> native_visuals;
+thread_local uint64_t native_staged = 0, native_consumed = 0;
 void Report() {
   const auto frame = FrameStatFrameCount();
   if (frame - stats.frame < 300)
@@ -90,6 +105,8 @@ void Report() {
       stats.bridges[3], stats.bridges[4], stats.bridges[5], stats.fallback,
       stats.refused);
   stats.frame = frame;
+  BD_INFO("[native-deferred] frame {} staged {} consumed {} pending {}; owned sorted packets, temporary visual transitions remain",
+      frame, native_staged, native_consumed, native_queue.Entries().size());
 }
 uint8_t *Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address > UINT32_MAX || bytes > UINT32_MAX ||
@@ -109,6 +126,14 @@ template <class T> T Read(uint32_t address) {
 }
 template <class T> void Write(uint32_t address, T value) {
   bd::mem::store<T>(address, value);
+}
+std::optional<uint32_t> CheckedWord(uint64_t address) {
+  return !(address & 3) && Range(address, 4) ? std::optional(Read<uint32_t>(uint32_t(address))) : std::nullopt;
+}
+bool NativeListMode() {
+  return Range(kPassMode, 1) && !Read<uint8_t>(kPassMode) &&
+      CheckedWord(kRenderViewIdVa) == 3 && CheckedWord(kList + 36) == 0x8221D530 &&
+      CheckedWord(kList + 40) == 0x8221D548;
 }
 
 // Compatibility addresses live only in this import record/adapter. The host
@@ -391,8 +416,24 @@ void SubmitSurface(EngineBridge &bridge, uint32_t entry, uint32_t visual,
 } // namespace
 
 void RecordDeferredConsumerFallback() {
+  if (HasNativeDeferredScene())
+    throw std::runtime_error("Accepted native deferred packets cannot fall back to the guest list");
   ++stats.fallback;
   Report();
+}
+
+bool HasNativeDeferredScene() { return !native_queue.Entries().empty(); }
+bool StageNativeDeferredScene(uint32_t visual, NativeRigidSceneSubmission &submission) {
+  if (!NativeRigidDeferredEnabled() || !REXCVAR_GET(bd_native_deferred_consumer) || !NativeListMode()) return false;
+  const auto mode = CheckNativeDeferredContract(visual, CheckedWord);
+  const auto preceding = CheckedWord(kList + 20);
+  if (!mode || !preceding || native_visuals.size() != native_queue.Entries().size()) return false;
+  if (native_visuals.capacity() < NativeDeferredQueue::kLimit) native_visuals.reserve(NativeDeferredQueue::kLimit);
+  if (!native_queue.Stage(submission, *preceding, FrameStatFrameCount())) return false;
+  while (native_visuals.size() < native_queue.Entries().size()) {
+    native_visuals.push_back({visual, *mode}); ++native_staged;
+  }
+  return true;
 }
 
 bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
@@ -402,20 +443,35 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
     if (++stats.refused <= 8)
       BD_WARN("[host-consumer] invalid initial list import; no native side "
               "effects");
+    if (HasNativeDeferredScene())
+      throw std::runtime_error("Native deferred list lost its compatibility import");
     return false;
   }
+  if (HasNativeDeferredScene() && (!NativeRigidDeferredEnabled() || !NativeListMode() ||
+      native_visuals.size() != native_queue.Entries().size()))
+    throw std::runtime_error("Native deferred pass changed before consumption");
+  std::vector<float> legacy_depths;
+  std::vector<DeferredInsertion> insertions;
+  for (const auto &entry : entries) legacy_depths.push_back(entry.depth);
+  for (const auto &entry : native_queue.Entries()) insertions.push_back(entry.order);
+  std::vector<DeferredSelection> merged;
+  if (!MergeDeferredWork(legacy_depths, insertions, merged) ||
+      !native_queue.BeginDrain(FrameStatFrameCount()))
+    throw std::runtime_error("Invalid, stale or reentrant mixed deferred list");
   // Sort native records once; no recursive guest calls or republished pointer
   // array is needed because the host owns the consuming loop and list drain.
   if (!Read<uint8_t>(kPassMode) && !Read<uint32_t>(kSortDisabled)) {
     std::vector<DeferredSortItem> order;
-    order.reserve(entries.size());
-    for (uint32_t i = 0; i < entries.size(); ++i)
-      order.push_back({entries[i].depth, i});
+    order.reserve(merged.size());
+    for (uint32_t i = 0; i < merged.size(); ++i) {
+      const auto &item = merged[i];
+      order.push_back({item.native ? insertions[item.index].depth : entries[item.index].depth, i});
+    }
     if (OrderDeferredWork(order)) {
-      auto sorted = entries;
+      auto sorted = merged;
       for (size_t i = 0; i < order.size(); ++i)
-        sorted[i] = entries[order[i].payload];
-      entries = std::move(sorted);
+        sorted[i] = merged[order[i].payload];
+      merged = std::move(sorted);
     } else {
       ++stats.refused;
       BD_WARN("[host-consumer] nonfinite depth; retaining submission order");
@@ -437,17 +493,20 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   uint32_t alpha = UINT32_MAX, winding = UINT32_MAX, sidedness = 127;
   int32_t depth_write = 1;
   bool stencil_pending = false;
-  for (const auto &item : entries) {
-    const auto entry = item.address;
+  for (const auto &item : merged) {
+    const auto entry = item.native ? 0 : entries[item.index].address;
     ++stats.entries;
     PPCRegister entry_reg{}, visual_reg{};
     entry_reg.u32 = entry;
     visual_reg.u32 = visual;
-    if (bdRenderListEntryHook(entry_reg, visual_reg)) {
+    if (item.native) CloseDeferredCompatibilityCapture();
+    else if (bdRenderListEntryHook(entry_reg, visual_reg)) {
       ++stats.replayed;
       continue;
     }
-    const auto next_visual = Read<uint32_t>(entry + 272);
+    const auto next_visual = item.native ? native_visuals[item.index].visual : Read<uint32_t>(entry + 272);
+    if (item.native && CheckNativeDeferredContract(next_visual, CheckedWord) != native_visuals[item.index].blend_mode)
+      throw std::runtime_error("Native deferred visual or callback contract changed");
     if (next_visual != visual) {
       if (visual)
         bridge.Call(sub_8221DCA0, BridgeKind::Visual, {kVisualContext});
@@ -457,6 +516,33 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
       if (visual)
         bridge.Call(sub_82425C28, BridgeKind::Visual,
                     {Read<uint32_t>(visual + 1864)});
+    }
+    if (item.native) {
+      if (technique != 2 || stencil_pending ||
+          CheckNativeDeferredContract(visual, CheckedWord) != native_visuals[item.index].blend_mode ||
+          CheckedWord(kVisualContext + 36) != 0)
+        throw std::runtime_error("Native deferred visual transition no longer ordinary");
+      auto submission = native_queue.Take(item.index);
+      const auto blend = FindNativeEnabledBlendIntent();
+      const auto alpha_intent = FindNativeAlphaIntent();
+      const auto receiver = FindNativePrimaryReceiver(visual, 3);
+      if (!submission || !blend || !alpha_intent || !receiver)
+        throw std::runtime_error("Native deferred late visual outputs unavailable");
+      for (auto &plan : submission->plans) {
+        const auto matrix = PackRigidMatrix(receiver->world_to_shadow);
+        if (plan.shadow != receiver->image || std::memcmp(&matrix, &plan.pass.world_to_shadow, sizeof(matrix)))
+          throw std::runtime_error("Native deferred shadow owner changed before consumption");
+        // Consume typed native publications after visual begin, never the old
+        // PSO/register file or a frozen walk-time blend/receiver colour.
+        plan.blend = *blend;
+        plan.alpha_to_coverage = alpha_intent->alpha_to_coverage;
+        const auto &colour = receiver->colour;
+        plan.pass.shadow_colour_strength = {colour[0], colour[1], colour[2], colour[3]};
+      }
+      if (!submission || !SubmitNativeRigidScenePackets(std::move(*submission), ctx.r1.u32))
+        throw std::runtime_error("Native deferred packet consumption failed");
+      ++native_consumed;
+      continue;
     }
     if (technique == 3)
       continue;
@@ -529,6 +615,8 @@ bool ConsumeDeferredList(PPCContext &ctx, uint8_t *base) {
   Write<uint32_t>(kList + 20, 0);
   std::memset(bd::mem::at<uint8_t>(pool), 0, kDeferredEntryBytes);
   ResetDeferredDepthImports();
+  if (!native_queue.EndDrain()) throw std::runtime_error("Native deferred packets were not fully consumed");
+  native_visuals.clear();
   if (!depth_write)
     bridge.State(48, 1);
   bridge.State(60, 0);

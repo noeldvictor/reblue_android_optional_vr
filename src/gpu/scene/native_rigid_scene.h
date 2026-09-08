@@ -56,6 +56,7 @@ struct NativeRigidDeferredInputs { bool fixed = false; float fixed_depth = 0; };
 // retained, address-free plan. It never interprets/captures/replays the node.
 std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject(
     const NativeInstancePose &pose, uint32_t node, const char *&refusal);
+bool StageNativeRigidSceneDeferredForObject(NativeRigidSceneSubmission &submission);
 // Transactional whole-node finalization: no sibling may retain an early light
 // value, reuse a ticket, or disagree with the common authored Bind/Keep action.
 inline bool FinalizeNativeRigidSceneLights(std::span<NativeRigidScenePlan> plans,

@@ -11,6 +11,7 @@ struct NativeRigidBatchItem;
 struct NativeRigidSceneSubmission;
 bool NativeRigidShadowEnabled();
 bool NativeRigidSceneEnabled();
+bool NativeRigidDeferredEnabled();
 // Called before the per-node interpreter/replay/capture, after host culling.
 // Once a supported family is recognized, missing owners/resources are fatal;
 // it cannot silently warm a template. Unsupported participation stays legacy.

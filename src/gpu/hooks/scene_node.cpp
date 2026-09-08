@@ -344,6 +344,8 @@ bool bdRenderListEntryHook(PPCRegister &r31, PPCRegister &r23) {
   return false;
 }
 
+void bd::gpu::scene::CloseDeferredCompatibilityCapture() { CloseListCapture(); }
+
 REX_HOOK_RAW(sub_8227F360) {
   if (!REXCVAR_GET(bd_native_deferred_consumer) ||
       !bd::gpu::scene::ConsumeDeferredList(ctx, base)) {

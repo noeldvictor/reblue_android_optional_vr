@@ -15,6 +15,7 @@
 #include "gpu/scene/native_sampler_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/deferred_consumer.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/scene/native_fog_bridge.h"
@@ -53,6 +54,7 @@ struct NativeObjectTextureState {
   std::optional<PrimitivePolicyInputs> policy_inputs;
   std::optional<NativeMaterialAlphaInputs> alpha_inputs;
   std::optional<NativeRigidCutoutInputs> cutout_pass;
+  std::optional<NativeRigidDeferredInputs> deferred_inputs;
   std::optional<NativeMaterialShadowInputs> shadow_inputs;
   std::optional<NativeSamplerFilterPass> shadow_filters;
   struct Mesh {
@@ -161,6 +163,14 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     if (NativeRigidSceneEnabled() && *render_view == 3) {
       publication->alpha_inputs = ReadMaterialAlphaInputs(*visual, Word);
       publication->cutout_pass = CaptureCutoutPass();
+      if (NativeRigidDeferredEnabled()) {
+        // bdSceneNodeDrawSingle, 82280C3C..82280C6C: shadow_allowed
+        // gates the live sort-disabled word passed to the depth helper.
+        const auto fixed = Word((uint32_t(-32035) << 16) - 26168);
+        const auto depth_word = Word((uint32_t(-32251) << 16) + 20912);
+        if (fixed && depth_word)
+          publication->deferred_inputs = NativeRigidDeferredInputs{*fixed != 0, std::bit_cast<float>(*depth_word)};
+      }
     }
     if (publication->shadow_phase) {
       publication->shadow_inputs = ReadMaterialShadowInputs(*visual, Word);
@@ -221,7 +231,7 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
   refusal = "whole-node ordinary scene family unavailable";
-  const auto admission = PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs);
+  const auto admission = PrepareNativeRigidSceneAdmission(*program, scope->policy_inputs, NativeRigidDeferredEnabled());
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });
@@ -254,7 +264,7 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
     if (cutout) cutout->reference = references[primitive];
     refusal = "whole-node scene shader resources unavailable";
     auto plan = PrepareNativeRigidScene(*program, *packet,
-        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal, cutout, {}, lights);
+        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal, cutout, scope->deferred_inputs, lights);
     if (!plan) {
       // Failure-only context for the exact next producer decision. No probe
       // loop, frame dump, weakened admission or partial sibling replacement.
@@ -266,6 +276,14 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
     result.push_back(std::move(*plan));
   }
   return result;
+}
+bool StageNativeRigidSceneDeferredForObject(NativeRigidSceneSubmission &submission) {
+  if (std::none_of(submission.plans.begin(), submission.plans.end(),
+      [](const auto &plan) { return plan.deferred; })) return true;
+  const auto *scope = current;
+  return scope && scope->pose && scope->pose->instance == submission.instance &&
+      scope->pose->model_generation == submission.model_generation &&
+      StageNativeDeferredScene(scope->visual, submission);
 }
 void ReportNativeMaterialUvMismatch(const NodeTag &tag,
     const NativeMaterialTextureValues &values, const void *actual) {

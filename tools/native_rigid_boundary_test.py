@@ -230,7 +230,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("0x63B8D67932573E51", scene)
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         submit = direct.split("bool SubmitNativeRigidScene(", 1)[1].split("void PrepareNativeRigidBatchDraw(", 1)[0]
-        self.assertLess(submit.index("PrepareNativeRigidSceneAdmission(*model, inputs)"), submit.index("PrepareNativeRigidSceneForObject"))
+        self.assertLess(submit.index("PrepareNativeRigidSceneAdmission(*model, inputs, NativeRigidDeferredEnabled())"), submit.index("PrepareNativeRigidSceneForObject"))
         self.assertLess(submit.index("pending.push_back("), submit.index("StageNativeItem("))
         self.assertIn("item->regression = geometry->id == 0x258694267A8DBAEEull", submit)
         self.assertIn("scene_family_emitted += instances", direct)
@@ -294,6 +294,21 @@ class NativeRigidBoundaryTest(unittest.TestCase):
                          "draw.zwrite = plan.depth_write", "StageNativeItem", "DrawQueuePush"):
             self.assertIn(required, consumer)
         self.assertLess(consumer.index("pending.push_back"), consumer.index("StageNativeItem"))
+
+    def test_deferred_packets_connect_to_the_same_consumer_without_entry_imports(self):
+        source = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
+        branch = source.split("auto submission = native_queue.Take(item.index);", 1)[1].split("++native_consumed", 1)[0]
+        for required in ("FindNativeEnabledBlendIntent()", "FindNativePrimaryReceiver(visual, 3)",
+                         "SubmitNativeRigidScenePackets(std::move(*submission), ctx.r1.u32)"):
+            self.assertIn(required, branch)
+        for forbidden in ("Read<", "bd::mem::", "Material(", "BindEntry", "D3DDevice_", "ResolveGuestTexture"):
+            self.assertNotIn(forbidden, branch)
+        for required in ("MergeDeferredWork(legacy_depths, insertions, merged)", "CloseDeferredCompatibilityCapture()",
+                         "CheckNativeDeferredContract(next_visual, CheckedWord)", "native_queue.EndDrain()"):
+            self.assertIn(required, source)
+        queue = (ROOT / "src/gpu/scene/native_deferred_queue.h").read_text()
+        for forbidden in ("NodeTag", "visual", "bd::mem::", "816", "DeferredEntryRecipe"):
+            self.assertNotIn(forbidden, queue)
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()

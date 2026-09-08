@@ -9,6 +9,7 @@
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_rigid_shadow.h"
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/scene/native_deferred_queue.h"
 #include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_rigid_route.h"
@@ -1030,6 +1031,47 @@ void RigidScenePacket() {
     const auto bind_ticket = publication.Resolve(7,*red);
     assert(bind_ticket && FinalizeNativeRigidSceneLights(std::span(&explicit_bind,1),*bind_ticket));
     assert(explicit_bind.pass.lights[0].colour_strength.x == 1);
+    {
+      NativeDeferredQueue queue;
+      auto delayed = *captured;
+      delayed.deferred = delayed.draw = true; delayed.depth = 20;
+      NativeRigidSceneSubmission mixed{11,93,1,7,false,{*captured,delayed,delayed}};
+      mixed.plans[1].primitive = 1; mixed.plans[2].primitive = 2;
+      assert(!queue.Take(0) && !queue.EndDrain());
+      for (uint32_t fault = 0; fault < 6; ++fault) {
+        auto rejected = mixed;
+        if (fault == 0) rejected.frame = 8;
+        if (fault == 1) rejected.plans[2].depth = std::numeric_limits<float>::quiet_NaN();
+        if (fault == 2) rejected.plans[2].light_ticket = *final;
+        if (fault == 3) rejected.plans[2].light_recipe.reset();
+        if (fault == 4) rejected.plans[2].draw = false;
+        assert(!queue.Stage(rejected, fault == 5 ? 5139 : 1, 7));
+        assert(queue.Entries().empty() && rejected.plans.size() == 3);
+      }
+      assert(queue.Stage(mixed,1,7) && mixed.plans.size() == 1 && !mixed.plans[0].deferred);
+      assert(queue.Entries().size() == 2);
+      auto later = NativeRigidSceneSubmission{11,93,1,7,false,{delayed}};
+      assert(!queue.Stage(later,0,7) && later.plans.size() == 1); // invalid insertion order
+      auto next_frame = later; next_frame.frame = 8;
+      assert(!queue.Stage(next_frame,2,8)); // undrained preceding frame
+      mixed = {}; delayed = {}; // producer destroyed; queue owns the original packets
+      assert(!queue.BeginDrain(8) && queue.BeginDrain(7));
+      assert(!queue.BeginDrain(7) && !queue.EndDrain() && !queue.Stage(later,2,7));
+      // Stable mixed sort consumes two native siblings around a legacy writer.
+      // A late blue Bind must affect Keep, even though red was current at stage.
+      const auto late = publication.Resolve(7,*blue);
+      assert(late && publication.Commit(7,*late));
+      for (uint32_t i = 0; i < 2; ++i) {
+        auto value = queue.Take(i);
+        assert(value && value->plans[0].primitive == i + 1 && !queue.Take(i));
+        const auto inherited = publication.Resolve(7,*value->plans[0].light_recipe);
+        assert(inherited && FinalizeNativeRigidSceneLights(value->plans,*inherited));
+        assert(value->plans[0].pass.lights[0].colour_strength.z == 1);
+        assert(value->plans[0].geometry == geometry && value->plans[0].albedo[0] == albedo);
+      }
+      assert(queue.EndDrain() && queue.Entries().empty());
+      assert(queue.Stage(next_frame,0,8) && queue.BeginDrain(8) && queue.Take(0) && queue.EndDrain());
+    }
     publication.Reset();
     assert(!publication.Resolve(7,*keep) && pending.plans.front().pass.lights[0].colour_strength.z == 1);
     packet = good;

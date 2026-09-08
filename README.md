@@ -212,13 +212,13 @@ The desktop build passes without guest object compilation. Live game acceptance
 is still pending; this is not a proven fix for the earlier title-logo/tree gaps.
 [Handoff contract, causal fixtures and remaining gates](research/20260908_0033_immediate-geometry-bindings.md).
 
-**Host128 builds the deferred-packet groundwork; live connection is still pending.**
+**Earlier Host128 deferred-packet groundwork:**
 Native plans now retain sorted depth, cutoff and depth-write policy; mixed-order
 metadata preserves submission ties. Lighting captures an owned Bind/Keep action
 and resolves inherited values at the final draw position. The existing direct
 lighting path shares that implementation. Three C++ fixtures,351 Python checks
 and55 two-eye GPU cases pass, including overlapping blend-order controls.
-The live deferred producer/consumer still uses the compatibility list: its
+At that checkpoint the deferred producer/consumer still used the compatibility list: its
 participant callbacks and late material/pass updates must be accounted for before
 native submission is enabled. No new guest path removal or game-pixel acceptance
 is claimed by this checkpoint.
@@ -231,9 +231,21 @@ Bind/Keep lights are finalized together at consumption, with stale publication
 and partial-sibling guards. The same consumer retains packets through the existing
 indirect queue/fence path and honors their depth-write policy. Two C++ fixtures,
 352 Python checks,55 two-eye Vulkan cases (validation0/0) and the host link pass.
-The sorted producer is still unconnected: late effect callbacks must be covered
-before enabling it. No new game run, accepted pixels, speedup or full native frame
+The sorted producer was still unconnected at that checkpoint. No new game run, accepted pixels, speedup or full native frame
 is claimed. [Owned consumer and remaining integration](research/20260908_0135_owned-scene-consumption.md).
+
+**Host130 connects ordinary rigid sorted packets to the native consumer.**
+Owned packets now merge with legacy entries in one stable depth order, without
+allocating guest render-list entries for native work. Their native branch skips
+per-entry material callbacks, resource/world/constant imports and D3D draws.
+Lights resolve at actual submission; blend and receiver colour come from native
+publications after the remaining visual transitions. The live callback contract,
+queue capacity, frame and single-consumption rules are checked explicitly.
+Two changed C++ fixtures,353 Python checks and the host build pass. This route
+is opt-in (`bd_native_rigid_deferred`), with live mixed-list/pixel qualification
+still pending. Visual-transition and outgoing compatibility adapters remain;
+this is not a complete host frame or a measured speedup.
+[Connection, callback evidence and next acceptance gate](research/20260908_0206_native-deferred-connection.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

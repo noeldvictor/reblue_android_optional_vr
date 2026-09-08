@@ -307,14 +307,33 @@ Two C++ fixtures,352 Python checks and55 two-eye Vulkan cases pass (1.26 s,
 validation0/0); host129 links without guest objects. No game run or new pixels.
 [Owned consumer implementation and evidence](../research/20260908_0135_owned-scene-consumption.md).
 
-The remaining connection is the sorted native producer and mixed payloads in
-`ConsumeDeferredList` feeding that same consumer. Default scene admission still
-excludes deferred work. Do not flip it on using frozen walk-time material/pass
-values: actual list callbacks are `sub_8221D530`/`sub_8221D548`, dispatching the
-effect-participant chain and resource begin/end, not just `sub_82174270`'s shader
-choice. Account for those late outputs and authored participation before replacing
-them. Use the recovered callback map and new causal fixtures, not another whole
-source audit or unchanged live probe. Full native frame/game/stereo gates remain.
+Host130 connects the ordinary rigid deferred producer, bounded owned packet queue
+and mixed payloads in `ConsumeDeferredList` to that same native consumer. The
+temporary opt-in is `bd_native_rigid_deferred` (default false, requires native
+scene and deferred consumer). Deferred siblings allocate no816-byte guest entry;
+direct siblings remain immediate. One stable mixed order preserves submission
+ties and resolves each delayed light action at its draw position. Native entries
+skip model callbacks, per-entry resource/world/constant imports and D3D draws.
+
+Live callback slots are checked against the recovered ordinary contract: lights
+then shader for models, known shadow participants then shader for visuals, and
+no-op visual resource begin/end. Visual transitions remain an explicit temporary
+adapter, with source identities only in its sidecar. Native blend/alpha and
+receiver-colour publications are consumed after visual begin, not frozen at the
+walk. Unknown/changed contracts, stale/reentrant queues, capacity overflow or a
+lost consumer refuse without replaying accepted packets through the guest list.
+Two changed C++ fixtures and353 Python checks pass; host130 links without guest
+objects. Existing55 two-eye shader cases are reused, not rerun or claimed as
+mixed-list integration. No new game run or image.
+
+Next: a bounded live admission/consumption check with the deferred opt-in must
+establish reachable ordinary callback/visual contracts and fresh staged/consumed
+counts. Preserve a concrete refusal and add its causal regression before retrying.
+Qualify actual mixed-order pixels once the existing image budget allows it; then
+retire the remaining visual adapter with the shared effect owners. Do not repeat
+the completed callback census or build a second renderer. Full native frame,
+authored-effect, scene/reload and both-eye acceptance remain open.
+[Sorted producer/consumer connection and evidence](../research/20260908_0206_native-deferred-connection.md).
 [Deferred contracts and pending runtime connection](../research/20260908_0109_deferred-packet-order.md).
 
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B

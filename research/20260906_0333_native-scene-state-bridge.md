@@ -4287,3 +4287,36 @@ down2,457,600 B from producer preflight; drive-wide movement is not all attribut
 to the task. Immediate cleanup free-space gain36,864 B differs from logical log
 bytes. No image/raw growth or repeated cleanup credit; the original image-budget
 question remains unanswered. All owned jobs are terminal.
+
+### Connected native deferred continuation (2026-09-08)
+
+Original3 GiB exception/floor62,509,998,080 B unchanged. First scoped free read
+80,511,225,856 B; producer preflight80,511,295,488 B. No owned producer was live.
+Existing texture/material/GPU fixture trees75,383,225/8,361,060/15,275,881 B,
+132/41/17 files; attachment logs272,416 B/166 files. Planned replacement outputs
+under2 MiB retained fixture growth and128 KiB logs, with32 MiB fixture/192 MiB
+host free-drop guards,300 s supervisors and30 s CTest. No raw/image/cook/perf/game
+producer. The protected raw/image inventory and unanswered export-budget question
+are unchanged; no new allowance or capture-cleanup credit is claimed.
+
+Output50/PID32180, deferred2/PID37152, CPU33/PID36876 and host130/PID37044 all
+terminal0. CPU33 runs32 tests, including both changed C++ fixtures;353 Python
+checks pass. Host130 is f3131a5d5 dirty, codegen0 written/1 module current and no
+guest objects. Exact hashes and behavioral scope are in
+`20260908_0206_native-deferred-connection.md`. Native sorted connection is built,
+not yet live/pixel qualified. Unchanged rigid18 shader evidence is reused.
+
+Removed10 resolved superseded success logs after replacement: output49,
+post_output_cpu32, deferred build1/CPU1 and host129 stdout/stderr pairs.5,485
+logical B removed once; reproducible logs only. Immediate physical free gain
+12,288 B differs from logical bytes. All distinct GPU/material proofs, unresolved
+failures, images, raw sets and user data are retained. New logs7,268 B; total
+274,199 B/164 files, net1,783 B growth. Texture fixture76,577,767 B/132 files,
+up1,194,542 B for the production queue/callback regressions and rebuilt objects/
+executable. Material/GPU fixtures unchanged. These selected fixture/log scopes
+grew1,196,325 B; host/source/Git and unrelated drive activity remain separate.
+
+After cleanup free80,508,788,736 B, down2,506,752 B from producer preflight. This
+is drive-wide movement, not all attributed task storage. No profile mutation;
+SHA256 remains2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+All owned jobs terminal; no duplicate producer or image export was launched.

@@ -7,6 +7,7 @@
 #include "gpu/scene/deferred_depth.h"
 #include "gpu/scene/deferred_entry_bridge.h"
 #include "gpu/scene/deferred_work.h"
+#include "gpu/scene/native_deferred_contract.h"
 #include <array>
 #ifdef NDEBUG
 #undef NDEBUG
@@ -14,8 +15,54 @@
 #include <cassert>
 #include <limits>
 #include <random>
+#include <unordered_map>
 
 using namespace bd::gpu::scene;
+
+void TestCallbackContract() {
+  constexpr uint32_t registry = (uint32_t(-32030) << 16) - 31132;
+  constexpr uint32_t lights = 0x82E246F4, shader = 0x82783A58, visual = 0x9000;
+  std::unordered_map<uint64_t,uint32_t> words{
+      {registry,0x1000},{registry+8,2},{0x1000,lights},{0x1004,shader},
+      {lights,0x2000},{0x2000,0x8218B310},{0x2004,0x820DFA50},
+      {shader,0x2100},{0x2100,0x82174270},{0x2104,0x820DFA50},
+      {0x2108,0x82174648},{0x210C,0x82174C60},
+      {registry+12,0x3000},{registry+20,11},
+      {visual,0x4000},{0x4020,0x820DFA50},{0x4024,0x820DFA50},
+      {visual+3000,0},{visual+1864,0}};
+  for (uint32_t i = 0; i < 11; ++i) {
+    const uint32_t object = i == 10 ? shader : i == 0 ? 0x82DD6100 :
+        i == 9 ? 0x82DD6FC0 : 0x82DD62A0 + (i-1)*420;
+    words[0x3000+i*4] = object;
+    if (i == 10) continue;
+    const uint32_t table = 0x5000+i*32;
+    words[object] = table;
+    words[table+8] = i == 0 ? 0x82176708 : i == 9 ? 0x820D1998 : 0x82177650;
+    words[table+12] = 0x820DFA50;
+  }
+  const auto read = [&](uint64_t address) -> std::optional<uint32_t> {
+    const auto it = words.find(address);
+    return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  for (uint32_t mode = 0; mode < 6; ++mode) {
+    words[visual+1864] = mode;
+    assert(CheckNativeDeferredContract(visual,read) == mode);
+  }
+  const auto valid = words;
+  for (const auto &[address,value] : std::array<std::pair<uint64_t,uint32_t>,12>{{
+      {registry+8,1}, {0x1000,shader}, {0x2000,0x82174270},
+      {0x2104,0x82174C60}, {registry+20,12}, {0x3004,0x82DD6100},
+      {0x3028,0x82DD6FC0}, {0x5008,0xDEADBEEF}, {0x500C,0},
+      {0x4024,0x82174C60}, {visual+3000,14}, {visual+1864,6}}}) {
+    words = valid; words[address] = value;
+    assert(!CheckNativeDeferredContract(visual,read));
+  }
+  words = valid; words.erase(0x4020);
+  assert(!CheckNativeDeferredContract(visual,read));
+  words = valid; words[registry+20] = 1; words[0x3000] = shader;
+  assert(CheckNativeDeferredContract(visual,read) == 5); // optional features removed
+  assert(!CheckNativeDeferredContract(0,read));
+}
 
 void TestMixedOrder() {
   const std::array<float,3> compatibility{10,30,20};
@@ -174,6 +221,7 @@ void TestDepth() {
 }
 
 int main() {
+  TestCallbackContract();
   TestMixedOrder();
   TestDepth();
   std::array items{DeferredSortItem{2, 0}, DeferredSortItem{-1, 1},
