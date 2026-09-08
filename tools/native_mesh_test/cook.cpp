@@ -217,6 +217,20 @@ static void TestSkinCook() {
   const auto skin_input = NativeSkinShadowVertexInput(cooked,skin_inputs);
   Check(skin_input && skin_input->Elements().size() == 5 && skin_input->ShaderDecode() == VertexShaderDecode{},
       "native skin GPU signature has no source decoder state");
+  Check(!NativeSkinShadowVertexInput(cooked,skin_inputs,true),"cutout skin cannot invent missing UVs");
+  auto with_uv = cooked;
+  with_uv.attributes.insert(with_uv.attributes.begin(),{MeshSemantic::TexCoord,0,0});
+  for (size_t n = 0; n < with_uv.attributes.size(); ++n) with_uv.attributes[n].offset = uint32_t(n*16);
+  with_uv.layout = NativeMeshLayoutId(with_uv.attributes);
+  auto &uv_stream = with_uv.streams[0]; const auto &skin_stream = cooked.streams[0];
+  uv_stream.stride += 16; uv_stream.bytes.assign(skin_stream.bytes.size()/skin_stream.stride*uv_stream.stride,0);
+  for (size_t n = 0; n < skin_stream.bytes.size()/skin_stream.stride; ++n)
+    std::memcpy(uv_stream.bytes.data()+n*uv_stream.stride+16,skin_stream.bytes.data()+n*skin_stream.stride,skin_stream.stride);
+  auto cutout_input = NativeSkinShadowVertexInput(with_uv,skin_inputs,true);
+  Check(cutout_input && cutout_input->Elements().size() == 6 && cutout_input->Elements()[5].alignedByteOffset == 0 &&
+      cutout_input->Elements()[5].location == 5 && cutout_input->ShaderDecode() == VertexShaderDecode{},
+      "cutout skin resolves owned TexCoord0 independently of source shader locations");
+  with_uv = {}; Check(cutout_input->Elements()[0].alignedByteOffset == 16,"cutout layout survives source destruction");
   Check(envelopes && envelopes->size() == 3 && conservative,"load-time native joint envelopes");
   const std::array<float,3> expected{.6f,18.4f,21.3f};
   Check(bool(bounds),"native skin consumes owned pose");

@@ -31,7 +31,7 @@
 REXCVAR_DECLARE(bool, bd_occlusion_cull);
 REXCVAR_DECLARE(bool, bd_occlusion_diag);
 REXCVAR_DEFINE_BOOL(bd_native_skin_shadow, true, kCvarGroup,
-    "Native opaque phase1 skin casters from load-owned vertices and completed instance poses; requires native shadow path.");
+    "Native phase1 opaque/cutout skin casters from owned vertices, poses and images; requires native shadow path.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
     "Fail-closed native opaque and phase1 cutout rigid caster families; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
@@ -150,7 +150,7 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   const bool cutouts = std::any_of(admission.policies.begin(), admission.policies.end(),
       [](const auto &policy) { return policy.alpha_test; });
   const char *refusal = "whole-node caster resources or matrices unavailable";
-  const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal)
+  const auto plans = cutouts ? PrepareNativeRigidShadowForObject(pose, node, *camera, refusal, skin)
       : PrepareNativeRigidShadow(*model, pose.transforms[node], *inputs, *camera, {}, skin ? &pose : nullptr);
   if (!plans) BD_ERROR("[native-shadow-packet] instance {} generation {} node {} phase {} cutouts {} ranges {}; {}",
       pose.instance, pose.model_generation, node, inputs->phase, cutouts, model->ranges.size(), refusal);
@@ -174,14 +174,19 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   for (const auto &plan : *plans) {
     if (!plan.draw) continue;
     const auto &geometry = plan.geometry;
-    const auto &vertex_input = geometry->skin_influences ? geometry->skin_shadow_vertex_input : geometry->rigid_vertex_input;
+    const auto &vertex_input = geometry->skin_influences
+        ? (plan.albedo ? geometry->skin_shadow_cutout_vertex_input : geometry->skin_shadow_vertex_input)
+        : geometry->rigid_vertex_input;
     auto program = std::find_if(store.programs.begin(), store.programs.end(), [&](const auto &p) {
       return p.input == vertex_input;
     });
     if (program == store.programs.end()) {
       Require(store.programs.size() < 16, "native program capacity reached");
       NativeRigidPrograms shaders;
-      if (geometry->skin_influences) shaders.shadow = CreateNativeSkinShadowProgram(*s.device,vertex_input);
+      if (geometry->skin_influences) {
+        shaders.shadow = CreateNativeSkinShadowProgram(*s.device,vertex_input,bool(plan.albedo));
+        if (plan.albedo) shaders.shadow_cutout = shaders.shadow;
+      }
       else shaders = CreateNativeRigidPrograms(*s.device, vertex_input);
       Require(shaders.shadow && (geometry->skin_influences || (shaders.scene && shaders.shadow_cutout)), "native shader creation failed");
       store.programs.push_back({vertex_input, std::move(shaders)});

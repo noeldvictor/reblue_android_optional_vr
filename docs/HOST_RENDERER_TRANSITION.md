@@ -668,9 +668,15 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    skin geometry exists, but generation97/node47 (4primitives) and node62
    (6primitives) reject for `unconverted cutout sibling`. Generation38/node1
    (44primitives) uses technique1 with texture-dependent participation.
-   Next connect skin deformation to the existing shadow cutout producer, UV/base
-   image/wrap-sampler contract and fixed0.6-alpha shader; preserve whole-node
-   admission and test these mixed siblings before another broad run. Then handle
+   **Cutout source checkpoint:** skin deformation now connects to the existing
+   shadow cutout producer, UV/base image/wrap-sampler contract and fixed0.6-alpha
+   shader, preserving whole-node admission. Added fixtures cover mixed4/6-sibling
+   nodes, missing UV/image refusal, alpha boundaries and overlapping instanced
+   shadows across1/2/3 influences. All379 Python source/scenario checks pass;
+   changed C++ fixtures, shader compilation, GPU pixels and live emission remain
+   pending. These source changes do not update the host158 binary or its evidence.
+   Next build/run the affected fixtures and verify the connected live consumer.
+   Then handle
    technique1 participation using owned image classes, not an assumed ordinary
    texture or relaxed rejection. Reuse `PrepareNativeRigidShadowForObject`, the
    current skin vertex/palette owner and the shared queue. Native scene shading,

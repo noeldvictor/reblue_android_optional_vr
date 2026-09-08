@@ -1746,8 +1746,35 @@ void SkinCasterOwnership() {
   invalid.skin_geometries.push_back(nullptr);
   assert(!PrepareNativeRigidShadow(invalid,transforms[0],policy,camera,{},a.get())); // transactional siblings
   invalid = *program; invalid.policy_steps = {{PrimitivePolicyOperation::Alpha,1,0}}; invalid.ranges[0].policy_step_end = 1;
-  const auto alpha_refusal = PrepareNativeRigidShadowAdmission(invalid,policy,true);
-  assert(alpha_refusal.route == NativeRigidCasterRoute::Legacy && std::string_view(alpha_refusal.reason) == "unconverted cutout sibling");
+  assert(PrepareNativeRigidShadowAdmission(invalid,policy,true).route == NativeRigidCasterRoute::Native);
+  assert(!PrepareNativeRigidShadow(invalid,transforms[0],policy,camera,{},a.get())); // image/UV packets still mandatory
+  auto cutout_image = std::make_shared<NativeTextureGpu>();
+  cutout_image->image = std::make_unique<SceneSource>(); cutout_image->view = std::make_unique<RenderTextureView>();
+  cutout_image->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  geometry->skin_shadow_cutout_vertex_input = geometry->skin_shadow_vertex_input; // fake GPU input in CPU admission test
+  for (uint32_t siblings : {4u,6u}) {
+    auto mixed = *program; mixed.ranges.resize(siblings,mixed.ranges[0]);
+    mixed.geometries.resize(siblings); mixed.skin_geometries.resize(siblings,geometry);
+    mixed.policy_steps = {{PrimitivePolicyOperation::Alpha,1,0}};
+    for (uint32_t n = 1; n < siblings; ++n) mixed.ranges[n].policy_step_end = 1;
+    std::vector<NativeRigidShadowCutout> images(siblings);
+    for (uint32_t n = 1; n+1 < siblings; ++n) {
+      images[n].textured = images[n].owns_uv = true; images[n].image.primary = cutout_image;
+      images[n].uv = {.25f,.5f,0,0};
+      images[n].sampler = NativeMaterialSampler2D{{},MaterialSampleAddress::Wrap,MaterialSampleAddress::Wrap};
+    }
+    const auto build = [&] { return PrepareNativeRigidShadow(mixed,transforms[0],policy,camera,images,a.get()); };
+    auto covered = build();
+    assert(covered && covered->size() == siblings && !covered->front().albedo && !covered->back().albedo);
+    assert(covered->at(1).albedo == cutout_image && covered->at(1).skin_bounds &&
+        std::bit_cast<float>(covered->at(1).object.flags.w) == .6f);
+    images[siblings-2].owns_uv = false; assert(!build()); images[siblings-2].owns_uv = true;
+    images[siblings-2].image.primary.reset(); assert(!build()); images[siblings-2].image.primary = cutout_image;
+    geometry->skin_shadow_cutout_vertex_input.reset(); assert(!build());
+    geometry->skin_shadow_cutout_vertex_input = geometry->skin_shadow_vertex_input;
+    mixed.skin_geometries.back().reset(); assert(!build()); // late sibling refuses the entire node
+    mixed = {}; images.clear(); assert(covered->at(1).albedo && covered->at(1).geometry);
+  }
   auto other_technique = policy; other_technique.technique = 1; other_technique.texture_effects = true;
   assert(std::string_view(PrepareNativeRigidShadowAdmission(*program,other_technique,true).reason) == "unconverted technique/phase");
   const std::array<std::shared_ptr<const NativeInstancePose>,3> poses{a,b,a};

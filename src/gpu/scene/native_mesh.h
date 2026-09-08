@@ -55,6 +55,7 @@ struct NativeGeometry {
   NativeVertexInputHandle layered_rigid_vertex_input; // explicit TexCoord2, no substituted UV
   NativeVertexInputHandle water_vertex_input; // authored tangent, resolved at load
   NativeVertexInputHandle skin_shadow_vertex_input;
+  NativeVertexInputHandle skin_shadow_cutout_vertex_input; // explicit TexCoord0; never a substitute UV
   uint32_t skin_influences = 0;
   std::vector<NativeSkinJointBounds> skin_bounds;
   std::optional<float> wave_weight; // indexed maximum |COLOR0.r|, CPU-derived

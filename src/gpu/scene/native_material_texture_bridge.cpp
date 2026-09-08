@@ -410,7 +410,7 @@ NativeObjectTextureState::Mesh *PrepareReplayMaterialMesh(const NodeTag &tag) {
 } // namespace
 
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
-    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal) {
+    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal, bool skin) {
   const auto *scope = current;
   refusal = "shadow object scope/pose/phase unavailable";
   if (!scope || !scope->shadow_phase || scope->render_view != 1 || scope->pose.get() != &pose ||
@@ -420,7 +420,7 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
   refusal = "shadow owned node/admission unavailable";
   const auto *program = FindNativeInstanceNode(pose, node);
   if (!program) return {};
-  const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs);
+  const auto admission = PrepareNativeRigidShadowAdmission(*program, scope->policy_inputs,skin);
   if (admission.route != NativeRigidCasterRoute::Native) return {};
   const auto *mesh = PrepareMaterialMesh(*program);
   refusal = "shadow owned texture recipe unavailable";
@@ -445,7 +445,7 @@ std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObj
     }
   }
   refusal = "shadow canonical geometry, matrices or sampled image contract unavailable";
-  auto plans = PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts);
+  auto plans = PrepareNativeRigidShadow(*program, pose.transforms[node], *scope->policy_inputs, camera, cutouts,skin ? &pose : nullptr);
   if (!plans) for (size_t n=0;n<std::min<size_t>(8,cutouts.size());++n) {
     const auto &geometry = program->geometries[n];
     const auto &cutout = cutouts[n];

@@ -35,15 +35,18 @@ struct NativeRigidPrograms { NativePipelineHandle scene, shadow, shadow_cutout; 
 // this function does not accumulate a global cache or read any source resources.
 NativeRigidPrograms CreateNativeRigidPrograms(plume::RenderDevice &device,
                                               NativeVertexInputHandle input);
-NativePipelineHandle CreateNativeSkinShadowProgram(plume::RenderDevice &device, NativeVertexInputHandle input);
+NativePipelineHandle CreateNativeSkinShadowProgram(plume::RenderDevice &device, NativeVertexInputHandle input,
+                                                  bool cutout = false);
 
 inline NativeVertexInputHandle NativeSkinShadowVertexInput(const NativeMeshData &mesh,
-                                                          NativeVertexInputLibrary &library) {
+                                                          NativeVertexInputLibrary &library, bool cutout = false) {
   const auto influences = NativeMeshSkinInfluences(mesh.attributes);
   if (!influences || !ValidateNativeMesh(mesh) || mesh.streams[0].stride > 255) return {};
-  std::array<plume::RenderInputElement,5> elements{};
-  for (uint32_t n = 0; n < elements.size(); ++n) {
-    const auto semantic = n < 3 ? MeshSemantic::SkinPosition : n == 3 ? MeshSemantic::SkinJoints : MeshSemantic::SkinWeights;
+  std::array<plume::RenderInputElement,6> elements{};
+  const uint32_t count = cutout ? 6 : 5;
+  for (uint32_t n = 0; n < count; ++n) {
+    const auto semantic = n < 3 ? MeshSemantic::SkinPosition : n == 3 ? MeshSemantic::SkinJoints :
+        n == 4 ? MeshSemantic::SkinWeights : MeshSemantic::TexCoord;
     // Inactive lanes have zero weights. Reuse a valid position fetch rather
     // than advertise an unbound input or carry a console missing-stream rule.
     const uint32_t index = n < influences ? n : 0;
@@ -51,10 +54,10 @@ inline NativeVertexInputHandle NativeSkinShadowVertexInput(const NativeMeshData 
       return a.semantic == semantic && a.index == (n < 3 ? index : 0);
     });
     if (a == mesh.attributes.end()) return {};
-    elements[n] = {n < 3 ? "POSITION" : n == 3 ? "BLENDINDICES" : "BLENDWEIGHT",
+    elements[n] = {n < 3 ? "POSITION" : n == 3 ? "BLENDINDICES" : n == 4 ? "BLENDWEIGHT" : "TEXCOORD",
         n < 3 ? n : 0,n,plume::RenderFormat::R32G32B32A32_FLOAT,0,a->offset};
   }
-  return library.Resolve(elements,1,{});
+  return library.Resolve(std::span(elements).first(count),1,{});
 }
 
 // Native shader locations come from the named asset schema, not the translated

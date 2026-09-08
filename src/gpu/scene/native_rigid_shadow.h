@@ -78,7 +78,7 @@ inline NativeRigidCasterAdmission PrepareNativeRigidCasterAdmission(
   for (const auto &policy : policies) {
     if (!policy.routing_known) return {unsupported,{},"unknown primitive routing"};
     if (policy.deferred && !shadow_deferred) return {unsupported,{},"unconverted deferred participation"};
-    if (policy.alpha_test && (!scene_cutouts || skinned)) return {unsupported,{},"unconverted cutout sibling"};
+    if (policy.alpha_test && !scene_cutouts) return {unsupported,{},"unconverted cutout sibling"};
   }
   return {NativeRigidCasterRoute::Native, std::move(policies),"owned caster"};
 }
@@ -98,7 +98,7 @@ inline NativeRigidCasterAdmission PrepareNativeRigidShadowAdmission(
   return admission;
 }
 std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShadowForObject(
-    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal);
+    const NativeInstancePose &pose, uint32_t node, const RenderCamera &camera, const char *&refusal, bool skin = false);
 inline std::optional<NativeBounds> NativeSkinCasterBounds(const NativeModelMaterialProgram &program,
     const NativeInstancePose &pose, uint32_t node) {
   if (node >= pose.transforms.size() || program.skin_geometries.size() != program.ranges.size() ||
@@ -157,6 +157,7 @@ inline std::optional<std::vector<NativeRigidShadowPlan>> PrepareNativeRigidShado
       if (cutouts.empty()) return {};
       const auto &cutout = cutouts[n];
       if (cutout.textured) {
+        if (skinned && !geometry->skin_shadow_cutout_vertex_input) return {};
         if (!policy.deferred) return {}; // direct callbacks select shadownull VS
         const auto &image = cutout.image.primary;
         if (!cutout.owns_uv || !image || !image->image || !image->view || cutout.image.slice_2d || cutout.image.cube ||

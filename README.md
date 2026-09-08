@@ -78,15 +78,18 @@ and other unadmitted families still use the legacy producer. Game water/reflecti
 pixels, HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
 [Completed image connection, verification and remaining work](research/20260908_1345_native-water-images.md).
 
-**Characters (2026-09-08, CPU/GPU-tested; live admission incomplete):** native skin
+**Characters (2026-09-08, opaque path CPU/GPU-tested; cutout source checkpoint):** native skin
 geometry, animated bounds and owned pose palettes connect to the existing shadow
 queue and frame fences. Six Vulkan pixel cases cover one-to-three influences and
 single/instanced casters; the host build and CPU lifetime/capacity tests pass.
-Live probes confirm skin geometry loads, but observed ordinary nodes have cutout
-siblings that the opaque-only path rejects. Another observed family needs
-technique-1 texture-dependent participation. No native skin-shadow game emission
-is proven yet. Next pair skinning with the existing cutout image/UV/sampler owner;
-skinned scene shading and native animation production also remain pending.
+Live probes of the opaque-only build confirm skin geometry loads but reject
+ordinary nodes with cutout siblings. Source now connects skin deformation to the
+existing cutout image/UV/sampler owner and fixed-alpha shader, with mixed-sibling,
+missing-resource and alpha-edge fixtures added. All 379 Python source/scenario
+checks pass; the changed C++ fixtures, shaders, GPU pixels and live game emission
+are not yet verified. Another observed family needs technique-1 texture-dependent
+participation; skinned scene shading and native animation production also remain
+pending. No native skin-shadow game emission is proven yet.
 Host158 is built; host155/run980 remains the last complete strict reload result.
 No speedup or full native character/frame completion is claimed.
 [Verification, exact live refusals and next connection](research/20260908_1100_native-skin-caster-verification.md).

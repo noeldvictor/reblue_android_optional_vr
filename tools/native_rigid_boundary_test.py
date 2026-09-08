@@ -208,8 +208,9 @@ class NativeRigidBoundaryTest(unittest.TestCase):
 
     def test_production_shaders_do_not_import_the_translated_abi(self):
         paths = list((ROOT / "src/gpu/shaders/hlsl").glob("native_rigid_*.hlsl"))
-        paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h"]
-        self.assertEqual(len(paths), 9)
+        paths += [ROOT / "src/gpu/scene/native_rigid_shader.h", ROOT / "src/gpu/scene/native_rigid_vertex.h",
+                  ROOT / "src/gpu/scene/native_skin_vertex.h"]
+        self.assertEqual(len(paths), 11)
         for path in paths:
             text = path.read_text()
             for forbidden in ("shader_common.h", "g_VSC", "g_PSC", "BD_SHARED", "BOOL_BIT", "GuestShader", "packoffset"):
@@ -226,10 +227,16 @@ class NativeRigidBoundaryTest(unittest.TestCase):
             self.assertIn(required, direct)
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
         self.assertLess(walk.index("NativeSkinCasterBounds("), walk.index("PublishNodeSphere(out, radius)"))
-        shader = (ROOT / "src/gpu/shaders/hlsl/native_rigid_skin_shadow_vs.hlsl").read_text()
+        shader = (ROOT / "src/gpu/scene/native_skin_vertex.h").read_text()
         self.assertIn("skin_joints[range.x+joint]", shader)
         self.assertNotIn("object_data.world", shader)
         self.assertNotIn("exMatrix", shader)
+        bridge = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
+        self.assertIn("camera, cutouts,skin ? &pose : nullptr", bridge)
+        cutout = (ROOT / "src/gpu/shaders/hlsl/native_rigid_skin_shadow_cutout_vs.hlsl").read_text()
+        self.assertIn("NativeSkinWorld(", cutout)
+        self.assertIn("object_data.uv_scale_offset", cutout)
+        self.assertNotIn("object_data.world", cutout)
 
     def test_gpu_fixture_uses_production_programs_and_real_pixels(self):
         text = (ROOT / "tools/native_scene_snapshot_test/rigid.cpp").read_text()

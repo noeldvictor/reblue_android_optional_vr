@@ -128,6 +128,7 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   result->layered_rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs, true);
   result->water_vertex_input = std::move(water_input);
   result->skin_shadow_vertex_input = std::move(skin_input);
+  if (influences) result->skin_shadow_cutout_vertex_input = NativeSkinShadowVertexInput(data,s.vertex_inputs,true);
   result->skin_influences = influences;
   if (skin_bounds) result->skin_bounds = std::move(*skin_bounds);
   s.skin_bounds_bytes += bounds_bytes;

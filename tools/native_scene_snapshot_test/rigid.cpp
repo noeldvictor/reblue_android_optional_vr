@@ -44,7 +44,7 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
 void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore = true,
          uint32_t deferred = 0, uint32_t skin = 0) {
   Need(!deferred || (mode == 19 && !stale && restore), "Deferred ordering fixture scope");
-  Need(!skin || (skin <= 3 && (mode == 1 || mode == 4) && !stale && !deferred),"Skin caster fixture scope");
+  Need(!skin || (skin <= 3 && (mode == 1 || mode == 4 || mode >= 37) && !stale && !deferred),"Skin caster fixture scope");
   const bool cutout = (mode >= 12 && mode < 23) || mode == 40, untextured = mode == 10 || mode == 21;
   const bool shadow_cutout = mode >= 23, shadow_untextured = mode == 31 || mode == 36 || mode == 38;
   const bool cutout_receiver = mode >= 37;
@@ -173,6 +173,9 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
   if (skin) {
     NativeMeshData asset;
     asset.indices = {0,1,2,0,2,3};
+    const bool textured_skin = shadow_cutout && !shadow_untextured;
+    const uint32_t prefix = textured_skin ? 16 : 0;
+    if (textured_skin) asset.attributes.push_back({MeshSemantic::TexCoord,0,0});
     for (auto semantic : {MeshSemantic::SkinPosition,MeshSemantic::SkinNormal})
       for (uint32_t n = 0; n < skin; ++n) asset.attributes.push_back({semantic,n,uint32_t(asset.attributes.size()*16)});
     asset.attributes.push_back({MeshSemantic::SkinJoints,0,uint32_t(asset.attributes.size()*16)});
@@ -185,13 +188,14 @@ void Run(RenderDevice &device, uint32_t mode, uint32_t stale = 0, bool restore =
     for (uint32_t v = 0; v < 4; ++v) {
       const auto &p = vertices[v].position;
       const RigidFloat4 positions[]{{p.x+.25f,p.y,p.z,0},{p.y,p.x,p.z,0},{-p.x,p.y,p.z,0}};
+      if (textured_skin) std::memcpy(asset.streams[0].bytes.data()+v*skin_stride,&vertices[v].uv,16);
       for (uint32_t n = 0; n < skin; ++n)
-        std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+n*16,&positions[n],16);
-      std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+skin*32,&joints,16);
-      std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+skin*32+16,&weights,16);
+        std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+n*16,&positions[n],16);
+      std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+skin*32,&joints,16);
+      std::memcpy(asset.streams[0].bytes.data()+v*skin_stride+prefix+skin*32+16,&weights,16);
     }
-    auto skin_input = NativeSkinShadowVertexInput(asset,inputs);
-    skin_program = CreateNativeSkinShadowProgram(device,skin_input);
+    auto skin_input = NativeSkinShadowVertexInput(asset,inputs,textured_skin);
+    skin_program = CreateNativeSkinShadowProgram(device,skin_input,textured_skin);
     Need(bool(skin_program),"Production native skin caster shader");
     skin_vb = Upload(device,asset.streams[0].bytes.data(),skin_vertex_bytes,RenderBufferFlag::VERTEX);
     std::vector<uint8_t> palette_bytes(palette_offset+instance_count*3*sizeof(RigidMatrix),0xCD);
@@ -609,5 +613,6 @@ void CheckNativeRigid(plume::RenderDevice &device) {
     Run(device,0,stale,true);
   }
   for(uint32_t deferred=1;deferred<=3;++deferred) Run(device,19,0,true,deferred);
-  for(uint32_t skin=1;skin<=3;++skin) for (uint32_t mode : {1u,4u}) Run(device,mode,0,true,0,skin);
+  for(uint32_t skin=1;skin<=3;++skin)
+    for (uint32_t mode : {1u,4u,37u,38u,39u,41u,42u,43u,44u,45u}) Run(device,mode,0,true,0,skin);
 }
