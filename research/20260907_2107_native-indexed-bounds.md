@@ -118,3 +118,93 @@ coverage and the distinct timeout log. Three new reusable material-cache records
 total204 B; no raw or new image output. Last recorded free space81,040,945,152 B,
 213,766,144 B below the starting drive reading; that drive-wide change is not
 wholly attributable to the counted files. Prior cleanup is not credited again.
+
+## Readiness/culling observation follow-up (host121, 2026-09-07)
+
+Source checkpoint9c4a6b7 separates observation from acceptance, without changing
+rendering or autoplay movement. `NativeRigidReloadReadiness` preserves paused/
+walking/stage and exact250 ms freshness checks. The bridge reports at most64
+window transitions, with blocker bits (1 paused,2 not walking,4 wrong stage,
+8 stale), observation age, input poll gap, autoplay blockers/episode and actual
+scene/shadow window endpoints. No new guest reads or per-tick logging.
+
+330 Python checks pass0.151 s. Output41/PID26688 and CPU24/PID37792 terminate0;
+the C++ fixture passes0.36/0.38 s, including249,999,999 vs250,000,000 ns and the
+loss of899 prior emissions on stale observation. No shader changes or fresh GPU
+fixture claimed; prior occlusion5 remains the actual query/binding evidence.
+Host121/PID38032/session58654 terminates0,18 scheduled host steps/codegen0 written,
+no guest objects. Binary stampfc8fdbf dirty, not the later source commit.
+Exe48,711,168 B SHA256
+`5BED5D92099DAC39BD3369E541BF1C31AAE45677A2631A8E65F8E14250D4792A`;
+PDB109,723,648 B SHA256
+`BFBC27D8D742F9DED02D0102463EE8E616194EBBD8C5A7EF6F4C43476BC7B5A9`.
+
+The existing scenario tool adds the standalone read-only command:
+
+```powershell
+python -B tools/native_instance_scenario.py <owned-current-log> --occlusion-observation
+```
+
+It bounds input to800 KiB and requires consecutive recent post-event field
+contexts with advancing native requests, queries, collection and skips; counters
+before the latest context, shutdown, teardown, mismatches or stale/zero deltas
+cannot trigger capture. It rejects combination with acceptance flags and prints
+OBSERVED, never a reload/pixel PASS. The ignored existing supervisor invokes it
+once per new query sample, then takes one bounded owned-window JPEG. It continues
+the unchanged full strict reload chain afterward; the JPEG cannot satisfy that
+chain or change its exit status. PowerShell parsing and artifact-free scenario
+tests pass. Completed960's last loading context correctly returns Pending.
+
+Run961/PID33484/session3602 starts21:33:41 with the same21 effective settings,
+300 s/800 KiB/192 MiB/75 MiB overlap limits, Count0 and110 KiB JPEG reservation.
+Source and profile checks precede launch; existing finally cleanup owns shutdown
+and byte-exact profile restoration. Final live result follows below.
+
+### Run961 final: strict text gates pass, requested image missing
+
+The owned process terminates21:35:45; the supervisor exits1 for incomplete
+requested window inspection. Full strict cold/reload/material/receiver/lighting/
+cutout checks pass before shutdown. This is a text-gate pass, not an overall
+acceptance pass. There are no new game pixels. The original profile hash remains
+`2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0`.
+Retained log506,703 B SHA256
+`7AA01668CDEA82D187C1204B3109D2C5FF7D057FCA74A6DF15A1F7BF4408675C`.
+
+Cold generation93/instance144 qualifies scene/shadow759->1660, then closes at
+title1661/1661/1661. Reload generation207/instance385 qualifies762->1662 at
+21:35:43.625. Exactly two readiness starts are logged; no reset is observed.
+Run960's failure remains unexplained: non-reproduction is not a fix.
+
+Last query frame4800:27,193 requests,7,702 queries,7,697 collected,3,396 zeros,
+304 native skips, history5. Refusals:19,491 invalid bounds,72 no history,
+10 changed depth,6,860 changed camera,70 warming,386 visible,304 occluded;
+other reasons0. All304 skips are already present at frame3900, before the first
+reloaded interactive context4084. Subsequent4200/4500/4800 samples have no new
+skips. The fresh-culling trigger correctly does not accept event-era totals as
+interactive visibility. It does not prove that no individual interactive frame
+could ever cull; the evidence is this bounded run's sampled windows.
+
+Fresh reloaded4384..4684:2,450 native scene emissions/2,449 retirements; wider
+casters33,226/33,232, textured scene900/900 and textured shadow300/300. Scene
+indirect calls2,450 and merged instances0: this window is singleton-only and does
+not supersede959's distinct batching proof. Movement episode1 advances143.893886
+units; layered/inherited/both-eye coverage remains separately unqualified.
+
+The supervisor also exposed a sequencing mistake: it stopped on the completed
+text gate even though a separately requested image remained pending. Its local
+condition now requires both before success shutdown, under the same300-second
+limit; parser syntax checked, not live-retested. No fresh boot merely to wait for
+different framing or a readiness reset. Next change must address native
+moving-view/depth visibility with current-frame native depth/queue consumers and
+causal GPU coverage. Keep exact-camera history safety until its consumer is
+replaced; do not lower900, raise250 ms or relax freshness/image triggers.
+
+Retired only six replaced output40/CPU23/host120 stdout/stderr logs,7,639 logical
+B, after output41/CPU24/host121 and current strict reload proof. Findings/build
+hashes remain here; commands/source reproduce these superseded logs. No image,
+raw, profile, game data or failure log removed. Immediate free-space gain12,288 B
+is not isolated from volume activity. Counted retained net+539,321 B, chiefly the
+new current-runtime log and expanded CPU fixture; other host objects/CMake/source/
+Git are not allocated. Ending measured free80,978,022,400 B is16,195,584 B below
+this continuation's starting reading. No new cache/perf/dump/raw/image outputs.
+All producer handles are terminal; the same cumulative allowance/floor applies.

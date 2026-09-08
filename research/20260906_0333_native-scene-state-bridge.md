@@ -3774,3 +3774,30 @@ strict settings,300 s/800 KiB/192 MiB/75 MiB overlap and one110 KiB JPEG within
 the existing172,616 B headroom. No raw/perf/dumps or asset conversion requested;
 bounded existing material caches remain counted. Retire only superseded fixture
 logs after replacement passes; preserve all prior failure and accepted pixels.
+
+Output41/PID26688 and CPU24/PID37792 terminate0 (0.36/0.38 s); host121/PID38032/
+session58654 terminates0,18 scheduled host steps, codegen0 written, no guest
+objects. Source checkpoint9c4a6b7 is pushed before run961. The2107 report records
+actual binary hashes/stamp and the separate-observation contract.
+
+Run961/PID33484/session3602 terminates21:35:45 with supervisor exit1 for missing
+requested image. Its full strict cold/reload text chain passes, with no readiness
+reset observed; no cause/fix for960 is claimed. No new interactive-field skip
+delta reaches the image trigger. The supervisor's early text-pass stop is now
+corrected locally, syntax checked only; no further boot. Profile restored exactly,
+no cache/perf/dump/raw/image growth found. Retain961's506,703 B current strict
+native-bounds reload proof and960 failure;959 still owns distinct batching proof.
+
+Removed six superseded output40/CPU23/host120 stdout/stderr logs,7,639 logical B,
+after inspecting their replacement and old terminal success evidence. Reproducible
+from source/commands; build hashes/findings remain2107. Immediate free gain12,288 B
+is not isolated from other volume activity. No prior cleanup double-credited and
+no protected runtime failure, game data, profile, raw or image file removed.
+
+Texture fixture72,201,319 B/129 files (+16,754), aggregate build/test logs227,957 B/
+150 (-3,592), exe/PDB+3,072/+16,384 and new runtime961+506,703. Counted retained
+net+539,321 B for expanded CPU coverage and current strict reload evidence;
+other host objects/CMake/source/Git are not allocated. Image archive unchanged
+10,313,144 B/9 files,172,616 B headroom. Ending free80,978,022,400 B is16,195,584 B
+below the continuation's first drive reading, not wholly attributed to counted
+files. All producers terminal; original3 GiB allowance/floor unchanged.

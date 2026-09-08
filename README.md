@@ -150,15 +150,20 @@ from native occlusion; primitive identities keep sibling visibility independent.
 Legacy-only nodes still consume no query/history capacity. The old translated
 query shader/upload and address-keyed draw filter remain removed.
 
-327 Python checks, expanded C++ behavior fixtures and eight two-fence Vulkan
-query cases pass, with zero GPU validation errors/warnings. Run960 records
-24,011 submitted/collected queries and **1,026 native primitive skips**. Cold
-teardown passes, but the run times out at 300 seconds before the reloaded epoch
-meets the existing continuous-readiness gate. **No image was captured; reload
-and game-pixel acceptance remain open.** The readiness-reset cause is not yet
-established. Moving-view visibility, tree-gap investigation and stereo culling
-also remain open; no safety checks were relaxed and no speedup is measured.
-[Indexed bounds, actual culling and unresolved reload gate](research/20260907_2107_native-indexed-bounds.md).
+Run960 records24,011 submitted/collected queries and **1,026 native primitive
+skips**, but times out before reload qualification. **Host121/run961 now passes
+the full strict cold/reload checks with those native bounds**, including900 fresh
+scene and shadow emissions in each epoch and old-source/GPU retirement. Its
+bounded readiness logging sees no reset; run960's timeout is not explained away.
+
+330 Python checks and the expanded CPU fixture pass; the unchanged query shader
+retains its eight two-fence Vulkan cases with zero validation errors/warnings.
+Run961 records304 skips, but none advance in its sampled interactive-field
+windows. The separate image observation therefore does not qualify, and the
+overall run exits1 for the missing requested image. **Game pixels, moving-view
+visibility, tree-gap investigation and stereo culling remain open.** No timing
+gain or complete host-owned frame is claimed; no safety checks were relaxed.
+[Indexed bounds, strict reload proof and remaining visibility gates](research/20260907_2107_native-indexed-bounds.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

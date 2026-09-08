@@ -186,19 +186,36 @@ No image was captured. Neither culling correctness nor a cause for the missing
 reload gate is proven. Host119/run959 remains the preceding full strict reload
 pass; host107/run945 remains the accepted game-pixel checkpoint.
 
-Next verification must obtain bounded readiness-reset provenance and a separately
-timed image of actual culling, so one pending lifecycle gate does not prevent all
-visual observation. Keep the existing900-emission continuous window and250 ms
-observer-freshness requirement; do not lower thresholds, count culled draws as
-emissions or retry unchanged until a pass. The current log cannot distinguish a
-walking/readiness interruption from stale observation. Continue moving-view/depth
-visibility ownership without loosening camera equality or temporal safety.
-Controlled hidden/visible game pixels, the tree-gap investigation, stereo and
-the broad desktop acceptance gate remain required.
+Host121/run961 follow-up now passes the full strict cold/reload chain with the
+indexed native bounds: generation93/instance144 retires before207/385, both
+900-emission windows pass, and fresh material/receiver/light/cutout gates pass.
+330 Python checks and output CPU24 pass; query shaders are unchanged. Bounded
+readiness transition reporting is connected, but this run observes only two
+window starts and no reset. It does not explain960's timeout or fix a known cause.
+
+Its separate fresh-culling image trigger sees no positive skip delta in the
+sampled interactive-field windows (304 cumulative skips are already present at
+the end of the opening event). The supervisor exits1 for the missing image after
+the strict text gate passes. Its early-stop condition is corrected locally to
+wait for both requested outcomes within the same limit; no unchanged retry.
+Readiness reporting remains bounded64 lines, and the900-emission/250 ms gates
+remain strict. Captured pixels, if any, cannot satisfy or bypass reload acceptance.
+
+Next connected bundle: moving-view/depth visibility through current-frame native
+depth and the existing rigid queue, indexed bounds and native image owners.
+Inspect `src/gpu/occlusion_cull.cpp`, the native rigid consumer and pass ordering;
+prove moving-camera and changing-occluder behavior in the existing GPU fixture
+before another game boot. Exact-camera history cannot provide general moving-view
+culling; do not relax its equality or temporal checks to manufacture skips.
+The separate observation tool is ready for a changed implementation; it is not
+a reason to repeat diagnostic-only boots. Controlled hidden/visible game pixels,
+the tree-gap investigation, stereo and the full desktop gate remain required.
 
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB
 run960 image was not produced. Preserve960's timeout evidence along with957/948/941.
+Run961 also produced no image; its506,703 B log is the current strict reload proof,
+while959 retains distinct real multi-instance batching evidence.
 [Indexed native bounds, current result and storage](../research/20260907_2107_native-indexed-bounds.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
