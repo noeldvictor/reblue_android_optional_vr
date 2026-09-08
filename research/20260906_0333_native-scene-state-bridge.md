@@ -4126,3 +4126,46 @@ host objects, source/Git and unrelated volume activity are separate. All owned
 producers terminal; exact owner profile restored. Image total10,378,927 B leaves
 106,833 B, short of the next110 KiB reservation. No additional game run or raw
 capture; preserve963 and preflight a distinct next export before launching.
+
+### Corrected encoder live continuation (2026-09-08)
+
+Previous turn made progress:0efb3d0 pushed, host126 and CPU30 pass;963's invalid
+JPEG remains preserved. First free79,952,072,704 B; no owned renderer/build/test
+live, host126 EXE hash and exact116 B owner-profile hash still match. Reuse the
+actual a6727b6-dirty binary; no restamp build or unchanged fixture rerun.
+Read current devloop/disk policy and the entire local run supervisor. Planned
+run964 uses the same strict reload/field/culling observation,300 s,800 KiB text,
+110 KiB JPEG,64 B request and192 MiB/free-floor guard; raw/perf/dump/cook off.
+Before launch, losslessly recompress only the reviewed scene-commands PNG under
+4 MiB temporary overlap, retaining exact chunks/scanlines/decoded pixels. Preserve
+963's JPEG/request under explicit truncated-evidence names (rename only, still
+counted, no space credited), then check the existing aggregate budgets. The
+new observation is a valid renderer-owned post-gamma frame using the corrected
+encoder, not another PrintWindow image or relaxed visibility gate.
+
+Run964/PID36196/session59694 completed00:14:57..00:17:04, terminal1. The strict
+cold/reload chain passed (generation93/instance144 ->207/384); fresh reloaded
+frames4660..4960 added300 snapshots,3229 generated/recorded draws,3227 collected
+instances,3214 visible and13 culled. Request `1 4960 5080` recorded frame5005,
+slot1, input0185D1CFD150, output0185F3B958E8, descriptor104,1920x1080 awaiting
+the submission fence. At00:17:03.680 the renderer reported
+`encoding/size/exclusive-write refused`; no JPEG was written. The supervisor's
+generic reload-error exit followed that probe error, not a failed reload gate.
+This is not new pixel acceptance or a diagnosis of962's title-logo discrepancy.
+Retain519,448 B `logs/reblue_964.log`, SHA256
+5434E7DA19DA08652068375C3F4E25F482144B351B97FFC32205F67486FB6980,
+and11 B `out/verification/native_frame_probe.request`. Exact116 B owner profile
+restored to SHA256
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+
+Completed lossless scene-commands PNG recompression:3,334,156 ->3,258,340 B,
+75,816 logical B reclaimed once, with identical chunks/scanlines/decoded pixels.
+New SHA2561CD34950E217EA8A82AA6D26F3C91A327C2F8AE36532E1CFD0A17542E16CD7C3.
+Preserved963's JPEG/request as `native_frame_probe_truncated_window.jpg` and
+`native_frame_probe_truncated.request` in `out/verification`; hashes unchanged,
+no bytes reclaimed by renaming. Image total10,303,111 B leaves182,649 B under
+the10 MiB aggregate limit. New964 text/request retains519,459 B; subtracting
+the PNG savings, these selected diagnostic scopes grew443,643 B. No new raw,
+performance CSV, asset cook, build or fixture output in this continuation.
+The proposed256 KiB per-image limit still needs owner approval and separate
+aggregate-budget preflight; no further capture is authorized by this checkpoint.
