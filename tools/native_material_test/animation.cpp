@@ -725,6 +725,108 @@ void TestFirstMatchAnimationDescriptors() {
     } while (std::next_permutation(order.begin(),order.end()));
   }
 }
+void TestIndexedAnimationAssets() {
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u};
+  std::array<NativeSkeletonJoint,3> skeleton;
+  skeleton[0].pose_index=2; skeleton[1].pose_index=0; skeleton[1].parent=0;
+  skeleton[2].pose_index=1; skeleton[2].parent=0;
+  for (auto &joint : skeleton) {
+    joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+    joint.blend_rest.translation={10,0,0}; joint.blend_rest.scale={2,2,2};
+  }
+  for (uint16_t type : {0,1}) {
+    ClipSource source, named_source;
+    for (uint32_t address=0x2000; address<0x2080; address+=4) source.words.erase(address);
+    source.Half(0x1006,type);
+    const uint32_t stride=type == 0 ? 12 : 20, counts=type == 0 ? 8 : 12;
+    for (uint32_t n=0; n<3; ++n) {
+      const auto record=0x2000+n*stride;
+      source.Word(record,n == 0 ? 0x5000 : n == 2 ? 0x3000 : 0);
+      source.Word(record+4,n == 2 ? 0x4000 : 0);
+      source.Half(record+counts,n == 0 ? 1 : n == 2 ? 3 : 65535);
+      source.Half(record+counts+2,n == 2 ? 3 : 0);
+      if (type == 1) { source.Word(record+8,n == 2 ? 0x6000 : 0); source.Half(record+16,n == 2 ? 3 : 0); }
+    }
+    if (type == 0) { named_source.Word(0x2050,0); named_source.Half(0x2058,0); }
+    auto read=[&](uint64_t address){ return source.Read(address); };
+    animation_source::ImportTrace trace;
+    auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,read,&trace);
+    auto named=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return named_source.Read(address);});
+    Require(asset && named && asset->Indexed() && !named->Indexed() && asset->ChannelMask() == (type == 0 ? 3u : 7u) &&
+            trace.descriptors == 3 && trace.unique_names == 3,"12/20-byte indexed descriptors import without reading names or absent scale fields");
+    Require(!asset->FindTrack(0) && asset->FindTrack(999,0)->translation.front().value == JointVector{1,2,3} &&
+            !asset->FindTrack(0,3),"indexed lookup requires a bounded joint identity, never a name or preorder ordinal");
+    const auto bytes=asset->RetainedBytes();
+    Require(animation_source::ReadKeyedAsset(0x1000,bytes,read).has_value() &&
+            !animation_source::ReadKeyedAsset(0x1000,bytes-1,read),"indexed metadata and curves share exact retained-byte accounting");
+    auto invalid=source; invalid.words.erase(0x302c);
+    Require(!animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return invalid.Read(address);}),
+            "indexed import refuses incomplete active keys transactionally");
+    invalid=source; invalid.Word(0x1000,UINT32_MAX-stride);
+    Require(!animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return invalid.Read(address);}),
+            "indexed descriptor extent cannot wrap");
+    source.words.clear(); named_source.words.clear();
+    for (unsigned step=0; step<=128; ++step) {
+      std::vector<animation_source::ChannelRecord> actual(3), expected(3);
+      Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,float(step)/128,1,2,false,actual,{},true) &&
+              animation_source::ApplyKeyedLayer(*named,names,skeleton,float(step)/128,1,2,false,expected,{},true) &&
+              actual == expected,"indexed and named source-free imports reach identical whole channels through reordered native joints");
+    }
+    std::vector<animation_source::ChannelRecord> records(3);
+    for (size_t n=0; n<3; ++n) {
+      auto &record=records[n]; record.fill(0x7fc01234); record[0]=64|1|4; record[1]=uint32_t(0xDEAD0000+n);
+      record[2]=std::bit_cast<uint32_t>(20.0f); record[3]=record[4]=0;
+      if (type == 1) for (unsigned word=9; word<12; ++word) record[word]=std::bit_cast<uint32_t>(4.0f);
+    }
+    const auto before=records;
+    const std::array<std::string_view,31> invalid_exclusions{};
+    const NativeAnimationFilter ignored{"an overlong ignored indexed filter",invalid_exclusions,false};
+    Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,0,true,records,ignored) &&
+            records[2] == before[2] && std::bit_cast<float>(records[0][2]) == 10.5f &&
+            std::bit_cast<float>(records[1][2]) == 15.0f && records[0][1] == before[0][1] && records[1][1] == before[1][1],
+            "indexed weighted traversal ignores keyed-only filters/forced subtree and preserves headers while including following siblings");
+    if (type == 0) {
+      Require(records[0][0] == before[0][0] && records[0][9] == before[0][9] && records[1][11] == before[1][11],
+              "TR-only layer does not read, blend, clear or rewrite even nonfinite active scale bytes");
+    } else {
+      Require(std::bit_cast<float>(records[0][9]) == 3 && std::bit_cast<float>(records[1][9]) == 3,
+              "indexed missing scale blends against owned authored rest scale");
+    }
+    records=before;
+    Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,1,2,false,records) &&
+            records[0][1] == before[0][1] && !(records[1][0]&1) && (records[2][0]&128),
+            "full-weight indexed preserve path retains headers, clears absent channels and marks animated curves");
+    const std::array duplicate_names{1u,1u,1u};
+    Require(animation_source::ApplyKeyedLayer(*asset,duplicate_names,skeleton,.25f,1,2,false,records,{},true) &&
+            std::bit_cast<float>(records[0][2]) == 1 && std::bit_cast<float>(records[2][2]) == 2,
+            "indexed consumer does not introduce a false unique-name binding requirement");
+    auto enlarged=skeleton; std::vector<NativeSkeletonJoint> too_many(enlarged.begin(),enlarged.end());
+    NativeSkeletonJoint extra; extra.pose_index=3; too_many.push_back(extra);
+    std::vector<animation_source::ChannelRecord> oversized(4); const auto untouched=oversized;
+    const std::array four_names{1u,2u,3u,4u};
+    Require(!animation_source::ApplyKeyedLayer(*asset,four_names,too_many,.25f,1,2,false,oversized,{},true) && oversized == untouched,
+            "a model selecting beyond indexed clip storage refuses before publishing partial channels");
+    NativeAnimationResidency residency(bytes+NativeAnimationResidency::kEntryBytes);
+    Require(residency.Publish(7,9,std::move(*asset)),"indexed clips use the existing bounded residency owner");
+    auto lease=residency.Find(9); residency.Retire(7);
+    Require(lease && residency.Bytes() == bytes+NativeAnimationResidency::kEntryBytes,
+            "retired indexed assets remain charged while leased");
+    std::vector<animation_source::ChannelRecord> channels(3);
+    Require(animation_source::ApplyKeyedLayer(*lease,names,skeleton,.25f,1,2,false,channels,{},true),
+            "retired indexed asset produces channels without source or catalog");
+    auto native=skeleton_source::ReadChannels(0x8000,3,[&](uint64_t address)->std::optional<uint32_t>{
+      if (address < 0x8000 || address >= 0x8090 || (address&3)) return {};
+      return channels[(address-0x8000)/48][((address-0x8000)%48)/4];
+    });
+    std::vector<RenderMatrix> pose;
+    Require(native && EvaluateNativeSkeleton(skeleton,*native,JointIdentity(),pose),"indexed channels feed the production native hierarchy");
+    NativeInstanceRegistry instances; const auto instance=instances.Create(91);
+    Require(instances.Publish(instance,0,pose) && instances.Transfer(instance,0,1,3),"indexed hierarchy reaches immutable native render-pose ownership");
+    const auto retained=instances.Read(instance,1); instances.Retire(instance); lease.reset();
+    Require(residency.Bytes() == 0 && retained && retained->transforms == pose,
+            "published indexed poses outlive source, asset and instance retirement");
+  }
+}
 } // namespace
 void TestAnimationClips() {
   TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
@@ -732,5 +834,6 @@ void TestAnimationClips() {
   TestLayerMixing();
   TestConstantTimesAndScaleTail(); TestNamedAnimationSelection();
   TestFirstMatchAnimationDescriptors();
+  TestIndexedAnimationAssets();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

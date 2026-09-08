@@ -834,17 +834,32 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    refused preparations as the SAME duplicate-descriptor clip, not two clips or
    exhausted residency. First-match descriptor canonicalization now passes
    material57/CPU55 and409 guards, including243 descriptor patterns x6 unique
-   model traversal orders. Its host rebuild/live admission remain pending;
+   model traversal orders. Host174/run982 verifies live canonicalization:
+   122 descriptors ->121 tracks/93424B,prepare-refused0,7590 matching samples,
+   wrong0. The changed source address is not a stable asset identity. Its host
+   build passes; no guest objects/shaders. Run981's superseded text is retired;
    named/excluded routes still need actual live coverage. Duplicate model names,
    nonzero Euler modes and nonzero entry depth still refuse explicitly.
-   Next verify the changed importer and own dense routes,
-   then connect native channels through slot clocks/completed handoff to retire
-   outgoing scratch. Choose an actual authored layer/subtree transition before
+   **Indexed format connection (host175):** type0 T/R and type1 T/R/S import into
+   the same immutable clip/residency owner with joint-index bindings, no synthetic
+   names or packed storage in the native asset. The existing layer/instance
+   consumers handle dense header/scale/global/traversal differences. Material58/
+   CPU56 and410 guards pass, including129 advancing samples per format,
+   reordered identities, source destruction, ignored filter/scale/header rules,
+   exact budgets and retired clip ->completed native pose lifetime. Host175
+   passes without guest objects/shaders; no indexed live content observed.
+   Indexed pure application supports duplicate names, but the model importer
+   still withholds ambiguous name tables, so that runtime admission remains open.
+   Next connect native controller channels through slot clocks/completed handoff
+   to retire outgoing scratch, without making absent dense content a permanent
+   blocker on that active path. Choose an actual authored layer/subtree transition before
    another live probe, with advancing source-clock/interior-key observations;
-   no unchanged boot or reduced threshold. Types0/1, late writers/special bones,
+   no unchanged boot or reduced threshold. Indexed loader/content qualification,
+   inherited dense compression/nonzero Euler modes, late writers/special bones,
    persistent cooking, outgoing48-byte channels/palettes and full desktop/both-eye
    gates remain. Preserve975's reload and971/962's pixel failures; defaults
    unchanged, no Quest work.
+   [Indexed connection, source boundaries and exact verification](../research/20260908_1916_native-indexed-animation.md).
    [Named/importer source contracts and checkpoint](../research/20260906_0333_native-scene-state-bridge.md#2026-09-08-named-animation-inputs-and-importer-contracts-after52a9510).
    [Weighted/layer contracts and scoped verification](../research/20260908_1824_native-animation-layers.md).
    [Selected residency, evidence and storage](../research/20260908_1745_selected-motion-residency.md).

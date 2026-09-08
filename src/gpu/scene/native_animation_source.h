@@ -101,7 +101,9 @@ std::optional<NativeAnimationSplineChannel> ReadSplineChannel(uint32_t source, b
 // Type 2: T/S = {s16 frame,pad,f32 xyz}, R = {s16 frame,s16 xyz angle}.
 // Type3 nonconstant channels contain three {u32 count,ptr} scalar descriptors;
 // each relocated scalar key is {s16 frame,compact value,f32 tangent}. Constants
-// retain the type2 layout. Dense types0/1 remain a distinct unsupported contract.
+// retain the type2 layout. Completed dense type0/1 descriptors are12/20 bytes,
+// indexed by joint identity, with T/R or T/R/S and no name lookup. For those
+// layouts JointBinding::name_hash is the source joint ordinal, not a hash.
 template <class ReadWord>
 std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
     std::span<const JointBinding> bindings, size_t maximum_bytes, ReadWord &&read, ImportTrace *trace = nullptr) {
@@ -111,8 +113,10 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
   const uint64_t header = source;
   const auto records = Word(header,read), timing = Word(header+12,read);
   const auto duration = Half(header+4,read), type = Half(header+6,read), count = Half(header+8,read);
-  if (!records || !*records || !timing || !duration || !type || (*type != 2 && *type != 3) || !count ||
-      *count > kMaxNativeJoints || uint64_t(*records)+uint64_t(*count)*36 > uint64_t(UINT32_MAX)+1) return {};
+  if (!records || !*records || !timing || !duration || !type || *type > 3 || !count ||
+      *count > kMaxNativeJoints) return {};
+  const uint32_t record_stride=*type == 0 ? 12 : *type == 1 ? 20 : 36;
+  if (uint64_t(*records)+uint64_t(*count)*record_stride > uint64_t(UINT32_MAX)+1) return {};
   const float rate = std::bit_cast<float>(*timing)*30;
   if (trace) trace->Stage("sample-rate");
   if (!std::isfinite(rate) || rate <= 0) return {};
@@ -136,18 +140,18 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
   if (used > maximum_bytes) return {};
   for (uint32_t n=0; n<*count; ++n) {
     if (trace) { trace->Stage("descriptor-name"); trace->track=n; trace->channel=trace->key=UINT32_MAX; }
-    const uint64_t record = uint64_t(*records)+n*36;
-    const auto hash = Word(record+18,read);
+    const uint64_t record = uint64_t(*records)+n*record_stride;
+    const auto hash = *type < 2 ? std::optional<uint32_t>(n) : Word(record+18,read);
     if (!hash) return {};
     if (!record_hashes.emplace(*hash,true).second) continue;
     const auto binding = mapping.find(*hash);
     if (binding == mapping.end()) continue;
     NativeAnimationTrack track; track.pose_index = binding->second;
     std::unique_ptr<NativeAnimationSplines> splines;
-    for (unsigned channel=0; channel<3; ++channel) {
+    for (unsigned channel=0; channel<(*type == 0 ? 2u : 3u); ++channel) {
       if (trace) { trace->Stage("channel-header"); trace->channel=channel; trace->key=UINT32_MAX; }
       const auto address = Word(record+channel*4,read);
-      const auto keys_count = Half(record+12+channel*2,read);
+      const auto keys_count = Half(record+(*type == 0 ? 8 : 12)+channel*2,read);
       if (!address || !keys_count) return {};
       // Null channel means absent even if its unused count is nonzero.
       if (!*address) continue;
@@ -209,7 +213,7 @@ std::optional<NativeAnimationClip> ReadKeyedClip(uint32_t source,
   return NativeAnimationClip::Create(bindings.size(),float(*duration)/30,std::move(tracks),maximum_bytes);
 }
 
-// Import first-match named tracks at completed load, before model selection.
+// Import indexed or first-match named tracks at completed load, before model selection.
 // Shadowed duplicate descriptors are not sampler inputs; do not decode or
 // retain their unused curves. Packed aliases share the same canonical asset.
 template <class ReadWord>
@@ -218,28 +222,33 @@ std::optional<NativeAnimationAsset> ReadKeyedAsset(uint32_t source, size_t maxim
   if (trace) *trace=ImportTrace{};
   const auto records = Word(source,read);
   const auto type = Half(uint64_t(source)+6,read), count = Half(uint64_t(source)+8,read);
-  if (!records || !*records || !type || (*type != 2 && *type != 3) || !count || !*count || *count > kMaxNativeJoints ||
-      uint64_t(*records)+uint64_t(*count)*36 > uint64_t(UINT32_MAX)+1 || maximum_bytes < sizeof(NativeAnimationAsset)) return {};
+  if (!records || !*records || !type || *type > 3 || !count || !*count || *count > kMaxNativeJoints ||
+      maximum_bytes < sizeof(NativeAnimationAsset)) return {};
+  const bool indexed=*type < 2;
+  const uint32_t record_stride=*type == 0 ? 12 : *type == 1 ? 20 : 36;
+  if (uint64_t(*records)+uint64_t(*count)*record_stride > uint64_t(UINT32_MAX)+1) return {};
   std::vector<JointBinding> bindings;
   std::vector<uint32_t> names;
-  bindings.reserve(*count); names.reserve(*count);
+  bindings.reserve(*count); if (!indexed) names.reserve(*count);
   std::unordered_set<uint32_t> seen_names;
   if (trace) trace->descriptors=*count;
   for (uint32_t n=0; n<*count; ++n) {
     if (trace) { trace->Stage("asset-name"); trace->track=n; }
-    const auto hash = Word(uint64_t(*records)+n*36+18,read);
+    if (indexed) { bindings.push_back({n,n}); continue; }
+    const auto hash = Word(uint64_t(*records)+n*record_stride+18,read);
     if (!hash) return {};
     if (!seen_names.insert(*hash).second) continue;
     bindings.push_back({uint32_t(names.size()),*hash}); names.push_back(*hash);
   }
-  if (trace) { trace->unique_names=uint32_t(names.size()); trace->Stage("asset-target-budget"); }
+  if (trace) { trace->unique_names=uint32_t(bindings.size()); trace->Stage("asset-target-budget"); }
   const size_t metadata=sizeof(NativeAnimationAsset)+names.size()*sizeof(NativeAnimationAsset::Target);
   if (metadata > maximum_bytes) return {};
   auto clip = ReadKeyedClip(source,bindings,
       maximum_bytes-metadata,read,trace);
   if (!clip) return {};
   if (trace) trace->Stage("asset-validation/budget");
-  auto asset=NativeAnimationAsset::Create(std::move(*clip),std::move(names),maximum_bytes);
+  auto asset=NativeAnimationAsset::Create(std::move(*clip),std::move(names),maximum_bytes,
+      indexed ? NativeAnimationBinding::Joint : NativeAnimationBinding::Name,*type == 0 ? 3 : 7);
   if (asset && trace) trace->Stage("complete");
   return asset;
 }
@@ -252,6 +261,7 @@ std::optional<NativeAnimationAsset> ReadKeyedAsset(uint32_t source, size_t maxim
 using ChannelRecord = std::array<uint32_t,12>;
 inline bool ApplyKeyedAsset(const NativeAnimationAsset &asset, std::span<const uint32_t> names,
     float seconds, bool preserve, std::vector<ChannelRecord> &records) {
+  if (asset.Indexed()) return false; // Indexed preserve semantics require the layer boundary below.
   if (names.empty() || names.size() > kMaxNativeJoints || (preserve && records.size() != names.size())) return false;
   std::unordered_set<uint32_t> unique;
   for (uint32_t name : names) if (!unique.insert(name).second) return false;
@@ -280,33 +290,37 @@ inline bool ApplyKeyedLayer(const NativeAnimationAsset &asset, std::span<const u
     uint32_t root_pose, bool single_subtree, std::vector<ChannelRecord> &records,
     const NativeAnimationFilter &filter = {}, bool reset = false) {
   if (names.size() != skeleton.size() || records.size() != names.size() || !std::isfinite(weight)) return false;
-  const auto selected=SelectNativeAnimationNodes(skeleton,root_pose,single_subtree,filter);
+  // Indexed samplers ignore named filters and the keyed-only forced-subtree flag.
+  const bool indexed=asset.Indexed();
+  const auto selected=SelectNativeAnimationNodes(skeleton,root_pose,indexed ? false : single_subtree,
+      indexed ? NativeAnimationFilter{} : filter);
   if (!selected) return false;
   if (std::abs(weight) < kNativeAnimationWeightEpsilon) return true;
   std::unordered_set<uint32_t> unique;
-  for (auto name : names) if (!unique.insert(name).second) return false;
+  if (!indexed) for (auto name : names) if (!unique.insert(name).second) return false;
   std::vector<NativeJointChannels> sampled;
   if (!asset.Clip().Sample(seconds,sampled)) return false;
   auto output=reset ? std::vector<ChannelRecord>(records.size()) : records;
   for (size_t n=0; n<skeleton.size(); ++n) {
     const auto &joint=skeleton[n];
     auto &record=output[joint.pose_index];
-    if (selected->headers[n]) record[1]=names[joint.pose_index];
+    if (selected->headers[n] && (!indexed || reset)) record[1]=names[joint.pose_index];
     if (!selected->channels[n]) continue;
-    const auto *track=asset.FindTrack(names[joint.pose_index]);
-    if (!track) continue;
+    const auto *track=asset.FindTrack(names[joint.pose_index],joint.pose_index);
+    if (!track) { if (indexed) return false; continue; }
+    const auto channel_mask=asset.ChannelMask();
     NativeJointChannels previous, result;
     previous.translated=(record[0]&1)!=0; previous.rotated=(record[0]&2)!=0; previous.scaled=(record[0]&4)!=0;
     auto get=[&](auto &value,unsigned word) { for (auto &component : value) component=std::bit_cast<float>(record[word++]); };
     if (previous.translated) get(previous.translation,2);
     if (previous.rotated) get(previous.rotation,5);
-    if (previous.scaled) get(previous.scale,9);
-    if (!BlendNativeChannels(previous,sampled[track->pose_index],joint.blend_rest,weight,result)) return false;
-    record[0]&=~7u;
+    if (previous.scaled && (channel_mask&4)) get(previous.scale,9);
+    if (!BlendNativeChannels(previous,sampled[track->pose_index],joint.blend_rest,weight,result,channel_mask)) return false;
+    record[0]&=~channel_mask;
     auto put=[&](const auto &value,unsigned word) { for (float component : value) record[word++]=std::bit_cast<uint32_t>(component); };
     if (result.translated) { record[0]|=1; put(result.translation,2); }
     if (result.rotated) { record[0]|=2; put(result.rotation,5); }
-    if (result.scaled) { record[0]|=4; put(result.scale,9); }
+    if ((channel_mask&4) && result.scaled) { record[0]|=4; put(result.scale,9); }
     if (track->Animated()) record[0]|=128;
   }
   records=std::move(output); return true;

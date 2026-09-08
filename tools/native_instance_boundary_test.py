@@ -76,6 +76,15 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("TestNamedAnimationSelection()", self.animation_test)
         self.assertIn("TestConstantTimesAndScaleTail()", self.animation_test)
 
+    def test_indexed_animation_reuses_assets_layers_and_preserves_dispatch_state(self):
+        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("bool Mix(", 1)[0]
+        self.assertIn("const bool indexed=asset->Indexed()", sampler)
+        self.assertIn("preserve && !indexed && ctx.r8.u32 != 0", sampler)
+        self.assertIn("preserve && !indexed ? 0u : *exclusion", sampler)
+        self.assertIn("if (!indexed) {", sampler)
+        self.assertIn("type && *type <= 3", self.animation_bridge)
+        self.assertIn("TestIndexedAnimationAssets()", self.animation_test)
+
     def test_animation_assets_retire_with_both_loader_types_and_pinned_bytes_remain_charged(self):
         for name in ("sub_8217BD00", "sub_8217C580"):
             hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]

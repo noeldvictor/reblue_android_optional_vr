@@ -130,26 +130,28 @@ integration acceptance. Animation curves, special bones, late writers, source
 palette adapters and motion/both-eye pixels remain; normal defaults stay unchanged.
 [Contract, scoped live evidence and remaining failures](research/20260908_1544_native-skeleton-evaluation.md).
 
-**Native animation (2026-09-08, host172; opt-in):** owned keyed/cubic curves,
-authored rest values, weighted sampling, subtree selection and whole-layer mixing
-connect to the existing native skeleton/instance consumers. Selected slots share
-the unchanged 8 MiB motion budget; steady-state samplers do not decode source keys.
-C++ ownership/blending tests, 408 source/scenario checks and the desktop build pass.
-Run980 records **13,858 matching samples and 23 matching layer mixes, zero
-mismatches**, including 113 weighted and 382 cubic samples. The repeated-cubic
-call-count criterion is reached, but the requested 256-mix gate fails; no subtree
-calls were observed. Advancing/interior-key motion, full field/reload and pixels
-remain unqualified. Host173/run981 identifies the two import refusals as retries
-of one clip with duplicate descriptor names: 4,002 matching samples, zero drift.
-Named/excluded traversal and constant-time/scale-tail import rules are now
-connected and CPU-tested, but filtered calls were not observed live. First-match
-descriptor canonicalization passes material57/CPU55 and 409 source/scenario
-checks; its host rebuild and live verification are still pending.
-Dense families, slot clocks, dormant source-backed catalog,
-persistent cooking and outgoing channel/palette adapters remain. Defaults are
-unchanged; prior reload and pixel failures stay open. Verify the changed importer,
-then exercise actual layer/subtree transitions, not repeat an unchanged boot.
-[Named/importer checkpoint and exact verification limits](research/20260906_0333_native-scene-state-bridge.md#2026-09-08-named-animation-inputs-and-importer-contracts-after52a9510).
+**Native animation (2026-09-08, host175; opt-in):** indexed T/R and T/R/S clips
+now join named keyed/cubic curves, authored rest values, weighted sampling,
+subtree/name filters and layer mixing in the existing skeleton/instance owners.
+Selected slots share the unchanged 8 MiB motion budget; steady-state samplers
+do not decode source keys. C++ behavior tests, 410 source/scenario checks and
+the host build pass. Indexed clips have CPU/host-build coverage, not live coverage.
+
+**Live importer fix (host174/run982):** duplicate descriptors now retain only the
+first matching track: one 122-descriptor input imports as 121 owned tracks.
+Preparation refusals are zero, with **7,590 matching samples and zero drift**.
+Earlier run980 reached 23 matching layer mixes, 113 weighted and 382 cubic
+samples, but failed its requested 256-mix gate; no subtree/filter calls were
+observed. Advancing/interior-key motion, full field/reload, skin pixels and both
+eyes remain unqualified. Host175 does not inherit live qualification from174.
+
+Next: own slot/controller channels and clocks through the completed-pose handoff,
+retiring outgoing scratch. Dense loader/content coverage, special/late bone
+writers, duplicate model-name admission, inherited dense compression/Euler modes,
+persistent cooking and source-backed catalog/palette adapters remain. Defaults
+are unchanged; prior reload and pixel failures stay open. New live probes need
+actual authored layer/subtree/indexed content, not an unchanged boot.
+[Indexed animation connection, importer verification and remaining gates](research/20260908_1916_native-indexed-animation.md).
 [Weighted/layer connection, scoped evidence and remaining gates](research/20260908_1824_native-animation-layers.md).
 [Selected-motion residency, runtime evidence and next work](research/20260908_1745_selected-motion-residency.md).
 [Clip math/source contract and regressions](research/20260908_1612_native-animation-clips.md).

@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 namespace bd::gpu::scene {
+enum class NativeAnimationBinding { Name, Joint };
 // Stable authored name keys are import-time asset associations, not addresses.
 // The numeric track ordinal selects the same immutable clip sampler used by
 // model-bound clips. Models may load before or after these shared tracks.
@@ -18,9 +19,16 @@ class NativeAnimationAsset {
 public:
   struct Target { uint32_t name_key, track; };
   static std::optional<NativeAnimationAsset> Create(NativeAnimationClip clip,
-      std::vector<uint32_t> names, size_t maximum_bytes) {
-    if (names.size() != clip.JointCount() || names.size() != clip.Tracks().size()) return {};
-    for (size_t n=0; n<names.size(); ++n) if (clip.Tracks()[n].pose_index != n) return {};
+      std::vector<uint32_t> names, size_t maximum_bytes,
+      NativeAnimationBinding binding = NativeAnimationBinding::Name, uint32_t channel_mask = 7) {
+    if (clip.JointCount() != clip.Tracks().size() ||
+        (binding == NativeAnimationBinding::Name ? names.size() != clip.JointCount() || channel_mask != 7 :
+         binding != NativeAnimationBinding::Joint || !names.empty() || (channel_mask != 3 && channel_mask != 7))) return {};
+    for (size_t n=0; n<clip.Tracks().size(); ++n) {
+      const auto &track=clip.Tracks()[n];
+      if (track.pose_index != n || (!(channel_mask&4) &&
+          (!track.scale.empty() || (track.splines && track.splines->scale.active)))) return {};
+    }
     std::vector<Target> targets;
     if (maximum_bytes < sizeof(NativeAnimationAsset) + clip.RetainedBytes() ||
         names.size() > (maximum_bytes-sizeof(NativeAnimationAsset)-clip.RetainedBytes())/sizeof(Target)) return {};
@@ -31,24 +39,30 @@ public:
       if (targets[n-1].name_key == targets[n].name_key) return {};
     const auto bytes = sizeof(NativeAnimationAsset)+clip.RetainedBytes()+targets.capacity()*sizeof(Target);
     if (bytes > maximum_bytes) return {};
-    return NativeAnimationAsset(std::move(clip),std::move(targets),bytes);
+    return NativeAnimationAsset(std::move(clip),std::move(targets),bytes,binding,channel_mask);
   }
   size_t RetainedBytes() const { return bytes_; }
   float Duration() const { return clip_.Duration(); }
   const NativeAnimationClip &Clip() const { return clip_; }
-  const NativeAnimationTrack *FindTrack(uint32_t name_key) const {
+  bool Indexed() const { return binding_ == NativeAnimationBinding::Joint; }
+  uint32_t ChannelMask() const { return channel_mask_; }
+  const NativeAnimationTrack *FindTrack(uint32_t name_key, uint32_t joint = UINT32_MAX) const {
+    if (Indexed()) return joint < clip_.Tracks().size() ? &clip_.Tracks()[joint] : nullptr;
     const auto target = std::lower_bound(targets_.begin(),targets_.end(),name_key,
         [](const auto &a, uint32_t key){return a.name_key < key;});
     if (target == targets_.end() || target->name_key != name_key) return nullptr;
-    // Import creates exactly one track per authored descriptor, in ordinal order.
+    // Import creates one canonical first-match track per authored name.
     return &clip_.Tracks()[target->track];
   }
 private:
-  NativeAnimationAsset(NativeAnimationClip clip, std::vector<Target> targets, size_t bytes)
-      : clip_(std::move(clip)), targets_(std::move(targets)), bytes_(bytes) {}
+  NativeAnimationAsset(NativeAnimationClip clip, std::vector<Target> targets, size_t bytes,
+      NativeAnimationBinding binding, uint32_t channel_mask)
+      : clip_(std::move(clip)), targets_(std::move(targets)), bytes_(bytes), binding_(binding), channel_mask_(channel_mask) {}
   NativeAnimationClip clip_;
   std::vector<Target> targets_;
   size_t bytes_;
+  NativeAnimationBinding binding_;
+  uint32_t channel_mask_;
 };
 
 // Only this temporary boundary index knows loader/clip keys. Completed loads

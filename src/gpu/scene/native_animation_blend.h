@@ -30,8 +30,8 @@ inline JointQuaternion BlendJointRotation(const JointQuaternion &from, const Joi
 }
 
 inline bool BlendNativeChannels(const NativeJointChannels &previous, const NativeJointChannels &incoming,
-    const NativeJointChannels &rest, float weight, NativeJointChannels &out) {
-  if (!std::isfinite(weight)) return false;
+    const NativeJointChannels &rest, float weight, NativeJointChannels &out, uint32_t channel_mask = 7) {
+  if (!std::isfinite(weight) || (channel_mask&~7u)) return false;
   auto result=previous;
   if (std::abs(weight) < kNativeAnimationWeightEpsilon) { out=result; return true; }
   auto blend = [&](const auto &from, bool active, const auto &to, bool supplied,
@@ -55,12 +55,12 @@ inline bool BlendNativeChannels(const NativeJointChannels &previous, const Nativ
     if (enabled) for (float component : value) if (!std::isfinite(component)) return false;
     return true;
   };
-  if (!blend(previous.translation,previous.translated,incoming.translation,incoming.translated,
-             rest.translation,rest.translated,result.translation,result.translated) ||
-      !blend(previous.rotation,previous.rotated,incoming.rotation,incoming.rotated,
-             rest.rotation,rest.rotated,result.rotation,result.rotated) ||
-      !blend(previous.scale,previous.scaled,incoming.scale,incoming.scaled,
-             rest.scale,rest.scaled,result.scale,result.scaled)) return false;
+  if (((channel_mask&1) && !blend(previous.translation,previous.translated,incoming.translation,incoming.translated,
+             rest.translation,rest.translated,result.translation,result.translated)) ||
+      ((channel_mask&2) && !blend(previous.rotation,previous.rotated,incoming.rotation,incoming.rotated,
+             rest.rotation,rest.rotated,result.rotation,result.rotated)) ||
+      ((channel_mask&4) && !blend(previous.scale,previous.scaled,incoming.scale,incoming.scaled,
+             rest.scale,rest.scaled,result.scale,result.scaled))) return false;
   out=result; return true;
 }
 

@@ -6383,3 +6383,95 @@ not all attributable to this task: CPU stdout is2027B; source/Git/CTest/system
 activity is separate from that measured file subtotal. No raw/image producer.
 README/queue now distinguish implemented filters, CPU-verified canonicalization
 and outstanding live/desktop gates. Stage only this source/test/docs bundle.
+
+### 2026-09-08 first-match host verification after717b499
+
+Previous turn progress: committed the connected names/importer bundle with
+material57/CPU55 and409 passing guards. Goal remains active, not complete or
+blocked. New entry main ahead15, no active renderer/build/test producer, free
+63504236544B. Explicit external push was denied again; automatic continuation
+does not answer the payload/destination approval question, so no upload retry.
+Main read devloop/guest-source/disk policy and the active queue/current ledger.
+Next host174 reuses the configured tree, j4,192MiB free-drop,300s timeout,
+10MiB cumulative build logs and floor62509998080B. Expected private bridge
+incremental rebuild, no guest objects/shaders; retain small build receipt.
+After build success, one changed-code import probe should establish positive
+canonicalization of the formerly refused input plus>=4000 matching samples;
+not absent-filter/subtree/motion/pixel qualification. Existing operator must
+reserve the full400KiB text overlap against75MiB,60s runtime/192MiB free-drop,
+zero new raw/perf/cache/images and exact owner-profile restoration. Preserve
+981 until this causal replacement is verified; broader979/980 failures remain.
+
+Host174/PID27340/session12681 completed0: codegen0writes, no guest objects or
+shaders; bridge and version consumers rebuilt. EXE49235968B, SHA256
+8F1AFCBE9BEC892BC3154296381BB20A77C79E9DFFE8E3328FAFFC784A13D0DC;
+PDB113000448B. Build end free63503761408B. Runtime preflight78075871B
+diagnostics plus409600B reserved log, free63469105152B: intervening34656256B
+drive growth not explained by the small build/log deltas. Scoped current build
+inventory finds existing build metadata,10 host objects,EXE/PDB/version header,
+restored profile and one149357B runtime log; no new raw/perf/cache/dump files.
+No unknown cleanup or budget reset; all further producers enforce the samefloor.
+
+Run982/PID29656/session75098 terminal19:06:00 exit1 diagnostic-observed stop,
+not full scene/motion/pixel qualification. Positive canonicalization:122 source
+descriptors ->121 unique tracks,93424 retained asset bytes. Source address is
+25B5EF7C this run, not a persistent identity. Last frame1433:7590 sampled/checked,
+wrong0,whole8/preserved7582,weighted113,mixed/checked8,cubic6,filtered/subtree0.
+All1070 registrations admitted;16 resident clips1290176B;prepare-refused0,
+one unavailable model. This verifies the duplicate-descriptor import correction
+and sustained matching channels, not those unobserved scopes. Profile restored
+and independently matches2F1BC38D... prior full hash. Run982 log149357B,SHA256
+AAFCE6EB640ECAF3076FC93AC8524B1F39415F8B47646F03B4B5F4004FAB49EE.
+After replacement verified, retired981 provenance text and host173's two build
+logs, retaining their hashes/source diagnosis here and982 as current evidence.
+
+Next connected bundle uses the SAME clip/assets/layers/skeleton/instance owners
+for indexed T/R and T/R/S formats. No source keys/name scan in sampling; native
+asset carries joint-index binding and channel participation, not packed records.
+Source82288C00(file60:9706),82288DC0(file24:10102),82289EF0(file95:10198),
+82289FA8(file88:9743) read completely. Direct dense dispatch resets flags/writes
+headers; weighted dense dispatch preserves headers and ignores keyed name/
+exclusion/forced-subtree rules. Type0 leaves scale bytes/flags untouched.
+Both dense dispatchers leave sampler globals unchanged; inherited compressed
+mode and nonzero Euler mode remain explicit unsupported runtime contracts.
+Header initializer82288680(file66:9955) read completely; keyed loader fixup
+82198DE0/98F30/98FF8 uses36-byte records and is NOT proof of live dense content.
+No dense loads occurred in982; real dense loader/content coverage stays open.
+Reuse prior quaternion/channel math evidence, no new shader or visual claim.
+CPU fixtures cover source destruction,129 advancing samples in each format,
+reordered identities, ignored filters/scale/header invariants, exact budgets,
+bounded failure and retired assets feeding completed native instance poses.
+Plan material58/CPU56 thenhost175 after focused/all-boundary checks. Existing
+64MiB fixture/8MiB CPU/192MiB host free-drop,300s/10MiB log/floor62509998080B
+limits; estimated<16MiB fixture and<192MiB host peak, small text receipts.
+No new live run until a useful indexed-content observation can be specified.
+
+Material58/PID37628 build0, CPU56/PID28036 PASS0.12s/CTest0.13s;410 guards
+PASS0.221s. Host175/PID31752 build0, private bridge+link only/codegen0writes,
+no guest objects/shaders. All producers terminal; no queued runtime. Current
+host175 EXE49236480B/PDB113004544B and material58 EXE1208832B,
+fixture tree10247849B/43; hashes/source/runtime limits in
+20260908_1916_native-indexed-animation.md. Host174/982 remains the latest live
+animation evidence, NOT a live qualification of175's indexed connection.
+
+Completed cleanup this turn:981/173's three text files120921B,free
+63468986368->63469109248,122880B observed reclaimed; then57/55's four text
+files2163B,free63467970560->63467974656,4096B observed reclaimed. Total7
+superseded agent text files123084B logical/126976B observed reclaim. Exact
+literal targets validated, no recursion/reparse or game data/profile/raw deletion.
+These logs are reproducible but removed; recorded981 hash/diagnosis remains,
+982 and979/980 plus current baseline/pixel/reload failures stay retained.
+No cleanup from earlier turns is credited here.
+
+19:20 pre-commit free63467945984B (59.11GiB), net36290560B drive-wide use
+from63504236544B entry, not wholly attributed to this task. Enumerated partial
+net retained growth131053B: runtime text+32421B,build logs-696B,material EXE
++83456B,host EXE/PDB+15872B. Other object/build metadata,source/Git and system
+activity are outside that subtotal; the34656256B pre-runtime discrepancy above
+is not explained away. Fixture ending tree and all producer caps are recorded.
+Build/test logs421138B/214; runtime-operator diagnostic accounting78105068B
+by unchanged-category deltas, below75MiB stop; next producer must remeasure
+full overlap rather than reuse this derived value. Timestamp inventory finds no
+new raw/perf/cache/dump/image files; owner profile independently restored.
+README/active queue updated once for this bundle. Explicit local source/test/docs
+commit only; external push still denied with no new upload approval supplied.
