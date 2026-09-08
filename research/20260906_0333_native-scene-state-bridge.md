@@ -3880,3 +3880,106 @@ Scoped root writes are Ninja metadata and the fixture; NVIDIA DXCache has no
 files modified since22:09. No renderer/compiler/fixture process remains live.
 Raw/image archives are unchanged, no asset/profile/perf/dump output was produced,
 and no prior cleanup is double-credited. Original3 GiB allowance and floor remain.
+
+### Current-depth runtime connection continuation (2026-09-07 22:56)
+
+Previous turn made progress: GPU contract9e7ee1e is pushed and runtime source
+connection4c890ad is committed locally. Its push is security-blocked pending
+payload-specific owner approval; do not retry without that authority. Source
+work continues locally. Corrected the stale emission guard to check regression
+identity and exclusion of culled commands;339 Python guards/scenarios now pass.
+The old check failure remains recorded in4c890ad, not a runtime qualification.
+
+First measured free80,008,998,912 B. Existing texture fixture72,201,319 B/129 files,
+GPU fixture14,550,168 B/15 and attachment logs241,730 B/152 are unchanged since
+the prior checkpoint. No compiler/game/fixture producer is live. The intervening
+drive-wide decline is not assigned to these unchanged artifacts or credited as
+task activity; scoped recent build/log/driver-cache writes are inspected before
+launch. Original3 GiB allowance and62,509,998,080 B floor remain unchanged.
+
+Reuse output fixture42/CPU25 next,32 MiB free-drop/temporary guard,300 s wrapper
+and30 s CTest timeout. After it passes, incremental host122 uses192 MiB guard,
+300 s timeout and the existing unexpected-guest-object stop. Estimated fixture
+growth under2 MiB and host replacement/object/link overlap under192 MiB; text
+under32 KiB for this build group, still within10 MiB aggregate attachment logs.
+Keep prior passing output41/CPU24/host121 until replacements pass, then retire
+only superseded logs. No new tree, guest build, raw/image, asset or profile output
+for these jobs. Existing protected raw252,177,116,500 B and images10,313,144 B
+remain, with172,616 B image headroom and no incoming raw allowance.
+
+Output42/PID38292 and CPU25/PID34036 terminate0; the C++ output test passes in
+0.37/0.40 s. Host122/PID21964 stops during configure: the backend-only source
+list still named deleted occlusion_cull.cpp. No compile/game producer remains.
+Free80,007,593,984 B. Remove that dead reference, classify the new Vulkan-aware
+visibility implementation as backend-specific, and guard both in the source
+test. Host123 is the bounded retry under the same192 MiB/300 s/log limits.
+Scoped root writes before these jobs were Ninja/CMake metadata; host121 binary
+and logs were unchanged, with zero recent NVIDIA DXCache writes. No isolated
+cause for the earlier drive-wide decline is asserted.
+
+Host123/PID23020/session42964 terminates0 after102 scheduled steps/99 emitted
+steps (host only, codegen0 generated files changed). Exe48,731,648 B and
+PDB109,654,016 B, stamped4c890ad dirty. Free80,004,616,192 B. GPU shaders are
+unchanged from72-case visibility3 proof; this host connection still needs live
+evidence. Runtime preflight reserves78,191,956 B before800 KiB text+110 KiB JPEG,
+which exceeds75 MiB by480,596 B; no game launch/profile mutation occurred.
+
+Losslessly compress retained940/949/951 logs before live work: exact inputs
+483,446+410,254+254,383=1,148,083 B, archive overlap bounded under1.2 MiB. Keep
+940's pre941 baseline and949/951 timing/storage failures byte-for-byte; verify
+all archive entry sizes/SHA256 against originals before retiring the plain
+copies. Archive stays under logs/retained-*.zip, explicitly counted in both
+preflight and live cumulative checks. This is not deletion of failure evidence
+or a budget reset. Current945/956/957/958/959/960/961 and941/947/948 stay plain.
+
+Archive verification passed all three entry lengths/SHA256. ZIP196,094 B replaces
+1,148,083 B plain text, net951,989 logical B reclaimed; measured free gain962,560 B
+is not solely attributed. Entries remain fully recoverable; no historical raw or
+image was removed.940 SHA2785A5001BC6DD0EF935269CB322A8E0A266439CB5A7163B4DA850DF574B536B;
+949 D8372C7399ACF76F1C10C9C96C163A29F96FC5CE6FA84F63D41A98E8DDF40FF5;
+951 3A953CFE06CBDA7961BE0D42C37A81DB175EF196839ECC34302DECE9556DFA8B.
+
+Next run962 uses the inspected run_post_image_flow supervisor, not the historical
+run_scene_handoff helper. Its current-depth observation trigger is updated and
+PowerShell syntax checked. Same complete cold/reload/receiver/lighting/caster/
+cutout chain,300 s,800 KiB text, no raw/perf/dump/cook, one at-most110 KiB mono
+JPEG only after fresh current-depth generated/drawn/collected/visible/culled
+deltas. Image observation cannot satisfy or bypass strict reload acceptance.
+Profile SHA2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0
+is checked before temporary overrides and must restore exactly in finally. Peak
+runtime guard192 MiB and75 MiB cumulative diagnostic stop remain, including the
+new archive. No renderer/build producer live at preflight. Preserve961 until the
+new strict chain passes and preserve956 tree-gap pixels regardless of counters.
+
+Run962/PID27128/session52256 terminates23:07:28, supervisor exit0. All21 settings
+took effect; exact116 B profile/hash restored. Both strict cold/reload epochs
+pass, including actual900 visible-emission windows and cold1658/1658/1658 source/
+GPU closure. Fresh reloaded4634..4934 adds3248 generated/draw-recorded commands,
+3247 fence-collected receipts,3236 visible and11 culled instances. No safety gate
+was reduced. This is native GPU consumption, not frame timing or full-host proof.
+
+Manual inspection **rejects** the97,976 B JPEG: a title logo conflicts with the
+logged active field/player movement. Preserve it as unresolved window/presentation
+discrepancy, not accepted game pixels.945 remains accepted mono baseline,956 tree
+gap and941/947/948/960 failures remain.962's521,322 B text is current strict
+runtime proof;961 is also retained, not silently replaced by failed visual
+evidence. No further game boot. Next use the existing renderer-owned screenshot
+path with frame/fence provenance to distinguish capture from presentation.
+
+Final measured texture fixture72,286,199 B/129 (+84,880), unchanged GPU fixture
+14,550,168 B/15, attachment logs269,518 B/152 (+27,788 net), image archive
+10,411,120 B/10 (+97,976),74,640 B headroom. Attachment text produced33,267 B across
+output42/CPU25/host122/123,499 B above the32 KiB estimate but far below the enforced
+10 MiB aggregate limit. Eight superseded build/test logs removed5,479 logical B;
+the12,288 B instantaneous volume gain is not isolated physical-reclaim credit.
+Combined actual logical cleanup:951,989 B lossless log compression +5,479 B
+superseded text =957,468 B. All archive contents remain checksum-recoverable.
+
+Counted retained net change is-269,175 B: fixture+84,880, net attachment text
++27,788, run962+521,322, JPEG+97,976, archive replacement-951,989 and host exe/PDB
+net-49,152. Other object/PCH/source/Git/CMake bytes are unallocated; no raw/perf/
+dump/cache/asset output found for the game run. Codegen reports0 written and one
+module up to date; no guest objects rebuilt. End free79,974,555,648 B is34,443,264 B
+below the first reading, a drive-wide change not wholly attributed to the counted
+files. All owned producers terminal;339 Python checks and diff check pass.
+Original cumulative exception/floor and all protected raw/data remain unchanged.

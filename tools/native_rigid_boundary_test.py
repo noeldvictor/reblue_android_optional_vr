@@ -191,7 +191,10 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertLess(shadow.index("for (const auto &plan : *plans)"), shadow.index("DrawQueuePush(entry.draw)"))
         self.assertIn("if (item->regression) NoteNativeRigidSubmitted", direct)
         self.assertIn("if (record->regression) NoteNativeRigidFenceRetired", direct)
-        self.assertIn("if (generation) NoteNativeRigidEmitted", direct)
+        resolved = direct.split("void ResolveNativeRigidEmission(", 1)[1].split("void NoteNativeRigidEmission(", 1)[0]
+        self.assertIn("if (items[0]->regression) NoteNativeRigidEmitted(items[0]->model_generation,render_view,instances)", resolved)
+        self.assertLess(resolved.index("if (!visible) { store.scene_culled += instances; return; }"),
+                        resolved.index("NoteNativeRigidEmitted("))
         self.assertIn("[native-caster-family]", direct)
         policy = (ROOT / "src/gpu/scene/native_rigid_shadow.h").read_text()
         self.assertNotIn("0x63B8D67932573E51", policy)

@@ -201,15 +201,12 @@ wait for both requested outcomes within the same limit; no unchanged retry.
 Readiness reporting remains bounded64 lines, and the900-emission/250 ms gates
 remain strict. Captured pixels, if any, cannot satisfy or bypass reload acceptance.
 
-Next connected bundle: moving-view/depth visibility through current-frame native
-depth and the existing rigid queue, indexed bounds and native image owners.
-Inspect `src/gpu/occlusion_cull.cpp`, the native rigid consumer and pass ordering;
-prove moving-camera and changing-occluder behavior in the existing GPU fixture
-before another game boot. Exact-camera history cannot provide general moving-view
-culling; do not relax its equality or temporal checks to manufacture skips.
-The separate observation tool is ready for a changed implementation; it is not
-a reason to repeat diagnostic-only boots. Controlled hidden/visible game pixels,
-the tree-gap investigation, stereo and the full desktop gate remain required.
+Current connected bundle: moving-view/depth visibility through current-frame
+native depth and the existing rigid queue, indexed bounds and native image
+owners. The production exact-camera query-history path is now removed; its
+historical evidence below is not the current implementation. Controlled
+hidden/visible game pixels, the tree-gap investigation, stereo and the full
+desktop gate remain required.
 
 The GPU side of this bundle is now built and verified: `native_depth_visibility.*`
 and `native_visibility_*` build a current-depth maximum pyramid and native indexed
@@ -221,24 +218,35 @@ the real command fields and distinguish generated/culled/drawn instances. GPU47
 adds a compile-verified noncopyable reservation (no shader/behavior change).
 334 Python checks,46 rigid cases and8 query regressions pass; Vulkan validation0/0.
 
-Next connected runtime work: retain the native depth owner and per-primitive
-world bounds with `NativeRigidBatchItem`; preserve authored ordering and exact
-batch camera/depth compatibility in `draw_queue.cpp`. Reuse shared-budget work
-across a recording, explicitly refresh after intervening non-monotonic depth
-writes, and reset emitter binding state after compute. Route actual native draws
-through `DrawCommand`, seal before submission, collect only after the real frame
-fence, then retire work before native image owners. Retain one budget across all
-in-flight slots, not a fresh budget per draw. This runtime consumer is unconnected.
+Host123/run962 now connects that runtime consumer: retained depth/world bounds,
+exact batch camera compatibility, shared work across all slots, refresh after
+non-native depth writes and complete emitter-state restoration after compute.
+Actual native draws use `DrawCommand`; all three submission paths seal work,
+and real slot-fence completion precedes receipt collection and retirement.
+Production query pools/history/filter and their obsolete build entry are removed.
+339 Python checks, expanded output42/CPU25 and the host link pass.
 
-Existing scene/cutout validators assume submitted/emitted/retired draw equality;
-GPU-zeroed commands cannot be counted as emitted to preserve that assumption.
-Add explicit pending/culled/visible classification and causal lifecycle/parser
-regressions while preserving900 actual visible-emission windows, generation/source
-retirement and250 ms readiness. Mere command generation must never satisfy output
-acceptance. Remove old query-history production calls when its last consumer is
-migrated; do not relax temporal safety or exempt the selected regression asset.
-No host executable/game run was produced for this GPU-only checkpoint.
+Per-item pending/visible/culled/retired classification replaces assumed equality.
+Both strict cold/reload epochs pass without reducing900 actual visible emissions
+or250 ms readiness; cold generation93 closes1658 scene/shadow submissions at the
+real fence, followed by new generation207. In the fresh reloaded4634..4934 window,
+3,248 generated/draw-recorded commands yield3,247 collected receipts:3,236 visible
+and11 culled instances. These are actual indirect draws, not a speedup or broad
+scene qualification. This sample has no merged native batches;959 retains that
+distinct proof. The run terminates normally and restores the exact owner profile.
+
+The captured97,976 B window JPEG **fails visual acceptance**: title-logo pixels
+conflict with the logged interactive field/movement context. No cause or fix is
+claimed. Keep945 as last accepted mono pixels and956's tree-gap evidence. Before
+another boot, reuse `gpu/screenshot.*`/`ServiceOnPresent` to obtain a bounded
+renderer-owned, frame-identified post-gamma image, with actual fence/lifetime and
+storage guards. It must distinguish stale window capture from a wrong presented
+frame; repeating PrintWindow or relaxing context checks cannot answer that.
+Do not build another capture/renderer framework or make the selected asset a
+permanent ceiling on scene ownership. Current-depth controlled pixels, broader
+scene/animation/event/both-eye gates and Quest readiness remain open.
 [Current-depth GPU contract and integration findings](../research/20260907_2209_native-depth-visibility.md).
+[Runtime receipts, live checks and image discrepancy](../research/20260907_2256_current-depth-runtime.md).
 
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB

@@ -143,7 +143,7 @@ No speedup claim; real batches are still singletons.
 [Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
 [Corrected contract, live reload and open pixel issue](research/20260907_1927_corrected-shadow-coverage.md).
 
-**Native per-primitive occlusion is now skipping real draws.** Host120 derives
+**Earlier native-bounds/query checkpoint (now superseded):** Host120 derives
 indexed bounds from owned mesh data before GPU upload and transforms them with
 the exact native object matrix. This removes the walk's radius-scale handoff
 from native occlusion; primitive identities keep sibling visibility independent.
@@ -171,11 +171,25 @@ GPU-generated indexed commands pass72 Vulkan cases, including perspective views,
 and malformed-result rejection. Generated commands execute before any CPU
 readback; fence-delayed receipts distinguish culled, drawn and merely generated
 instances. Shared work-buffer limits and ordered scratch reuse are implemented.
-334 Python checks,46 existing rigid-shader cases and8 query regressions also pass;
-GPU validation reports zero errors/warnings. **Game queue/lifecycle integration
-is still pending**: the game still uses exact-camera query history. This is not
-a host-only frame, game-pixel qualification or measured speedup.
-[Current-depth implementation, GPU evidence and next integration](research/20260907_2209_native-depth-visibility.md).
+46 existing rigid-shader cases and8 query regressions also pass; GPU fixture
+validation reports zero errors/warnings.
+[Current-depth implementation and GPU evidence](research/20260907_2209_native-depth-visibility.md).
+
+**Host123/run962 connects current-depth GPU visibility to real native rigid
+draws and removes production temporal query history.**339 Python checks, the
+expanded C++ fixture and the host build pass. Both strict cold/reload epochs
+pass with900 actual visible scene/shadow emissions each and source/GPU retirement.
+A fresh reloaded300-frame window generates3,248 commands and fence-classifies
+3,236 visible plus11 culled instances; pending work is accounted separately.
+GPU-zeroed commands do not count as visible output.
+
+**Visual acceptance failed:** the saved window image shows the title logo, despite
+the field/camera/movement log context. Keep it as failure evidence; do not infer
+whether this is stale window capture or a presentation defect yet. Next, tie the
+existing renderer-owned screenshot readback to an identified presented frame
+before another game run. Controlled culling pixels, the tree gap, full scene/
+stereo coverage and speedup remain unqualified.
+[Runtime connection, checks and image discrepancy](research/20260907_2256_current-depth-runtime.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

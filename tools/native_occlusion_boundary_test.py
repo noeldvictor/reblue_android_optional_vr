@@ -17,6 +17,10 @@ class NativeOcclusionBoundaryTest(unittest.TestCase):
     def test_temporal_query_production_is_removed(self):
         self.assertFalse((ROOT / "src/gpu/occlusion_cull.cpp").exists())
         self.assertFalse((ROOT / "src/gpu/occlusion_cull.h").exists())
+        build = (ROOT / "src/CMakeLists.txt").read_text()
+        self.assertNotIn("gpu/occlusion_cull.cpp", build)
+        backend = build.split("set(reblue_backend_only", 1)[1].split(")", 1)[0]
+        self.assertIn("gpu/native_depth_visibility.cpp", backend)
         source = (ROOT / "src/gpu/native_depth_visibility.cpp").read_text()
         for forbidden in ("GuestTexture", "ShadowFitCamera", "UploadHostConstants", "ConstantDescriptorSet",
                           "dynamicOffset", "matrix_va", "mesh_va"):
