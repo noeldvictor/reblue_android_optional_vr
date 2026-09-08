@@ -143,19 +143,25 @@ No speedup claim; real batches are still singletons.
 [Cutoff fix, live cutout counts and pending gates](research/20260907_1838_cutout-integration.md).
 [Corrected contract, live reload and open pixel issue](research/20260907_1927_corrected-shadow-coverage.md).
 
-**Native occlusion now queries only eligible native draw consumers.** Host119/run959
-passes the full strict cold/reload checks. Legacy-only nodes no longer occupy
-query/history capacity; empty passes avoid query pipeline/binding work. The old
-translated query shader/upload and address-keyed draw filter remain removed.
-Eight Vulkan cases now feed two real fenced submissions into the native culling
-decision; C++ behavior contracts and 326 Python checks pass. The latest live
-sample has 8,960 queries / 8,954 collected, but **zero native draw skips**. Bounded
-reasons identify unusable bounds and changed camera history, not capacity/depth
-identity failures. Tighter native bounds and moving-view visibility still need
-implementation/verification; no safety checks were relaxed. Game pixels, tree-gap
-investigation and stereo culling remain open, with no measured speedup.
+**Native per-primitive occlusion is now skipping real draws.** Host120 derives
+indexed bounds from owned mesh data before GPU upload and transforms them with
+the exact native object matrix. This removes the walk's radius-scale handoff
+from native occlusion; primitive identities keep sibling visibility independent.
+Legacy-only nodes still consume no query/history capacity. The old translated
+query shader/upload and address-keyed draw filter remain removed.
 
-The same run supplies fresh **multi-instance batching evidence**: its reloaded
+327 Python checks, expanded C++ behavior fixtures and eight two-fence Vulkan
+query cases pass, with zero GPU validation errors/warnings. Run960 records
+24,011 submitted/collected queries and **1,026 native primitive skips**. Cold
+teardown passes, but the run times out at 300 seconds before the reloaded epoch
+meets the existing continuous-readiness gate. **No image was captured; reload
+and game-pixel acceptance remain open.** The readiness-reset cause is not yet
+established. Moving-view visibility, tree-gap investigation and stereo culling
+also remain open; no safety checks were relaxed and no speedup is measured.
+[Indexed bounds, actual culling and unresolved reload gate](research/20260907_2107_native-indexed-bounds.md).
+
+The preceding host119/run959 passed the full strict cold/reload checks and
+supplies fresh **multi-instance batching evidence**: its reloaded
 300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with
 2,813 instances participating in merged groups. Earlier checkpoints saw only
 singletons. This is real command batching, not whole-scene or pixel qualification
@@ -175,8 +181,8 @@ are preserved. Authored update producers, live inherited-binding acceptance, bro
 material/object families, visual sequences and both-eye game checks remain.
 [Preserved regression](research/20260907_1224_native-receiver-setup.md).
 
-Verification:320 Python source/scenario checks, both expanded C++ fixtures and
-46 GPU modes pass. The GPU run takes1.30 s with zero validation errors/warnings,
+Earlier cutout verification:320 Python source/scenario checks, both expanded C++
+fixtures and46 GPU modes pass. That GPU run takes1.30 s with zero validation errors/warnings,
 including exact cutoff boundaries and overlapping casters in reversed order.
 Earlier37/41-mode shadow results tested a superseded alpha model; scene modes0..22
 remain unchanged. Host116/run956 passes both strict field epochs, but its new
@@ -194,7 +200,7 @@ or lifecycle acceptance. All acceptance switches remain off in the normal profil
 | Desktop VR | Layered multiview presentation and headless OpenXR runtime | Complete host frame and representative both-eye/animated-effect qualification |
 | Quest 2 | Earlier APK/OpenXR/controller foundations | Desktop acceptance first, then device qualification, foveation and optimization |
 
-Plume integration is at `3094b35`. Remaining source lookups, register/resource
+Plume integration is at `2d206ee`. Remaining source lookups, register/resource
 adapters, retained templates and compatibility scopes prevent claiming removal
 of all Xbox 360 rendering machinery. Historical checkpoint detail belongs in
 the [transition document](docs/HOST_RENDERER_TRANSITION.md) and linked research,

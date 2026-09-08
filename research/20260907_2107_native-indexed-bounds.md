@@ -66,3 +66,55 @@ skips prove the live branch is reached, not visual correctness or speedup.
 Keep945 accepted pixels,956 tree-gap and957/948/941 failure evidence. The earlier
 940 generic mono reload JPEG was retired after checking its supersession by945;
 its hash/findings remain in1140. See the [same cumulative storage ledger](20260906_0333_native-scene-state-bridge.md).
+
+## Final live result: culling reached, reload gate failed
+
+Run960 terminated with exit1 at21:12:50 after its300-second limit. The supervisor
+reported that the load-owned model/material comparison had not reached matching
+fresh field samples; the retained-log parser identifies the missing prerequisite
+as completed same-process selected-asset reload. There is no reload-qualified or
+complete marker. This is a failed acceptance run, not a passed reload or a proven
+culling regression. No game image was produced: capture awaited that full gate.
+
+The last cumulative sample at frame8400 records49,457 native requests,24,011
+queries submitted and fence-collected,12,091 zeros and1,026 native primitive skips.
+Decisions: invalid-view0, invalid-bounds25,446, ambiguous0, capacity0, no-history758,
+changed-depth10, changed-camera20,361, changed-bounds336, stale0, warming80,
+visible1,440 and occluded1,026. History ends empty after the scene changes.
+Frame1500 already had152 skips. These are real native consumer skips, not unique
+objects, matched-state pixel proof or a measured FPS gain. Prior run959 queried
+nodes rather than individual primitives; its totals are not a timing comparison.
+
+Cold generation93/instance144 qualifies at21:08:53.944 with scene/shadow emitted
+789->1689, satisfying both900-emission windows. It then retires its source and
+closes at title with1690/1690/1690 submitted/emitted/fence-retired for both paths.
+Reload generation207 loads at21:09:09.293; instance385 reaches the native route.
+FieldActive bg41_01/event0 samples occur, but no reload qualification follows.
+At21:10:55.189 its source retires with scene and shadow each2228/2228/2226.
+Generation255 then loads and autoplay leaves the test field. Those matching
+scene/shadow totals do not establish why the continuous gate failed.
+
+The unchanged `native_rigid_lifecycle_bridge.cpp` requires unpaused walking in
+stage `(2<<32)|4101` and an observation younger than250 ms. The output window
+resets on lost readiness or generation changes and requires900 additional scene
+and shadow emissions continuously. Existing logs omit reset/freshness causes.
+Next obtain bounded reset provenance and separately timed culling pixels; do not
+raise250 ms, lower900, relabel skipped draws as emissions or retry unchanged.
+Moving-view/occluder safety, controlled visibility and both-eye game acceptance
+remain open. Preserve the tree-gap and prior legacy UV/light failure evidence.
+
+Retained log: `out/build/win-amd64-release/logs/reblue_960.log`,780,656 B, SHA256
+`517D72619B74980777D0E2C1C737834DD0728B7CE5EF44228CEB4575F36C5DCF`.
+The116-byte normal profile was restored byte-for-byte, SHA256
+`2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0`.
+Source is committed/pushed as6f0838f; host120 retains its actual edbcd32-dirty
+build stamp. All producer handles are terminal. No rebuild/boot is needed to
+publish this result.
+
+Final storage accounting is in the same cumulative ledger. This continuation
+retired the superseded940 JPEG and14 replaced fixture logs:15 files/134,170
+logical bytes total. Counted retained net is+1,439,545 B, chiefly expanded fixture
+coverage and the distinct timeout log. Three new reusable material-cache records
+total204 B; no raw or new image output. Last recorded free space81,040,945,152 B,
+213,766,144 B below the starting drive reading; that drive-wide change is not
+wholly attributable to the counted files. Prior cleanup is not credited again.

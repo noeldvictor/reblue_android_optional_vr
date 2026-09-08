@@ -3715,3 +3715,41 @@ Run960 planned: full strict cold/reload chain, Count0, one110 KiB JPEG,300 s,
 Question: do exact per-primitive native boxes qualify for queries and suppress
 hidden native draws, with fresh scene/reload and inspected mono pixels? Camera
 history checks stay exact; failure to cull is not permission to loosen them.
+
+Run960/PID33516/session76067 terminates1 at21:12:50 on the300-second timeout.
+It reaches1,026 native primitive skips and completes cold source/GPU retirement,
+but never qualifies the selected reloaded epoch. No image was produced; the
+full strict gate remains open. The2107 report preserves the missing-readiness
+evidence, exact counters, log hash and next observation. Profile restored exactly;
+all owned producers are terminal. Preserve960's780,656 B failure log,959's prior
+strict pass,945 accepted pixels,956 tree-gap evidence and957/948/941 failures.
+
+After replacement fixtures passed, removed14 superseded stdout/stderr logs:
+native_mesh_test11/12, mesh_cpu10, host_post_output_test39, post_output_cpu22,
+native_scene_snapshot_test41 and occlusion_pixels4. These9,474 logical B include
+the resolved Windows max compile failure, not an unresolved runtime failure.
+The replacement is mesh13/CPU11, output40/CPU23 and GPU42/occlusion5, reproducible
+from source and recorded commands. Immediate drive gain8,192 B is not isolated
+from other volume activity. Together with the already recorded940 JPEG, cleanup
+this continuation totals15 files/134,170 logical B; do not add the image twice
+or credit any prior continuation's cleanup. The deleted940 pixels are no longer
+on disk; their hash/findings remain in1140 and the reviewed945 successor remains.
+
+Retained mesh fixture1,537,443 B/30 files (+47,356); texture fixture72,184,565 B/129
+(+32,846); GPU fixture12,878,617 B/13 (+671,088); aggregate build/test logs231,549 B/
+150 (+7,003 after cleanup). Exe/PDB+4,608/+20,480; runtime960+780,656 and retired
+940 image-124,696. The later scene transition also produced three reusable native
+material-cache records,68 B each, in `cache/native_materials/v1`:
+`2d3212820e194cf6.bdmat`, `9736f2804261ce3b.bdmat`, `999e24d31205983a.bdmat`.
+Retain those204 B under the existing versioned cache budget; no broad recook,
+duplicate asset set, new raw/perf/dump or image output was found.
+
+Counted retained net+1,439,545 B (~1.37 MiB), for expanded fixtures and distinct
+current failure evidence. Other host objects/CMake/generated shader header/source/
+Git are not allocated in that subtotal. Image archive10,313,144 B/9 files leaves
+172,616 B below10 MiB. Last measured free81,040,945,152 B is213,766,144 B below
+this continuation's first reading; drive-wide activity is not wholly attributed
+to the counted files. There is no next producer approved by this accounting:
+review the unexplained drive change before another output-producing attempt.
+The cumulative3 GiB allowance, original62,509,998,080 B floor and protected
+evidence obligations remain unchanged.

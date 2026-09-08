@@ -137,12 +137,12 @@ with no native consumer from camera/bounds/depth/history refusal; query only
 eligible native consumers, then prove actual skipped draws with controlled
 visibility and pixels. Do not weaken camera/generation safety to inflate skips.
 Stereo queries remain unqualified. The attempted JPEG found the renderer already
-terminal; no image was written. The image archive has only47,920 B headroom below
-10 MiB, so a new110 KiB image needs identified superseded-image cleanup first.
+terminal; no image was written. At that checkpoint the image archive had only
+47,920 B headroom below10 MiB; the reviewed cleanup below subsequently made room.
 Keep957 failure evidence,956 tree-gap evidence,945 accepted pixels and948/941.
 [Native occlusion connection and exact evidence](../research/20260907_2007_native-occlusion.md).
 
-Current follow-up, host119/run959: query admission now happens only at the
+Prior follow-up, host119/run959: query admission now happens only at the
 preflighted, nonempty native rigid consumer, with owned world bounds passed by
 value from the walk. The walk's broad query publication and camera lookup bridge
 are removed; legacy-only nodes cannot consume query/history capacity. Empty
@@ -157,12 +157,9 @@ At query frame4800: 31,649 native requests, 8,960 submitted /8,954 collected,
 3,034 zeros and0 native skips. Decisions: 22,689 invalid bounds, 8,613 changed
 camera, 304 missing history, 43 visible; other reasons0. Bounds rejection includes
 missing/nonfinite/near-clipped inputs; this sample does not isolate those subtypes.
-Next bundle: derive tighter bounds from owned canonical geometry and the exact
-native object transform, replacing the remaining walk radius-scale handoff where
-possible. Test actual draw coverage/near-plane behavior, then moving-view/depth
-visibility without loosening camera equality or temporal safety. Do not repeat
-this unchanged run for a different camera. Controlled hidden/visible game pixels
-and stereo remain required; the broad desktop gate is unchanged.
+Those refusal counts motivated the indexed native bounds connection below;
+they are historical node-level counts, not directly comparable to primitive-level
+counts or a controlled performance measurement.
 
 The independent reloaded4352..4652 material window now proves real scene batching:
 9,515 instances /7,893 indirect calls, 2,813 instances in merged groups. Wider
@@ -170,6 +167,39 @@ scene emissions advance, layered draws remain0. This replaces the current
 "singletons only" observation, not historical measurements or pixel acceptance.
 No measured speedup and no claim that the admission edit caused the observed
 batching; the moving scene differs from958. Preserve all existing visual failures.
+
+Current connection, host120/run960: native geometry now owns bounds derived from
+checked, indexed v2 Position.xyz before GPU upload, including signed base vertex.
+The production object matrix produces conservative world boxes; no new file
+format, sidecar or bulk recook is needed. Native occlusion no longer consumes the
+walk's radius-scale bounds handoff. Preflight/order remain whole-node, but query
+identity and culling are per primitive. The walk's other source/frustum adapters
+remain. Exact camera, depth generation, near-plane and temporal checks stay strict.
+
+327 Python checks, mesh/output CPU fixtures and eight two-fence GPU cases pass
+(validation0/0). Host120 links without guest objects. Run960 records49,457 native
+requests,24,011 submitted/collected queries,12,091 zeros and1,026 primitive skips.
+Cold generation93 fully retires before207, but the300-second supervisor terminates
+the run before reload qualification. The selected reloaded object emits2,228 scene
+and2,228 shadow primitives; totals alone do not satisfy continuous readiness.
+No image was captured. Neither culling correctness nor a cause for the missing
+reload gate is proven. Host119/run959 remains the preceding full strict reload
+pass; host107/run945 remains the accepted game-pixel checkpoint.
+
+Next verification must obtain bounded readiness-reset provenance and a separately
+timed image of actual culling, so one pending lifecycle gate does not prevent all
+visual observation. Keep the existing900-emission continuous window and250 ms
+observer-freshness requirement; do not lower thresholds, count culled draws as
+emissions or retry unchanged until a pass. The current log cannot distinguish a
+walking/readiness interruption from stale observation. Continue moving-view/depth
+visibility ownership without loosening camera equality or temporal safety.
+Controlled hidden/visible game pixels, the tree-gap investigation, stereo and
+the broad desktop acceptance gate remain required.
+
+The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
+image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB
+run960 image was not produced. Preserve960's timeout evidence along with957/948/941.
+[Indexed native bounds, current result and storage](../research/20260907_2107_native-indexed-bounds.md).
 
 ### Delivered connection: owned scene lighting consumed by native rigid draws
 
