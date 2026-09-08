@@ -51,9 +51,10 @@ private:
   size_t bytes_;
 };
 
-// Only this temporary boundary index knows loader/clip keys. There is no lazy
-// sample-time import, disk cache or second instance/pose owner. The bridge
-// serializes access. Retired but leased assets still debit the aggregate cap.
+// Only this temporary boundary index knows loader/clip keys. Completed loads
+// register backing lifetime; selected slots prepare immutable assets BEFORE
+// sampling. Dormant pack entries do not consume the working set's curve budget.
+// The bridge serializes access; retired but leased assets remain charged.
 class NativeAnimationResidency {
 public:
   static constexpr size_t kMaxBytes = 8u << 20, kMaxClips = 4096, kEntryBytes = 256;
@@ -63,6 +64,9 @@ public:
   NativeAnimationResidency &operator=(const NativeAnimationResidency &) = delete;
   size_t Bytes() const { return accounting_->bytes.load(); }
   size_t Size() const { return entries_.size(); }
+  size_t ResidentCount() const {
+    return std::ranges::count_if(entries_,[](const auto &entry){return bool(entry.second.resident);});
+  }
   size_t AvailableAssetBytes() const {
     if (entries_.size() >= maximum_clips_) return 0;
     const auto bytes = Bytes();
@@ -72,34 +76,82 @@ public:
     std::erase_if(entries_,[&](const auto &entry){return entry.second.owner == owner;});
   }
   void Invalidate(uint32_t source) { entries_.erase(source); }
+  bool Register(uint32_t owner, uint32_t source) {
+    Invalidate(source);
+    if (!owner || !source || entries_.size() >= maximum_clips_ || RemainingBytes() < kEntryBytes) return false;
+    entries_.emplace(source,Entry{owner,std::make_shared<Charge>(accounting_,kEntryBytes)});
+    return true;
+  }
   bool Publish(uint32_t owner, uint32_t source, NativeAnimationAsset asset) {
     Invalidate(source);
     if (!owner || !source || entries_.size() >= maximum_clips_ ||
         asset.RetainedBytes() > AvailableAssetBytes()) return false;
-    const size_t bytes = asset.RetainedBytes()+kEntryBytes;
-    auto resident = std::make_shared<Resident>(std::move(asset),accounting_,bytes);
-    accounting_->bytes.fetch_add(bytes);
-    resident->charged = true;
-    entries_.emplace(source,Entry{owner,std::move(resident)});
+    if (!Register(owner,source)) return false;
+    auto &entry = entries_.at(source);
+    entry.resident = std::make_shared<Resident>(std::move(asset),accounting_,entry.charge);
     return true;
+  }
+  template <class Import>
+  bool Prepare(uint32_t source, uint32_t frame, Import &&import) {
+    const auto found = entries_.find(source);
+    if (found == entries_.end()) return false; // never resurrect retired/in-flight backing
+    auto &entry = found->second;
+    entry.last_frame = frame;
+    if (entry.resident) return true; // no packed-key reads on steady-state slot updates
+    auto attempt = [&] {
+      const auto budget = RemainingBytes();
+      // A failed generation is retried only when its available budget improves.
+      // Malformed/oversized assets cannot cause a per-tick decode/allocation loop.
+      if (!budget || (entry.attempted && budget <= entry.failed_budget)) return false;
+      entry.attempted = true; entry.failed_budget = budget;
+      auto asset = import(source,budget);
+      if (!asset || asset->RetainedBytes() > budget) return false;
+      entry.resident = std::make_shared<Resident>(std::move(*asset),accounting_,entry.charge);
+      entry.attempted = false;
+      return true;
+    };
+    if (attempt()) return true;
+    // Keep this and the two preceding frames' selections, plus every lease.
+    // Evict only dormant payloads; their loader registration remains bounded.
+    for (auto &[key,candidate] : entries_) {
+      if (key != source && candidate.resident && candidate.resident.use_count() == 1 &&
+          uint32_t(frame-candidate.last_frame) > 2) candidate.resident.reset();
+    }
+    return attempt();
   }
   std::shared_ptr<const NativeAnimationAsset> Find(uint32_t source) const {
     const auto entry = entries_.find(source);
-    return entry == entries_.end() ? nullptr :
+    return entry == entries_.end() || !entry->second.resident ? nullptr :
         std::shared_ptr<const NativeAnimationAsset>(entry->second.resident,&entry->second.resident->asset);
   }
 private:
   struct Accounting { std::atomic<size_t> bytes{0}; };
-  struct Resident {
-    NativeAnimationAsset asset;
+  struct Charge {
     std::shared_ptr<Accounting> accounting;
     size_t bytes;
-    bool charged = false;
-    Resident(NativeAnimationAsset value, std::shared_ptr<Accounting> budget, size_t count)
-        : asset(std::move(value)), accounting(std::move(budget)), bytes(count) {}
-    ~Resident() { if (charged) accounting->bytes.fetch_sub(bytes); }
+    Charge(std::shared_ptr<Accounting> budget, size_t count) : accounting(std::move(budget)), bytes(count) {
+      accounting->bytes.fetch_add(bytes);
+    }
+    ~Charge() { accounting->bytes.fetch_sub(bytes); }
+    Charge(const Charge &) = delete;
+    Charge &operator=(const Charge &) = delete;
   };
-  struct Entry { uint32_t owner; std::shared_ptr<const Resident> resident; };
+  struct Resident {
+    NativeAnimationAsset asset;
+    std::shared_ptr<Charge> entry_charge;
+    Charge payload_charge;
+    Resident(NativeAnimationAsset value, std::shared_ptr<Accounting> budget, std::shared_ptr<Charge> entry)
+        : asset(std::move(value)), entry_charge(std::move(entry)), payload_charge(std::move(budget),asset.RetainedBytes()) {}
+  };
+  struct Entry {
+    uint32_t owner;
+    std::shared_ptr<Charge> charge;
+    std::shared_ptr<const Resident> resident;
+    uint32_t last_frame = 0;
+    size_t failed_budget = 0;
+    bool attempted = false;
+  };
+  size_t RemainingBytes() const { const auto bytes=Bytes(); return bytes >= maximum_bytes_ ? 0 : maximum_bytes_-bytes; }
   size_t maximum_bytes_, maximum_clips_;
   std::shared_ptr<Accounting> accounting_ = std::make_shared<Accounting>();
   std::unordered_map<uint32_t,Entry> entries_;

@@ -39,7 +39,7 @@ struct Store {
   std::mutex mutex;
   NativeAnimationResidency assets;
   uint64_t loaded = 0, load_refused = 0, sampled = 0, whole = 0, preserved = 0, checks = 0, wrong = 0;
-  uint64_t cubic = 0;
+  uint64_t cubic = 0, registered = 0, prepare_refused = 0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -62,9 +62,10 @@ void Report(Store &store) {
   const auto frame = FrameStatFrameCount();
   if (frame-store.frame < 300) return;
   uint64_t unavailable = 0; for (auto count : store.missing) unavailable += count;
-  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; owned keys, original slot clocks/layers and outgoing channel adapter remain",
-      frame,store.loaded,store.load_refused,store.assets.Size(),store.assets.Bytes(),
-      store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic);
+  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; registered {} catalog {} prepare-refused {}; owned keys, original slot clocks/layers and outgoing channel adapter remain",
+      frame,store.loaded,store.load_refused,store.assets.ResidentCount(),store.assets.Bytes(),
+      store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic,
+      store.registered,store.assets.Size(),store.prepare_refused);
   store.frame = frame;
 }
 bool Unavailable(Missing reason) {
@@ -88,19 +89,27 @@ void Import(uint32_t source) {
   // Retire stale lookup before import, including unsupported source-address reuse.
   store.assets.Invalidate(source);
   if (!loading_owner || !Enabled()) return;
-  auto asset = animation_source::ReadKeyedAsset(source,store.assets.AvailableAssetBytes(),Word);
-  const bool published = asset && store.assets.Publish(loading_owner,source,std::move(*asset));
-  ++(published ? store.loaded : store.load_refused);
+  const auto type = animation_source::Half(uint64_t(source)+6,Word);
+  const bool published = type && (*type == 2 || *type == 3) && store.assets.Register(loading_owner,source);
+  ++(published ? store.registered : store.load_refused);
   if (!published && store.load_refused <= 4) {
-    const auto type = animation_source::Half(uint64_t(source)+6,Word);
     BD_INFO("[native-animation-load-refused] type {}; original motion remains available",type ? int(*type) : -1);
   }
 }
 thread_local uint32_t slot_graph = 0;
 struct SlotScope {
   uint32_t previous;
-  explicit SlotScope(uint32_t visual) : previous(slot_graph) {
+  explicit SlotScope(uint32_t visual, uint32_t slot) : previous(slot_graph) {
     slot_graph = Enabled() ? Word(uint64_t(visual)+2620).value_or(0) : 0;
+    if (!slot_graph || !FindLoadedNativeModel(slot_graph)) return;
+    const auto source = animation_source::SelectedSlotSource(visual,slot,Word);
+    if (!source || !*source) return;
+    auto &store = Clips(); std::lock_guard lock(store.mutex);
+    store.assets.Prepare(*source,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
+      auto asset = animation_source::ReadKeyedAsset(address,budget,Word);
+      ++(asset ? store.loaded : store.prepare_refused);
+      return asset;
+    });
   }
   ~SlotScope() { slot_graph = previous; }
 };
@@ -200,7 +209,7 @@ REX_HOOK_RAW(sub_8217C580) {
   __imp__sub_8217C580(ctx,base);
 }
 REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
-  bd::gpu::scene::animation_bridge::SlotScope slot(ctx.r3.u32);
+  bd::gpu::scene::animation_bridge::SlotScope slot(ctx.r3.u32,ctx.r4.u32);
   __imp__bdVisualObjectAnimSlotUpdate(ctx,base);
 }
 REX_HOOK_RAW(sub_82289888) {

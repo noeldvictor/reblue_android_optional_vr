@@ -6058,3 +6058,93 @@ Normal defaults, weighted/subtree/layer fallbacks and previous failure evidence
 are unchanged. Latest bounded host-build free-space receipt63756955648B; no
 cleanup/reclaimed-byte claim. This user-requested Git checkpoint starts no new
 build, runtime probe, capture or cleanup.
+
+### 2026-09-08 repeated cubic runtime observation after af0020d
+
+Previous goal work made progress (owned compressed curves, passing CPU/build);
+Git checkpoint af0020d is local. External push was explicitly rejected again;
+this automatic continuation is not upload approval. Read guest-source/devloop,
+disk policy, current queue and loaded-motion evidence. Reuse host169 without a
+build/restamp: EXE49207296B SHA256
+`66D30017BAB86A69E59902BC044233EE82D1E2CADC23A0B6EE9625B83069BF26`;
+PDB112828416B. Material52 EXE930816B SHA256
+`FB86D9B3353F3745256E539CD25EDF0C98D3E803014B751E58159765B7D23F1A`.
+17:23:38 free63755239424B; no observed game/build producer; owner profile hash
+still2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+
+New observation: at least256 actually bound cubic sampling calls with the same
+strict original comparison, not another type2 first call. Extend the existing
+ignored operator with an explicit cubic-probe switch; other scenario gates cannot
+satisfy it. This answers whether native time/tangent conversion survives real
+motion clocks, deciding what causal boundary regression is needed before further
+layer ownership. Not a full field/reload/skin/pixel qualification. Reuse60s,
+400KiB log,192MiB free-drop and cumulative floor62509998080B; aggregate75MiB
+operator stop/100MiB diagnostics. Estimated new retained log<400KiB, runtime
+peak<192MiB; raw/perf/cache/images0 new, exact profile restoration in finally.
+Retire only superseded material50/CPU48 and material51/CPU49 text logs after
+verified52/50 pass; preserve48/46 failure, host169 and run976 admission evidence.
+
+Run977/PID29776 terminal17:26:15 (60s probe, exit1), exact profile restored.
+Log217191B retained as residency-failure evidence. At frame1291:124 resident,
+8388240B (368B below8MiB), loads124/refused946, sampled/checked/cubic0,
+unavailable8670. This contradicts usable selected-motion residency, not cubic
+parity. Preserve the failure; no unchanged retry. Actual cleanup above removed
+8 exact superseded text files/4786B logical; free63754514432 ->63754526720,
+12288B observed reclaimed. Regenerable logs only; no raw/asset/profile deletion.
+
+Changed design: same residency index registers completed type2/3 source lifetime,
+then actual selected visual slots prepare native immutable curves before sampler
+entry. Source-backed dormant catalog is an explicit temporary streaming boundary,
+not full native asset cooking. Reuse existing loader retirement and shared leases;
+charge catalog, active payloads and retired pins within8MiB/4096entries. Dormant
+unleased payloads may evict after two unused frames; failed imports retry only
+when budget improves or the source generation changes. No sample-time key decode,
+new model/pose owner or per-tick failed decode loop. Read full slot-update body
+file89:2624 and selection writer file86:2636: slot*56+visual1920 ->ready entry+12.
+Frame-interpolation hook TOML read; no new hook site/codegen changes.
+
+Plan causal CPU material53/CPU51 then host170, existing300s/64MiB/8MiB/192MiB
+guards. CPU fixture fills a dormant catalog before selecting a working set,
+exercises pressure, recent-use/alias pins, retirement/reuse and source destruction.
+Estimate fixture<8MiB peak,<16KiB logs; host<192MiB peak. Same cumulative budgets.
+No new runtime retry until this changed ownership boundary passes CPU/build.
+
+Material53/PID28916 and CPU51/PID29108 terminal0 (0.12s/CTest0.13s). All406
+artifact-free source/scenario checks pass0.227s. Host170/PID31072 terminal0,
+codegen0 writes/no guest objects or shaders; animation bridge plus version
+consumers/link. Host end free63757455360B. Superseded52/50 text logs may now
+retire; keep host169/run977 residency failure. Next one identical bounded cubic
+probe on the changed activation-residency code, not a retry of host169.
+
+Run978/PID35428 terminal17:41:59, exit1 at60s: repeated cubic observation NOT
+reached. Frame1931 sampled/checked12989,wrong0,whole27,preserved12962,cubic1;
+loads14,registered1070,catalog1067,resident9/581952B,unavailable462,
+prepare-refused2 (unclassified). Reported resident peak942672B. No drift, but
+one cubic call is not advancing/interior-key qualification. This changes the
+next action to weighted/subtree/layer ownership and classifying the two refused
+selected clips, not another unchanged boot. Full field/reload/pixel gates stay
+pending. Owner profile hash restored exactly; both runtime sessions terminal.
+
+Current host170 EXE49209856B/PDB112852992B, material53 EXE949760B,
+tree9561657B/43. Hashes and complete scoped evidence in
+`research/20260908_1745_selected-motion-residency.md`. No new raw/cache/dump/perf
+files since17:23:38 (scoped timestamp inventory); no images generated. Current
+and failure logs977/978 retained217191+218900B. After replacement53/51 PASS,
+removed52/50 four text files2163B; free63757455360 ->63757459456,4096B reclaim.
+After978 replaced976's first-call admission, verified976 SHA and host168's
+successful build/benign GLOB regeneration warnings, then removed those three
+superseded text logs43684B; free63755874304 ->63755919360,45056B reclaim.
+Total this turn15 files/50633B logical,61440B observed reclaimed, not double-
+credited earlier removals. Regenerable diagnostic text only; reports/hashes and
+all unresolved failure evidence remain. No game data/assets/raws deleted.
+
+Pre-commit ending free63755919360B (59.38GiB), net+679936B from63755239424.
+Drive-wide activity is distinct from attributed retained change: runtime logs
++396428B after976 retirement, build logs421892 ->415613B (-6279B), selected
+EXE/PDBs+46080B. Combined enumerated retained change+436229B, excluding other
+objects, source, Git and system activity. Runtime operator accounting now
+77645035B by last preflight plus978 minus retired976/host168 logs; build logs
+415613B/208, images unchanged10434657B/13, raw0 new. Same100MiB diagnostics,
+75MiB operator stop,10MiB build logs and cumulative floor; no budget reset.
+README/active queue updated once for the connected result. All producers are
+terminal, no queued run, and full renderer goal remains active/incomplete.

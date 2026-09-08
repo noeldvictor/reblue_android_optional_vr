@@ -35,6 +35,15 @@ std::optional<uint16_t> Half(uint64_t address, ReadWord &&read) {
   return uint16_t(*word >> ((address & 2) ? 0 : 16));
 }
 
+// bdVisualObjectSetAnimation writes a ready lookup entry to visual+1920+slot*56;
+// bdVisualObjectAnimSlotUpdate reads its initialized motion pointer at entry+12.
+template <class ReadWord>
+std::optional<uint32_t> SelectedSlotSource(uint32_t visual, uint32_t slot, ReadWord &&read) {
+  if (!visual) return {};
+  const auto entry = Word(uint64_t(visual)+1920+uint64_t(slot)*56,read);
+  return entry && *entry ? Word(uint64_t(*entry)+12,read) : std::nullopt;
+}
+
 // The source decoder's compact float flushes exponent-zero values to signed
 // zero and treats exponent31 as finite. It is not IEEE binary16 at the boundary.
 inline float CompactFloat(uint16_t bits) {

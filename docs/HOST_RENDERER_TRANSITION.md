@@ -787,35 +787,35 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    palettes/completed source copy, unsupported bone routes and full desktop
    sequence/both-eye gates remain. No speedup/full host frame or Quest claim.
    [Skeleton contract, live scopes and preserved failures](../research/20260908_1544_native-skeleton-evaluation.md).
-   **Loaded keyed animation sampling (host168, opt-in):** completed standalone/
-   packed loads now publish immutable named tracks under an8MiB aggregate motion
-   residency cap. Packed aliases share keys; loader retirement and source reuse
-   invalidate lookup without repointing pinned leases. The existing model owner
-   retains dense authored name bindings within its budget. Whole reset and
-   weight1/full-root preserve sampling now bypass original recursive keyed walks
-   and source-key reads for admitted type2 clips, feeding the existing channel/
-   skeleton/instance chain. Source clock/slot advancement, weighted/subtree/layer
-   application and outgoing48-byte channels remain explicit adapters.
-   Material50/CPU48,output82/CPU54,405 Python checks and host168 pass, including
-   source destruction, flag/byte semantics, aliases, budgets and real native pose
-   consumption. Run976 observes69 imported clips and one matching preserve-mode
-   sampling call, then deliberately stops as an admission probe (terminal1).
-   This is NOT sustained field/reload/nonconstant-animation/pixel qualification;
-   whole-reset live reachability and live retirement are also pending. Four
-   refusal examples identify compressed type3, not every one of992 refusals.
-   **Compressed curve checkpoint (host169; live pending):** type3 per-axis cubic
-   keys now import into the same immutable assets and runtime channel consumer,
-   retaining the8MiB residency cap. Material52/CPU50 and host169 pass. Tests cover
-   all65,536 compact-float encodings, asymmetric Hermite tangents, multiple rates,
-   angular short-segment rules, source destruction and allocation/refusal bounds.
-   No cubic live comparison has run; run976 remains type2 admission evidence only.
-   Next verify repeated actual cubic consumption with strict source-clock/interior-
-   key comparison, then own weighted/subtree/layer application through these same
-   assets/consumers. Do not let another type2-only sample satisfy the cubic gate.
-   Types0/1, slots, late writers/special bones, persistent clip cooking, outgoing
-   channels/palettes and full desktop/both-eye gates remain. Preserve975's reload
-   and971/962's pixel failures; no unchanged retry or Quest work. Defaults stay
-   unchanged. [Runtime connection, scope and storage](../research/20260908_1653_loaded-animation-sampling.md).
+   **Selected-motion residency and sampling (host170, opt-in):** completed
+   standalone/packed loads register source lifetime in the same bounded index;
+   selected slots prepare immutable named type2/type3 curves before sampling.
+   Run977 exposed eager load-order starvation: 124 clips filled the8MiB cap and
+   zero selected calls reached native sampling. Dormant catalog entries now
+   consume only bounded metadata; active curves, aliases and retired leases share
+   the unchanged cap. Recent selections/leases prevent eviction; failed imports
+   retry only on increased available budget or source generation changes.
+   Steady-state slots/samplers do not decode source keys. Dormant source-backed
+   registrations remain a temporary streaming boundary, not native clip cooking.
+   Whole reset and weight1/full-root preserve sampling reuse the existing model
+   names, channel/skeleton/instance owners and strict original comparison.
+   Material53/CPU51,406 source/scenario checks and host170 pass, including
+   load-order pressure, pins, retirement, source reuse/destruction, exact budgets
+   and existing exhaustive compact-float/Hermite/angular curve fixtures.
+   Run978:12989 checked/sampled,wrong0; whole27,preserved12962,cubic1. Reported
+   resident peak942672B; two prepare failures remain unclassified. This proves
+   reachable sustained channel sampling, NOT the repeated256-cubic observation,
+   scoped field/reload/skin/motion pixels or both loader-retirement paths. Preserve
+   both977's starvation failure and978's insufficient cubic coverage.
+   Next own weighted/subtree/layer application through these same assets and
+   consumers, recover the two refused selected-clip contracts, then verify actual
+   advancing cubic motion with strict source-clock/interior-key comparisons. No
+   unchanged boot or type2-only pass can satisfy that gate. Types0/1, slot clocks,
+   late writers/special bones, persistent cooking, outgoing48-byte channels/
+   palettes and full desktop/both-eye gates remain. Preserve975's reload and
+   971/962's pixel failures; defaults unchanged, no Quest work.
+   [Selected residency, evidence and storage](../research/20260908_1745_selected-motion-residency.md).
+   [Original runtime connection](../research/20260908_1653_loaded-animation-sampling.md).
    [Recovered clip/loader contracts and angular regressions](../research/20260908_1612_native-animation-clips.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass

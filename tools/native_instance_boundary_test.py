@@ -20,7 +20,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.animation_bridge = (root / "src/gpu/scene/native_animation_bridge.cpp").read_text(encoding="utf-8")
         cls.animation_asset = (root / "src/gpu/scene/native_animation_asset.h").read_text(encoding="utf-8")
 
-    def test_animation_import_is_load_scoped_and_sampler_never_reads_source_keys(self):
+    def test_animation_registration_is_load_scoped_and_sampler_never_reads_source_keys(self):
         for name in ("sub_8217BD70", "sub_8217C5E8"):
             hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
             self.assertLess(hook.index("Retire(owner)"), hook.index(f"__imp__{name}"))
@@ -33,6 +33,18 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("asset=store.assets.Find(ctx.r5.u32)", sampler)
         self.assertIn("ApplyKeyedAsset(*asset,model->AnimationTargets()", sampler)
         self.assertLess(sampler.index("throw std::runtime_error"), sampler.index("auto *output"))
+
+    def test_selected_slots_prepare_owned_curves_before_sampling_with_bounded_refusals(self):
+        registration = self.animation_bridge.split("void Import(", 1)[1].split("thread_local uint32_t slot_graph", 1)[0]
+        self.assertIn("store.assets.Register(loading_owner,source)", registration)
+        self.assertNotIn("ReadKeyedAsset", registration)
+        slot = self.animation_bridge.split("struct SlotScope", 1)[1].split("bool Sample(", 1)[0]
+        self.assertIn("SelectedSlotSource(visual,slot,Word)", slot)
+        self.assertIn("store.assets.Prepare", slot)
+        self.assertIn("ReadKeyedAsset(address,budget,Word)", slot)
+        self.assertIn("budget <= entry.failed_budget", self.animation_asset)
+        self.assertIn("candidate.resident.use_count() == 1", self.animation_asset)
+        self.assertIn("TestSelectedAnimationResidency()", self.animation_test)
 
     def test_animation_assets_retire_with_both_loader_types_and_pinned_bytes_remain_charged(self):
         for name in ("sub_8217BD00", "sub_8217C580"):

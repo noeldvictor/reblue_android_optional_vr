@@ -282,6 +282,50 @@ ClipSource CubicSource(float rate = 1) {
   key(0x8400,-7,0x3c00,0); // cubic keys may precede the start; constant holds
   return source;
 }
+void TestSelectedAnimationResidency() {
+  auto source=CubicSource();
+  auto read=[&](uint64_t address){return source.Read(address);};
+  source.Word(0x9000+1920+56,0xa000); source.Word(0xa00c,0x1000);
+  Require(animation_source::SelectedSlotSource(0x9000,1,read) == 0x1000 &&
+          !animation_source::SelectedSlotSource(0x9000,0,read) &&
+          !animation_source::SelectedSlotSource(0x9000,UINT32_MAX,read),
+          "actual selected slot stride and ready-entry pointer, not motion ID or an in-flight lookup");
+  const auto bytes=animation_source::ReadKeyedAsset(0x1000,128*1024,read)->RetainedBytes();
+  constexpr size_t entry_bytes=NativeAnimationResidency::kEntryBytes;
+  NativeAnimationResidency residency(16*entry_bytes+2*bytes,16);
+  for (uint32_t n=1; n<=16; ++n) Require(residency.Register(7,n*16),"dormant pack entries register without decoding curves");
+  Require(residency.Bytes() == 16*entry_bytes && residency.ResidentCount() == 0 && !residency.Register(8,0x200),
+          "catalog metadata and count are bounded inside the same aggregate cap");
+  unsigned imports=0;
+  auto import=[&](uint32_t,size_t budget){ ++imports; return animation_source::ReadKeyedAsset(0x1000,budget,read); };
+  Require(!residency.Prepare(0x9999,10,import) && imports == 0,"unregistered source cannot trigger late discovery");
+  Require(residency.Prepare(0x10,10,import) && residency.Prepare(0x20,10,import) && imports == 2 &&
+          residency.Bytes() == 16*entry_bytes+2*bytes,"selected working set gets budget ahead of dormant load order");
+  auto lease=residency.Find(0x10), alias=residency.Find(0x10);
+  Require(lease == alias && !residency.Prepare(0x30,11,import) && imports == 2,
+          "full active working set refuses before allocation; recent selections and aliases stay pinned");
+  Require(residency.Prepare(0x30,13,import) && imports == 3 && residency.Find(0x10) == lease &&
+          !residency.Find(0x20) && residency.Find(0x30),"evict only dormant unleased payloads, not live source registration");
+  source.words.clear();
+  for (uint32_t frame=14; frame<120; ++frame)
+    Require(residency.Prepare(0x10,frame,import) && residency.Prepare(0x30,frame,import),
+            "selected resident curves survive source destruction without reimport on slot ticks");
+  Require(imports == 3,"steady-state preparation does not invoke the boundary decoder");
+  residency.Retire(7);
+  Require(residency.Size() == 0 && residency.Bytes() == bytes+entry_bytes &&
+          !residency.Prepare(0x10,120,import) && imports == 3,"loader retirement removes dormant and resident lookup without resurrecting backing");
+  std::vector<NativeJointChannels> channels;
+  Require(lease->Clip().Sample(.25f,channels),"retired native motion lease remains source-free");
+  lease.reset(); alias.reset(); Require(residency.Bytes() == 0,"retired index/payload charges release with last alias");
+
+  source=CubicSource(); imports=0;
+  NativeAnimationResidency tight(bytes+entry_bytes-1,1);
+  Require(tight.Register(8,0x10),"register oversized candidate's lifetime within cap");
+  for (uint32_t frame=0; frame<120; ++frame) Require(!tight.Prepare(0x10,frame,import),"oversized selected clip refuses");
+  Require(imports == 1 && tight.Bytes() == entry_bytes,"unchanged failed budget cannot cause per-tick decode/allocation retries");
+  Require(tight.Register(9,0x10) && !tight.Prepare(0x10,120,import) && imports == 2,
+          "source-address generation reuse resets refusal without borrowing the retired payload");
+}
 void TestCompressedAnimations() {
   for (uint32_t bits=0; bits<=65535; ++bits) {
     const int exponent=(bits>>10)&31;
@@ -341,6 +385,6 @@ void TestCompressedAnimations() {
 }
 } // namespace
 void TestAnimationClips() {
-  TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestCompressedAnimations();
+  TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }
