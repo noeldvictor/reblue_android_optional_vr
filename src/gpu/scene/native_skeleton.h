@@ -36,13 +36,20 @@ inline JointQuaternion MultiplyJointQuaternions(const JointQuaternion &a, const 
           a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
           a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]};
 }
-inline RenderMatrix JointEulerRotation(const JointVector &radians) {
+inline JointQuaternion JointEulerQuaternion(const JointVector &radians) {
   const float x=radians[0]*.5f, y=radians[1]*.5f, z=radians[2]*.5f;
   // The source appends each new axis to the right: qZ * qY * qX.
-  return JointRotation(MultiplyJointQuaternions(
+  return MultiplyJointQuaternions(
       MultiplyJointQuaternions({0,0,std::sin(z),std::cos(z)}, {0,std::sin(y),0,std::cos(y)}),
-      {std::sin(x),0,0,std::cos(x)}));
+      {std::sin(x),0,0,std::cos(x)});
 }
+inline RenderMatrix JointEulerRotation(const JointVector &radians) { return JointRotation(JointEulerQuaternion(radians)); }
+
+struct NativeJointChannels {
+  JointVector translation{}, scale{1,1,1};
+  JointQuaternion rotation{0,0,0,1};
+  bool translated = false, rotated = false, scaled = false, reset_parent = false;
+};
 
 // Parent is a preorder ordinal, pose_index a model-local joint identity. No
 // pointers, resource wrappers, guest flags or source-address identity survives.
@@ -51,11 +58,9 @@ struct NativeSkeletonJoint {
   JointVector translation{}, scale{1,1,1};
   RenderMatrix before_rotation = JointIdentity(), rotation = JointIdentity(), after_rotation = JointIdentity();
   bool inherit_parent_scale = false;
-};
-struct NativeJointChannels {
-  JointVector translation{}, scale{1,1,1};
-  JointQuaternion rotation{0,0,0,1};
-  bool translated = false, rotated = false, scaled = false, reset_parent = false;
+  // Blending reads authored rest values even when the base transform disables
+  // that channel. Availability is independent of base-transform activation.
+  NativeJointChannels blend_rest;
 };
 
 inline bool ValidNativeSkeleton(std::span<const NativeSkeletonJoint> joints) {

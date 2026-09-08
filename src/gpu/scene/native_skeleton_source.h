@@ -67,6 +67,11 @@ std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, Read
     joint.inherit_parent_scale = (*flags & 0x40) != 0;
     if ((*flags & 1) && !Floats(source+16,joint.translation,read)) return {};
     if ((*flags & 8) && !Floats(source+44,joint.scale,read)) return {};
+    joint.blend_rest.translated = Floats(source+16,joint.blend_rest.translation,read);
+    joint.blend_rest.scaled = Floats(source+44,joint.blend_rest.scale,read);
+    JointVector rest_angles;
+    joint.blend_rest.rotated = Floats(source+28,rest_angles,read);
+    if (joint.blend_rest.rotated) joint.blend_rest.rotation = JointEulerQuaternion(rest_angles);
     for (const auto [flag,offset,matrix] : std::array{
         std::tuple{4u,28u,&joint.rotation}, std::tuple{16u,80u,&joint.before_rotation},
         std::tuple{32u,92u,&joint.after_rotation}}) {

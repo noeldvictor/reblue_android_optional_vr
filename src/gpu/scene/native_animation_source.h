@@ -4,6 +4,7 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #pragma once
+#include "gpu/scene/native_animation_blend.h"
 #include "gpu/scene/native_animation_asset.h"
 #include <bit>
 #include <unordered_map>
@@ -232,5 +233,40 @@ inline bool ApplyKeyedAsset(const NativeAnimationAsset &asset, std::span<const u
     if (track->Animated()) record[0] |= 128;
   }
   records = std::move(output); return true;
+}
+
+inline bool ApplyKeyedLayer(const NativeAnimationAsset &asset, std::span<const uint32_t> names,
+    std::span<const NativeSkeletonJoint> skeleton, float seconds, float weight,
+    uint32_t root_pose, bool single_subtree, std::vector<ChannelRecord> &records) {
+  if (names.size() != skeleton.size() || records.size() != names.size() || !std::isfinite(weight)) return false;
+  const auto selected=SelectNativeAnimationSubtree(skeleton,root_pose,single_subtree);
+  if (!selected) return false;
+  if (std::abs(weight) < kNativeAnimationWeightEpsilon) return true;
+  std::unordered_set<uint32_t> unique;
+  for (auto name : names) if (!unique.insert(name).second) return false;
+  std::vector<NativeJointChannels> sampled;
+  if (!asset.Clip().Sample(seconds,sampled)) return false;
+  auto output=records;
+  for (size_t n=0; n<skeleton.size(); ++n) {
+    if (!(*selected)[n]) continue;
+    const auto &joint=skeleton[n];
+    auto &record=output[joint.pose_index]; record[1]=names[joint.pose_index];
+    const auto *track=asset.FindTrack(names[joint.pose_index]);
+    if (!track) continue;
+    NativeJointChannels previous, result;
+    previous.translated=(record[0]&1)!=0; previous.rotated=(record[0]&2)!=0; previous.scaled=(record[0]&4)!=0;
+    auto get=[&](auto &value,unsigned word) { for (auto &component : value) component=std::bit_cast<float>(record[word++]); };
+    if (previous.translated) get(previous.translation,2);
+    if (previous.rotated) get(previous.rotation,5);
+    if (previous.scaled) get(previous.scale,9);
+    if (!BlendNativeChannels(previous,sampled[track->pose_index],joint.blend_rest,weight,result)) return false;
+    record[0]&=~7u;
+    auto put=[&](const auto &value,unsigned word) { for (float component : value) record[word++]=std::bit_cast<uint32_t>(component); };
+    if (result.translated) { record[0]|=1; put(result.translation,2); }
+    if (result.rotated) { record[0]|=2; put(result.rotation,5); }
+    if (result.scaled) { record[0]|=4; put(result.scale,9); }
+    if (track->Animated()) record[0]|=128;
+  }
+  records=std::move(output); return true;
 }
 } // namespace bd::gpu::scene::animation_source
