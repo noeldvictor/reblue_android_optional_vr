@@ -378,13 +378,30 @@ balanced, old93/144 retires before new207/434. Other receiver/light/caster/cutou
 and source/GPU gates pass. No new crash dump/capture; profile restored. Run968
 and its symbolized cause remain failure evidence; no pixel/speedup claim.
 
-Next connected family: native water material parameters/images/geometry feeding
-an actual native shader and the existing ordered scene queue. Reuse the current
+Water shader/input checkpoint (host135): `native_water_inputs.h`,
+`native_water_material_source.h`, `native_water_program.*` and the native water
+VS/PS now consume semantic materials, tangent-bearing native meshes, six explicit
+image bindings and existing native light/fog data. The existing GPU fixture runs
+16 two-eye cases with real indexed instancing and native scene snapshots;
+55 unchanged rigid cases also pass, validation0/0. This is a built native consumer,
+not live water conversion: no game hook or queue admission changed. Native wave
+deformation/material changes need authored-scene/art review. See
+[water program evidence](../research/20260908_0435_native-water-program.md).
+
+Next connected work: attach these native water parameters/images/geometry to
+the existing ordered scene queue. Reuse the current
 water update/refraction setup, instance/model/mesh owners and native scene-image
 publications. Remove this family's per-entry legacy material/resource execution,
 not just another callback helper; preserve authored updates, reflections,
 refraction, blend/depth and snapshot order. Exit through production CPU/GPU
 fixtures plus fresh water consumption/retirement and mixed cold/reload checks.
+Publish completed material values with native instance/generation identity after
+the resource writer, not a draw-time descriptor lookup. The current import copies
+final parameter destinations; it is not yet installed in a frame-bounded owner.
+Retain image leases through the real queue/fence and extend load-owned geometry
+with the validated tangent input. Displacement requires conservative native bounds.
+The shader supports per-eye cameras/image layers; their actual game producers,
+water shadow-view variants and all authored controls remain integration work.
 Do not freeze late values or weaken unknown-writer refusal. Receiver descriptors,
 source-input imports, outgoing legacy state and legacy-opened scopes remain
 adapters in the broader scene. Qualify mixed-order

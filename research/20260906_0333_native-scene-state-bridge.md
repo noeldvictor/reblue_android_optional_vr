@@ -4495,3 +4495,50 @@ counted once. Latest free80,248,889,344 B (~74.74 GiB),239,534,080 B below first
 reading; most drive-wide movement remains outside attributed producer files.
 No producer live. Full native-frame, pixel/sequence/both-eye and Quest gates remain
 open; no speedup claim and no change to the unanswered image-budget request.
+
+### Native water program and stereo GPU fixtures (2026-09-08)
+
+Same cumulative ledger, original3GiB exception/floor62,509,998,080B and raw/image
+limits. First measured free80,244,531,200B. Before the first producer,
+free80,247,488,512B; GPU fixture15,275,881B/17files and build logs275,555B/166files.
+No live renderer/build producer at start. Existing shader dumps/source/assets
+reused; no extraction, cooking, download, renderer run, image export or raw data.
+The ignored existing supervisor gained a water test selector, not a new harness.
+GPU build peak estimate48MiB, enforced free-drop48MiB initially/32MiB subsequent;
+GPU tests16MiB, host192MiB;300s producer/30s CTest and10MiB aggregate logs.
+
+GPU builds52/PID32272,53/35344,54/35612,55/29132,57/33388 terminal0;
+56/33752 terminal1 (Windows max macro collision, corrected). Water1/PID35244,
+2/33984 and4/21652 terminal1; failures and exact causes/hashes retained in
+`20260908_0435_native-water-program.md`. Water3/37120 terminal0 with the first10
+cases; finalwater5/31016 terminal0 with16two-eye cases in1.26s. Rigid19/29656
+terminal0 with55cases in1.24s. Both GPU suites validation0errors/0warnings;
+one existing GOG overlay loader diagnostic each.368 artifact-free Python tests
+pass. Host135/PID32596 terminal0 in9.52s;0codegen writes/no guest objects.
+This builds the new program, not a live water queue connection. No game/profile
+changes; original116B profile hash unchanged. All named producers terminal.
+
+Final GPU fixture17,190,913B/19files, growth1,915,032B. New compiled water shader
+headers300,263B (236,809PS/63,454VS), in the existing generated tree. Host EXE/PDB
+grow46,080B combined; their exact identities and the fixture hash are in the
+water report. Keep current build products; no duplicate binary/archive copies.
+These are needed for the next connected native water producer/queue work.
+
+After final water and rigid replacement passed, removed20exact superseded
+agent-owned log files: GPU build51,53..56; water tests1..4; rigid test18, each
+stdout/stderr. Logical deletion35,990B. The water report preserves the diagnosed
+fixture failure causes/hashes; complete old stdout text is retired. These cases
+can be rerun but historic exact output is not retained. Keep first shader build52,
+current57/water5/rigid19/host135 plus the prior live host134 build evidence.
+No unresolved game failure, original asset/profile, capture, protected raw data
+or active build tree removed. Immediate free80,227,532,800->80,227,577,856B:
+45,056B physical interval gain. Cleanup counted once, not the replacement sizes.
+
+Build logs now280,732B/172files, net5,177B growth; new gross logs41,167B minus
+35,990B retired. Selected fixture/log/shader-header/EXE/PDB growth2,266,552B;
+other new object/build metadata and source/Git bytes are separate. Ending free
+80,227,577,856B (~74.72GiB),16,953,344B below the first reading. That drive-wide
+change includes unattributed system activity, not all producer output or cleanup.
+No new raw/images/OS dumps are required by these fixtures. Native material
+publication, live queue/image lifetimes, conservative wave bounds and game
+art/pixel/sequence/both-eye qualification remain open; full goal not narrowed.

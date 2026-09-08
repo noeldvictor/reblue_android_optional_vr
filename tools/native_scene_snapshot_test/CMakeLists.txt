@@ -1,4 +1,5 @@
-add_executable(native_scene_snapshot_test main.cpp rigid.cpp occlusion.cpp visibility.cpp screenshot.cpp
+add_executable(native_scene_snapshot_test main.cpp rigid.cpp water.cpp occlusion.cpp visibility.cpp screenshot.cpp
+    ../../src/gpu/scene/native_water_program.cpp
     ../../src/gpu/scene/native_rigid_program.cpp ../../src/gpu/native_occlusion_program.cpp
     ../../src/gpu/scene/native_mesh_data.cpp ../../src/gpu/native_depth_visibility.cpp ../../src/gpu/screenshot_readback.cpp)
 target_include_directories(native_scene_snapshot_test PRIVATE ../../src ../.. "${REBLUE_GEN_DIR}")
@@ -9,6 +10,8 @@ add_test(NAME native_scene_snapshot_pixels COMMAND native_scene_snapshot_test)
 set_tests_properties(native_scene_snapshot_pixels PROPERTIES TIMEOUT 30)
 add_test(NAME native_rigid_pixels COMMAND native_scene_snapshot_test --rigid)
 set_tests_properties(native_rigid_pixels PROPERTIES TIMEOUT 30)
+add_test(NAME native_water_pixels COMMAND native_scene_snapshot_test --water)
+set_tests_properties(native_water_pixels PROPERTIES TIMEOUT 30)
 add_test(NAME native_occlusion_pixels COMMAND native_scene_snapshot_test --occlusion)
 set_tests_properties(native_occlusion_pixels PROPERTIES TIMEOUT 30)
 add_test(NAME native_depth_visibility_pixels COMMAND native_scene_snapshot_test --visibility)

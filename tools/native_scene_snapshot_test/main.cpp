@@ -166,16 +166,18 @@ void CheckPixels(RenderDevice &device, uint32_t layers, uint32_t samples) {
 }
 } // namespace
 void CheckNativeRigid(RenderDevice &device);
+void CheckNativeWater(RenderDevice &device);
 void CheckNativeOcclusion(RenderDevice &device);
 void CheckNativeDepthVisibility(RenderDevice &device);
 void CheckNativeScreenshot(RenderDevice &device);
 int main(int argc, char **argv) {
   try {
     const bool rigid = argc == 2 && std::strcmp(argv[1], "--rigid") == 0;
+    const bool water = argc == 2 && std::strcmp(argv[1], "--water") == 0;
     const bool occlusion = argc == 2 && std::strcmp(argv[1], "--occlusion") == 0;
     const bool visibility = argc == 2 && std::strcmp(argv[1], "--visibility") == 0;
     const bool screenshot = argc == 2 && std::strcmp(argv[1], "--screenshot") == 0;
-    Require(argc == 1 || rigid || occlusion || visibility || screenshot, "Only --rigid, --occlusion, --visibility or --screenshot is supported; no raw capture mode");
+    Require(argc == 1 || rigid || water || occlusion || visibility || screenshot, "Only --rigid, --water, --occlusion, --visibility or --screenshot is supported; no raw capture mode");
     VulkanInterfaceOptions options;
     options.extraInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     VkValidationFeatureEnableEXT sync = VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
@@ -220,6 +222,7 @@ int main(int argc, char **argv) {
           (caps.depthAttachmentResolveModes & (1u << uint32_t(RenderResolveMode::MIN))), "Required native features missing");
       std::cout << "GPU=" << native->physicalDeviceProperties.deviceName << "; image dimensions are case-specific; raw bytes=0\n";
       if (rigid) CheckNativeRigid(*device);
+      else if (water) CheckNativeWater(*device);
       else if (occlusion) CheckNativeOcclusion(*device);
       else if (visibility) CheckNativeDepthVisibility(*device);
       else if (screenshot) CheckNativeScreenshot(*device);

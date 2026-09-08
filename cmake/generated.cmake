@@ -53,6 +53,14 @@ reblue_host_shader(native_rigid_shadow_vs vs_6_1)
 reblue_host_shader(native_rigid_shadow_cutout_vs vs_6_1)
 reblue_host_shader(native_rigid_shadow_cutout_ps ps_6_1)
 reblue_host_shader(native_rigid_ps ps_6_1)
+reblue_host_shader(native_water_vs vs_6_1)
+reblue_host_shader(native_water_ps ps_6_1)
+if(TARGET native_scene_snapshot_test)
+    add_custom_target(native_water_shader_headers DEPENDS
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_water_vs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_water_ps.hlsl.spirv.h")
+    add_dependencies(native_scene_snapshot_test native_water_shader_headers)
+endif()
 if(TARGET native_scene_snapshot_test)
     # The fixture is declared in a child directory; give Ninja an explicit
     # cross-directory ordering edge before compiling the production factory.

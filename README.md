@@ -284,6 +284,19 @@ speedup remain unproven. Source-input imports, receiver descriptors and outgoing
 state remain; water setup is host code, but its draws are still a legacy family.
 [Writer-ordered connection and causal failure](research/20260908_0337_native-visual-inputs.md).
 
+**Native water shader built; live routing still pending (host135):** semantic
+water materials, named mesh attributes and explicit image bindings now feed an
+independent native shader program. Sixteen two-eye GPU cases pass: instanced
+indirect drawing, planar/cube reflections, retained scene snapshots, shoreline
+depth, animated bump/wave inputs, lighting/fog, transparency and depth-write
+policy. The existing 55 rigid GPU cases also pass; both suites report zero
+validation errors/warnings. These are small production-program fixtures, not
+game-scene qualification. Live water still uses its legacy draw family. Next is
+the generation-safe material/image handoff into the existing ordered scene
+queue, including late writers and snapshot ordering. The native wave basis and
+material changes still need art-style/sequence review; no speedup is claimed.
+[Water shader interface, tests and remaining connection](research/20260908_0435_native-water-program.md).
+
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded
 300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with
