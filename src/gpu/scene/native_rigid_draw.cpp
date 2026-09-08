@@ -10,6 +10,7 @@
 #include "gpu/scene/native_rigid_program.h"
 #include "gpu/scene/native_sampler_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene/native_lighting_bridge.h"
 #include "gpu/device.h"
 #include "gpu/draw_queue.h"
 #include "gpu/frame_stats.h"
@@ -219,26 +220,37 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
   return true;
 }
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
-                            const std::optional<PrimitivePolicyInputs> &inputs) {
+                            const std::optional<PrimitivePolicyInputs> &inputs, uint32_t stack) {
   if (!NativeRigidSceneEnabled()) return false;
   const auto *model = FindNativeInstanceNode(pose, node);
   if (!model) return false;
   const auto admission = PrepareNativeRigidSceneAdmission(*model, inputs);
   if (admission.route == NativeRigidCasterRoute::Legacy) return false;
+  Require(admission.route == NativeRigidCasterRoute::Native, "scene family or object pass policy unavailable");
+  const char *refusal = "native scene object preparation failed";
+  auto plans = PrepareNativeRigidSceneForObject(pose, node, refusal);
+  Require(plans.has_value() && !plans->empty(), refusal);
+  NativeRigidSceneSubmission submission{pose.instance, pose.model_generation, node,
+      FrameStatFrameCount(), SelectedNativeRigidShadow(*model), std::move(*plans)};
+  return SubmitNativeRigidScenePackets(std::move(submission), stack);
+}
+bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32_t stack) {
   const auto require = [](bool valid, const char *reason) {
     if (valid) return;
-    BD_ERROR("[native-rigid-scene] admitted node refused: {}; interpreter/capture/replay remain disabled", reason);
+    BD_ERROR("[native-rigid-scene] admitted packet refused: {}; interpreter/capture/replay remain disabled", reason);
     throw std::runtime_error(reason);
   };
-  require(admission.route == NativeRigidCasterRoute::Native, "scene family or object pass policy unavailable");
-  const char *refusal = "native scene object preparation failed";
-  const auto plans = PrepareNativeRigidSceneForObject(pose, node, refusal);
-  require(plans.has_value() && !plans->empty(), refusal);
-  const auto camera = FindNativePassCamera(3);
-  for (const auto &plan : *plans)
-    require(camera && std::memcmp(&plan.pass.world_to_clip[0],
-        camera->world_to_clip.data(), sizeof(RenderMatrix)) == 0, "scene camera changed before submission");
-  require(CommitNativeRigidSceneLights(*plans), "ordered native lighting or outgoing compatibility publication unavailable");
+  auto &plans = submission.plans;
+  require(NativeRigidSceneEnabled() && submission.instance && submission.model_generation &&
+      submission.frame == FrameStatFrameCount() && !plans.empty() && plans.size() <= 4096,
+      "stale or incomplete owned scene submission");
+  // No active object scope, pose, source model, shader-register import or camera
+  // lookup survives this boundary. Resolve Keep at consumption, not at capture.
+  require(plans.front().light_recipe.has_value(), "owned light action unavailable");
+  const auto ticket = ResolveNativeSceneLights(*plans.front().light_recipe);
+  require(ticket && FinalizeNativeRigidSceneLights(plans, *ticket), "ordered whole-node light finalization unavailable");
+  const bool draws = std::any_of(plans.begin(), plans.end(), [](const auto &plan) { return plan.draw; });
+  require(!draws || CommitNativeSceneLights(*ticket, stack), "outgoing compatibility light publication unavailable");
   auto &s = state();
   std::lock_guard lock(s.mutex);
   auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,
@@ -246,21 +258,27 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   require(s.ready && s.device && s.command_list_open && commands, "native scene command scope unavailable");
   const auto *shape = commands->ColorShape();
   const auto current_camera = commands->Camera(FrameStatFrameCount(), 3);
-  require(shape && shape->layers == 1 && current_camera &&
-      current_camera->world_to_clip == camera->world_to_clip, "mono native scene scope/camera required");
+  require(shape && shape->layers == 1 && current_camera, "mono native scene scope/camera required");
+  for (const auto &plan : plans) {
+    require(plan.geometry && plan.vertex_input && plan.light_ticket,
+        "incomplete owned scene geometry or finalized lighting");
+    for (const auto &eye : plan.pass.world_to_clip)
+      require(std::memcmp(&eye, current_camera->world_to_clip.data(), sizeof(RenderMatrix)) == 0,
+          "scene camera changed before submission");
+  }
   if (!s.native_rigid_draws) s.native_rigid_draws = std::make_shared<NativeRigidDrawStore>();
   auto &store = *s.native_rigid_draws;
   auto &records = store.records[Video::CurrentFrameSlot()];
-  require(records.size() <= 4096 && plans->size() <= 4096-records.size(), "native draw retention capacity reached");
+  require(records.size() <= 4096 && plans.size() <= 4096-records.size(), "native draw retention capacity reached");
   struct Pending {
     QueuedDraw draw;
     std::shared_ptr<NativeRigidBatchItem> item;
   };
   std::vector<Pending> pending;
-  pending.reserve(plans->size());
+  pending.reserve(plans.size());
   // Preflight the complete node, including every pipeline and sampled owner,
   // before any sibling is submitted. The existing queue/fence retains all layers.
-  for (const auto &plan : *plans) {
+  for (const auto &plan : plans) {
     if (!plan.draw) continue;
     const auto &geometry = plan.geometry;
     auto program = std::find_if(store.programs.begin(), store.programs.end(), [&](const auto &p) {
@@ -279,6 +297,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     pipeline_state.renderTargetFormat = shape->format;
     pipeline_state.depthStencilFormat = plume::RenderFormat::D32_FLOAT_S8_UINT;
     pipeline_state.sampleCount = static_cast<plume::RenderSampleCounts>(shape->samples);
+    pipeline_state.zWriteEnable = plan.depth_write;
     bool blend_dirty = false;
     ApplyBlendState(plan.blend, pipeline_state, blend_dirty);
     pipeline_state.enableAlphaToCoverage = plan.alpha_to_coverage && shape->samples > 1;
@@ -310,13 +329,13 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     draw.framebuffer = commands->Framebuffer();
     draw.viewport = plume::RenderViewport(0, 0, float(shape->width), float(shape->height));
     draw.scissor = plume::RenderRect(0, 0, shape->width, shape->height); draw.has_viewport = true;
-    draw.render_view = 3; draw.zwrite = true;
+    draw.render_view = 3; draw.zwrite = plan.depth_write;
     // Blended cutouts keep their authored ordering and depth writes. They are
     // not opaque reorder candidates merely because their alpha also discards.
     draw.reorderable = !plan.blend.alphaBlendEnable;
     require(draw.bindings.Valid(), "invalid native scene descriptor contract");
     item->geometry = geometry; item->input = {plan.object,plan.pass};
-    item->model_generation = pose.model_generation; item->instance = pose.instance;
+    item->model_generation = submission.model_generation; item->instance = submission.instance;
     item->regression = geometry->id == 0x258694267A8DBAEEull;
     item->albedo = plan.albedo; item->shadow = plan.shadow;
     item->scene_depth = commands->DepthOwner();
@@ -324,14 +343,14 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
         ? TransformNativeBounds(*geometry->bounds,std::bit_cast<RenderMatrix>(plan.object.world)) : std::nullopt;
     pending.push_back({std::move(draw),std::move(item)});
   }
-  store.scene_suppressed += plans->size()-pending.size();
+  store.scene_suppressed += plans.size()-pending.size();
   // Every authored effect and sibling preflight still runs. Visibility is now
   // decided from current depth at emission, not previous-frame query history.
   if (!pending.empty() && !s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands); s.draw_framebuffer_bound = true;
   }
-  bool family_multi = pending.size() > 1 && !SelectedNativeRigidShadow(*model);
+  bool family_multi = pending.size() > 1 && !submission.regression_node;
   for (auto &entry : pending) {
     if (!entry.item->regression) {
       ++store.scene_family_primitives;
@@ -344,11 +363,11 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   store.scene_submitted += pending.size();
   store.scene_family_multi_nodes += family_multi;
   const auto frame = FrameStatFrameCount();
-  if (SelectedNativeRigidShadow(*model) &&
-      (store.scene_reported_generation != pose.model_generation || frame-store.scene_reported_frame >= 300)) {
+  if (submission.regression_node &&
+      (store.scene_reported_generation != submission.model_generation || frame-store.scene_reported_frame >= 300)) {
     BD_INFO("[native-rigid-scene] frame {} submitted {} emitted {} suppressed {} fence-retired {}; node {} instance {} generation {}; visibility pending {} culled {} retired-culled {} resources-retired {}; owned packet and native program, no node interpreter/template/replay",
         frame, store.scene_submitted, store.scene_emitted, store.scene_suppressed, store.scene_retired,
-        node, pose.instance, pose.model_generation, store.scene_submitted-store.scene_emitted-store.scene_culled,
+        submission.node, submission.instance, submission.model_generation, store.scene_submitted-store.scene_emitted-store.scene_culled,
         store.scene_culled,store.scene_retired_culled,store.scene_resource_retired);
     BD_INFO("[native-rigid-batch] frame {} scene instances {} visible indirect calls {} shadow instances {} visible indirect calls {} merged instances {}; native storage records, no translated gather",
         frame, store.scene_emitted, store.scene_batches, store.emitted, store.shadow_batches, store.merged_instances);
@@ -367,7 +386,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
         frame, scene.submitted, scene.emitted, scene.retired, scene.textured_emitted, scene.textured_retired,
         shadow.submitted, shadow.emitted, shadow.retired, shadow.textured_emitted, shadow.textured_retired);
     store.scene_reported_frame = frame;
-    store.scene_reported_generation = pose.model_generation;
+    store.scene_reported_generation = submission.model_generation;
   }
   return true;
 }

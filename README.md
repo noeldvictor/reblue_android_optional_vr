@@ -224,6 +224,17 @@ native submission is enabled. No new guest path removal or game-pixel acceptance
 is claimed by this checkpoint.
 [Deferred contracts, validation and the remaining connection](research/20260908_0109_deferred-packet-order.md).
 
+**Host129 connects an object-scope-independent native scene consumer.** The
+current direct route hands over owned geometry, images, materials, matrices and
+native identities; submission no longer needs the producing pose/object scope.
+Bind/Keep lights are finalized together at consumption, with stale publication
+and partial-sibling guards. The same consumer retains packets through the existing
+indirect queue/fence path and honors their depth-write policy. Two C++ fixtures,
+352 Python checks,55 two-eye Vulkan cases (validation0/0) and the host link pass.
+The sorted producer is still unconnected: late effect callbacks must be covered
+before enabling it. No new game run, accepted pixels, speedup or full native frame
+is claimed. [Owned consumer and remaining integration](research/20260908_0135_owned-scene-consumption.md).
+
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded
 300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with

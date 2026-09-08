@@ -963,6 +963,77 @@ void RigidScenePacket() {
   assert(plan->object.uv_scale_offset.z == .25f+1.f/512 && plan->object.uv_scale_offset.w == -.5f+1.f/512);
   assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo[0] == albedo);
   auto good = packet;
+  {
+    // Production packet preparation can outlive the object scope without
+    // resolving an unseeded Keep or retaining a pose/source lookup key.
+    NativeSceneLightingPublication publication;
+    NativeSceneLightSet authored;
+    authored.count = 2; authored.mode = 2; authored.scoring.scale = 255;
+    for (uint32_t n = 0; n < 2; ++n) {
+      auto &light = authored.lights[n];
+      light.candidate.id = int32_t(n); light.candidate.kind = LitDirectional;
+      light.candidate.enabled = true; light.candidate.views = 1u << n;
+      light.candidate.intensity = 1;
+      LitLight value{}; value.kind = LitDirectional; value.direction = {0,-1,0};
+      value.colour = n ? LitVector{0,0,1} : LitVector{1,0,0}; light.value = value;
+    }
+    assert(publication.Publish(7, authored, {{11,93,0,NativeObjectLightInputs{}},{11,93,1,std::nullopt}}));
+    const auto update = publication.Update(7);
+    const auto red = publication.Capture(7,update,11,93,0,0);
+    const auto blue = publication.Capture(7,update,11,93,0,1);
+    const auto keep = publication.Capture(7,update,11,93,1,0);
+    assert(red && blue && keep && !publication.Resolve(7,*keep));
+    packet.lights.reset();
+    assert(!build());
+    const auto captured = PrepareNativeRigidScene(program,packet,receiver,nullptr,{}, {},keep);
+    assert(captured && captured->light_recipe && !captured->light_ticket);
+    assert(captured->pass.lights[0].kind.x == LitDisabled);
+    assert(!PrepareNativeRigidScene(program,packet,receiver,nullptr,{}, {},NativeSceneLightRecipe{}));
+    NativeRigidSceneSubmission pending{11,93,1,7,false,{*captured,*captured}};
+    pending.plans[1].primitive = 1;
+    const auto before = pending.plans.front().pass;
+    const auto object_before = pending.plans.front().object;
+    packet = {}; authored = {}; // finalization cannot consult the producer
+    const auto first = publication.Resolve(7,*red);
+    assert(first && first->revision == 0 && publication.Commit(7,*first));
+    const auto stale = publication.Resolve(7,*keep);
+    const auto next = publication.Resolve(7,*blue);
+    assert(stale && next && publication.Commit(7,*next) && !publication.CanCommit(7,*stale));
+    const auto final = publication.Resolve(7,*keep);
+    assert(final && final->lights[0].colour.z == 1);
+    for (uint32_t fault = 0; fault < 7; ++fault) {
+      auto rejected = pending;
+      auto ticket = *final;
+      if (fault == 0) ++ticket.update;
+      if (fault == 1) ticket.inherited = false;
+      if (fault == 2) rejected.plans[1].light_recipe.reset();
+      if (fault == 3) rejected.plans[1].light_recipe = *red;
+      if (fault == 4) rejected.plans[1].light_ticket = ticket;
+      if (fault == 5) ticket.lights[2].colour.x = std::numeric_limits<float>::quiet_NaN();
+      if (fault == 6) ticket.revision = UINT64_MAX;
+      assert(!FinalizeNativeRigidSceneLights(rejected.plans,ticket));
+      for (const auto &sibling : rejected.plans)
+        assert(std::memcmp(&sibling.pass,&before,sizeof(before)) == 0);
+      assert(!rejected.plans.front().light_ticket); // no partially finalized sibling
+    }
+    assert(FinalizeNativeRigidSceneLights(pending.plans,*final) && publication.Commit(7,*final));
+    assert(!FinalizeNativeRigidSceneLights(pending.plans,*final));
+    for (const auto &sibling : pending.plans) {
+      assert(sibling.pass.lights[0].colour_strength.z == 1 && sibling.pass.lights[0].colour_strength.x == 0);
+      assert(sibling.pass.lights[1].kind.x == LitDisabled && sibling.pass.lights[2].kind.x == LitDisabled);
+      assert(std::memcmp(&sibling.object,&object_before,sizeof(object_before)) == 0);
+      assert(std::memcmp(&sibling.pass,&before,offsetof(NativeRigidPassGPU,lights)) == 0);
+      assert(std::memcmp(sibling.pass.fog,before.fog,sizeof(before.fog)) == 0);
+      assert(sibling.geometry == geometry && sibling.albedo[0] == albedo && sibling.shadow == depth);
+    }
+    auto explicit_bind = *captured; explicit_bind.light_recipe = *red;
+    const auto bind_ticket = publication.Resolve(7,*red);
+    assert(bind_ticket && FinalizeNativeRigidSceneLights(std::span(&explicit_bind,1),*bind_ticket));
+    assert(explicit_bind.pass.lights[0].colour_strength.x == 1);
+    publication.Reset();
+    assert(!publication.Resolve(7,*keep) && pending.plans.front().pass.lights[0].colour_strength.z == 1);
+    packet = good;
+  }
   packet.material_mask = 7;
   packet.material_values[2][0] = std::numeric_limits<float>::quiet_NaN();
   assert(build()); // Inactive reflection channel is not a diffuse/specular dependency.

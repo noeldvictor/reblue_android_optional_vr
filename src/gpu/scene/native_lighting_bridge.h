@@ -20,8 +20,10 @@ std::optional<NativeSelectedLights> FindNativeSelectedLights(uint32_t selection)
 void PublishNativeSceneLights(uint32_t manager);
 uint64_t NativeSceneLightUpdate(uint32_t frame);
 // Native IDs and owned pass only; no source slots, dirty flags or descriptors.
-std::optional<NativeSceneLightTicket> FindNativeSceneLights(uint64_t instance,
+std::optional<NativeSceneLightRecipe> CaptureNativeSceneLights(uint64_t instance,
     uint64_t model_generation, uint32_t node, const NativeLightingInputs &pass);
+// Consumes only owned values/publication identity; no instance/source lookup.
+std::optional<NativeSceneLightTicket> ResolveNativeSceneLights(const NativeSceneLightRecipe &recipe);
 // Commit at draw participation, never during a speculative/suppressed prepare.
 // Stack belongs only to the outgoing compatibility descriptor adapter.
 bool CommitNativeSceneLights(const NativeSceneLightTicket &ticket, uint32_t stack);

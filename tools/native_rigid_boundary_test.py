@@ -63,7 +63,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_direct_scene_has_a_live_producer_and_an_emission_gate(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         walk = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy)", walk)
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy, ctx.r1.u32)", walk)
         for required in ("PrepareNativeRigidSceneForObject(pose, node, refusal)",
                          "shape->layers == 1", "first.albedo[layer]", "first.shadow->view.get()",
                          "ResolveSamplerLocked(", "item->input = {plan.object,plan.pass}", "store.scene_retired",
@@ -73,9 +73,10 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("scene::NoteNativeRigidEmission(d,native_items)", emitter)
         self.assertIn("items[0]->regression", direct)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
-        preview = lights.split("std::optional<NativeSceneLightTicket> FindNativeSceneLights(", 1)[1].split(
+        preview = lights.split("std::optional<NativeSceneLightRecipe> CaptureNativeSceneLights(", 1)[1].split(
             "bool CommitNativeSceneLights(", 1)[0]
-        self.assertIn("scene.current.Prepare(frame, pass.light_update, instance, model_generation, node, pass.light_view)", preview)
+        self.assertIn("scene.current.Capture(frame, pass.light_update, instance, model_generation, node, pass.light_view)", preview)
+        self.assertIn("scene.current.Resolve(FrameStatFrameCount(), recipe)", preview)
         for forbidden in ("__imp__", "bd::mem::", "Word(", "PrepareSelection(", "PrepareSelectedLights("):
             self.assertNotIn(forbidden, preview)
 
@@ -105,7 +106,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
             self.assertNotIn(forbidden, source)
         consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text().split(
             "std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject", 1)[1].split("\n}", 1)[0]
-        self.assertIn("FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs)", consumer)
+        self.assertIn("CaptureNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs)", consumer)
         for forbidden in ("Word(", "+3132", "+3376", "+3380", "PrepareNativeSelectedLightValues"):
             self.assertNotIn(forbidden, consumer)
         self.assertNotIn("PreviewSelectedLightValues", (ROOT / "src/gpu/scene/native_light_selection_source.h").read_text())
@@ -122,10 +123,12 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("PrepareNativeLightMirror(kPublisher,ticket.lights,safe_word)", mirror)
         self.assertNotIn("__imp__", mirror)
         draw = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text().split("bool SubmitNativeRigidScene(", 1)[1]
-        self.assertLess(draw.index("PrepareNativeRigidSceneForObject("), draw.index("CommitNativeRigidSceneLights(*plans)"))
-        self.assertLess(draw.index("CommitNativeRigidSceneLights(*plans)"), draw.index("std::lock_guard lock(s.mutex)"))
+        self.assertLess(draw.index("PrepareNativeRigidSceneForObject("), draw.index("SubmitNativeRigidScenePackets(std::move(submission), stack)"))
+        self.assertLess(draw.index("ResolveNativeSceneLights("), draw.index("FinalizeNativeRigidSceneLights("))
+        self.assertLess(draw.index("FinalizeNativeRigidSceneLights("), draw.index("CommitNativeSceneLights(*ticket, stack)"))
+        self.assertLess(draw.index("CommitNativeSceneLights(*ticket, stack)"), draw.index("std::lock_guard lock(s.mutex)"))
         consumer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text()
-        self.assertIn("return !draws || CommitNativeSceneLights(ticket,current->stack)", consumer)
+        self.assertNotIn("CommitNativeSceneLights", consumer)
         parameters = (ROOT / "src/gpu/constant_buffers.cpp").read_text()
         for name in ("PublishNativeShaderParameters", "InvalidateNativeShaderParameters"):
             body = parameters.split("void " + name + "(", 1)[1].split("\n}", 1)[0]
@@ -261,7 +264,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("ReadMaterialAlphaInputs(*visual, Word)", producer)
         self.assertIn("publication->cutout_pass = CaptureCutoutPass()", producer)
         consumer = source.split("std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject", 1)[1].split(
-            "bool CommitNativeRigidSceneLights", 1)[0]
+            "\n}", 1)[0]
         self.assertIn("ComposeMaterialAlphaReferences(program->ranges, admission.policies", consumer)
         self.assertIn("cutout->reference = references[primitive]", consumer)
         for forbidden in ("Word(", "CurrentAlphaIntent", "CurrentBlendIntent", "Video::AlphaThreshold", "pipelineState"):
@@ -278,6 +281,19 @@ class NativeRigidBoundaryTest(unittest.TestCase):
             body = (ROOT / "src/gpu/scene" / path).read_text().split(function + "() {", 1)[1].split("\n}", 1)[0]
             for forbidden in ("Bootstrap", "ReadShadow", "ReadImport", "bd::mem::"):
                 self.assertNotIn(forbidden, body)
+
+    def test_scene_packet_consumer_has_no_object_scope_or_pose_dependency(self):
+        source = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        consumer = source.split("bool SubmitNativeRigidScenePackets(", 1)[1].split(
+            "void PrepareNativeRigidBatchDraw(", 1)[0]
+        for forbidden in ("pose.", "*model", "FindNativePassCamera", "FindNativeObjectPrimitive",
+                          "PrepareNativeRigidSceneForObject", "NodeTag", "bd::mem::", "current->stack"):
+            self.assertNotIn(forbidden, consumer)
+        for required in ("submission.frame == FrameStatFrameCount()", "plan.light_ticket",
+                         "for (const auto &eye : plan.pass.world_to_clip)", "pipeline_state.zWriteEnable = plan.depth_write",
+                         "draw.zwrite = plan.depth_write", "StageNativeItem", "DrawQueuePush"):
+            self.assertIn(required, consumer)
+        self.assertLess(consumer.index("pending.push_back"), consumer.index("StageNativeItem"))
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()

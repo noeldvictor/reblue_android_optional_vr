@@ -255,15 +255,14 @@ uint64_t NativeSceneLightUpdate(uint32_t frame) {
   std::lock_guard lock(scene.mutex);
   return scene.current.Update(frame);
 }
-std::optional<NativeSceneLightTicket> FindNativeSceneLights(uint64_t instance,
+std::optional<NativeSceneLightRecipe> CaptureNativeSceneLights(uint64_t instance,
     uint64_t model_generation, uint32_t node, const NativeLightingInputs &pass) {
   if (!REXCVAR_GET(bd_native_lighting)) return {};
   auto &scene = Scene();
   std::lock_guard lock(scene.mutex);
   const auto frame = FrameStatFrameCount();
-  const auto result = scene.current.Prepare(frame, pass.light_update, instance, model_generation, node, pass.light_view);
-  ++(result ? scene.reads : scene.missing);
-  scene.inherited += result && result->inherited;
+  const auto result = scene.current.Capture(frame, pass.light_update, instance, model_generation, node, pass.light_view);
+  if (!result) ++scene.missing;
   if (frame-scene.reported >= 300 || (!result && scene.missing <= 3)) {
     BD_INFO("[native-scene-lights] frame {} update {} pass update {} light view {}; {} publications {} refused; "
             "{} bindings {} unavailable imports; {} native reads {} missing; instance {} generation {} node {}; no legacy selection/cache reads",
@@ -273,6 +272,15 @@ std::optional<NativeSceneLightTicket> FindNativeSceneLights(uint64_t instance,
     BD_INFO("[native-light-order] frame {} inherited preparations {} native commits {} owned callback observations {} unowned observations {}; no guessed defaults",
         frame,scene.inherited,scene.commits,scene.observed,scene.unowned);
   }
+  return result;
+}
+std::optional<NativeSceneLightTicket> ResolveNativeSceneLights(const NativeSceneLightRecipe &recipe) {
+  if (!REXCVAR_GET(bd_native_lighting)) return {};
+  auto &scene = Scene();
+  std::lock_guard lock(scene.mutex);
+  const auto result = scene.current.Resolve(FrameStatFrameCount(), recipe);
+  ++(result ? scene.reads : scene.missing);
+  scene.inherited += result && result->inherited;
   return result;
 }
 bool CommitNativeSceneLights(const NativeSceneLightTicket &ticket, uint32_t stack) {

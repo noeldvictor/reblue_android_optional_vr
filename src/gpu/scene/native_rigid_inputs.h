@@ -153,6 +153,24 @@ struct NativeRigidPassInputs {
   std::array<LitLight, 3> lights{};
   std::array<LitFog, 2> fog{};
 };
+// Shared by initial packing and late ordered-light resolution. Failure leaves
+// the previous GPU values intact, including when a later light is invalid.
+inline bool SetRigidLights(NativeRigidPassGPU &pass, const std::array<LitLight, 3> &lights) {
+  RigidLightGPU packed[3]{};
+  for (uint32_t n = 0; n < 3; ++n) {
+    const auto &light = lights[n];
+    auto &value = packed[n];
+    value.position_range = {light.position.x, light.position.y, light.position.z, light.inverse_range};
+    value.direction_cone = {light.direction.x, light.direction.y, light.direction.z, light.cone_cosine};
+    value.colour_strength = {light.colour.x, light.colour.y, light.colour.z, light.cone_strength};
+    value.kind.x = uint32_t(light.kind);
+    if (!RigidFinite(value.position_range) || !RigidFinite(value.direction_cone) ||
+        !RigidFinite(value.colour_strength) || light.kind < LitDisabled || light.kind > LitPoint ||
+        light.inverse_range < 0 || (light.kind == LitSpot && (light.cone_cosine >= 1 || light.cone_cosine < -1))) return false;
+  }
+  for (uint32_t n = 0; n < 3; ++n) pass.lights[n] = packed[n];
+  return true;
+}
 // Scalar light/fog semantics are explicitly packed, never memcpy'd as a GPU ABI.
 inline std::optional<NativeRigidPassGPU> BuildRigidPass(const NativeRigidPassInputs &input) {
   NativeRigidPassGPU result{};
@@ -167,17 +185,7 @@ inline std::optional<NativeRigidPassGPU> BuildRigidPass(const NativeRigidPassInp
   if (!RigidFinite(result.world_to_shadow) || !RigidFinite(result.ambient) ||
       !RigidFinite(result.colour_grade) || !RigidFinite(result.shadow_colour_strength) ||
       !RigidFinite(result.shadow_filter) || result.shadow_filter.z < 0 || result.shadow_filter.w != 0) return {};
-  for (uint32_t n = 0; n < 3; ++n) {
-    const auto &light = input.lights[n];
-    auto &packed = result.lights[n];
-    packed.position_range = {light.position.x, light.position.y, light.position.z, light.inverse_range};
-    packed.direction_cone = {light.direction.x, light.direction.y, light.direction.z, light.cone_cosine};
-    packed.colour_strength = {light.colour.x, light.colour.y, light.colour.z, light.cone_strength};
-    packed.kind.x = uint32_t(light.kind);
-    if (!RigidFinite(packed.position_range) || !RigidFinite(packed.direction_cone) ||
-        !RigidFinite(packed.colour_strength) || light.kind < LitDisabled || light.kind > LitPoint ||
-        light.inverse_range < 0 || (light.kind == LitSpot && (light.cone_cosine >= 1 || light.cone_cosine < -1))) return {};
-  }
+  if (!SetRigidLights(result, input.lights)) return {};
   for (uint32_t n = 0; n < 2; ++n) {
     const auto &fog = input.fog[n]; auto &packed = result.fog[n];
     packed.origin_start = {fog.origin.x, fog.origin.y, fog.origin.z, fog.start};

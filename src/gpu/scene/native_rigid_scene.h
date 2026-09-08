@@ -41,13 +41,43 @@ struct NativeRigidScenePlan {
   uint32_t primitive = 0;
   bool deferred = false, depth_write = true;
   float depth = 0;
+  // Pending recipes are not drawable until finalization installs a current
+  // ticket and repacks all three light slots at the actual submission position.
+  std::optional<NativeSceneLightRecipe> light_recipe;
+};
+struct NativeRigidSceneSubmission {
+  uint64_t instance = 0, model_generation = 0;
+  uint32_t node = 0, frame = 0;
+  bool regression_node = false;
+  std::vector<NativeRigidScenePlan> plans;
 };
 struct NativeRigidDeferredInputs { bool fixed = false; float fixed_depth = 0; };
 // Transitional object producer: resolves source bindings before returning the
 // retained, address-free plan. It never interprets/captures/replays the node.
 std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObject(
     const NativeInstancePose &pose, uint32_t node, const char *&refusal);
-bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans);
+// Transactional whole-node finalization: no sibling may retain an early light
+// value, reuse a ticket, or disagree with the common authored Bind/Keep action.
+inline bool FinalizeNativeRigidSceneLights(std::span<NativeRigidScenePlan> plans,
+    const NativeSceneLightTicket &ticket) {
+  if (plans.empty() || !ticket.update || ticket.revision == UINT64_MAX || !plans.front().light_recipe) return false;
+  const auto &recipe = *plans.front().light_recipe;
+  if (recipe.update != ticket.update ||
+      (recipe.bind && !SameNativeSelectedLights(*recipe.bind, ticket.lights)) ||
+      ticket.inherited != !recipe.bind.has_value()) return false;
+  for (const auto &plan : plans) {
+    if (plan.light_ticket || !plan.light_recipe || plan.light_recipe->update != recipe.update ||
+        plan.light_recipe->bind.has_value() != recipe.bind.has_value() ||
+        (recipe.bind && !SameNativeSelectedLights(*plan.light_recipe->bind, *recipe.bind))) return false;
+  }
+  NativeRigidPassGPU packed{};
+  if (!SetRigidLights(packed, ticket.lights)) return false;
+  for (auto &plan : plans) {
+    for (uint32_t n = 0; n < 3; ++n) plan.pass.lights[n] = packed.lights[n];
+    plan.light_ticket = ticket;
+  }
+  return true;
+}
 // Share rigid participation rules with casting, then classify the scene shader
 // from authored recipes, before a missing pose/texture can choose legacy drawing.
 inline NativeRigidCasterAdmission PrepareNativeRigidSceneAdmission(
@@ -74,7 +104,8 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
     const NativeObjectPrimitive<NativeTextureBinding> &packet,
     const NativeRigidReceiver &receiver, const char **refusal = nullptr,
     std::optional<NativeRigidCutoutInputs> cutout = {},
-    std::optional<NativeRigidDeferredInputs> deferred = {}) {
+    std::optional<NativeRigidDeferredInputs> deferred = {},
+    std::optional<NativeSceneLightRecipe> light_recipe = {}) {
   const auto refuse = [&](const char *reason) -> std::optional<NativeRigidScenePlan> {
     if (refusal) *refusal = reason;
     return {};
@@ -93,7 +124,8 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
       !packet.shader.vertex_bones || *packet.shader.vertex_bones ||
       packet.shader.texture_layers > 3 || !packet.shader.vertex_colour ||
       !packet.features || packet.features->reflection || packet.features->normal_mapping ||
-      !packet.lights || !packet.fog || !packet.camera || !packet.lighting ||
+      (!packet.lights && !light_recipe) || (light_recipe && !light_recipe->update) ||
+      !packet.fog || !packet.camera || !packet.lighting ||
       !packet.policy.routing_known || (packet.policy.deferred && (!deferred || !packet.policy.alpha_test)) ||
       !packet.textures.owns_uv ||
       packet.receiver_shadow == NativeShadowPolicy::Unknown) return refuse("native primitive owners or shader features unavailable");
@@ -149,7 +181,10 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   // old width*scale metadata. Slope strength is an explicit native filter policy.
   inputs.shadow_filter = {lighting.shadow_bias, .4f*lighting.shadow_bias,
       .65f/float(shadow->shape.width), 0};
-  inputs.lights = *packet.lights; inputs.fog = *packet.fog;
+  // A pending recipe deliberately has no draw-ready light values. Even an
+  // explicit Bind is packed only by the final consumer, using a current ticket.
+  inputs.lights = light_recipe ? NativeSelectedLights{} : *packet.lights;
+  inputs.fog = *packet.fog;
   const auto pass = BuildRigidPass(inputs);
   if (!object || !pass) return refuse("nonfinite native object/pass GPU inputs");
   if (packet.policy.alpha_test && !SetRigidCutout(*object, cutout->reference,
@@ -158,6 +193,7 @@ inline std::optional<NativeRigidScenePlan> PrepareNativeRigidScene(
   NativeRigidScenePlan plan{geometry, vertex_input, albedo, shadow, samplers, *object, *pass,
       packet.policy.cull, packet.policy.direct};
   plan.primitive = packet.primitive;
+  plan.light_recipe = std::move(light_recipe);
   if (packet.policy.alpha_test) {
     plan.blend = cutout->blend;
     plan.alpha_to_coverage = cutout->alpha_to_coverage;

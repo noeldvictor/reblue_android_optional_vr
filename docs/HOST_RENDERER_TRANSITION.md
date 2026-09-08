@@ -293,10 +293,24 @@ mixed-order metadata, an unsorted control and depth-write-off. These use native
 production shaders, not actual compatibility shaders or the live deferred list.
 Host128 links without guest objects; no game run or image was produced.
 
-The remaining connection is `PrepareNativeRigidSceneForObject` -> sorted native
-payloads in `ConsumeDeferredList` -> existing queue/fence ownership. Default scene
-admission still excludes deferred work. Do not flip it on using walk-time light
-tickets: actual list callbacks are `sub_8221D530`/`sub_8221D548`, dispatching the
+Host129 now connects `PrepareNativeRigidSceneForObject` -> owned
+`NativeRigidSceneSubmission` -> `SubmitNativeRigidScenePackets` -> existing
+queue/fence ownership for the current direct path. Backend consumption has no
+pose, model lookup or active object-scope dependency. The producer captures only
+Bind/Keep recipes; the consumer resolves and transactionally packs whole-node
+lights before the outgoing compatibility mirror and backend lock. Packet camera
+rows are checked against the active command scope, and depth-write policy reaches
+both the pipeline and queue metadata. The immediate-only light getter/scope-bound
+commit adapter are removed. Light-read counters now count whole-node resolutions,
+not speculative per-primitive preparations; do not compare those totals as FPS.
+Two C++ fixtures,352 Python checks and55 two-eye Vulkan cases pass (1.26 s,
+validation0/0); host129 links without guest objects. No game run or new pixels.
+[Owned consumer implementation and evidence](../research/20260908_0135_owned-scene-consumption.md).
+
+The remaining connection is the sorted native producer and mixed payloads in
+`ConsumeDeferredList` feeding that same consumer. Default scene admission still
+excludes deferred work. Do not flip it on using frozen walk-time material/pass
+values: actual list callbacks are `sub_8221D530`/`sub_8221D548`, dispatching the
 effect-participant chain and resource begin/end, not just `sub_82174270`'s shader
 choice. Account for those late outputs and authored participation before replacing
 them. Use the recovered callback map and new causal fixtures, not another whole

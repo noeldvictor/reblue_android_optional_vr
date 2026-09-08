@@ -4254,3 +4254,36 @@ are deliberately separate. All owned producers terminal; owner profile unchanged
 at SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
 The10,303,111 B image archive and252,177,116,500 B protected raw inventory receive
 no new files and no new cleanup credit. Preserve all outstanding runtime gates.
+
+### Owned scene consumer continuation (2026-09-08)
+
+Original exception/floor62,509,998,080 B remains unchanged. First read before
+edits80,516,481,024 B free; producer preflight80,519,471,104 B free. Existing
+texture/material/GPU fixture trees measured74,477,093/8,359,739/15,272,322 B,
+132/41/17 files; attachment logs271,558 B/166 files. No owned producer was live.
+Planned replacement-only outputs: under2 MiB retained fixture growth,128 KiB
+logs;32 MiB fixture free-drop and192 MiB host overlap guards,300 s supervisors,
+30 s CTest and10 MiB aggregate logs. No new game/image/raw/cook/perf output.
+
+Output49/CPU32, material41/CPU39, GPU51/rigid18 and host129 all completed0;
+PIDs, hashes and limits are in `20260908_0135_owned-scene-consumption.md`.
+Two C++ fixtures,352 Python checks and55 two-eye Vulkan cases pass, validation0/0.
+Host129 is016d3a954 dirty, codegen0 written and no guest objects. New direct
+packet-consumer connection is host-built, not live/pixel qualified; sorted
+production and all full-frame acceptance gates remain open.
+
+After replacement validation, removed14 exact superseded success logs: output48/
+CPU31, material40/CPU38, GPU50/rigid17 and host128 stdout/stderr pairs.27,042
+logical B removed once; reproducible logs only. New logs27,900 B, retained total
+272,416 B/166 files, net858 B growth. Distinct deferred/screenshot/visibility/query
+evidence and every unresolved failure remain. Owner profile unchanged116 B,
+SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+
+Final fixture sizes75,383,225/8,361,060/15,275,881 B, unchanged file counts;
+growth906,132/1,321/3,559 B respectively. These fixture/log scopes grew911,870 B
+for the new production-packet regressions and rebuilt objects/executables. Host
+outputs/objects and source/Git are separate. Post-cleanup free80,517,013,504 B,
+down2,457,600 B from producer preflight; drive-wide movement is not all attributed
+to the task. Immediate cleanup free-space gain36,864 B differs from logical log
+bytes. No image/raw growth or repeated cleanup credit; the original image-budget
+question remains unanswered. All owned jobs are terminal.

@@ -368,7 +368,7 @@ void Walk(PPCContext &ctx, uint8_t *base, u32 root, u32 ctx_va) {
             ctx.r6.u64 = ctx_va;
             if (!(view_id == 1 && instance_pose &&
                   SubmitNativeRigidShadow(*instance_pose, index, shadow_policy)) &&
-                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index, shadow_policy)))
+                !(view_id == 3 && instance_pose && SubmitNativeRigidScene(*instance_pose, index, shadow_policy, ctx.r1.u32)))
               bdSceneNodeDrawSingle(ctx, base);
             // Diagnostic only: per-node light callbacks publish during the draw.
             if (instance_pose && REXCVAR_GET(bd_native_materials_verify))

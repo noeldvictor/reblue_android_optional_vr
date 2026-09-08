@@ -33,7 +33,7 @@ class NativeOcclusionBoundaryTest(unittest.TestCase):
     def test_native_consumer_preserves_ordered_lights_and_sibling_preflight(self):
         source = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         start = source.index("bool SubmitNativeRigidScene(")
-        light = source.index("CommitNativeRigidSceneLights", start)
+        light = source.index("CommitNativeSceneLights", start)
         siblings = source.index("pending.push_back", light)
         draw = source.index("DrawQueuePush", siblings)
         self.assertLess(light, siblings)
@@ -45,7 +45,7 @@ class NativeOcclusionBoundaryTest(unittest.TestCase):
 
     def test_owned_bounds_and_current_view_feed_queries(self):
         source = (ROOT / "src/gpu/scene/host_walk.cpp").read_text()
-        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy)", source)
+        self.assertIn("SubmitNativeRigidScene(*instance_pose, index, shadow_policy, ctx.r1.u32)", source)
         self.assertNotIn("world_bounds", source)
         self.assertNotIn("OcclusionCullNote", source)
         self.assertNotIn("FindNativePassOcclusionView", source)

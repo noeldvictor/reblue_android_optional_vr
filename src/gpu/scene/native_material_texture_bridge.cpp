@@ -247,14 +247,14 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
     auto packet = FindNativeObjectPrimitive(pose, node, primitive);
     if (!packet || !packet->lighting) return {};
     refusal = "owned scene/object lighting publication unavailable";
-    const auto lights = FindNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
+    const auto lights = CaptureNativeSceneLights(pose.instance, pose.model_generation, node, packet->lighting->inputs);
     if (!lights) return {};
-    packet->lights = lights->lights; // values survive publication/source/GPU retirement
+    packet->lights.reset(); // no walk-time/inherited shader values in a pending packet
     auto cutout = cutouts ? scope->cutout_pass : std::nullopt;
     if (cutout) cutout->reference = references[primitive];
     refusal = "whole-node scene shader resources unavailable";
     auto plan = PrepareNativeRigidScene(*program, *packet,
-        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal, cutout);
+        {receiver->image, receiver->world_to_shadow, receiver->colour, *visibility}, &refusal, cutout, {}, lights);
     if (!plan) {
       // Failure-only context for the exact next producer decision. No probe
       // loop, frame dump, weakened admission or partial sibling replacement.
@@ -263,24 +263,10 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
           packet->material_mask,packet->shader.texture_layers,packet->textures.image_mask,refusal);
       return {};
     }
-    plan->light_ticket = *lights;
     result.push_back(std::move(*plan));
   }
   return result;
 }
-bool CommitNativeRigidSceneLights(std::span<const NativeRigidScenePlan> plans) {
-  if (!current || plans.empty() || !plans.front().light_ticket) return false;
-  const auto &ticket = *plans.front().light_ticket;
-  bool draws = false;
-  for (const auto &plan : plans) {
-    if (!plan.light_ticket || plan.light_ticket->update != ticket.update ||
-        plan.light_ticket->revision != ticket.revision ||
-        !SameNativeSelectedLights(plan.light_ticket->lights,ticket.lights)) return false;
-    draws |= plan.draw;
-  }
-  return !draws || CommitNativeSceneLights(ticket,current->stack);
-}
-
 void ReportNativeMaterialUvMismatch(const NodeTag &tag,
     const NativeMaterialTextureValues &values, const void *actual) {
   if (!current || !actual || stats.wrong > 4) return;
