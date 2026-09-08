@@ -690,6 +690,10 @@ void ReflectionCommands() {
     const NativeSceneClear clear{{.125f,.25f,.5f,1},1,0};
     auto scope = NativeSceneCommands::CreateLeasedColor(lease,depth,framebuffer->framebuffer.get(),clear);
     assert(scope && scope->WritesImage(lease.image.texture) && scope->Matches(lease.image.texture,depth->image.get()));
+    NativeReflectionPublication publication;
+    assert(!publication.Read(7) && !publication.Complete(7,*scope,lease));
+    publication.Begin(7);
+    assert(!publication.Read(7) && !publication.Complete(7,*scope,lease));
     SnapshotRecorder completion;
     assert(!FinishNativeReflection(completion,*scope,lease) && completion.events.empty());
     SceneCommandRecorder writes;
@@ -698,6 +702,12 @@ void ReflectionCommands() {
     assert(FinishNativeReflection(completion,*scope,lease));
     assert((completion.events == std::vector<char>{'e','b'}) && !completion.source && !completion.destination);
     assert(*lease.image.layout == RenderTextureLayout::SHADER_READ);
+    assert(!publication.Complete(8,*scope,lease));
+    assert(publication.Complete(7,*scope,lease));
+    auto queued = publication.Read(7);
+    assert(queued == lease && !publication.Complete(7,*scope,lease));
+    publication.Begin(7); // same-frame replacement invalidates only future reads
+    assert(!publication.Read(7) && queued == lease);
     completion.events.clear();
     assert(FinishNativeReflection(completion,*scope,lease) && (completion.events == std::vector<char>{'e'}));
     for (uint32_t field=0; field<6; ++field) {
@@ -710,7 +720,13 @@ void ReflectionCommands() {
       if (field == 5) bad = {lease.owner,lease.image}; // no owned sampling view
       completion.events.clear();
       assert(!FinishNativeReflection(completion,*scope,bad) && completion.events.empty());
+      assert(!publication.Complete(7,*scope,bad) && !publication.Read(7));
     }
+    assert(publication.Complete(7,*scope,lease));
+    assert(!publication.Read(8) && !publication.Read(7)); // stale cannot resurrect
+    publication.Begin(8);
+    publication.Reset(); // compatibility producer invalidates unconditionally
+    assert(!publication.Complete(8,*scope,lease) && !publication.Read(8));
     assert(!NativeSceneCommands::CreateLeasedColor({},depth,framebuffer->framebuffer.get(),clear));
     const auto prior = lease.image.texture;
     color.reset(); scope.reset(); framebuffer.reset();
@@ -720,6 +736,8 @@ void ReflectionCommands() {
     store.AfterFence(1); assert(!store.Stats().resident);
     assert(!pool.Acquire({1440,1584,layers},make)); // final output reader still owns it
     lease = {};
+    assert(!pool.Acquire({1440,1584,layers},make)); // queued reader outlives publication/source
+    queued = {};
     auto reused = pool.Acquire({1440,1584,layers},make);
     assert(reused && reused->image.get() == prior); // reuse only after both owners release
   }

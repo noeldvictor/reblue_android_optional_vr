@@ -14,6 +14,8 @@
 #include "gpu/scene/native_fog_bridge.h"
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include "gpu/scene/native_water_bottom.h"
+#include "gpu/scene/native_reflection_pass.h"
+#include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_texture_binding_bridge.h"
 #include "gpu/scene/native_alpha_bridge.h"
@@ -171,9 +173,10 @@ struct Adapter {
   }
   void EnableSourceAlphaBlending() { State(60, 1); State(72, 6); State(76, 7); }
   void EnableDepthTest() { State(40, 1); } // no depth-write override, separate alpha or blend-op reset
-  void Bind(uint32_t slot, uint32_t address) {
+  GuestTexture *Bind(uint32_t slot, uint32_t address) {
+    GuestTexture *image = nullptr;
     if (address) {
-      auto *image = ResolveGuestTexture(address); // can wait for IO, never under the video mutex
+      image = ResolveGuestTexture(address); // can wait for IO, never under the video mutex
       if (!image) {
         image = GetOrCreateDebugTexture(); // preserve the existing unsupported-image marker, never replay setup
         ++stats.debug_bindings;
@@ -183,12 +186,17 @@ struct Adapter {
       ++stats.bindings;
     } else ++stats.null_bindings;
     ctx.r3.u64 = ReadWord(kDevice); // temporary void-callback register convention
+    return image;
   }
   void BindPlanarReflection() {
     const auto address = ReadWord(kPlanarImage);
-    Bind(7, address);
-    if (capture && address)
-      if (const auto *image = ResolveGuestTexture(address)) output.planar = image->nativeImage;
+    const auto *outgoing = Bind(7, address);
+    if (capture) {
+      output.planar = FindCompletedNativeWaterReflection();
+      // Late descriptor/state writes can alias the outgoing getter. Validate
+      // that mirror, but never select native input from it or guess inheritance.
+      Check(output.planar && outgoing && outgoing->nativeImage == output.planar);
+    }
   }
   void BindSceneImage() {
     const auto image = ReadWaterSceneImage(Word);
@@ -197,20 +205,16 @@ struct Adapter {
   }
   bool WantsSnapshot() { return int32_t(ReadWord(uint64_t(material) + 4700)) > 0; }
   void Snapshot() {
+    ++stats.snapshots;
+    if (water && capture) {
+      // Native request -> exact producer result. Authored timing and outgoing
+      // getter/slot publication remain inside that producer for mixed consumers.
+      Check(ProduceNativeSceneSnapshot(material,output.snapshot) && bool(output.snapshot));
+      return;
+    }
     ctx.r3.u64 = uint64_t(material) + (water ? 4648 : 4932);
     ctx.r4.u64 = material;
-    ++stats.snapshots;
     sub_8221D2C8(ctx, base); // native snapshot producer; unowned scopes remain tracked there
-    if (water && capture) {
-      // Scheduling still selects its output getter, never an active attachment
-      // or a previously bound slot. Copy its exact completed native lease now.
-      constexpr uint32_t scene_getter = (uint32_t(-32035) << 16) - 26284;
-      constexpr uint32_t reflection_getter = (uint32_t(-32035) << 16) - 26280;
-      const auto phase = Word(kPhase);
-      const auto address = phase == 3 ? Word(scene_getter) : phase == 5 ? Word(reflection_getter) : std::nullopt;
-      if (address && *address)
-        if (const auto *image = ResolveGuestTexture(*address)) output.snapshot = image->nativeImage;
-    }
   }
 };
 void Prepare(PPCContext &ctx, uint8_t *base, bool water) {

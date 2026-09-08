@@ -5018,3 +5018,78 @@ All producers terminal; budgets unchanged. Preserve current151/CPU64/output39,
 material43/test41/978, causal976/977 and archived974 plus other protected evidence.
 Next host152/game979 only for a named new implementation or coverage observation,
 not to repeat the established water eligibility gate.
+
+### Native water frame-image connection (2026-09-08, source42fd400 plus edits)
+
+Prior turn made progress: connected water producer committed42fd400, all producers
+terminal; remote push rejected by security review pending explicit destination
+approval. No retry/workaround. Same cumulative3GiB exception/floor62,509,998,080B,
+20GiB reserve and diagnostic/log/raw/image limits. First free80112410624B; no
+renderer/build/compiler/test processes. Existing CPU79049778B, EXE48992256/PDB111308800B,
+attachment logs309706B. No assets/cooking/downloads/new trees or raw/image captures.
+New native reflection publication and direct snapshot return connect completed
+producer leases to the water material output, removing consumer getter readback.
+378 artifact-free guards pass. CPU65/output40 will verify completion/stale/reset/
+replacement/lease retention with32/16MiB free-drop and300/30s bounds; host152 uses
+192MiB/300s, one incremental target. Reuse unchanged GPU programs/evidence. A new
+capture-free integration will test exact primary-plane publication and consumption,
+not repeat eligibility; authored snapshot/game-pixel/both-eye gates remain pending.
+
+Before new outputs, inspected and retired11 exact superseded files: host150,
+CPU63/output38, material42/test40 stdout/stderr and hash-verified976. Their passing
+purposes are replaced by151/CPU64/output39/material43/test41/978;976's failed water
+reachability is now resolved by the causal normal test and978's actual new route.
+Retain977's causal inputs and archived974. Removed537422B logical;976 full text
+is retired, its prior result/hash remain above. No protected unresolved evidence,
+current binary, asset or profile removed. Count this cleanup only once.
+
+Cleanup interval80112001024->80112549888B (+548864 drive-wide). CPU65/PID18836
+and output40/PID35532 exit0 (0.47s). Host152/PID36116 and153/PID36232 failed
+on missing outer namespace qualification in the two global hooks; corrected
+frame counter/native image type. Host154/PID30172 exit0; codegen0/no guest objects.
+979/PID24896/session53964 terminal09:43:01 after127s, strict cold/reload/mixed
+chain pass,22 settings/0 raws/exact profile restoration. Native primary-plane
+publications/reads advance1200/1191 at1860 to3900/3150 at4560; last water4575
+submitted3166/emitted3078/retired3164, unavailable0. Fresh cold/reload water queue
+windows1800..2100 and4200..4500 each stage/consume300 records. This qualifies
+the connected image lease route, not the subsequently added mirror-alias guard.
+979 log536971B SHA2566067493B7543798D51A3087C548C937B0E71F4EBAB52DC2C974E45B28B781348.
+Host154 EXE904278E2DEDD1BAADFF1639EDE4D2E431B5A3F3B8B0D489FB396507FE18045BA;
+PDB8D03832F4B53C13CF0B2D1CE76800FF000051199F414DD4E7A06132EE2497502.
+
+Review added a strict outgoing reflection-mirror identity check: the native image
+is selected only from its completed producer, but a late alias changing the
+compatibility getter must refuse rather than silently diverge. Host155/PID38448
+exit0. New source guard needed its expected fully qualified frame-counter spelling
+updated after the compile fix; all378 guards pass, no comparison weakened.
+Retired7 inspected superseded files after replacement: host151/CPU64/output39
+stdout/stderr plus hash-verified978.542574B logical; interval80111038464->80111587328B
+(+548864), counted once. Retain979 until the guard-qualified replacement passes.
+Next980 validates that final mirror check under the same180s/800KiB/192MiB,
+capture-free strict chain. No allowance reset or additional game-pixel/stereo claim.
+
+980/PID35532/session59700 terminal09:47:28 after126s, exit0. All22 settings/0raws/
+exact116B profile restoration. Strict cold/reload/mixed checks pass. Fresh reflection
+1873..2173 and4273..4573 each add300 publications/reads; last3900/3171. Water cold
+1581..1881 submits/retires300 and emits290; reload4259..4559 submits/retires300 and
+emits279. Generation94 retires1657 before208 submits1658. Last3158 submitted,
+3069 emitted,87 culled,3156 retired, unavailable0. No authored snapshot/bottom or
+new game-pixel/HDR/stereo claim. Full evidence in20260908_1345_native-water-images.md.
+980538768B SHA256E997247279093E05F317DB1BB9B80746DEBD2FF03F59BE24C82306EDDE51D6A7.
+Host155 EXECB7C66A2A0BAA1648182FD0645BE985B495F1D75017E37E8310BFD795B18316F,
+PDB11BF3C812C5B3F08ACA57B0CEE7CA1B0CF592B036329F6D9F6F3A8DE752C2E62.
+CPU6540768B79E4E14A7DFAFA180266A0132BB6441EE5F8954EBA3718EB06739C2CA9.
+
+After final replacement passed, retired7 inspected superseded files: resolved
+namespace failures152/153 and pre-guard154 stdout/stderr, plus hash-verified979.
+547403B logical; interval80110436352->80110993408B (+557056). Count once.
+Total this bundle25 files/1627399B logical removed. CurrentCPU79082588B/132files
+(+32810); EXE48994816/PDB111312896B (+6656); attachment logs302033B/192files
+(-7673). Retained977/980/archived9741000851B vs1532109B (-531258). Selected
+retained change-499465B; other objects/metadata/source/Git/system changes separate.
+First80112410624 to ending80110993408B:1417216B less free drive-wide, not all task
+attributed. No new caches/raws/images/downloads/assets; limits unchanged. Keep
+155/CPU65/output40/980, material43/test41, GPU67/water14/rigid23/snapshot22,
+causal977/archived974 and all other protected unresolved/raw/image evidence.
+All producers terminal. Next host156/game981,CPU66/output41 only for a new
+connected change or explicitly scoped missing coverage, not another planar-read probe.

@@ -58,23 +58,25 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest connected checkpoint (2026-09-08, host151/run978):** admitted game water
-now bypasses the node command interpreter and source render-list allocation,
-using retained native model/pose records in the existing sorted queue. Its native
-visual/material/draw connection remains in place. Ordered normal-map selection
-and environment sampler inputs are now captured by the load-owned material recipe.
-CPU behavior tests, 377 source/scenario checks and strict desktop cold/reload checks
-pass. Fresh water staging and consumption advance equally in both ready-field
-epochs: 3,111 records at the last queue sample. The later GPU sample reports 3,162
-submissions, 3,065 emitted draws and 3,160 fence-retired packets; the previous water
-generation retires before the reloaded one submits.
+**Latest connected checkpoint (2026-09-08, host155/run980):** native water now
+gets its planar reflection directly from the completed native pass. Refraction
+snapshots also return their exact image lease directly, without callback/getter
+readback in the water consumer. Late outgoing-image aliases are checked, not ignored.
+The prior native node producer, sorted queue and visual/material/draw connection
+remain in place; admitted water no longer executes the node command interpreter
+or allocates source render-list entries.
+CPU behavior tests, 378 source/scenario checks and strict desktop cold/reload checks
+pass. Both ready-field epochs advance native reflection publications and reads;
+the last sample has 3,900 publications and 3,171 reads. The GPU sample reports 3,158
+submissions, 3,069 emitted draws and 3,156 fence-retired packets, with no admission
+refusal. The previous water generation retires before the reloaded one submits.
 These are repeated draws, not unique assets or a speedup measurement. The unchanged
 20-case two-eye GPU water fixture remains shader evidence, not game-stereo proof.
-Outgoing mixed-frame image/state/world/sampler exports, late parameter descriptors
-and image getters remain adapters; special-image and other unadmitted families still
-use the legacy producer. Game water/reflection pixels, HDR art parity and authored
-shore/refraction/stereo coverage remain unqualified.
-[Producer verification and storage record](research/20260906_0333_native-scene-state-bridge.md#native-water-deferred-producer-2026-09-08-source681f1fd-plus-edits).
+Outgoing mixed-frame image/state/world/sampler exports, late parameter descriptors,
+bump-image table selection and snapshot timing/getters remain adapters; special-image
+and other unadmitted families still use the legacy producer. Game water/reflection
+pixels, HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
+[Completed image connection, verification and remaining work](research/20260908_1345_native-water-images.md).
 
 ### How much is left?
 

@@ -59,7 +59,8 @@ NativeSceneCommands *Active(VideoState &s) {
   return s.render_target && s.depth_stencil && s.render_target->texture && s.depth_stencil->texture
       ? ActiveNativeSceneCommands(s.render_target->texture, s.depth_stencil->texture) : nullptr;
 }
-bool TrySnapshot(PPCContext &ctx) {
+bool TrySnapshot(uint32_t subject, NativeImageLease &output) {
+  output = {};
   if (!REXCVAR_GET(bd_native_scene_passes)) return false;
   ++stats.calls;
   const auto phase_value = Read<uint32_t>(kPhase);
@@ -71,7 +72,6 @@ bool TrySnapshot(PPCContext &ctx) {
   const auto shared = Read<uint8_t>(kShared), ready = Read<uint8_t>(kReady);
   const auto getter = Read<uint32_t>(phase == SceneSnapshotPhase::Scene ? kSceneGetter : kReflectionGetter);
   if (!last || !shared || !ready || !getter || !*getter) { ++stats.input_refusals; return false; }
-  const auto subject = ctx.r4.u32;
   const auto plan = PlanSceneSnapshot(phase, *last == subject, *shared != 0, *ready != 0);
   auto *destination = ResolveGuestTexture(*getter); // may wait for IO; never under video lock
   if (!destination) { ++stats.input_refusals; return false; }
@@ -85,6 +85,7 @@ bool TrySnapshot(PPCContext &ctx) {
           destination->width, destination->height, destination->layers)) {
         ++stats.output_refusals; return false;
       }
+      output = destination->nativeImage;
     }
     Video::SetTexture(13, destination);
     ++stats.reused;
@@ -132,13 +133,20 @@ bool TrySnapshot(PPCContext &ctx) {
     bd::mem::store<uint8_t>(kReady, 1);
   }
   Video::SetTexture(13, destination);
+  output = lease;
   ++stats.copies;
   return true;
 }
 } // namespace
+bool ProduceNativeSceneSnapshot(uint32_t subject, NativeImageLease &output) {
+  const bool complete = TrySnapshot(subject,output);
+  Report();
+  return complete;
+}
 } // namespace bd::gpu::scene
 REX_HOOK_RAW(sub_8221D2C8) {
   using namespace bd::gpu::scene;
-  if (!TrySnapshot(ctx)) { ++stats.compatibility; __imp__sub_8221D2C8(ctx, base); }
+  bd::gpu::NativeImageLease output;
+  if (!ProduceNativeSceneSnapshot(ctx.r4.u32,output)) { ++stats.compatibility; __imp__sub_8221D2C8(ctx, base); }
   Report();
 }

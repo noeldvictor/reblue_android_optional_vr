@@ -528,10 +528,25 @@ entirely source-free queue or frame. Special image overrides, direct/skinned and
 other unadmitted producers remain explicit legacy families.
 [Producer verification and storage](../research/20260906_0333_native-scene-state-bridge.md#native-water-deferred-producer-2026-09-08-source681f1fd-plus-edits).
 
+Completed water frame-image connection (2026-09-08, host155/run980): the named
+reflection pass now publishes its exact completed native HDR lease directly to
+water. Incomplete/stale/compatibility writes invalidate future reads; queued leases
+survive replacement and retirement. Other reflection planes cannot replace this role.
+The water snapshot call now receives the producer's exact result, not a callback
+followed by a getter lookup. Its authored scheduling/getter/slot exports remain
+producer adapters. An outgoing reflection-mirror check refuses unknown late aliases.
+378 guards, CPU publication/lifetime tests and strict cold/reload/mixed checks pass.
+Each ready-field epoch advances300 reflection publications/reads; latest3900/3171.
+Water3158 submitted/3069 emitted/3156 retired, unavailable0, old generation94 fully
+retired before208. No authored snapshot/bottom or game-pixel/HDR/stereo qualification.
+[Contracts, current verification and remaining adapters](../research/20260908_1345_native-water-images.md).
+
 Next connected work: remove remaining water producer/late-material image and state
 adapters, including outgoing sampler/world/state exports when their mixed consumers
 no longer need them. Reuse the connected publication/queue, water update/refraction
-setup and existing instance/model owners. Replace remaining source feature and getter imports with native
+setup and existing instance/model owners. Native water's completed planar/snapshot
+selection is now connected; replace remaining bump-table, authored feature and
+producer-side timing/getter imports with native
 producer inputs while preserving late aliases, Bind/Keep and snapshot ordering;
 do not freeze them at the initial walk or recreate owners. Complete image-role
 production for currently unavailable cases, not a permanent fallback family.

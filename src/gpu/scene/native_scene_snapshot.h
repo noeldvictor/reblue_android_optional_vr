@@ -7,6 +7,10 @@
 #include "gpu/scene/native_scene_commands.h"
 namespace bd::gpu::scene {
 enum class SceneSnapshotPhase { Inactive, Scene, Reflection };
+// Native consumers receive the exact completed/reused lease from the producer,
+// never by rereading a global output getter after a callback. A refused producer
+// leaves output empty and performs no original-body replay.
+bool ProduceNativeSceneSnapshot(uint32_t subject, NativeImageLease &output);
 struct SceneSnapshotPlan {
   bool bind = false, refresh = false, publish_cache = false;
   bool operator==(const SceneSnapshotPlan &) const = default;

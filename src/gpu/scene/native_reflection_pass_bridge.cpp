@@ -40,6 +40,8 @@ namespace {
 constexpr uint32_t kEngine = (uint32_t(-32034)<<16)-19936;
 constexpr uint32_t kPassMode = (uint32_t(-32036)<<16)-5536;
 constexpr uint32_t kPrimary = (uint32_t(-32035)<<16)+24832;
+// sub_82454720 always selects this plane, not the most recently drawn plane.
+constexpr uint32_t kWaterPlane = (uint32_t(-32035)<<16)+29040;
 struct ReflectionPass {
   uint32_t source = 0, plane = 0;
   GuestTexture *color = nullptr, *depth = nullptr, *output = nullptr;
@@ -49,9 +51,11 @@ struct ReflectionPass {
   NativeImageLease image;
 };
 thread_local std::vector<ReflectionPass> passes;
+thread_local NativeReflectionPublication water_reflection;
 struct Stats {
   uint64_t begins = 0, ends = 0, compatibility_begin = 0, compatibility_end = 0;
   uint64_t outputs = 0, empty_clears = 0, cameras = 0, missing_camera = 0, faults = 0;
+  uint64_t water_outputs = 0, water_reads = 0;
   uint32_t frame = 0;
 };
 thread_local Stats stats;
@@ -65,6 +69,8 @@ void Report() {
       stats.begins,stats.ends,passes.size(),stats.compatibility_begin,stats.compatibility_end,
       stats.outputs,stats.empty_clears,stats.cameras,stats.missing_camera,stats.faults);
   stats.frame = frame;
+  BD_INFO("[native-reflection-images] frame {} water publications {} reads {}; exact completed water-plane lease, no sampled-getter import",
+      frame,stats.water_outputs,stats.water_reads);
 }
 bool Range(uint64_t address, uint64_t bytes) {
   if (!address || !bytes || address+bytes-1 > UINT32_MAX ||
@@ -186,6 +192,11 @@ bool End(PPCContext &ctx, uint8_t *base, uint32_t source) {
       "Native reflection output publication failed");
   Check(pass.output->nativeImage == pass.image && !pass.output->sourceSurface &&
       &pass.output->layout.Get() == pass.image.image.layout,"Native reflection output lost its owner");
+  if (pass.plane == kWaterPlane) {
+    Check(water_reflection.Complete(FrameStatFrameCount(),*pass.commands,pass.image),
+        "Native water reflection completion lost its producing scope");
+    ++stats.water_outputs;
+  }
   ++stats.outputs;
   uint32_t result = 0; Check(LeaveNativePass(result),"Native reflection could not restore its previous pass");
   ReleaseResourceAdapter(pass.color->selfVa); ctx.r3.u64 = ReleaseResourceAdapter(pass.depth->selfVa);
@@ -195,6 +206,11 @@ bool End(PPCContext &ctx, uint8_t *base, uint32_t source) {
   return true;
 }
 } // namespace
+NativeImageLease FindCompletedNativeWaterReflection() {
+  auto image = water_reflection.Read(FrameStatFrameCount());
+  stats.water_reads += bool(image);
+  return image;
+}
 NativeSceneCommands *ActiveNativeReflectionCommands(plume::RenderTexture *color, plume::RenderTexture *depth) {
   if (passes.empty() || !passes.back().commands || NativePassDepth() != passes.back().nesting) return nullptr;
   auto &commands = *passes.back().commands;
@@ -204,7 +220,14 @@ NativeSceneCommands *ActiveNativeReflectionCommands(plume::RenderTexture *color,
 REX_HOOK_RAW(sub_821875F8) {
   using namespace bd::gpu::scene;
   const auto source = ctx.r3.u32;
-  if (!Begin(ctx,base,source)) { ++stats.compatibility_begin; __imp__sub_821875F8(ctx,base); passes.push_back({source}); }
+  const bool water_plane = Words(source,44) && bd::mem::load<uint32_t>(source+40) == kWaterPlane;
+  if (water_plane) water_reflection.Begin(bd::gpu::FrameStatFrameCount());
+  if (!Begin(ctx,base,source)) {
+    // An unknown/compatibility writer cannot leave a previous native publication
+    // available as if it were the current completed water plane.
+    water_reflection.Reset();
+    ++stats.compatibility_begin; __imp__sub_821875F8(ctx,base); passes.push_back({source});
+  }
   Report();
 }
 REX_HOOK_RAW(sub_821877C8) {

@@ -200,6 +200,25 @@ class NativeWaterBoundaryTest(unittest.TestCase):
                          "weak_reflection.expired()", "Reflection cannot publish before its pending clear"):
             self.assertIn(required, fixture)
 
+    def test_water_frame_images_are_direct_completed_producer_results(self):
+        bridge = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
+        planar = bridge.split("void BindPlanarReflection()", 1)[1].split("void BindSceneImage()", 1)[0]
+        self.assertIn("FindCompletedNativeWaterReflection()", planar)
+        self.assertIn("outgoing->nativeImage == output.planar", planar)
+        self.assertNotIn("ResolveGuestTexture", planar)
+        snapshot = bridge.split("void Snapshot()", 1)[1].split("void Prepare(", 1)[0]
+        self.assertIn("ProduceNativeSceneSnapshot(material,output.snapshot)", snapshot)
+        for forbidden in ("scene_getter", "reflection_getter", "ResolveGuestTexture", "nativeImage"):
+            self.assertNotIn(forbidden, snapshot)
+        reflection = (ROOT / "src/gpu/scene/native_reflection_pass_bridge.cpp").read_text()
+        self.assertIn("pass.plane == kWaterPlane", reflection)
+        self.assertLess(reflection.index("FinishNativeReflection("), reflection.index("water_reflection.Complete("))
+        self.assertIn("water_reflection.Begin(bd::gpu::FrameStatFrameCount())", reflection)
+        self.assertIn("water_reflection.Reset()", reflection)
+        snapshot_producer = (ROOT / "src/gpu/scene/native_scene_snapshot_bridge.cpp").read_text()
+        self.assertIn("output = destination->nativeImage", snapshot_producer)
+        self.assertLess(snapshot_producer.index("Check(CopySceneSnapshot("), snapshot_producer.index("output = lease"))
+
 
 if __name__ == "__main__":
     unittest.main()
