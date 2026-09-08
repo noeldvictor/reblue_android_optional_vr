@@ -4697,3 +4697,58 @@ not just attributed cleanup. Commit handoff reused evidence and did not start
 another producer or reset any budget. Next IDs: host142, game971, CPU59/output35,
 GPU65/water12/rigid22/snapshot21; another unchanged bottom-inactive boot is not
 useful evidence. Full goal remains active, including authored game stereo gates.
+
+### Native planar reflection verification (2026-09-08, sourcea5d66b9 plus GPU fixture)
+
+Same cumulative3GiB exception/floor62,509,998,080B and20GiB reserve (supervisor
+21GiB), raw/image/log gates unchanged. First free80,176,353,280B. Both fixture
+trees and attachment logs matched the previous ledger; no live renderer/build/
+test/compiler in the authoritative process check. Inter-turn drive movement is
+not attributed to new captures or duplicate producers. Profile116B hash unchanged.
+No shader regeneration, new tree, assets/cooking or raw/image files this turn.
+
+Existing supervisors: CPU/GPU builds32MiB free-drop caps, tests16MiB, host192MiB,
+300s build/30s test timeouts and10MiB aggregate attachment logs. CPU59/PID35632,
+output35/PID32268, GPU65/PID24556, water12/PID17760, rigid22/PID32140,
+snapshot21/PID37028 and host142/PID32328/session1353 all terminal0. Tests cover
+native reflection output through the actual18-case two-eye water GPU producer/
+consumer and existing55 rigid/8 snapshot regressions, validation0/0.373 Python
+checks pass. Codegen0 writes/deletions, no guest objects. Detailed scope and hashes
+are in20260908_1110_native-reflection-pass.md; no full-frame/art/pixel acceptance.
+
+Pre-build cleanup removed18 superseded successful attachment logs: CPU57/test33,
+GPU61/63,water9,host139/140,rigid20,snapshot19 stdout/stderr.69,715B logical;
+immediate free80,176,345,088->80,176,427,008B,81,920B drive interval gain.
+After replacement passes, removed14 more: CPU58/test34,GPU64,water11,host141,
+rigid21,snapshot20 stdout/stderr.30,832B logical; free80,174,194,688->
+80,174,235,648B,40,960B interval gain. Preserve CPU29 timeout/build52, GPU62/
+water10 causal failures and all unresolved game evidence. No protected image/raw
+baseline, originals, profile or active build tree removed.
+
+Runtime preflight before the second log cleanup: diagnostic inventory77,640,552B
+plus819,200B maximum text fits75MiB with183,448B headroom. Actual run971/
+PID37076/session32898 enforced180s,800KiB text and192MiB free drop; terminal0 at
+11:08:03UTC, strict mixed cold/reload chain passes. Reflection publications3900,
+compatibility/faults0; fresh300-publication/camera intervals after readiness in
+both epochs. Initial9 camera misses persist unchanged, cause unqualified. No
+scene-snapshot report, hence no reflection-phase snapshot claim. Native water
+game admission remains absent. No captures; exact original profile hash restored.
+
+After971 replaced the same strict cold/reload purposes, removed hash-verified
+logs969/970,1,008,228B. Full old text is retired; dated reports preserve their
+outcomes/hashes and971 retains the replacement text. The older lossless817..911
+zip and failure968 evidence remain. Immediate free80,173,142,016->80,174,153,728B,
+1,011,712B interval gain. Three cleanup operations total34files/1,108,775B logical
+and1,134,592B drive interval gains; credit once, not again next continuation.
+
+Final selected CPU fixture78,216,846B/132files (growth218,844B), GPU fixture
+18,933,958B/19files (growth248,123B), EXE/PDB combined growth152,576B. Attachment
+logs299,998B/180files:40,025B new minus100,547B retired =60,522B net shrink.
+Runtime log971524,518B minus retired1,008,228B =483,710B net shrink. Selected
+products/logs/runtime therefore grow75,311B net, needed for current owner evidence.
+Last measured free80,174,153,728B (~74.67GiB),2,199,552B below first reading;
+other host objects/metadata/source/Git/system activity is not all attributed here.
+Raw/image sets unchanged; no exception expanded. All producers terminal and
+profile restored. Next IDs CPU60/output36,GPU66/water13/rigid23/snapshot22,
+host143/game972. Continue the ordered water producer/native mixed-consumer
+connection, not another unchanged reflection-only or bottom-inactive boot.

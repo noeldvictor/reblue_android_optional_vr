@@ -119,6 +119,26 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         water = (ROOT / "src/gpu/scene/native_water_scene.h").read_text()
         self.assertIn("target(bottom,layers.z,true)", water)
 
+    def test_reflection_pass_renders_into_exclusive_native_output_owner(self):
+        bridge = (ROOT / "src/gpu/scene/native_reflection_pass_bridge.cpp").read_text()
+        for required in ("REX_HOOK_RAW(sub_821875F8)", "REX_HOOK_RAW(sub_821877C8)",
+                         "AcquireNativePostImage", "CreateNativeColorAttachmentAdapter", "HostTargetClass::ReflectionDepth",
+                         "AcquireNativeLeasedColorFramebuffer", "NativeSceneCommands::CreateLeasedColor",
+                         "FinishNativeReflection", "Video::PublishNativeImage", "DrawQueueFlush", "LeaveNativePass"):
+            self.assertIn(required, bridge)
+        for forbidden in ("D3DDevice_", "hcgD3DCreateSurface", "bdSurfaceSetMSAA(", "bdDestroySurface(",
+                          "copyTexture", "HostTargetClass::ReflectionColor"):
+            self.assertNotIn(forbidden, bridge)
+        core = (ROOT / "src/gpu/scene/native_reflection_pass.h").read_text()
+        for forbidden in ("PPCContext", "bd::mem", "sourceSurface", "GuestTexture", "copyTexture"):
+            self.assertNotIn(forbidden, core)
+        scene = (ROOT / "src/gpu/scene/native_scene_pass_bridge.cpp").read_text()
+        self.assertEqual(scene.count("ActiveNativeReflectionCommands(color, depth)"), 2)
+        fixture = (ROOT / "tools/native_scene_snapshot_test/water.cpp").read_text()
+        for required in ("AcquireLeasedColor", "CreateLeasedColor", "FinishNativeReflection", "NativeImageLease::From(reflection)",
+                         "weak_reflection.expired()", "Reflection cannot publish before its pending clear"):
+            self.assertIn(required, fixture)
+
 
 if __name__ == "__main__":
     unittest.main()

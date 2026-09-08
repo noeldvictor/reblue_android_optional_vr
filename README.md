@@ -58,12 +58,15 @@ translated game executable (18,777 function bodies in the local census), not
 the original high-level source project. That source lets us trace exact behavior
 and replace complete rendering paths; it does not make ownership automatic.
 
-**Latest source checkpoint (2026-09-08), verification pending:** planar reflection
-begin/end hooks now render into an exclusive native HDR image lease, reuse native
-depth/framebuffer owners and publish that same image without a console resolve.
-Authored camera/extent/getter and legacy draw adapters remain; the game still has
-no native water-queue caller. This checkpoint has not been built or run and does
-not supersede the tested binaries or acceptance evidence below.
+**Latest connected checkpoint (2026-09-08, host142/run971):** planar reflection
+now renders into an exclusive native HDR image lease, reuses native depth/framebuffer
+owners and publishes the same image without a console resolve. The live cold/reload
+check passes; its last sample records 3,900 completed publications with no fallback
+or ownership faults. CPU ownership tests, 18 two-eye water GPU cases and the existing
+rigid/snapshot regressions pass. Authored camera/extent/getter and legacy draw adapters
+remain, and the game still has no native water-queue caller. Reflection game pixels,
+HDR art parity and reflection-phase refraction snapshots remain unqualified.
+[Reflection connection, verification and remaining work](research/20260908_1110_native-reflection-pass.md).
 
 ### How much is left?
 

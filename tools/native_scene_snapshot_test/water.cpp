@@ -9,6 +9,7 @@
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/scene/native_scene_framebuffer.h"
 #include "gpu/scene/native_water_bottom.h"
+#include "gpu/scene/native_reflection_pass.h"
 #include "gpu/native_post_images.h"
 #include "gpu/draw_bindings.h"
 #include <plume_vulkan.h>
@@ -193,7 +194,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   for (uint32_t i = 0; i < 2; ++i) {
     auto &m = materials[i]; m.tint = {.2f+.2f*i,.3f,.4f,.4f+.2f*i};
     m.uv_scale = .2f; m.scroll_u = .3f; m.scroll_v = -.2f; m.phase = phase;
-    m.reflection = mode == 2 ? WaterReflectionEnvironment : mode == 1 || mode == 6 || mode == 7 ? WaterReflectionPlanar : WaterReflectionNone;
+    m.reflection = mode == 2 ? WaterReflectionEnvironment : mode == 1 || mode == 6 || mode == 7 || mode == 15 ? WaterReflectionPlanar : WaterReflectionNone;
     m.refraction = mode == 3 || mode == 4 || mode == 14; m.shore = mode == 4 || mode == 14;
     m.depth_opacity = 1; m.shininess = 8; m.highlight = mode == 5 || lit ? .2f : 0;
     m.reflection_distortion = mode == 6 ? .2f : 0;
@@ -229,7 +230,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   const Indexed indexed{6,2,0,0,1}; // poison instance zero detects ignored firstInstance
   auto indirect = Upload(device,&indexed,sizeof(indexed),RenderBufferFlag::INDIRECT);
   auto colour = MakeImage(device,2), depth = MakeImage(device,2,false,true);
-  std::array<Image,6> images{MakeImage(device,1),MakeImage(device,2),Image{},
+  std::array<Image,6> images{MakeImage(device,1),Image{},Image{},
       MakeImage(device,2,false,true),MakeImage(device,6,true),MakeImage(device,1,false,true)};
   NativeSceneFramebufferStore bottom_store(1);
   auto bottom_framebuffer = bottom_store.Acquire({NativeTargetImageHandle{},images[3].owner},nullptr,
@@ -239,9 +240,9 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   Need(bool(bottom_scope),"Water depth-only bottom producer");
   // Same bounded owner/pool and typed view handoff as the live snapshot
   // producer. A queued reader must prevent pool overwrite, not just deletion.
-  NativePostImagePool snapshot_pool(uint64_t(size)*size*2*8,1);
+  NativePostImagePool snapshot_pool(uint64_t(size)*size*2*8*2,2);
   const NativePostRecipe snapshot_recipe{size,size,2};
-  auto snapshot = snapshot_pool.Acquire(snapshot_recipe,[&] {
+  const auto make_post = [&] {
     auto result = std::make_shared<NativePostImage>();
     result->recipe = snapshot_recipe; result->descriptor = 0;
     auto desc = RenderTextureDesc::ColorTarget(size,size,RenderFormat::R16G16B16A16_FLOAT);
@@ -256,8 +257,29 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     result->framebuffer = device.createFramebuffer(fb);
     Need(result->view && result->framebuffer,"Water pooled snapshot view/framebuffer");
     return result;
-  });
+  };
+  auto snapshot = snapshot_pool.Acquire(snapshot_recipe,make_post);
   Need(bool(snapshot),"Water pooled snapshot lease");
+  auto reflection = snapshot_pool.Acquire(snapshot_recipe,make_post);
+  Need(reflection && reflection->image != snapshot->image,"Reflection and snapshot have exclusive pool images");
+  auto reflection_depth = MakeImage(device,2,false,true);
+  NativeSceneFramebufferStore reflection_store(1);
+  auto reflection_framebuffer = reflection_store.AcquireLeasedColor(NativeImageLease::From(reflection),reflection_depth.owner,
+      [&](const auto &desc) { return device.createFramebuffer(desc); });
+  Need(bool(reflection_framebuffer),"Water native leased reflection framebuffer");
+  auto reflection_scope = NativeSceneCommands::CreateLeasedColor(NativeImageLease::From(reflection),reflection_depth.owner,
+      reflection_framebuffer->framebuffer.get(),{{.125f,.25f,.5f,1},1,0});
+  Need(bool(reflection_scope),"Water native reflection command owner");
+  for (uint32_t eye = 0; eye < 2; ++eye) {
+    RenderTextureViewDesc view;
+    view.format = RenderFormat::R16G16B16A16_FLOAT; view.dimension = RenderTextureViewDimension::TEXTURE_2D;
+    view.mipLevels = 1; view.arraySize = 1; view.arrayIndex = eye;
+    images[1].layer_views.push_back(reflection->image->createTextureView(view));
+    const auto *image = reflection->image.get(); const auto *layer_view = images[1].layer_views.back().get();
+    RenderFramebufferDesc desc; desc.colorAttachments = &image; desc.colorAttachmentViews = &layer_view; desc.colorAttachmentsCount = 1;
+    images[1].framebuffers.push_back(device.createFramebuffer(desc));
+    Need(layer_view && images[1].framebuffers.back(),"Water per-eye reflection writer");
+  }
   NativeWaterDescriptorSchema schema;
   std::array<std::unique_ptr<RenderDescriptorSet>,3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]),"Water descriptors"); }
@@ -293,6 +315,18 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   for (uint32_t i = 0; i < 6; ++i) {
     if (i == 2) continue; // the real native scene snapshot produces this image
     auto &image = images[i];
+    if (i == 1) {
+      const auto lease = NativeImageLease::From(reflection);
+      Need(!FinishNativeReflection(*commands,*reflection_scope,lease),"Reflection cannot publish before its pending clear");
+      reflection_scope->Bind(*commands);
+      Need(reflection_scope->ApplyClear(*commands),"Reflection owns colour/depth clear including an empty pass");
+      if (mode != 15) for (uint32_t eye = 0; eye < 2; ++eye) {
+        commands->setFramebuffer(image.framebuffers[eye].get());
+        commands->clearColor(0,RenderColor(.25f+.25f*eye,.125f,.0625f,1),&full,1);
+      }
+      Need(FinishNativeReflection(*commands,*reflection_scope,lease),"Production reflection completion without resolve or copy");
+      continue;
+    }
     if (i == 3) {
       Need(!FinishNativeWaterBottom(*commands,*bottom_scope),"Bottom cannot publish before its pending clear");
       bottom_scope->Bind(*commands);
@@ -313,8 +347,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
       else {
         // Exact binary16 source colours isolate the sampled-image route from
         // implementation-permitted clear/store rounding at format conversion.
-        const auto value = i == 0 ? RenderColor(.5f,.5f,1,1) : i == 1 ? RenderColor(.25f+.25f*layer,.125f,.0625f,1) :
-            RenderColor(.5f,.375f,.25f,1);
+        const auto value = i == 0 ? RenderColor(.5f,.5f,1,1) : RenderColor(.5f,.375f,.25f,1);
         commands->clearColor(0,value,&full,1);
         if (mode == 6 && i == 0) {
           const RenderRect half(0,0,size/2,size);
@@ -346,7 +379,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   std::array<const NativeRigidBatchItem *,2> pointers{&items[0],&items[1]};
   for (uint32_t n = 0; n < 2; ++n) {
     auto water = std::make_shared<NativeWaterBatchData>(); water->input = instances[n+1];
-    water->images = {bump,environment,NativeImageLease::From(images[1].owner),NativeImageLease::From(snapshot),
+    water->images = {bump,environment,NativeImageLease::From(reflection),NativeImageLease::From(snapshot),
         NativeImageLease::From(images[3].owner),NativeImageLease::From(images[5].owner)};
     water->samplers = {bump_sampler.get(),sampler.get(),sampler.get(),sampler.get(),sampler.get(),sun_sampler.get()};
     auto &item = items[n]; item.water = std::move(water); item.geometry = geometry;
@@ -360,8 +393,10 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   const std::weak_ptr<const NativeGeometry> weak_geometry = geometry;
   const std::weak_ptr<const NativeTextureGpu> weak_bump = bump;
   const std::weak_ptr<const NativePostImage> weak_snapshot = snapshot;
+  const std::weak_ptr<const NativePostImage> weak_reflection = reflection;
   geometry.reset(); bump.reset(); environment.reset(); snapshot.reset();
   bottom_scope.reset(); bottom_framebuffer.reset();
+  reflection.reset(); reflection_scope.reset(); reflection_framebuffer.reset();
   // Producer references retire now; framebuffer/view command resources from
   // the setup clears independently remain pinned until THEIR submission fence.
   for (auto &image : images) image.owner.reset();
@@ -369,6 +404,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   Need(!snapshot_pool.Acquire(snapshot_recipe,[]() -> NativePostImageHandle {
     throw std::runtime_error("Queued water snapshot must prevent pooled overwrite before allocation");
   }),"Queued water prevents a new snapshot writer");
+  Need(!weak_reflection.expired(),"Queued water retains the producing reflection image and view");
   if (mode == 0) {
     std::array<NativeWaterInstanceGPU,2> packed{};
     packed[0].object_data.material.tint.x = 123;
@@ -465,15 +501,20 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   Need(bottom_store.Stats().resident == 1,"Bottom producer framebuffer survives through its recorded fence");
   bottom_store.AfterFence(1);
   Need(bottom_store.Stats().resident == 0,"Bottom producer framebuffer retires after fence");
+  reflection_store.MarkUnused(1); reflection_store.AfterFence(0);
+  Need(reflection_store.Stats().resident == 1,"Reflection framebuffer and colour survive through their recorded fence");
+  reflection_store.AfterFence(1);
+  Need(!reflection_store.Stats().resident && !weak_reflection.expired(),"Reflection framebuffer retires but water still retains its image");
   for (auto &item : items) Need(item.output.Retire() && !item.output.Retire(),"Water exactly-once fence retirement");
   // Free descriptors before their owners. Real DrainSlot clears both only after
   // the fence; this fixture checks the same receipt/lease boundary, not a game run.
   for (auto &image : images) { image.framebuffers.clear(); image.layer_views.clear(); }
   sets = {}; items = {};
   snapshot_pool.MarkUnused(1); snapshot_pool.AfterFence(0,[](const auto &) {});
-  Need(!weak_snapshot.expired(),"Water snapshot pool requires its recorded retirement fence");
+  Need(!weak_snapshot.expired() && !weak_reflection.expired(),"Water snapshot/reflection pool requires its recorded retirement fence");
   snapshot_pool.AfterFence(1,[](const auto &) {});
-  Need(weak_geometry.expired() && weak_bump.expired() && weak_snapshot.expired(),"Water image/geometry leases release after fence");
+  Need(weak_geometry.expired() && weak_bump.expired() && weak_snapshot.expired() && weak_reflection.expired(),
+      "Water image/geometry leases release after fence");
   auto &native_buffer = *static_cast<VulkanBuffer *>(readback.get());
   Need(vmaInvalidateAllocation(native_buffer.device->allocator,native_buffer.allocation,0,VK_WHOLE_SIZE) == VK_SUCCESS,"Water readback invalidate");
   const auto *mapped = static_cast<const uint16_t *>(readback->map()); Need(mapped != nullptr,"Water readback map");
@@ -499,9 +540,10 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
     const float length = std::sqrt(delta_x*delta_x+delta_y*delta_y+delta_z*delta_z);
     const float facing = delta_z/length, fresnel = .2f+.8f*std::pow(1-facing,3.5f);
     std::array<float,4> expected{.9f*m.tint.x,.9f*m.tint.y,.9f*m.tint.z,m.tint.w};
-    const std::array<float,3> reflection = mode == 2 ? std::array{.5f,.375f,.25f} : std::array{.25f+.25f*eye,.125f,.0625f};
+    const std::array<float,3> reflection = mode == 2 ? std::array{.5f,.375f,.25f} : mode == 15 ?
+        std::array{.125f,.25f,.5f} : std::array{.25f+.25f*eye,.125f,.0625f};
     const float snapshot[]{.125f,.25f+.25f*eye,.5f};
-    if (mode == 1 || mode == 2) for (uint32_t c = 0; c < 3; ++c) expected[c] += .9f*fresnel*reflection[c];
+    if (mode == 1 || mode == 2 || mode == 15) for (uint32_t c = 0; c < 3; ++c) expected[c] += .9f*fresnel*reflection[c];
     if (mode == 3 || mode == 4 || mode == 14) {
       for (uint32_t c = 0; c < 3; ++c) expected[c] = snapshot[c]+(expected[c]-snapshot[c])*m.tint.w;
       expected[3] = 1;
@@ -562,7 +604,7 @@ void CheckNativeWater(RenderDevice &device) {
   CheckImport();
   CheckWaveBounds();
   for (uint32_t mode = 0; mode < 6; ++mode) Run(device,mode);
-  for (uint32_t mode = 8; mode <= 14; ++mode) Run(device,mode);
+  for (uint32_t mode = 8; mode <= 15; ++mode) Run(device,mode);
   for (uint32_t mode : {6u,7u}) {
     const auto first = Run(device,mode,0), second = Run(device,mode,.37f);
     for (uint32_t eye = 0; eye < 2; ++eye) {

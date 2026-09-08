@@ -428,22 +428,26 @@ no observed bottom-pass invocation/allocation. It does not qualify this new pass
 in game or add a native water-family caller.
 [Bottom producer and causal backend evidence](../research/20260908_1031_native-water-bottom.md).
 
-Planar-reflection source checkpoint (2026-09-08; build/runtime verification
-pending): `native_reflection_pass_bridge.cpp` replaces eligible begin/end
+Planar-reflection checkpoint (2026-09-08, host142/run971):
+`native_reflection_pass_bridge.cpp` replaces eligible begin/end
 attachment/clear/completion work with an exclusive HDR lease from the existing
 post-image pool and a native ReflectionDepth target. The existing framebuffer
 and command owners now accept leased colour attachments, retaining them through
 fences; completion publishes the exact rendered image without a copy or console
 resolve. Active reflection scopes also expose the existing native snapshot path.
-The CPU fixture is wired to exercise mono/layered clear/completion, output identity
-and refusal to reuse an image while framebuffer or sampled readers retain it;
-it has not yet been built or executed. Source-only validation: 372 Python
-boundary/scenario checks and `git diff --check` pass. Next verification: shared scene-command
-CPU regressions (including MSAA), reflection-producing water GPU cases, host link
-and fresh live reflection/snapshot consumption with mixed-order pixel review.
+CPU59/output35 passes mono/layered clear/completion, output identity, reader/fence
+retention and shared MSAA regressions. GPU65/water12 passes18 two-eye cases using
+the actual native reflection colour/depth/framebuffer/completion producer, including
+an empty reflection;55 rigid and8 snapshot cases also pass, validation0/0.
+373 Python checks pass. Host142 links without guest object rebuilds. Run971 passes
+the strict mixed cold/reload chain and observes3,900 completed reflection publications,
+zero compatibility/faults and fresh300-publication windows after readiness in each
+epoch. Nine initial camera misses stop increasing; their cause remains unqualified.
+No scene-snapshot call was observed, so reflection-phase snapshot integration remains
+open, as do actual game pixels and HDR art parity. Do not infer those from fixtures.
 Authored camera calculation, extent/getter update and legacy draws remain adapters.
-This does not add a game caller to the native water queue, qualify HDR art parity
-or restamp host141/run970 as evidence for the new source.
+This does not add a game caller to the native water queue or qualify a full native
+frame. [Reflection producer and evidence](../research/20260908_1110_native-reflection-pass.md).
 
 Next connected work: publish completed water values and image owners from the
 ordered material writer and admit the family into the existing mixed scene
@@ -461,7 +465,7 @@ image-owner mismatch is resolved. Use the completed bottom depth/projection
 pair, not a colour snapshot or a guessed later constant transform. Establish an
 authored bottom-active scenario or its scheduling gate before another live probe;
 unchanged bg41_01 retries add no evidence. Bump slot12, environment slot5,
-planar reflection, late per-primitive material writes and sampler publication
+ordered planar-reflection lease publication, late per-primitive material writes and sampler publication
 still need native producer connections; ordinary sampler tracking covers only
 slots0..4. Keep producer command framebuffers/resolve
 owners alive through their fences too. Load-owned tangent
