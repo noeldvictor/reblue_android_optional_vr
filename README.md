@@ -78,28 +78,26 @@ and other unadmitted families still use the legacy producer. Game water/reflecti
 pixels, HDR art parity and authored shore/refraction/stereo coverage remain unqualified.
 [Completed image connection, verification and remaining work](research/20260908_1345_native-water-images.md).
 
-**Characters (2026-09-08, scene and shadow skin consumers connected):** native
-geometry, animated bounds, joint-local normals and retained poses share the
-material owners, indirect queue and frame fences. Host/CPU tests and 154 Vulkan
-pixel cases pass (69 new skin scene cases); validation reports zero errors/warnings.
-All 387 Python checks pass.
-Host161's strict cold/reload run passes, including 13,200 native skin-shadow
-emissions and fence retirements per 300-frame field window. Ordinary skin scene
-draws emit/retire 5,661 primitives during each opening event, but stop advancing
-afterward: the interactive-field skin-scene gate correctly remains pending.
-One inspected 1920x1080 frame shows the character and ground shadows; it is not
-character parity, sequence or stereo qualification. Technique-1 scene shading,
-native animation and remaining rendering adapters are still open. No measured
-speedup or full native character/frame completion is claimed.
-Native Toon authored inputs now connect to the shared rigid/skin GPU path:
-scene/object lighting adjustments and ordered texture tints feed owned packets,
-whole-node admission and animated pre-culling. Host164 and the expanded C++
-fixture pass, as do 388 Python checks; the unchanged shaders retain their
-345-case Vulkan evidence. This new connection has **not been run in-game**:
-fresh post-event scene draws, reloads and pixels remain pending. Fur, outline,
-lattice deformation and sorted Toon families remain on the compatibility route.
-No new in-game or stereo qualification is claimed.
-[Authored Toon connection and pending live gate](research/20260908_1318_native-toon-producer.md).
+**Characters (2026-09-08, host164/run971):** native skin-scene draws now continue
+through interactive gameplay, not just the opening event. Authored Toon lighting
+adjustments and ordered texture tints feed owned packets, whole-node admission,
+animated bounds, the shared rigid/skin GPU path and frame-fence retirement.
+The strict cold/title/reload checks pass: fresh 300-frame windows in both fields
+add 13,200 scene emissions and retirements, with skin shadows also advancing.
+The old generation retires before the reloaded generation submits.
+Host/C++ tests and 388 Python checks pass; unchanged shaders retain their
+345-case Vulkan evidence with zero validation errors/warnings.
+
+**Character pixels remain unqualified:** the new 1920x1080 window capture shows
+the title logo instead of the logged interactive field, reproducing the earlier
+capture/presentation discrepancy. Counters do not resolve that mismatch. The
+next visual observation needs the existing renderer-fence capture path and its
+storage preflight, not another unchanged window capture. Fur, outline, lattice,
+sorted Toon, native animation and remaining rendering adapters stay open.
+No character parity, stable sequence, game stereo, speedup or host-only frame
+completion is claimed.
+[Live Toon scene/reload evidence and visual failure](research/20260908_1334_native-toon-live.md).
+[Authored Toon connection](research/20260908_1318_native-toon-producer.md).
 [Scene connection and its verification limits](research/20260908_1210_native-skin-scene-shading.md).
 [Connection, live evidence and remaining gates](research/20260908_1143_native-skinned-shadow-consumer.md).
 

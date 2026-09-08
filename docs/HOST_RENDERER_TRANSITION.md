@@ -261,6 +261,10 @@ aggregate archive also needs independently fitting overlap before another probe.
 Do not overwrite preserved probe paths or boot until the existing archive fits.
 That observation must distinguish stale window capture from a wrong presented
 frame; repeating PrintWindow or relaxing context checks cannot answer that.
+Host164/run971 reproduces this discrepancy during the Toon integration: fresh
+scene/reload receipts pass, but the full-resolution window image shows the title
+logo. Preserve that image and962; neither qualifies character pixels or proves
+the renderer-fence image would be wrong. No further unchanged PrintWindow retry.
 Do not build another capture/renderer framework or make the selected asset a
 permanent ceiling on scene ownership. Current-depth controlled pixels, broader
 scene/animation/event/both-eye gates and Quest readiness remain open.
@@ -715,12 +719,20 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    packets, classified whole-node admission and animated pre-culling. CPU50 and
    the host build pass; shaders are unchanged. Missing specular RGB remains
    unknown, not guessed black. Fur/outline/lattice and sorted Toon stay excluded.
-   Next require fresh native skin-scene emission and fence retirement independently
-   in both post-event reload epochs, then inspect current renderer pixels under
-   the existing storage budget. Host164 has not been run in-game; no new live
-   conversion, character parity, sequence or stereo acceptance is claimed.
-   Host161/run969 remains the last character live strict regression.
-   [Authored connection, source correction and pending gate](../research/20260908_1318_native-toon-producer.md).
+   Host164/run971 now passes the full strict cold/title/reload/mixed chain,
+   including fresh scene and shadow skin consumption independently in both
+   interactive fields: scene1428..1728 and3964..4264 each emit/fence-retire13200.
+   Generation93/instance144 retires before207/480. This replaces host161's
+   startup-only scene observation; repeated draws are not unique asset counts.
+   The new1920x1080/101438B window image shows the title logo, contrary to the
+   logged field context. Pixels fail acceptance; no cause or fix is inferred.
+   Preserve this and962's discrepancy. Next distinguish window capture from
+   actual post-gamma output through the existing fence-owned frame probe once
+   its explicit image allowance/aggregate overlap fit; do not retry PrintWindow
+   or relax the scene checks. Native animation and specialized families can
+   continue independently, but character parity/sequence/both eyes remain open.
+   [Live scene/reload evidence, visual failure and storage](../research/20260908_1334_native-toon-live.md).
+   [Authored connection and source correction](../research/20260908_1318_native-toon-producer.md).
    [Earlier GPU contract and fixture evidence](../research/20260908_1237_native-toon-surface.md).
    [Scene connection and verification](../research/20260908_1210_native-skin-scene-shading.md).
    [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).

@@ -5490,3 +5490,67 @@ texture85137417B (+2148591), EXE49090560B (+4608), PDB111763456B (+8192),
 attachment406877B/196files (-1179): net+2160212B for real material-linked fixture
 and current evidence. Other host objects/source/Git/system activity separate;
 no raw/image growth or budget reset. Live post-event scene/reload/pixels pending.
+
+### 2026-09-08 native Toon live connection gate (after 3ba183e)
+
+Previous turn committed the connected source/fixtures/docs locally; push remains
+blocked by the safety reviewer pending exact owner approval. Local verification
+is independent of that external-write restriction.13:22:35 preflight free
+78464479232B; no renderer/compiler/test process observed. Host164 EXE SHA256
+81A5E42635335A036A9FBE1942392C37DE173248C3539D015229F846AAD63B36 matches;
+owner profile116B SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+Images10408682B/12 leave77078B; new native_skin_scene_window.jpg absent.
+Plan one180s desktop cold/reload run with full strict mixed chain and separate
+fresh --skin-scene in both post-event epochs. No raw/cook/perf producer; log800KiB,
+one full-resolution JPEG<=70KiB,192MiB free-drop and existing75MiB diagnostics
+stop/full-overlap preflight. Same cumulative exception/floor, not a reset.
+Retain failure/current baseline until replacement proves its distinct purpose;
+profile restoration and owned-process shutdown are guaranteed by the supervisor.
+
+Run970/PID37808/session85183,13:23:21..13:26:04, terminal1 only at JPEG size
+gate after the complete strict cold/reload/mixed/skin-scene text chain passes.
+Old93/instance144 retires before207/479. Cold1257..1557 skin scene+13200 emitted/
+retired; reloaded3832..4132+13198, with13200 submissions and13200 shadow emissions/
+fences. JPEG exceeds70KiB even at bounded encoder qualities; no file written.
+No comparison failure, no raw output; original116B profile restored exact hash.
+Log537389B SHA256B1A768118963620826B382AB987CA4FEF4411E5B5F064F65C61BDE5755888DA6;
+ending free78458388480B. New live scene consumption established, pixels pending.
+
+13:28 lossless existing-PNG repack, <=4MiB temporary overlap: native_toon_material_window.png
+3333941->3258478B,75463B logical savings, measured free78426898432->78426972160B
+(73728B). Exact filtered data, all non-IDAT chunks and1920x1080 RGBA bytes match;
+decoded SHA2567b04541231a41a0aa0c9f7d80582769ebff2fa8ce56a1510f706a3d66883fc1f.
+New file SHA256e44a2c0821eadc08aa947cd5836b45a01bac37296b0d375c2198b309206d457a;
+historical report retains old encoded hash. No evidence/pixels removed or altered.
+Image total10333219B,152541B headroom. No previous cleanup credited again.
+Plan one follow-up same180s strict chain for the missing image, now normal110KiB
+JPEG within unchanged10MiB aggregate; no quality/scene comparison threshold
+changes. This is an output-capacity correction, not a renderer fix or blind
+retry of a comparison failure. Existing800KiB log/192MiB growth/75MiB diagnostics
+limits and profile restore remain; preserve970 until replacement proves live
+text and image outcomes. No rebuild, raw/perf/cook or new tool download.
+
+Run971/PID37324/session17745 terminal0,13:29:05..13:31:38. Actual preflight
+diagnostics77185187B +819200B log +112640B image fits75MiB; free78423748608B,
+floor78222422016B. Full strict cold/reload/mixed/skin scene+shadow chain passes;
+cold1428..1728 andreload3964..4264 scene+13200 emitted/fence-retired each.
+Old93/144 retires before207/480. Exact owner116B profile restored; no raw output.
+Ending free78418616320B. Log537422B SHA25603605F5ED86CA97C3665CCACDB0906C118C3A78C0C5038436CEFB2DF47F61428.
+Window1920x1080 JPEG101438B SHA2564A19BA8DDEE6B913F536C599B5686FAB0E80F5B05AD7B742DA995A660DB32881
+shows title-logo/village, not logged interactive field: visual acceptance FAIL,
+reproduces962 discrepancy, no cause/fix claimed. Preserve image; no further
+unchanged PrintWindow retry. Existing fence-owned probe needs its distinct
+per-image approval/aggregate-overlap preflight; source work need not stop.
+
+Completed checksum-verified archive of969/970:1108029B plaintext ->222514B
+retained-native-runtime-969-970-20260908-skin.zip. Both exact entry hashes match
+recorded originals before individually resolved/revalidated plaintext deletion.
+Archive SHA25696EB3EB08C905CCACB513363CCA0AD62BFB49C6128CFF3164CA38252EC730FA9.
+Logical885515B saved; actual start78415351808B, pre-delete78415060992B,
+end78416175104B (+823296B across operation). All evidence recoverable; current971
+plaintext and all images retained. Repack+archive total960978 logicalB /897024B
+measured gain, once. Selected log/archive/image net+215271B for reached native
+scene and visual failure. Image10434657B/13 leaves51103B.13:34:23 free78415912960B,
+48566272B below13:22:35 drive-wide; other activity separate. No new cache/hlsl
+files observed. Source/host/GPU binaries unchanged, no raw growth/budget reset.
+See20260908_1334_native-toon-live.md. Push approval still pending; no retry/bypass.
