@@ -6,6 +6,7 @@
 #include "gpu/scene/native_lighting.h"
 #include "gpu/native_target_images.h"
 #include "gpu/scene/native_transform.h"
+#include "gpu/scene/native_visual_inputs.h"
 #include <cmath>
 #include <optional>
 #include <utility>
@@ -17,18 +18,19 @@ struct NativePrimaryReceiver {
 };
 class NativeReceiverPublication {
   std::optional<NativePrimaryReceiver> value_;
-  uint32_t visual_ = 0, frame_ = 0, view_ = 0;
+  NativeVisualIdentity identity_;
+  uint32_t frame_ = 0, view_ = 0;
 public:
   void Reset() { value_.reset(); }
-  void Publish(NativePrimaryReceiver value, uint32_t visual, uint32_t frame, uint32_t view) {
+  void Publish(NativePrimaryReceiver value, NativeVisualIdentity identity, uint32_t frame, uint32_t view) {
     Reset();
-    if (!visual || view >= 16 || !value.image) return;
+    if (!identity || view >= 16 || !value.image) return;
     for (float item : value.colour) if (!std::isfinite(item)) return;
     for (float item : value.world_to_shadow) if (!std::isfinite(item)) return;
-    value_ = std::move(value); visual_ = visual; frame_ = frame; view_ = view;
+    value_ = std::move(value); identity_ = identity; frame_ = frame; view_ = view;
   }
-  std::optional<NativePrimaryReceiver> Read(uint32_t visual, uint32_t frame, uint32_t view) const {
-    return visual == visual_ && frame == frame_ && view == view_ ? value_ : std::nullopt;
+  std::optional<NativePrimaryReceiver> Read(NativeVisualIdentity identity, uint32_t frame, uint32_t view) const {
+    return identity == identity_ && frame == frame_ && view == view_ ? value_ : std::nullopt;
   }
 };
 // Temporary source-policy conversion, not fields of the retained native packet.
@@ -47,9 +49,8 @@ template<class Adapter> void RunNativeReceiverSetup(bool enabled, Adapter &adapt
   adapter.PublishCompatibilityColour(colour);
   adapter.PublishNative(colour);
 }
-// Temporary visual identity is resolved at the object producer boundary only.
-std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(uint32_t visual, uint32_t view);
+std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(NativeVisualIdentity identity, uint32_t view);
 // Direct ordinary visual producer. Reuses late authored colour publication and
 // explicit legacy exports without invoking the participant's guest ABI.
-bool PrepareNativePrimaryReceiver(uint32_t visual, uint32_t stack);
+bool PrepareNativePrimaryReceiver(NativeVisualIdentity identity, uint32_t stack);
 } // namespace bd::gpu::scene

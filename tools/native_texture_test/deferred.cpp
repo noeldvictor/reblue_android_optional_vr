@@ -105,6 +105,21 @@ void TestCallbackContract() {
     words[visual+1864] = mode;
     assert(CheckNativeDeferredContract(visual,read) == mode);
   }
+  words[visual+3132] = 17;
+  auto early = ReadNativeDeferredVisualInputs({1,2},visual,read);
+  assert(early && early->identity == (NativeVisualIdentity{1,2}) && early->diffuse_class == 17);
+  // A render-time author changes values after the node walk. The late batch
+  // producer, not the early stage call, supplies what native consumption sees.
+  words[visual+1864] = 1; words[visual+3132] = 64;
+  auto late = ReadNativeDeferredVisualInputs({1,2},visual,read);
+  assert(late && late->blend == NativeVisualBlend::AdditiveAlpha && late->diffuse_class == 64);
+  assert(early->blend == NativeVisualBlend::ModulateInverseSource && early->diffuse_class == 17);
+  assert(!ReadNativeDeferredVisualInputs({},visual,read));
+  assert(CheckDeferredVisualResource(0,read));
+  words[0x4020] = 0x12345678;
+  assert(!CheckDeferredVisualResource(visual,read));
+  assert(!ReadNativeDeferredVisualInputs({1,2},visual,read));
+  words[0x4020] = 0x820DFA50; words[visual+1864] = 5;
   const auto valid = words;
   for (const auto &[address,value] : std::array<std::pair<uint64_t,uint32_t>,12>{{
       {registry+8,1}, {0x1000,shader}, {0x2000,0x82174270},
@@ -119,6 +134,39 @@ void TestCallbackContract() {
   words = valid; words[registry+20] = 1; words[0x3000] = shader;
   assert(CheckNativeDeferredContract(visual,read) == 5); // optional features removed
   assert(!CheckNativeDeferredContract(0,read));
+}
+
+void TestNativeVisualPublication() {
+  NativeVisualPublication publication;
+  const NativeVisualIdentity first{1,10}, second{2,10}, next_generation{1,11};
+  std::vector<NativeVisualInputs> inputs{{second,NativeVisualBlend::AdditiveAlpha,7},{first,NativeVisualBlend::Alpha,4}};
+  assert(publication.Publish(9,inputs));
+  auto retained = publication.Read(first,9);
+  assert(retained && retained->diffuse_class == 4 && publication.Read(second,9)->diffuse_class == 7);
+  assert(!publication.Read(first,10) && !publication.Read(next_generation,9) && !publication.Read({},9));
+  inputs[1].diffuse_class = 23;
+  assert(publication.Read(first,9)->diffuse_class == 4);
+  assert(publication.Publish(9,inputs) && publication.Read(first,9)->diffuse_class == 23 && retained->diffuse_class == 4);
+  // Replacement and old-source retirement cannot alias another native instance.
+  inputs[1].identity = next_generation;
+  assert(publication.Publish(10,inputs) && !publication.Read(first,10) && publication.Read(next_generation,10));
+  for (uint32_t fault = 0; fault < 6; ++fault) {
+    auto bad = inputs;
+    if (fault == 0) bad.clear();
+    if (fault == 1) bad.back().identity.instance = 0;
+    if (fault == 2) bad.back().identity.model_generation = 0;
+    if (fault == 3) bad.back().identity = bad.front().identity;
+    if (fault == 4) bad.back().blend = NativeVisualBlend(6);
+    if (fault == 5) bad.reserve(NativeVisualPublication::kMaxBytes / sizeof(NativeVisualInputs) + 1);
+    assert(!publication.Publish(10,std::move(bad)) && !publication.Read(second,10));
+    assert(publication.Publish(10,inputs));
+  }
+  inputs.clear(); inputs.reserve(NativeVisualPublication::kMaxVisuals+1);
+  for (uint64_t i = 1; i <= NativeVisualPublication::kMaxVisuals; ++i) inputs.push_back({{i,1},NativeVisualBlend::Alpha,0});
+  assert(publication.Publish(10,inputs));
+  inputs.push_back({{NativeVisualPublication::kMaxVisuals+1,1},NativeVisualBlend::Alpha,0});
+  assert(!publication.Publish(10,std::move(inputs)));
+  assert(retained->identity == first && retained->diffuse_class == 4);
 }
 
 void TestMixedOrder() {
@@ -278,6 +326,7 @@ void TestDepth() {
 }
 
 int main() {
+  TestNativeVisualPublication();
   TestOrdinaryVisualExports();
   TestCallbackContract();
   TestMixedOrder();

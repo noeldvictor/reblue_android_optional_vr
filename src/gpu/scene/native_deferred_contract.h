@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include "gpu/scene/native_visual_inputs.h"
 
 namespace bd::gpu::scene {
 // This is a compatibility import, never a native asset or packet layout. The
@@ -14,7 +15,7 @@ namespace bd::gpu::scene {
 // shadow participants precede the shader's terminating visual callback. Check
 // live slots, not only a remembered vtable address or an initializer census.
 template <class Read>
-std::optional<uint32_t> CheckNativeDeferredContract(uint32_t visual, Read read) {
+bool CheckNativeDeferredRegistry(Read read) {
   constexpr uint32_t registry = (uint32_t(-32030) << 16) - 31132;
   constexpr uint32_t shader = 0x82783A58, lights = 0x82E246F4;
   constexpr uint32_t noop = 0x820DFA50;
@@ -46,11 +47,32 @@ std::optional<uint32_t> CheckNativeDeferredContract(uint32_t visual, Read read) 
     else return {};
     if (method(*participant, 8) != begin || method(*participant, 12) != end) return {};
   }
-  // PrepareEffectModel's input+4 is the visual (entry+244). Its +32/+36
-  // resource methods must be no-ops before omitting their paired invocation.
+  return true;
+}
+// Intervening legacy model resource callbacks must not be arbitrary writers of
+// another queued visual's authored inputs. Known participant callbacks only
+// change effect/device/selection state, whose late producers remain active.
+template <class Read>
+bool CheckDeferredVisualResource(uint32_t visual, Read read) {
+  if (!visual) return true;
+  const auto table = read(visual);
+  return table && *table && read(uint64_t(*table) + 32) == 0x820DFA50 &&
+      read(uint64_t(*table) + 36) == 0x820DFA50;
+}
+template <class Read>
+std::optional<uint32_t> CheckNativeDeferredContract(uint32_t visual, Read read) {
+  // PrepareEffectModel's input+4 is the visual (entry+244).
   if (!visual || read(uint64_t(visual) + 3000) != 0 ||
-      method(visual, 32) != noop || method(visual, 36) != noop) return {};
+      !CheckDeferredVisualResource(visual, read) || !CheckNativeDeferredRegistry(read)) return {};
   const auto blend_mode = read(uint64_t(visual) + 1864);
   return blend_mode && *blend_mode <= 5 ? blend_mode : std::nullopt;
+}
+template <class Read>
+std::optional<NativeVisualInputs> ReadNativeDeferredVisualInputs(
+    NativeVisualIdentity identity, uint32_t visual, Read read) {
+  if (!identity) return {};
+  const auto mode = CheckNativeDeferredContract(visual, read);
+  const auto category = visual ? read(uint64_t(visual) + 3132) : std::nullopt;
+  return mode && category ? std::optional(NativeVisualInputs{identity, NativeVisualBlend(*mode), *category}) : std::nullopt;
 }
 } // namespace bd::gpu::scene

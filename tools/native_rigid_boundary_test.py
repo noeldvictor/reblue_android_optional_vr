@@ -298,14 +298,19 @@ class NativeRigidBoundaryTest(unittest.TestCase):
     def test_deferred_packets_connect_to_the_same_consumer_without_entry_imports(self):
         source = (ROOT / "src/gpu/scene/deferred_consumer.cpp").read_text()
         branch = source.split("auto submission = native_queue.Take(item.index);", 1)[1].split("++native_consumed", 1)[0]
-        for required in ("ReadNativeDeferredEffects(visual)", "FinalizeNativeDeferredEffects(*submission, *effects, FrameStatFrameCount())",
+        for required in ("ReadNativeDeferredEffects(identity)", "FinalizeNativeDeferredEffects(*submission, *effects, FrameStatFrameCount())",
                          "SubmitNativeRigidScenePackets(std::move(*submission), ctx.r1.u32)"):
             self.assertIn(required, branch)
-        for forbidden in ("Read<", "bd::mem::", "Material(", "BindEntry", "D3DDevice_", "ResolveGuestTexture"):
+        for forbidden in ("Read<", "bd::mem::", "Material(", "BindEntry", "D3DDevice_", "ResolveGuestTexture",
+                          "FindNativeVisualIdentity", "CheckNativeDeferredContract"):
             self.assertNotIn(forbidden, branch)
         for required in ("MergeDeferredWork(legacy_depths, insertions, merged)", "CloseDeferredCompatibilityCapture()",
-                         "CheckNativeDeferredContract(next_visual, CheckedWord)", "native_queue.EndDrain()"):
+                         "CollectNativeVisualInputs(requested, inputs)", "visual_inputs.Read(identity, FrameStatFrameCount())",
+                         "CheckDeferredVisualResource(Read<uint32_t>(entry.address + 272), CheckedWord)", "native_queue.EndDrain()"):
             self.assertIn(required, source)
+        self.assertNotIn("native_visuals", source)
+        self.assertNotIn("VisualTransition", source)
+        self.assertLess(source.index("CollectNativeVisualInputs(requested, inputs)"), source.index("native_queue.BeginDrain("))
         queue = (ROOT / "src/gpu/scene/native_deferred_queue.h").read_text()
         for forbidden in ("NodeTag", "visual", "bd::mem::", "816", "DeferredEntryRecipe"):
             self.assertNotIn(forbidden, queue)
@@ -315,7 +320,7 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         scope = source.split("struct NativeDeferredVisualScope {", 1)[1].split("} // namespace", 1)[0]
         for forbidden in ("PPCContext", "bridge.Call", "GetFunction", "__imp__", "sub_8221DBE0(", "sub_82174648("):
             self.assertNotIn(forbidden, scope)
-        for required in ("PrepareNativePrimaryReceiver(visual, stack)", "PublishNativeDeferredBlend(blend_mode)",
+        for required in ("PrepareNativePrimaryReceiver(inputs.identity, stack)", "PublishNativeDeferredBlend(uint32_t(inputs.blend))",
                          "BeginDeferredMaterialCompatibility(port)", "EndDeferredMaterialCompatibility(port)",
                          "PrepareEffectParticipants(*this)", "FinishEffectParticipants(*this)", "ValidateRoster()"):
             self.assertIn(required, scope)
@@ -328,6 +333,25 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertNotIn("__imp__", blend)
         self.assertIn("NativeUpdate(context, nullptr, 2, false)", blend)
         self.assertIn("NativeUpdate(context, nullptr, 3, false)", blend)
+
+    def test_visual_publication_uses_native_keys_and_existing_source_index(self):
+        pure = (ROOT / "src/gpu/scene/native_visual_inputs.h").read_text()
+        for required in ("uint64_t instance = 0, model_generation = 0", "kMaxVisuals", "kMaxBytes",
+                         "inputs.capacity()", "frame != frame_", "it->identity == identity"):
+            self.assertIn(required, pure)
+        for forbidden in ("bd::mem::", "PPCContext", "Read<uint", "visual_va", "ResolveGuest", "unordered_map"):
+            self.assertNotIn(forbidden, pure)
+        bridge = (ROOT / "src/gpu/scene/native_instance_bridge.cpp").read_text()
+        producer = bridge.split("bool CollectNativeVisualInputs(", 1)[1].split("bool CollectNativeInstanceLightInputs(", 1)[0]
+        for required in ("std::lock_guard lock(store.mutex)", "store.sources", "ReadNativeDeferredVisualInputs(identity, visual, Word)",
+                         "pose->model_generation != identity.model_generation", "out.size() != requested.size()"):
+            self.assertIn(required, producer)
+        receiver = (ROOT / "src/gpu/scene/native_shadow_receiver_bridge.cpp").read_text()
+        native = receiver.split("bool PrepareNativePrimaryReceiver(", 1)[1].split("} // namespace", 1)[0]
+        self.assertIn("NativeVisualIdentity identity", native)
+        self.assertIn("Adapter adapter{kPrimary, 0, stack, identity}", native)
+        for forbidden in ("FindNativeVisualIdentity", "visual +", "visual)+", "uint32_t visual"):
+            self.assertNotIn(forbidden, native)
 
     def test_builds_only_explicit_shader_dependencies(self):
         text = (ROOT / "cmake/shaders.cmake").read_text()

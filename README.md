@@ -264,9 +264,18 @@ Python checks and the incremental host build pass. **Run967 passes the strict
 cold-field/title/reload chain:** sampled windows consume10,957/2,758 native packets
 through3,383/234 balanced native visual scopes alongside legacy draws. Source and
 GPU lifetime checks pass independently in both epochs. Pixels/both eyes remain
-unqualified; no speedup is claimed. Authored-input sidecars, outgoing legacy state
+unqualified; no speedup is claimed. In host132, authored-input sidecars, outgoing legacy state
 and legacy-opened scopes remain; the route is still opt-in.
 [Connected effects, contracts and verification](research/20260908_0251_native-deferred-effects.md).
+
+**New source checkpoint; host build/live validation pending:** deferred packets
+now use native instance/generation identities instead of a per-entry guest-address
+sidecar. The existing instance index publishes bounded blend/class values at the
+late list handoff; receiver publications use the same native keys. Two rebuilt
+C++ fixtures,32 CPU tests and361 Python checks pass. Host132/run967 above remain
+the last tested game binary/run, not evidence for this change. Mixed legacy
+callback ordering, fresh cold/reload consumption and pixels still need validation;
+source-input imports, receiver descriptors and outgoing legacy state remain.
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

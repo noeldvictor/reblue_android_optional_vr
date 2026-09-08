@@ -10,6 +10,7 @@
 #include "gpu/scene/native_rigid_route.h"
 #include "gpu/scene/native_rigid_route_bridge.h"
 #include "gpu/scene/native_primitive_policy_source.h"
+#include "gpu/scene/native_deferred_contract.h"
 #include "gpu/scene/guest_scene.h"
 #include "core/logging.h"
 #include "core/memory_helpers.h"
@@ -142,6 +143,38 @@ void Handoff(uint32_t container) {
   Report(store);
 }
 } // namespace
+
+NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual) {
+  if (!REXCVAR_GET(bd_native_instances) || !visual) return {};
+  auto &store = Instances();
+  std::lock_guard lock(store.mutex);
+  const auto it = store.sources.find(visual);
+  return it == store.sources.end() ? NativeVisualIdentity{} :
+      NativeVisualIdentity{it->second.instance, it->second.model_generation};
+}
+bool CollectNativeVisualInputs(std::span<const NativeVisualIdentity> requested,
+    std::vector<NativeVisualInputs> &out) {
+  out.clear();
+  if (!REXCVAR_GET(bd_native_instances) || requested.empty() || requested.size() > NativeVisualPublication::kMaxVisuals)
+    return false;
+  for (size_t i = 0; i < requested.size(); ++i)
+    if (!requested[i] || (i && requested[i-1] >= requested[i])) return false;
+  auto &store = Instances();
+  std::lock_guard lock(store.mutex);
+  out.reserve(requested.size());
+  for (const auto &[visual, binding] : store.sources) {
+    const NativeVisualIdentity identity{binding.instance, binding.model_generation};
+    if (!std::binary_search(requested.begin(), requested.end(), identity)) continue;
+    const auto pose = store.instances.Read(binding.instance, 1);
+    const auto inputs = ReadNativeDeferredVisualInputs(identity, visual, Word);
+    if (!pose || !pose->model || pose->model_generation != identity.model_generation || !inputs) {
+      out.clear(); return false;
+    }
+    out.push_back(*inputs);
+  }
+  if (out.size() != requested.size()) { out.clear(); return false; }
+  return true;
+}
 
 bool CollectNativeInstanceLightInputs(std::vector<NativeNodeLightBinding> &out,
     std::vector<NativeLightSourceBinding> &sources, size_t &unavailable) {

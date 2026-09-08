@@ -242,7 +242,7 @@ std::optional<std::vector<NativeRigidScenePlan>> PrepareNativeRigidSceneForObjec
         !ComposeMaterialAlphaReferences(program->ranges, admission.policies, *scope->alpha_inputs, references)) return {};
   }
   refusal = "fresh completed primary shadow or receiver colour unavailable";
-  const auto receiver = FindNativePrimaryReceiver(scope->visual,scope->render_view);
+  const auto receiver = FindNativePrimaryReceiver({pose.instance, pose.model_generation},scope->render_view);
   if (!receiver) return {};
   // This is the temporary source boundary, not a tag-based native draw API.
   NodeTag tag; tag.valid = true; tag.visual_va = scope->visual; tag.ctx_va = scope->context;

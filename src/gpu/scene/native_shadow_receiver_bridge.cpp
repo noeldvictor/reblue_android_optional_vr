@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_shadow_receiver_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/host_parameter_bridge.h"
 #include "gpu/scene/guest_scene.h"
 #include "gpu/resource_bridge.h"
@@ -67,23 +68,28 @@ LightingVector ReadColour(uint32_t source) {
   for (uint32_t n=0;n<4;++n) colour[n] = std::bit_cast<float>(ReadWord(uint64_t(source)+52+n*4));
   return colour;
 }
-void Publish(uint32_t source, uint32_t visual, std::optional<LightingVector> colour = {}) {
+void Publish(uint32_t source, uint32_t visual, std::optional<LightingVector> colour = {},
+    NativeVisualIdentity identity = {}) {
   receiver.Reset();
-  const auto mode = Word(kMode), tech = Word(uint64_t(visual)+3000), view = Word(kRenderViewIdVa);
+  const auto mode = Word(kMode), tech = visual ? Word(uint64_t(visual)+3000) : std::optional(0u), view = Word(kRenderViewIdVa);
   const auto output = Word(uint64_t(source)+12);
   const auto shadow = FindCompletedNativePrimaryShadow();
-  if (source != kPrimary || !visual || !mode || !tech || !view || !output || !shadow ||
+  // Only a legacy producer resolves its source identity. Native scopes supply
+  // their retained instance/generation directly, including after source reuse.
+  if (visual) identity = FindNativeVisualIdentity(visual);
+  if (source != kPrimary || !identity || !mode || !tech || !view || !output || !shadow ||
       !ImportReceiverParticipation(*tech,*mode)) return;
   // A later resource replacement must not attach this colour to a different
   // image. Resolve the temporary header only here, never in native submission.
   const auto *image = ResolveGuestTexture(*output);
   if (!image || image->nativeImage.owner != shadow->image ||
       image->texture != shadow->image->image.get()) return;
-  receiver.Publish({shadow->image,shadow->camera.world_to_clip,colour ? *colour : ReadColour(source)},visual,FrameStatFrameCount(),*view);
-  if (receiver.Read(visual,FrameStatFrameCount(),*view)) ++stats.published;
+  receiver.Publish({shadow->image,shadow->camera.world_to_clip,colour ? *colour : ReadColour(source)},identity,FrameStatFrameCount(),*view);
+  if (receiver.Read(identity,FrameStatFrameCount(),*view)) ++stats.published;
 }
 struct Adapter {
   uint32_t source, visual, stack;
+  NativeVisualIdentity identity;
   GuestTexture *image = nullptr;
   void Reset() { receiver.Reset(); }
   void Preflight() {
@@ -116,21 +122,21 @@ struct Adapter {
     bd::mem::store<uint32_t>(kLegacyLighting+408,ReadWord(kLegacyLighting+408)+1);
     bd::mem::store<float>(kLegacyLighting+204,colour[3]);
   }
-  void PublishNative(const LightingVector &colour) { Publish(source,visual,colour); }
+  void PublishNative(const LightingVector &colour) { Publish(source,visual,colour,identity); }
 };
 }
-bool PrepareNativePrimaryReceiver(uint32_t visual, uint32_t stack) {
-  if (!REXCVAR_GET(bd_native_shadow_receiver) || Word(uint64_t(visual) + 3000) != 0 ||
+bool PrepareNativePrimaryReceiver(NativeVisualIdentity identity, uint32_t stack) {
+  if (!REXCVAR_GET(bd_native_shadow_receiver) || !identity ||
       Word(kRenderViewIdVa) != 3) return false;
   const auto mode = Word(kMode);
   if (!mode || !ImportReceiverParticipation(0, *mode)) return false;
-  Adapter adapter{kPrimary, visual, stack};
+  Adapter adapter{kPrimary, 0, stack, identity};
   RunNativeReceiverSetup(true, adapter);
   ++stats.native; Report();
-  return receiver.Read(visual, FrameStatFrameCount(), 3).has_value();
+  return receiver.Read(identity, FrameStatFrameCount(), 3).has_value();
 }
-std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(uint32_t visual, uint32_t view) {
-  auto result = receiver.Read(visual,FrameStatFrameCount(),view);
+std::optional<NativePrimaryReceiver> FindNativePrimaryReceiver(NativeVisualIdentity identity, uint32_t view) {
+  auto result = receiver.Read(identity,FrameStatFrameCount(),view);
   ++(result ? stats.reads : stats.missing); Report();
   return result;
 }

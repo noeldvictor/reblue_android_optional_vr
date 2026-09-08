@@ -4418,3 +4418,25 @@ retention grows4,147 B, selected fixture/build/runtime-log scopes271,547 B. Tota
 logical removal this continuation515,642 B, no double credit. Free4,280,320 B above
 first reading is drive-wide activity, not all task cleanup. All producers terminal;
 full goal and image budget gates unchanged.
+
+### Native visual identity source checkpoint (2026-09-08)
+
+Commit/push request; no host build, game run, capture or profile override resumed.
+Original cumulative floor62,509,998,080 B and all raw/image limits unchanged.
+First measured free80,497,643,520 B; texture fixture76,845,900 B/132 files and
+build logs273,466 B/164 files match the prior ledger. Reused both existing CPU
+fixture targets, under32 MiB free-drop/300 s producer/30 s CTest and10 MiB log caps.
+Output52/PID23248, deferred4/PID14720 and CPU35/PID37752 all terminal0.32 CPU tests
+pass in7.06 s;361 artifact-free Python checks pass. Host132/run967 remain the
+prior binary/live evidence, not qualification for this source connection.
+
+Replacement fixture bytes77,315,936 B/132 files, growth470,036 B. New build logs
+4,011 B; after replacement passed, removed six exact superseded output51,
+deferred3 and CPU34 stdout/stderr files totaling4,011 logical B. These are
+reproducible success logs; no failure evidence, game data, raw/image payloads,
+active builds or distinct host/GPU evidence removed. Immediate free
+80,493,047,808->80,493,051,904 B (4,096 B physical gain). Build-log retention is
+unchanged; selected fixture/log growth470,036 B. Net drive-wide free change
+-4,591,616 B includes source/Git and unrelated activity, not just fixture growth.
+Ending free about74.96 GiB; no producers remain. Runtime callback/order and
+cold/reload/pixel qualification remain pending as recorded in the active queue.

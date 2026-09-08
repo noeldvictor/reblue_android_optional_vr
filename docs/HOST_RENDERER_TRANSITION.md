@@ -355,10 +355,22 @@ draws. No native pending work, fallback or refusal; old93/144 retires before the
 new207/388 scene. Existing receiver/light/caster/cutout and source/GPU gates pass.
 These are consumer/lifetime receipts, not pixel or timing qualification.
 
-Next: retire the bounded visual-authored sidecar at the native instance/effect
-producer and lifetime handoff, not by freezing late values or copying register
-state. Receiver descriptors, outgoing legacy state and legacy-opened scopes
-remain adapters. Reuse the now-qualified mixed-consumer gate. Qualify mixed-order
+Source checkpoint after host132: the native per-entry visual-address sidecar is
+removed. `NativeVisualPublication` owns bounded instance/generation-keyed blend
+and diffuse-class values, collected through the existing instance source index
+after scene preparation and before list drain. Receiver publication/read uses
+the same native keys; dynamic receiver colour, blend/alpha and lights stay late.
+Source retirement before this handoff refuses; retained values cannot alias a
+reused generation. Unknown legacy resource callbacks inside the batch refuse.
+Two rebuilt C++ fixtures,32 CPU tests and361 Python checks pass. No host rebuild
+or live run yet; host132/run967 remain the prior binary/evidence. This is an
+intermediate connection, not runtime-qualified sidecar retirement.
+
+Next: finish mixed legacy hook/callback ordering validation, compile the host
+connection and require fresh late-input publication receipts in both cold/reload
+epochs using the existing mixed-consumer gate. Do not freeze late values or
+weaken the unknown-writer refusal to pass. Receiver descriptors, source-input
+imports, outgoing legacy state and legacy-opened scopes remain adapters. Qualify mixed-order
 pixels once the image budget allows it, while continuing independent native
 ownership work. Do not repeat the callback census or build a second renderer.
 Full native frame, broader authored effects/scenes/reloads and both-eye acceptance
