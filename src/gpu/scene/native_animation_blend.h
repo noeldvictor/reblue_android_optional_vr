@@ -6,6 +6,8 @@
 #pragma once
 #include "gpu/scene/native_skeleton.h"
 #include <optional>
+#include <tuple>
+#include <type_traits>
 
 namespace bd::gpu::scene {
 inline constexpr float kNativeAnimationWeightEpsilon = 0x1p-23f;
@@ -33,7 +35,7 @@ inline bool BlendNativeChannels(const NativeJointChannels &previous, const Nativ
   auto result=previous;
   if (std::abs(weight) < kNativeAnimationWeightEpsilon) { out=result; return true; }
   auto blend = [&](const auto &from, bool active, const auto &to, bool supplied,
-                   const auto &base, bool available, auto &value, bool &enabled, bool rotation) {
+                   const auto &base, bool available, auto &value, bool &enabled) {
     if (weight == 1) { enabled=supplied; if (supplied) value=to; }
     else if (active || supplied) {
       if ((!active || !supplied) && !available) return false;
@@ -54,11 +56,48 @@ inline bool BlendNativeChannels(const NativeJointChannels &previous, const Nativ
     return true;
   };
   if (!blend(previous.translation,previous.translated,incoming.translation,incoming.translated,
-             rest.translation,rest.translated,result.translation,result.translated,false) ||
+             rest.translation,rest.translated,result.translation,result.translated) ||
       !blend(previous.rotation,previous.rotated,incoming.rotation,incoming.rotated,
-             rest.rotation,rest.rotated,result.rotation,result.rotated,true) ||
+             rest.rotation,rest.rotated,result.rotation,result.rotated) ||
       !blend(previous.scale,previous.scaled,incoming.scale,incoming.scaled,
-             rest.scale,rest.scaled,result.scale,result.scaled,false)) return false;
+             rest.scale,rest.scaled,result.scale,result.scaled)) return false;
+  out=result; return true;
+}
+
+// Whole-layer composition differs from clip application: a lone translation or
+// rotation is copied, but a lone scale fades to/from unit scale. Both absent
+// channels materialize canonical inactive defaults. No hierarchy/rest input.
+inline bool MixNativeChannels(const NativeJointChannels &left, const NativeJointChannels &right,
+    float weight, NativeJointChannels &out) {
+  if (!std::isfinite(weight)) return false;
+  NativeJointChannels result;
+  result.reset_parent=left.reset_parent || right.reset_parent;
+  auto mix=[&](const auto &a,bool active_a,const auto &b,bool active_b,auto &value,bool &active) {
+    active=active_a || active_b;
+    if (!active) return true;
+    if (!active_a || (active_b && weight == 1)) value=b;
+    else if (!active_b || std::abs(weight) < kNativeAnimationWeightEpsilon) value=a;
+    else if constexpr (std::tuple_size_v<std::remove_cvref_t<decltype(value)>> == 4)
+      value=BlendJointRotation(a,b,weight);
+    else for (size_t n=0; n<value.size(); ++n) {
+      const float target=b[n]*weight;
+      value[n]=float(std::fma(double(a[n]),double(1-weight),double(target)));
+    }
+    for (float component : value) if (!std::isfinite(component)) return false;
+    return true;
+  };
+  if (!mix(left.translation,left.translated,right.translation,right.translated,result.translation,result.translated) ||
+      !mix(left.rotation,left.rotated,right.rotation,right.rotated,result.rotation,result.rotated)) return false;
+  result.scaled=left.scaled || right.scaled;
+  if (left.scaled && right.scaled) {
+    if (!mix(left.scale,true,right.scale,true,result.scale,result.scaled)) return false;
+  } else if (result.scaled) {
+    for (size_t n=0; n<3; ++n) {
+      result.scale[n]=left.scaled ? float(std::fma(double(left.scale[n]),double(1-weight),double(weight))) :
+          float(std::fma(double(right.scale[n]),double(weight),double(1-weight)));
+      if (!std::isfinite(result.scale[n])) return false;
+    }
+  }
   out=result; return true;
 }
 

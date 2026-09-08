@@ -6148,3 +6148,126 @@ objects, source, Git and system activity. Runtime operator accounting now
 75MiB operator stop,10MiB build logs and cumulative floor; no budget reset.
 README/active queue updated once for the connected result. All producers are
 terminal, no queued run, and full renderer goal remains active/incomplete.
+
+### 2026-09-08 weighted/subtree animation connection after 9c41128
+
+Previous implementation made progress; owner-requested checkpoint9c41128 saved
+unfinished source. Push of13 pending commits was denied before execution; this
+automatic continuation supplies no new upload authorization. Full goal stays
+active. No observed game/compiler/ninja/cmake producer; starting free63750860800B,
+4,706,304B below prior post-commit receipt63755567104B (source/Git/system activity,
+no new build/run/capture). Existing same cumulative floor62509998080B and caps.
+
+Bundle: owned authored rest channels plus weighted keyed/cubic application and
+hierarchy subtree masks, connected through current model/clip/instance owners.
+Broader bdAnimationUpdate scope prepares the six physical selected slots before
+samplers; original clocks, buffer-layer mixing, collision/effects remain. Reuse
+the completed source audit of8228A3E8,8228A090,T/R/S helpers and824931B8;
+strict original output comparison remains the live acceptance criterion. No new
+guest hook sites, generated edits, shaders, assets or native owner framework.
+
+Plan material54/CPU52, shared-header consumer output83/CPU55, all-boundaries and
+host171 only after CPU passes. Existing bounded wrappers: fixture64MiB/free-drop,
+CPU8MiB, host192MiB;300s timeout,10MiB aggregate build logs. Estimate each fixture
+<16MiB peak and<16KiB logs; host<192MiB peak. Reuse existing outputs without
+copies; new raw/perf/cache/images0. After replacement PASS retire only prior
+material53/CPU51 and output82/CPU54 diagnostic text; preserve angular48/46,
+host169/run977, host170/run978 and all unresolved scenario/pixel failures.
+No runtime launch yet; any new probe needs explicit changed-code observation,
+remaining75MiB operator headroom and exact owner-profile restoration.
+
+Material54/PID32096 and output83/PID26556 terminal0; CPU52/PID37496 PASS
+0.11s/CTest0.13s, CPU55/PID37044 PASS0.51s/CTest0.53s;407 artifact-free checks
+PASS0.233s. Host171/PID27460/session78866 terminal0: codegen0writes, no guest
+objects/shaders, shared model/skeleton consumers and animation bridge rebuilt.
+Host end free63747538944B. After successful replacement, removed8 superseded
+material53/CPU51 and output82/CPU54 text logs3839B logical; measured free
+63747538944 ->63747547136B,8192B recovered. Regenerable text only; no game data,
+raws or unresolved failures removed. Host EXE SHA256
+8BC48CB126D0745E4FDDBE14C6A910745D75D4E133DE58298EBDECD02B1BF611.
+
+Next one changed-code weighted/subtree probe, not a cubic retry: require at least
+256 weighted sampled/comparison calls and one subtree call, all compared with
+the unchanged1e-4 active-channel tolerance and exact flags/inactive bytes.
+This tests whether actual slot weights and partial roots reach native application
+and whether quaternion/rest/mask parity holds; mismatch changes the specific
+contract to fix. Separate prior256-cubic gate stays open even if this probe
+succeeds. Existing operator gains explicit WeightedAnimationProbe switch;
+60s/400KiB log/192MiB free-drop, same75MiB aggregate stop and cumulative floor.
+Reserve full400KiB before launch; raw/perf/cache/images0, exact profile restored
+in finally. Owner profile hash verified unchanged. Retain979 as current weighted
+observation;977/978 remain failure evidence until their respective gates pass.
+
+Run979/PID35112/session2389 terminal18:16:43 exit1: requested256 weighted plus
+positive subtree observation NOT reached. Last frame2352 sampled/checked13822,
+wrong0,weighted113,subtree0,cubic380; whole402/preserved13420,unavailable1 model,
+prepare-refused2 unclassified. Thus weighted comparisons reached113 and cubic
+call-count threshold256 was observed, but no partial-subtree or scoped advancing
+interior-key/pixel qualification. Log260831B SHA256
+A8228C1CAB59B3605461FF36F9619837683CD6FB46B42E74B154727A11E86DB0;
+exact owner profile restored. Free63747280896B at18:17:03.
+
+Extend same bundle to whole-buffer layer composition, the remaining connected
+sampler consumer. Full sub_82284BE0 read(file39:9943..10491), both callers in
+bdAnimationUpdate read(file53:3196..3385). T/R lone channels copy, scale fades
+to/from unit, inactive defaults0/identity/1, flags union and left hash. Crucial
+in-place contract: output union flags publish before input flags reload; caller
+uses output==left for third/subsequent layers. Keep that ordering only in the
+outgoing adapter; native channel mixing is source-independent. Partial-overlap
+arrays refuse before execution. Same strict original compare, no epsilon or
+parity tolerance changes. CPU tests enumerate448 activation/weight combinations,
+in-place left/right/both, poisoned inactive bytes, rollback and actual hierarchy.
+
+Plan material55/CPU53 and host172 after tests, existing bounds/no guest/shaders.
+Shared skeleton header unchanged since171: output83/CPU55 stays valid. One
+further bounded live probe only for newly connected layer mixing (>=256 matching
+mixes) plus the unchanged>=256 cubic count criterion. Weighted/subtree gate from
+979 stays failed; no changed threshold. Same400KiB text/60s/192MiB limits and
+75MiB aggregate preflight; no new raw/perf/cache/images. After55/53 PASS retire
+only54/52 text; preserve host171/979 until its failed subtree gate is replaced.
+
+Material55/PID36384,CPU53/PID24040 PASS0.11s/CTest0.13s;408 artifact-free
+checks PASS0.226s. Host172/PID29060 terminal0 at18:23:11, only animation bridge
+and link, codegen0writes/no guest/shaders. Free63750340608B; independent drive
+activity gained space since979, not attributed to cleanup. Retired54/52's four
+superseded text logs2623B after replacement PASS: free63750340608->63750348800,
+8192B observed reclaim. This turn total12 files6462B logical/16384B observed
+cleanup, not recrediting prior turns. Runner parsed successfully after adding
+explicit MixAnimationProbe; run980 remains gated by full400KiB overlap preflight.
+
+Run980/PID22724/session76931 terminal18:24:54,exit1: requested>=256 matching
+mixes plus>=256 cubic calls NOT reached. Last frame2355:13858 sampled/checked,
+wrong0,23 mixed/checked,113 weighted,0 subtree,382 cubic,whole405/preserved13453.
+Only one unavailable model; two selected-clip preparation failures remain
+unclassified. Reported resident peak970672B, final11/682432B. Thus actual mixer
+and weighted comparisons pass for reached calls, but desired coverage does not;
+no full field/reload/advancing interior-key/pixel qualification. Preserve979/980
+and choose an authored layered/subtree scenario before another probe. Exact
+profile restored; no live producer/session or queued runtime remains.
+
+Current host172 EXE49228288B/PDB112939008B; material55 EXE1017344B,
+tree9765246B/43; shared output83 EXE1848832B, tree85872813B/134. Hashes and
+source contracts in20260908_1824_native-animation-layers.md. Scoped timestamp
+inventory since18:00 finds0 new capture/perf/cache/dump files. Images/raw budgets
+unchanged; no new image allowance. Both runtime logs remain260831/263220B.
+
+The old978 purpose (>=256 repeated cubic calls with matching output) is now
+observed at380/382 in979/980, despite their distinct weighted/subtree/mix gate
+failures. After validating978's preserved hash and host170's successful build,
+retired978 log and host170's two superseded build logs:3 files221428B logical,
+free63748227072->63748452352,225280B observed reclaim. This removes obsolete
+text evidence only; prior counts/hashes/reports remain. It does not claim
+advancing cubic motion or relabel either new probe as PASS. Preserve977's
+starvation diagnosis,979/980's insufficient scenario coverage and prior reload/
+pixel failures. No game data/assets/saves/profiles/raws deleted. All deleted
+files this turn are regenerable diagnostics,15 files227890B logical and241664B
+observed reclaim, excluding previously credited cleanup.
+
+Pre-commit end free63748452352B (59.37GiB), net-2408448B from63750860800B.
+Enumerated retained growth620124B: runtime+305151,build logs+2236,material tree
++203589,output tree+4700,host EXE/PDB+104448. Source/Git/other objects/system
+activity are outside that attributed subtotal. Build logs417849B/210; runtime
+operator accounting77952422B, same75MiB stop/100MiB diagnostics and cumulative
+floor62509998080B. README/active queue updated once for connected172 scope.
+Local source/test/docs commit is authorized; external push remains denied from
+the preceding user turn, with no new payload/destination approval supplied.

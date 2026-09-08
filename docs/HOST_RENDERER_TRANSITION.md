@@ -806,14 +806,35 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    resident peak942672B; two prepare failures remain unclassified. This proves
    reachable sustained channel sampling, NOT the repeated256-cubic observation,
    scoped field/reload/skin/motion pixels or both loader-retirement paths. Preserve
-   both977's starvation failure and978's insufficient cubic coverage.
-   Next own weighted/subtree/layer application through these same assets and
-   consumers, recover the two refused selected-clip contracts, then verify actual
-   advancing cubic motion with strict source-clock/interior-key comparisons. No
-   unchanged boot or type2-only pass can satisfy that gate. Types0/1, slot clocks,
-   late writers/special bones, persistent cooking, outgoing48-byte channels/
-   palettes and full desktop/both-eye gates remain. Preserve975's reload and
-   971/962's pixel failures; defaults unchanged, no Quest work.
+   977's starvation diagnosis and978's recorded insufficient cubic coverage;
+   the newer layer bundle below supersedes978's runtime log, not its report.
+   **Weighted/subtree/layer connection (host172, opt-in):** owned authored rest
+   values, weighted keyed/cubic application, hierarchy masks and native whole-layer
+   mixing now feed the same native skeleton/instance consumers. Broader
+   bdAnimationUpdate scope prepares all six physical slots before direct
+   whole-layer/subtree calls; original clocks/collision/effects remain intact.
+   Named/exclusion rules and nonzero Euler modes still refuse explicitly.
+   Layer composition preserves lone-channel semantics and in-place union-flags
+   ordering in the temporary outgoing adapter; native math stays source-free.
+   Material55/CPU53, shared output83/CPU55,408 guards and host172 pass, no guest
+   objects/shaders. CPU covers rest/base activation, quaternion weights, subtree
+   masks, source destruction,448 layer activation/weight cases and aliasing.
+   Run979:13822 matching samples,113 weighted,0 subtree,380 cubic; requested
+   >=256 weighted plus positive subtree gate FAILS. Run980:13858 sampled/checked,
+   wrong0,23 mixed/checked,113 weighted,0 subtree,382 cubic; requested>=256 mix
+   plus>=256 cubic gate FAILS. Earlier repeated-cubic call-count criterion is now
+   observed, not advancing/interior-key or diverse-motion qualification. Retain
+   new979/980 failures; neither ordinary matching calls nor startup totals prove
+   full field/reload/skin/pixels. Two selected imports remain unclassified.
+   Next recover those refused clip contracts and own named/excluded/dense routes,
+   then connect native channels through slot clocks/completed handoff to retire
+   outgoing scratch. Choose an actual authored layer/subtree transition before
+   another live probe, with advancing source-clock/interior-key observations;
+   no unchanged boot or reduced threshold. Types0/1, late writers/special bones,
+   persistent cooking, outgoing48-byte channels/palettes and full desktop/both-eye
+   gates remain. Preserve975's reload and971/962's pixel failures; defaults
+   unchanged, no Quest work.
+   [Weighted/layer contracts and scoped verification](../research/20260908_1824_native-animation-layers.md).
    [Selected residency, evidence and storage](../research/20260908_1745_selected-motion-residency.md).
    [Original runtime connection](../research/20260908_1653_loaded-animation-sampling.md).
    [Recovered clip/loader contracts and angular regressions](../research/20260908_1612_native-animation-clips.md).

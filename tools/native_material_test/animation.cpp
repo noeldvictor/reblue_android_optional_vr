@@ -383,8 +383,209 @@ void TestCompressedAnimations() {
   refuse([](auto &s){s.words.erase(0x8014);},"truncated cubic key refuses before source retirement");
   refuse([](auto &s){s.Word(0x7004,UINT32_MAX-6);},"cubic key address overflow refused");
 }
+void TestWeightedChannels() {
+  NativeJointChannels previous, incoming, rest, result;
+  rest.translated=rest.rotated=rest.scaled=true;
+  rest.translation={10,20,30}; rest.scale={2,3,4};
+  previous.reset_parent=true;
+  incoming.translated=incoming.rotated=incoming.scaled=true;
+  incoming.translation={2,4,6}; incoming.scale={4,5,6};
+  incoming.rotation={0,0,1,0};
+  Require(BlendNativeChannels(previous,incoming,rest,.25f,result) && result.reset_parent &&
+          result.translation == JointVector{8,16,24} && result.scale == JointVector{2.5f,3.5f,4.5f} &&
+          Near(result.rotation[2],std::sin(std::numbers::pi_v<float>/8)) &&
+          Near(result.rotation[3],std::cos(std::numbers::pi_v<float>/8)),
+          "inactive previous channels blend from authored rest, not identity/zero");
+  previous=result; incoming=NativeJointChannels{};
+  Require(BlendNativeChannels(previous,incoming,rest,.5f,result) && result.translated && result.rotated && result.scaled &&
+          result.translation == JointVector{9,18,27} && result.scale == JointVector{2.25f,3.25f,4.25f},
+          "missing incoming channels blend active previous values toward rest and remain enabled");
+  Require(BlendNativeChannels(previous,incoming,rest,1,result) && !result.translated && !result.rotated && !result.scaled &&
+          result.translation == previous.translation && result.rotation == previous.rotation,
+          "unit weight clears absent activation without rewriting inactive values");
+  const auto saved=result;
+  Require(BlendNativeChannels(previous,incoming,{},0,result) && result.translation == previous.translation &&
+          BlendNativeChannels(previous,incoming,{},-kNativeAnimationWeightEpsilon*.5f,result) &&
+          result.translation == previous.translation,"exact dispatcher epsilon is a no-op even without rest");
+  Require(!BlendNativeChannels(previous,incoming,{},kNativeAnimationWeightEpsilon,result),
+          "epsilon boundary is not silently treated as no-op");
+  result=saved;
+  Require(!BlendNativeChannels(previous,incoming,{},.5f,result) && result.translation == saved.translation &&
+          !BlendNativeChannels(previous,incoming,rest,std::numeric_limits<float>::infinity(),result),
+          "missing required rest/nonfinite weight refuse transactionally");
+  previous=NativeJointChannels{}; incoming=NativeJointChannels{};
+  Require(BlendNativeChannels(previous,incoming,{},.5f,result) && !result.translated,
+          "both channels absent need no rest value");
+  previous.rotated=incoming.rotated=true; previous.rotation={0,0,0,1}; incoming.rotation={0,0,0,-1};
+  Require(BlendNativeChannels(previous,incoming,{},.25f,result) && result.rotation == previous.rotation &&
+          BlendNativeChannels(previous,incoming,{},1,result) && result.rotation == incoming.rotation,
+          "shortest quaternion hemisphere except exact unit-weight authored sign");
+  previous.rotation={0,0,0,2}; incoming.rotation={0,0,0,2};
+  Require(BlendNativeChannels(previous,incoming,{},.5f,result) && result.rotation[3] == 2,
+          "near-parallel blend does not normalize authored accumulated values");
+  // Independent axis-angle reference over interpolation and extrapolation.
+  previous.rotation={0,0,0,1};
+  for (float angle : {.001f,.2f,1.4f,3.0f}) for (float weight : {-.25f,.1f,.5f,.9f,1.25f}) {
+    incoming.rotation={0,std::sin(angle*.5f),0,std::cos(angle*.5f)};
+    Require(BlendNativeChannels(previous,incoming,{},weight,result) &&
+            Near(result.rotation[1],std::sin(angle*weight*.5f)) &&
+            Near(result.rotation[3],std::cos(angle*weight*.5f)),
+            "weighted quaternion channels match independent axis-angle reference");
+  }
+}
+void TestWeightedLayerConsumption() {
+  ClipSource source;
+  auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);});
+  Require(asset.has_value(),"weighted source admission"); source.words.clear();
+  // Independent dense identity order; two roots and two sibling subtrees.
+  constexpr std::array poses{4u,2u,0u,5u,1u,3u};
+  constexpr std::array parents{kNativeSkeletonRoot,0u,1u,0u,3u,kNativeSkeletonRoot};
+  constexpr std::array names{0xBB776655u,0x11111111u,0xAA998877u,0x33333333u,0x44444444u,0xCC332211u};
+  std::vector<NativeSkeletonJoint> skeleton(6);
+  for (size_t n=0; n<6; ++n) {
+    auto &joint=skeleton[n]; joint.pose_index=poses[n]; joint.parent=parents[n];
+    joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+    joint.blend_rest.translation={10,20,30}; joint.blend_rest.scale={2,2,2};
+  }
+  Require(SelectNativeAnimationSubtree(skeleton,2,true) == std::vector<uint8_t>{0,1,1,0,0,0} &&
+          SelectNativeAnimationSubtree(skeleton,2,false) == std::vector<uint8_t>{0,1,1,1,1,0} &&
+          SelectNativeAnimationSubtree(skeleton,4,false) == std::vector<uint8_t>{1,1,1,1,1,1} &&
+          !SelectNativeAnimationSubtree(skeleton,99,true),"subtree and following-sibling masks use hierarchy, not dense identity order");
+  std::vector<animation_source::ChannelRecord> records(6);
+  for (auto &record : records) { record.fill(0x7FC01234); record[0]=64|8; }
+  const auto before=records;
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,2,true,records),
+          "owned weighted subtree applies after complete clip source destruction");
+  Require(records[2][0] == (64|8|128|7) && std::bit_cast<float>(records[2][2]) == 6 &&
+          std::bit_cast<float>(records[2][3]) == 10 && records[0][0] == (64|8|1) &&
+          std::bit_cast<float>(records[0][2]) == 5.5f && records[0][5] == before[0][5],
+          "weighted activation, missing channels, animated dirty bit and inactive payload preservation");
+  for (unsigned pose : {1,3,4,5}) Require(records[pose] == before[pose],"unselected records remain byte-identical, including names");
+  auto channels=skeleton_source::ReadChannels(0x8000,records.size(),[&](uint64_t address)->std::optional<uint32_t> {
+    if (address<0x8000 || address>=0x8000+records.size()*48 || (address&3)) return {};
+    const auto offset=address-0x8000; return records[offset/48][(offset%48)/4];
+  });
+  std::vector<RenderMatrix> pose;
+  Require(channels && EvaluateNativeSkeleton(skeleton,*channels,JointIdentity(),pose) && pose[2][12] == 6,
+          "weighted outgoing records drive the actual native skeleton evaluator");
+  NativeInstanceRegistry instances; const auto id=instances.Create(91);
+  Require(instances.Publish(id,0,pose) && instances.Transfer(id,0,1,6),"weighted native hierarchy reaches immutable instance consumer");
+  const auto completed=instances.Read(id,1);
+  const auto valid=records;
+  auto broken=skeleton; broken[2].blend_rest.translated=false;
+  records=before;
+  Require(!animation_source::ApplyKeyedLayer(*asset,names,broken,.25f,.5f,2,true,records) && records == before,
+          "late missing-rest failure rolls back earlier joint writes");
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,2,false,records) &&
+          records[5][1] == names[5] && records[5][0] == before[5][0] && records[5][2] == before[5][2] &&
+          records[1][1] == names[1] && records[1][0] == before[1][0] && records[3] == before[3],
+          "following siblings and descendants get names; unmatched/empty channels stay untouched; other roots do not");
+  auto unit=before, direct=before;
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,1,4,false,unit) &&
+          animation_source::ApplyKeyedAsset(*asset,names,.25f,true,direct) && unit == direct,
+          "unit full traversal preserves existing direct channel behavior exactly");
+  records=valid;
+  Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,0,2,true,records) && records == valid,
+          "zero weight leaves all outgoing bytes untouched");
+  asset.reset(); skeleton.clear(); instances.Retire(id);
+  Require(completed && completed->transforms[2][12] == 6,"completed weighted pose survives all animation/model owners");
+}
+void TestOwnedBlendRest() {
+  ClipSource source;
+  for (uint32_t offset=0; offset<80; offset+=4) source.Word(0x9000+offset,0);
+  const JointVector translation{10,20,30}, angles{0,0,std::numbers::pi_v<float>*.5f}, scale{2,3,4};
+  for (unsigned n=0; n<3; ++n) {
+    source.Word(0x9010+n*4,std::bit_cast<uint32_t>(translation[n]));
+    source.Word(0x901c+n*4,std::bit_cast<uint32_t>(angles[n]));
+    source.Word(0x902c+n*4,std::bit_cast<uint32_t>(scale[n]));
+  }
+  auto read=[&](uint64_t address){return source.Read(address);};
+  auto skeleton=skeleton_source::ReadSkeleton(0x9000,read);
+  Require(skeleton && (*skeleton)[0].translation == JointVector{} && (*skeleton)[0].scale == JointVector{1,1,1} &&
+          (*skeleton)[0].blend_rest.translation == translation && (*skeleton)[0].blend_rest.scale == scale &&
+          Near((*skeleton)[0].blend_rest.rotation[2],std::sqrt(.5f)),
+          "rest values are captured even when base transform flags disable all channels");
+  source.words.erase(0x9010);
+  auto partial=skeleton_source::ReadSkeleton(0x9000,read);
+  Require(partial && !(*partial)[0].blend_rest.translated && (*partial)[0].blend_rest.rotated,
+          "unavailable optional rest channel does not invalidate unrelated base geometry");
+  source.words.clear(); NativeJointChannels incoming,result; incoming.translated=true;
+  Require(BlendNativeChannels({},incoming,(*skeleton)[0].blend_rest,.5f,result) &&
+          result.translation == JointVector{5,10,15},"owned rest is independent of source lifetime and base activation");
+}
+void TestLayerMixing() {
+  // All channel-presence combinations have independent literal expectations:
+  // T/R copy a sole input while S blends a sole input with identity, not rest.
+  for (uint32_t flags_a=0; flags_a<8; ++flags_a) for (uint32_t flags_b=0; flags_b<8; ++flags_b)
+    for (float weight : {-1.0f,0.0f,kNativeAnimationWeightEpsilon*.5f,kNativeAnimationWeightEpsilon,.25f,1.0f,2.0f}) {
+      std::array<animation_source::ChannelRecord,1> a{},b{};
+      a[0][0]=flags_a|64; b[0][0]=flags_b|128; a[0][1]=91; b[0][1]=77;
+      for (unsigned word=2; word<12; ++word) { a[0][word]=0x7fc01234; b[0][word]=0x7fc05678; }
+      for (unsigned axis=0; axis<3; ++axis) {
+        if (flags_a&1) a[0][2+axis]=std::bit_cast<uint32_t>(4.0f+axis);
+        if (flags_b&1) b[0][2+axis]=std::bit_cast<uint32_t>(8.0f+axis);
+        if (flags_a&4) a[0][9+axis]=std::bit_cast<uint32_t>(2.0f+axis);
+        if (flags_b&4) b[0][9+axis]=std::bit_cast<uint32_t>(6.0f+axis);
+      }
+      for (unsigned axis=0; axis<4; ++axis) {
+        if (flags_a&2) a[0][5+axis]=std::bit_cast<uint32_t>(axis == 3 ? 1.0f : 0.0f);
+        if (flags_b&2) b[0][5+axis]=std::bit_cast<uint32_t>(axis == 3 ? 1.0f : 0.0f);
+      }
+      std::vector<animation_source::ChannelRecord> result;
+      Require(animation_source::MixChannelRecords(a,b,weight,false,false,result) &&
+              result[0][0] == (flags_a|flags_b|64|128) && result[0][1] == 91,
+              "mixed output unions all flags and retains the first layer identity");
+      auto blend=[&](float left,float right) { const float target=right*weight;
+        return float(std::fma(double(left),double(1-weight),double(target))); };
+      for (unsigned axis=0; axis<3; ++axis) {
+        float t=0,s=1;
+        if (flags_a&1) t=!(flags_b&1) || std::abs(weight)<kNativeAnimationWeightEpsilon ? 4.0f+axis :
+            weight == 1 ? 8.0f+axis : blend(4.0f+axis,8.0f+axis);
+        else if (flags_b&1) t=8.0f+axis;
+        if ((flags_a&4) && (flags_b&4)) s=std::abs(weight)<kNativeAnimationWeightEpsilon ? 2.0f+axis :
+            weight == 1 ? 6.0f+axis : blend(2.0f+axis,6.0f+axis);
+        else if (flags_a&4) s=float(std::fma(double(2.0f+axis),double(1-weight),double(weight)));
+        else if (flags_b&4) s=float(std::fma(double(6.0f+axis),double(weight),double(1-weight)));
+        Require(result[0][2+axis] == std::bit_cast<uint32_t>(t) && result[0][9+axis] == std::bit_cast<uint32_t>(s),
+                "layer T/S composition and inactive canonical defaults match independent source arithmetic");
+      }
+      for (unsigned axis=0; axis<4; ++axis)
+        Require(result[0][5+axis] == std::bit_cast<uint32_t>(axis == 3 ? 1.0f : 0.0f),
+                "both absent quaternion inputs produce inactive identity without reading poisoned bytes");
+    }
+  std::vector<animation_source::ChannelRecord> a(1),b(1),out;
+  b[0][0]=7; a[0][1]=91; a[0][8]=b[0][8]=std::bit_cast<uint32_t>(1.0f);
+  for (unsigned axis=0; axis<3; ++axis) {
+    a[0][2+axis]=a[0][9+axis]=std::bit_cast<uint32_t>(10.0f);
+    b[0][2+axis]=b[0][9+axis]=std::bit_cast<uint32_t>(2.0f);
+  }
+  Require(animation_source::MixChannelRecords(a,b,.5f,false,false,out) &&
+          std::bit_cast<float>(out[0][2]) == 2 && std::bit_cast<float>(out[0][9]) == 1.5f,
+          "distinct output uses actual activation, not stale inactive values");
+  Require(animation_source::MixChannelRecords(a,b,.5f,true,false,out) &&
+          std::bit_cast<float>(out[0][2]) == 6 && std::bit_cast<float>(out[0][9]) == 6,
+          "in-place left output preserves union-flags-before-input-read ABI");
+  Require(animation_source::MixChannelRecords(b,a,.5f,false,true,out) &&
+          std::bit_cast<float>(out[0][2]) == 6 && std::bit_cast<float>(out[0][9]) == 6,
+          "in-place right output preserves the same flag publication ordering");
+  Require(animation_source::MixChannelRecords(b,b,.5f,true,true,out) &&
+          std::bit_cast<float>(out[0][2]) == 2,"all three buffers may alias exactly");
+  const auto valid=out; b[0][2]=0x7fc01234;
+  Require(!animation_source::MixChannelRecords(a,b,.5f,false,false,out) && out == valid,
+          "nonfinite active layer refuses before any outgoing mutation");
+  std::array<NativeSkeletonJoint,1> skeleton;
+  auto channels=skeleton_source::ReadChannels(0x8000,1,[&](uint64_t address)->std::optional<uint32_t> {
+    if (address<0x8000 || address>=0x8030 || (address&3)) return {};
+    return valid[0][(address-0x8000)/4];
+  });
+  std::vector<RenderMatrix> pose;
+  Require(channels && EvaluateNativeSkeleton(skeleton,*channels,JointIdentity(),pose) && pose[0][12] == 2,
+          "mixed layer records connect to the production native hierarchy consumer");
+}
 } // namespace
 void TestAnimationClips() {
   TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
+  TestWeightedChannels(); TestWeightedLayerConsumption(); TestOwnedBlendRest();
+  TestLayerMixing();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

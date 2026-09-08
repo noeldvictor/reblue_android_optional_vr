@@ -130,18 +130,21 @@ integration acceptance. Animation curves, special bones, late writers, source
 palette adapters and motion/both-eye pixels remain; normal defaults stay unchanged.
 [Contract, scoped live evidence and remaining failures](research/20260908_1544_native-skeleton-evaluation.md).
 
-**Native animation (2026-09-08, host170; opt-in):** keyed and compressed cubic
-curves feed the existing native skeleton/instance consumers. Completed loaders
-register motion lifetime; selected slots prepare immutable curves before sampling.
-This fixes load-order starvation without raising the 8 MiB motion budget: dormant
-clips no longer fill it, and steady-state sampling does not decode source keys.
-CPU ownership/curve tests, 406 source/scenario checks and the desktop build pass.
-Run978 records **12,989 matching sampling calls, zero mismatches**, but only one
-cubic call. The repeated-cubic probe therefore remains **unqualified**, as do
-full field/reload and motion pixels. Dense families, weighted/subtree/layer
-application, slot clocks, dormant source-backed catalog, persistent cooking and
-outgoing channel/palette adapters remain. Defaults are unchanged; prior reload
-and pixel failures stay open.
+**Native animation (2026-09-08, host172; opt-in):** owned keyed/cubic curves,
+authored rest values, weighted sampling, subtree selection and whole-layer mixing
+connect to the existing native skeleton/instance consumers. Selected slots share
+the unchanged 8 MiB motion budget; steady-state samplers do not decode source keys.
+C++ ownership/blending tests, 408 source/scenario checks and the desktop build pass.
+Run980 records **13,858 matching samples and 23 matching layer mixes, zero
+mismatches**, including 113 weighted and 382 cubic samples. The repeated-cubic
+call-count criterion is reached, but the requested 256-mix gate fails; no subtree
+calls were observed. Advancing/interior-key motion, full field/reload and pixels
+remain unqualified. Two selected-clip imports still refuse for unclassified reasons.
+Named/excluded and dense families, slot clocks, dormant source-backed catalog,
+persistent cooking and outgoing channel/palette adapters remain. Defaults are
+unchanged; prior reload and pixel failures stay open. The next live scenario must
+exercise actual layer/subtree transitions, not repeat this boot unchanged.
+[Weighted/layer connection, scoped evidence and remaining gates](research/20260908_1824_native-animation-layers.md).
 [Selected-motion residency, runtime evidence and next work](research/20260908_1745_selected-motion-residency.md).
 [Clip math/source contract and regressions](research/20260908_1612_native-animation-clips.md).
 

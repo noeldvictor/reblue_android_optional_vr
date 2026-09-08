@@ -40,7 +40,7 @@ std::optional<uint16_t> Half(uint64_t address, ReadWord &&read) {
 // bdVisualObjectAnimSlotUpdate reads its initialized motion pointer at entry+12.
 template <class ReadWord>
 std::optional<uint32_t> SelectedSlotSource(uint32_t visual, uint32_t slot, ReadWord &&read) {
-  if (!visual) return {};
+  if (!visual || slot >= 6) return {};
   const auto entry = Word(uint64_t(visual)+1920+uint64_t(slot)*56,read);
   return entry && *entry ? Word(uint64_t(*entry)+12,read) : std::nullopt;
 }
@@ -266,6 +266,34 @@ inline bool ApplyKeyedLayer(const NativeAnimationAsset &asset, std::span<const u
     if (result.rotated) { record[0]|=2; put(result.rotation,5); }
     if (result.scaled) { record[0]|=4; put(result.scale,9); }
     if (track->Animated()) record[0]|=128;
+  }
+  records=std::move(output); return true;
+}
+
+inline bool MixChannelRecords(std::span<const ChannelRecord> left, std::span<const ChannelRecord> right,
+    float weight, bool destination_is_left, bool destination_is_right, std::vector<ChannelRecord> &records) {
+  if (left.empty() || left.size() > kMaxNativeJoints || left.size() != right.size() || !std::isfinite(weight)) return false;
+  std::vector<ChannelRecord> output(left.size());
+  for (size_t n=0; n<left.size(); ++n) {
+    auto &record=output[n]; record[0]=left[n][0]|right[n][0]; record[1]=left[n][1];
+    // The temporary in-place ABI publishes union flags before rereading inputs.
+    // Preserve that order here, not in the native channel API. Partial overlaps
+    // between different records are rejected by the runtime adapter.
+    auto decode=[&](const ChannelRecord &input,bool aliases_output) {
+      const uint32_t flags=aliases_output ? record[0] : input[0];
+      NativeJointChannels value;
+      value.translated=(flags&1)!=0; value.rotated=(flags&2)!=0;
+      value.scaled=(flags&4)!=0; value.reset_parent=(flags&64)!=0;
+      auto get=[&](auto &channel,unsigned word) { for (auto &component : channel) component=std::bit_cast<float>(input[word++]); };
+      if (value.translated) get(value.translation,2);
+      if (value.rotated) get(value.rotation,5);
+      if (value.scaled) get(value.scale,9);
+      return value;
+    };
+    NativeJointChannels mixed;
+    if (!MixNativeChannels(decode(left[n],destination_is_left),decode(right[n],destination_is_right),weight,mixed)) return false;
+    auto put=[&](const auto &channel,unsigned word) { for (float value : channel) record[word++]=std::bit_cast<uint32_t>(value); };
+    put(mixed.translation,2); put(mixed.rotation,5); put(mixed.scale,9);
   }
   records=std::move(output); return true;
 }

@@ -27,8 +27,10 @@ REX_EXTERN(__imp__sub_82288680);
 REX_EXTERN(__imp__sub_8217BD00);
 REX_EXTERN(__imp__sub_8217C580);
 REX_EXTERN(__imp__bdVisualObjectAnimSlotUpdate);
+REX_EXTERN(__imp__bdAnimationUpdate);
 REX_EXTERN(__imp__sub_82289888);
 REX_EXTERN(__imp__sub_8228A3E8);
+REX_EXTERN(__imp__sub_82284BE0);
 
 namespace bd::gpu::scene::animation_bridge {
 namespace {
@@ -39,7 +41,8 @@ struct Store {
   std::mutex mutex;
   NativeAnimationResidency assets;
   uint64_t loaded = 0, load_refused = 0, sampled = 0, whole = 0, preserved = 0, checks = 0, wrong = 0;
-  uint64_t cubic = 0, registered = 0, prepare_refused = 0;
+  uint64_t cubic = 0, registered = 0, prepare_refused = 0, weighted = 0, subtree = 0;
+  uint64_t mixed = 0, mix_checks = 0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -62,10 +65,10 @@ void Report(Store &store) {
   const auto frame = FrameStatFrameCount();
   if (frame-store.frame < 300) return;
   uint64_t unavailable = 0; for (auto count : store.missing) unavailable += count;
-  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; registered {} catalog {} prepare-refused {}; owned keys, original slot clocks/layers and outgoing channel adapter remain",
+  BD_INFO("[native-animation] frame {} loads {} refused {} resident {} bytes {}; sampled {} whole {} preserved {} unavailable {}; checked {} wrong {}; cubic {}; registered {} catalog {} prepare-refused {}; weighted {} subtree {}; mixed {} mix-checked {}; owned keys/layers, original slot clocks and outgoing channel adapter remain",
       frame,store.loaded,store.load_refused,store.assets.ResidentCount(),store.assets.Bytes(),
       store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic,
-      store.registered,store.assets.Size(),store.prepare_refused);
+      store.registered,store.assets.Size(),store.prepare_refused,store.weighted,store.subtree,store.mixed,store.mix_checks);
   store.frame = frame;
 }
 bool Unavailable(Missing reason) {
@@ -97,33 +100,61 @@ void Import(uint32_t source) {
   }
 }
 thread_local uint32_t slot_graph = 0;
+void PrepareSlot(uint32_t visual, uint32_t slot) {
+  const auto source = animation_source::SelectedSlotSource(visual,slot,Word);
+  if (!source || !*source) return;
+  auto &store = Clips(); std::lock_guard lock(store.mutex);
+  store.assets.Prepare(*source,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
+    auto asset = animation_source::ReadKeyedAsset(address,budget,Word);
+    ++(asset ? store.loaded : store.prepare_refused);
+    return asset;
+  });
+}
+struct VisualScope {
+  uint32_t previous;
+  explicit VisualScope(uint32_t visual) : previous(slot_graph) {
+    slot_graph = Enabled() ? Word(uint64_t(visual)+2620).value_or(0) : 0;
+    if (!slot_graph || !FindLoadedNativeModel(slot_graph)) { slot_graph=0; return; }
+    // Six physical slots include the separately selected subtree overlays, not
+    // just the active whole-body count at +2208. Prepare before any sampler call.
+    for (uint32_t slot=0; slot<6; ++slot) PrepareSlot(visual,slot);
+  }
+  ~VisualScope() { slot_graph = previous; }
+};
 struct SlotScope {
   uint32_t previous;
   explicit SlotScope(uint32_t visual, uint32_t slot) : previous(slot_graph) {
     slot_graph = Enabled() ? Word(uint64_t(visual)+2620).value_or(0) : 0;
-    if (!slot_graph || !FindLoadedNativeModel(slot_graph)) return;
-    const auto source = animation_source::SelectedSlotSource(visual,slot,Word);
-    if (!source || !*source) return;
-    auto &store = Clips(); std::lock_guard lock(store.mutex);
-    store.assets.Prepare(*source,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
-      auto asset = animation_source::ReadKeyedAsset(address,budget,Word);
-      ++(asset ? store.loaded : store.prepare_refused);
-      return asset;
-    });
+    if (!slot_graph || !FindLoadedNativeModel(slot_graph)) { slot_graph=0; return; }
+    PrepareSlot(visual,slot);
   }
-  ~SlotScope() { slot_graph = previous; }
+  ~SlotScope() { slot_graph=previous; }
 };
 bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   if (!Enabled()) return false;
-  if (preserve && (ctx.f2.f64 != 1.0 || ctx.r8.u32)) return Unavailable(Missing::Weight);
+  const float weight=preserve ? float(ctx.f2.f64) : 1.0f;
+  if (!std::isfinite(weight)) return Unavailable(Missing::Weight);
+  // The original dispatcher returns before touching nodes, channels or globals.
+  if (preserve && std::abs(ctx.f2.f64) < kNativeAnimationWeightEpsilon) return true;
   const uint32_t graph = preserve ? slot_graph : ctx.r4.u32;
   const auto model = FindLoadedNativeModel(graph);
   if (!model || model->AnimationTargets().empty() || model->AnimationTargets().size() != model->Skeleton().size())
     return Unavailable(Missing::Model);
-  if (preserve && Word(uint64_t(graph)+16) != ctx.r4.u32) return Unavailable(Missing::Subtree);
+  uint32_t root_pose=model->Skeleton().front().pose_index;
+  const bool single_subtree=preserve && ctx.r8.u32 != 0;
+  bool partial_subtree=false;
+  if (preserve) {
+    const auto index=Word(ctx.r4.u32), hash=Word(uint64_t(ctx.r4.u32)+4);
+    if (!index || *index >= model->AnimationTargets().size() || !hash ||
+        model->AnimationTargets()[*index] != *hash) return Unavailable(Missing::Subtree);
+    root_pose=*index;
+    partial_subtree=single_subtree || Word(uint64_t(graph)+16) != ctx.r4.u32;
+  }
   const auto exclusion = Word(kSamplerState+4), name = Word(kSamplerState+8), depth = Word(kSamplerState+24);
   // Named/excluded subtrees have authored traversal side effects not owned yet.
-  if (!exclusion || *exclusion || !name || (*name >> 24) || !depth || *depth)
+  const auto euler_mode=Word(0x827A7EE4); // byte +2: source qZ*qY*qX mode is zero
+  if (!exclusion || *exclusion || !name || (*name >> 24) || !depth || *depth ||
+      !euler_mode || ((*euler_mode >> 8) & 255))
     return Unavailable(Missing::Restrictions);
   std::shared_ptr<const NativeAnimationAsset> asset;
   { auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(ctx.r5.u32); }
@@ -141,12 +172,19 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
     const auto *input = bd::mem::at<const be_u32>(destination);
     for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) records[n][word] = input[n*12+word];
   }
-  if (!animation_source::ApplyKeyedAsset(*asset,model->AnimationTargets(),seconds,preserve,records))
+  const bool applied=preserve ? animation_source::ApplyKeyedLayer(*asset,model->AnimationTargets(),
+      model->Skeleton(),seconds,weight,root_pose,single_subtree,records) :
+      animation_source::ApplyKeyedAsset(*asset,model->AnimationTargets(),seconds,false,records);
+  if (!applied)
     return Unavailable(Missing::Sampling);
-  const bool used_cubic = std::ranges::any_of(model->AnimationTargets(),[&](uint32_t name) {
-    const auto *track = asset->FindTrack(name);
-    return track && track->splines && (track->splines->translation.active || track->splines->rotation.active || track->splines->scale.active);
-  });
+  const auto selected=SelectNativeAnimationSubtree(model->Skeleton(),root_pose,single_subtree);
+  bool used_cubic=false;
+  for (size_t n=0; n<model->Skeleton().size(); ++n) {
+    if (preserve && (!selected || !(*selected)[n])) continue;
+    const auto *track=asset->FindTrack(model->AnimationTargets()[model->Skeleton()[n].pose_index]);
+    used_cubic |= track && track->splines && (track->splines->translation.active ||
+        track->splines->rotation.active || track->splines->scale.active);
+  }
   if (REXCVAR_GET(bd_native_materials_verify)) {
     if (preserve) __imp__sub_8228A3E8(ctx,base); else __imp__sub_82289888(ctx,base);
     const auto *original = bd::mem::at<const be_u32>(destination);
@@ -164,8 +202,8 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
     auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.checks;
     if (!same) {
       ++store.wrong;
-      BD_ERROR("[native-animation-drift] model {} preserve {} seconds {} joint {} word {} native {:08X} original {:08X}; no replacement/fallback",
-          model->Generation(),preserve,seconds,first_joint,first_word,records[first_joint][first_word],
+      BD_ERROR("[native-animation-drift] model {} preserve {} seconds {} weight {} root {} single {} joint {} word {} native {:08X} original {:08X}; no replacement/fallback",
+          model->Generation(),preserve,seconds,weight,root_pose,single_subtree,first_joint,first_word,records[first_joint][first_word],
           uint32_t(original[first_joint*12+first_word]));
       throw std::runtime_error("Native animation channel comparison failed");
     }
@@ -175,7 +213,54 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   bd::mem::store<uint32_t>(kSamplerState,0);
   if (preserve) bd::mem::store<uint32_t>(kSamplerState+4,0);
   auto &store=Clips(); std::lock_guard lock(store.mutex);
-  ++store.sampled; ++(preserve ? store.preserved : store.whole); store.cubic += used_cubic; Report(store);
+  ++store.sampled; ++(preserve ? store.preserved : store.whole); store.cubic += used_cubic;
+  store.weighted += preserve && weight != 1; store.subtree += partial_subtree; Report(store);
+  return true;
+}
+bool Mix(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled()) return false;
+  if (ctx.r4.s32 <= 0) return true;
+  const auto model=FindLoadedNativeModel(slot_graph);
+  const uint32_t count=ctx.r4.u32, destination=ctx.r3.u32, left=ctx.r5.u32, right=ctx.r6.u32;
+  if (!model || count != model->Skeleton().size()) return Unavailable(Missing::Model);
+  const uint64_t bytes=uint64_t(count)*48;
+  auto valid=[&](uint32_t input) {
+    return !(input&3) && Range(input,bytes) && (input == destination ||
+        uint64_t(input)+bytes <= destination || uint64_t(destination)+bytes <= input);
+  };
+  if ((destination&3) || !Range(destination,bytes) || !valid(left) || !valid(right)) return Unavailable(Missing::Output);
+  auto read=[&](uint32_t address) {
+    std::vector<animation_source::ChannelRecord> records(count);
+    const auto *input=bd::mem::at<const be_u32>(address);
+    for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) records[n][word]=input[n*12+word];
+    return records;
+  };
+  const auto a=read(left), b=read(right);
+  std::vector<animation_source::ChannelRecord> records;
+  const float weight=float(ctx.f1.f64);
+  if (!animation_source::MixChannelRecords(a,b,weight,destination == left,destination == right,records))
+    return Unavailable(Missing::Sampling);
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    __imp__sub_82284BE0(ctx,base);
+    const auto expected=read(destination);
+    for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) {
+      const bool active=(word>=2 && word<5 && (records[n][0]&1)) ||
+          (word>=5 && word<9 && (records[n][0]&2)) || (word>=9 && (records[n][0]&4));
+      const float native=std::bit_cast<float>(records[n][word]), original=std::bit_cast<float>(expected[n][word]);
+      const bool equal=active ? std::isfinite(native) && std::isfinite(original) &&
+          std::abs(native-original) <= 1e-4f*std::max(1.0f,std::abs(original)) : records[n][word] == expected[n][word];
+      if (!equal) {
+        auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.wrong;
+        BD_ERROR("[native-animation-mix-drift] model {} weight {} aliases {}/{} joint {} word {} native {:08X} original {:08X}; no replacement/fallback",
+            model->Generation(),weight,destination == left,destination == right,n,word,records[n][word],expected[n][word]);
+        throw std::runtime_error("Native animation layer comparison failed");
+      }
+    }
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.mix_checks;
+  }
+  auto *output=bd::mem::at<be_u32>(destination);
+  for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) output[n*12+word]=records[n][word];
+  auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.mixed; Report(store);
   return true;
 }
 } // namespace
@@ -212,9 +297,17 @@ REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
   bd::gpu::scene::animation_bridge::SlotScope slot(ctx.r3.u32,ctx.r4.u32);
   __imp__bdVisualObjectAnimSlotUpdate(ctx,base);
 }
+REX_HOOK_RAW(bdAnimationUpdate) {
+  bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
+  // Preserve authored slot clocks, layer ordering, collision and effect updates.
+  __imp__bdAnimationUpdate(ctx,base);
+}
 REX_HOOK_RAW(sub_82289888) {
   if (!bd::gpu::scene::animation_bridge::Sample(ctx,base,false)) __imp__sub_82289888(ctx,base);
 }
 REX_HOOK_RAW(sub_8228A3E8) {
   if (!bd::gpu::scene::animation_bridge::Sample(ctx,base,true)) __imp__sub_8228A3E8(ctx,base);
+}
+REX_HOOK_RAW(sub_82284BE0) {
+  if (!bd::gpu::scene::animation_bridge::Mix(ctx,base)) __imp__sub_82284BE0(ctx,base);
 }

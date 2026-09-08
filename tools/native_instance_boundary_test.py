@@ -38,13 +38,32 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         registration = self.animation_bridge.split("void Import(", 1)[1].split("thread_local uint32_t slot_graph", 1)[0]
         self.assertIn("store.assets.Register(loading_owner,source)", registration)
         self.assertNotIn("ReadKeyedAsset", registration)
-        slot = self.animation_bridge.split("struct SlotScope", 1)[1].split("bool Sample(", 1)[0]
+        slot = self.animation_bridge.split("void PrepareSlot(", 1)[1].split("bool Sample(", 1)[0]
         self.assertIn("SelectedSlotSource(visual,slot,Word)", slot)
         self.assertIn("store.assets.Prepare", slot)
         self.assertIn("ReadKeyedAsset(address,budget,Word)", slot)
         self.assertIn("budget <= entry.failed_budget", self.animation_asset)
         self.assertIn("candidate.resident.use_count() == 1", self.animation_asset)
         self.assertIn("TestSelectedAnimationResidency()", self.animation_test)
+
+    def test_weighted_subtrees_share_visual_scope_and_preserve_controller_side_effects(self):
+        hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("VisualScope"), hook.index("__imp__bdAnimationUpdate(ctx,base)"))
+        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("} // namespace", 1)[0]
+        self.assertIn("ApplyKeyedLayer(*asset,model->AnimationTargets()", sampler)
+        self.assertIn("model->AnimationTargets()[*index] != *hash", sampler)
+        self.assertIn("kNativeAnimationWeightEpsilon) return true", sampler)
+        self.assertIn("!euler_mode", sampler)
+        self.assertIn("TestWeightedLayerConsumption()", self.animation_test)
+        self.assertIn("TestOwnedBlendRest()", self.animation_test)
+
+    def test_layer_mix_checks_complete_output_before_replacing_original_records(self):
+        mix = self.animation_bridge.split("bool Mix(", 1)[1].split("} // namespace", 1)[0]
+        self.assertIn("MixChannelRecords(a,b,weight,destination == left,destination == right,records)", mix)
+        self.assertIn("count != model->Skeleton().size()", mix)
+        self.assertLess(mix.index("throw std::runtime_error"), mix.index("auto *output="))
+        self.assertIn("REX_HOOK_RAW(sub_82284BE0)", self.animation_bridge)
+        self.assertIn("TestLayerMixing()", self.animation_test)
 
     def test_animation_assets_retire_with_both_loader_types_and_pinned_bytes_remain_charged(self):
         for name in ("sub_8217BD00", "sub_8217C580"):
