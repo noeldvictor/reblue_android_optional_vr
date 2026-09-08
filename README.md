@@ -165,13 +165,17 @@ visibility, tree-gap investigation and stereo culling remain open.** No timing
 gain or complete host-owned frame is claimed; no safety checks were relaxed.
 [Indexed bounds, strict reload proof and remaining visibility gates](research/20260907_2107_native-indexed-bounds.md).
 
-**Source-only prototype checkpoint:** current-depth maximum-pyramid compute
-shaders and a GPU-generated indexed-command fixture are now checked in. The
-existing 330 Python source/scenario checks pass, but this prototype has not been
-compiled or GPU-tested. Runtime queue/fence integration, aggregate in-flight
-resource limits and moving-camera/changing-occluder pixel proof remain pending;
-the game still uses the existing exact-camera query-history path. This checkpoint
-does not replace the tested binary or qualify a new rendering result.
+**Current-depth GPU foundation now verified:** maximum-depth pyramid shaders and
+GPU-generated indexed commands pass72 Vulkan cases, including perspective views,
+1x/2x/4x/8x MSAA, changing occluders/cameras in one recording, source retirement
+and malformed-result rejection. Generated commands execute before any CPU
+readback; fence-delayed receipts distinguish culled, drawn and merely generated
+instances. Shared work-buffer limits and ordered scratch reuse are implemented.
+334 Python checks,46 existing rigid-shader cases and8 query regressions also pass;
+GPU validation reports zero errors/warnings. **Game queue/lifecycle integration
+is still pending**: the game still uses exact-camera query history. This is not
+a host-only frame, game-pixel qualification or measured speedup.
+[Current-depth implementation, GPU evidence and next integration](research/20260907_2209_native-depth-visibility.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

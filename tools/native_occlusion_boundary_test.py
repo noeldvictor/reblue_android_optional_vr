@@ -70,6 +70,42 @@ class NativeOcclusionBoundaryTest(unittest.TestCase):
         self.assertIn("native_occlusion_pixels", cmake)
         self.assertIn("native_occlusion_tests::Run()", (ROOT / "tools/native_texture_test/post_output.cpp").read_text())
 
+    def test_current_depth_has_no_temporal_or_translated_inputs(self):
+        source = (ROOT / "src/gpu/native_depth_visibility.cpp").read_text()
+        for forbidden in ("GuestTexture", "UploadHostConstants", "OcclusionCullRequest", "queryResults", "waitForCommandFence"):
+            self.assertNotIn(forbidden, source)
+        shader = (ROOT / "src/gpu/shaders/hlsl/native_visibility_depth.h").read_text()
+        self.assertIn("Texture2DMSArray<float>", shader)
+        self.assertIn("sample_index<input.samples", shader)
+        self.assertIn("farthest = max", shader)
+        self.assertNotIn("RenderResolveMode::MIN", source)
+
+    def test_current_depth_budget_precedes_allocations_and_releases_last(self):
+        source = (ROOT / "src/gpu/native_depth_visibility.cpp").read_text()
+        self.assertLess(source.index("budget->Acquire(buffer_bytes)"), source.index("device.createBuffer("))
+        self.assertIn("plan->bytes+2*capacity*NativeDepthPyramid::kCommandStride", source)
+        header = (ROOT / "src/gpu/native_depth_visibility.h").read_text()
+        self.assertLess(header.index("} reservation_;"), header.index("pyramid_, indirect_, readback_"))
+        self.assertIn("bytes > byte_limit_-bytes_", header)
+        self.assertIn("owners_ >= owner_limit_", header)
+
+    def test_receipts_require_real_draw_and_validate_gpu_fields(self):
+        source = (ROOT / "src/gpu/native_depth_visibility.cpp").read_text()
+        draw = source.split("bool NativeDepthVisibilityWork::DrawCommand", 1)[1].split("bool NativeDepthVisibilityWork::Seal", 1)[0]
+        self.assertLess(draw.index("cmd.drawIndexedIndirect"), draw.index("draw_recorded = true"))
+        collect = source.split("NativeDepthVisibilityWork::CollectAfterFence()", 1)[1]
+        self.assertIn("!sealed_ || collected_", collect)
+        self.assertLess(collect.index("vmaInvalidateAllocation"), collect.index("readback_->map()"))
+        self.assertIn("std::memcmp(&actual,&expected_[n],sizeof(actual))", collect)
+        self.assertLess(collect.index("if (!valid) return {}"), collect.index("collected_ = true"))
+
+    def test_current_depth_fixture_exercises_ordered_reuse_and_faults(self):
+        fixture = (ROOT / "tools/native_scene_snapshot_test/visibility.cpp").read_text()
+        for required in ("RefreshDepth(*cmd,moved)", "original_pyramid", "scene.reset(); depth.reset();",
+                         "weak_depth.expired()", "Receipt fault buffer", "perspective", "EmittedInstances()"):
+            self.assertIn(required, fixture)
+        self.assertIn("native_depth_visibility_pixels", (ROOT / "tools/native_scene_snapshot_test/CMakeLists.txt").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

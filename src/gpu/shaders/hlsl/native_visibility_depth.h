@@ -20,9 +20,9 @@ void main(uint3 id : SV_DispatchThreadID) {
         float z = pyramid[input.offset+pixel.y*input.width+pixel.x];
         farthest = max(farthest,isfinite(z) && z >= 0 && z <= 1 ? z : 1);
 #else
-        for (uint sample=0;sample<input.samples;++sample) {
+        for (uint sample_index=0;sample_index<input.samples;++sample_index) {
 #if defined(NATIVE_MSAA)
-            float z = depth.Load(int3(pixel,0),sample);
+            float z = depth.Load(int3(pixel,0),sample_index);
 #else
             float z = depth.Load(int4(pixel,0,0));
 #endif

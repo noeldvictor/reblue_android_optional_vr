@@ -3801,3 +3801,82 @@ other host objects/CMake/source/Git are not allocated. Image archive unchanged
 10,313,144 B/9 files,172,616 B headroom. Ending free80,978,022,400 B is16,195,584 B
 below the continuation's first drive reading, not wholly attributed to counted
 files. All producers terminal; original3 GiB allowance/floor unchanged.
+
+### Current-depth visibility fixture continuation (2026-09-07 22:09)
+
+Previous turn made progress: source prototype2637bba is pushed with uncompiled
+GPU/runtime gates explicit;330 Python checks pass. First measured free this
+continuation80,956,170,240 B. No renderer/compiler/fixture process found live.
+Existing GPU fixture tree12,878,617 B/13 files and aggregate attachment logs
+227,957 B/150 files are reused; no new build tree. The earlier unbuilt prototype
+work first measured80,975,896,576 B, not a new allowance or attributed producer.
+
+Next GPU43 and visibility1 use the existing bounded wrapper,300 s producer /
+30 s CTest /5 s fence limits,32 MiB maximum free-drop/temporary overlap and10 MiB
+aggregate attachment logs. Expected added fixture/shader objects under8 MiB,
+text under64 KiB; no game boot, raw/image export, perf trace, recook or download.
+The original3 GiB allowance and62,509,998,080 B floor remain. Preserve GPU42 and
+occlusion5 until replacement tests pass, then retire only superseded build logs.
+945 accepted pixels,956 tree gap,960 timeout,961 reload and959 batching evidence
+remain protected. Current raw/image archives are unchanged by this fixture:
+252,177,116,500 B raw and10,313,144 B images; no incoming raw allowance.
+
+GPU43/PID35916 terminates0; four compute shaders and mask PS compile, native
+fixture links with no guest build. Visibility1/PID32484 terminates0:40 cases
+in1.43/1.45 s, RTX3060, validation0/0, one unrelated missing GOG overlay manifest
+loader message. Free80,955,744,256 B. No raw/image files produced.
+
+Queue audit identifies a causal integration prerequisite: existing emission
+counters increment at CPU recording, so GPU-zeroed commands require separate
+post-fence classification; generated commands alone cannot count as output.
+GPU44/visibility2 reserve the same32 MiB guard (not a reset), under64 KiB new text
+and unchanged cumulative limits. They add ordered same-image depth/camera
+refreshes, shared byte/owner budgeting, actual-draw receipts and post-fence
+readback before runtime queue/lifecycle integration. No game boot planned.
+
+GPU44/PID37592 fails on a missing standard span include, corrected before
+GPU45/PID35828 terminates0. Visibility2/PID34056 passes44 cases in1.20/1.21 s,
+validation0/0. It verifies four same-image camera/depth changes per sample
+count, no intermediate fence wait, exact-once real-draw receipts, shared buffer
+budget refusal and source pinning through the actual fence. Last free
+80,936,206,336 B. The intervening drive-wide drop is not attributed wholesale:
+scoped fixture size14,022,121 B/15 files after43 (+1,143,504 B), plus10,828 B
+attachment logs; root writes are Ninja metadata. No owned producer remains.
+
+GPU46/visibility3 add perspective projection and deliberate malformed command
+receipt rejection;334 Python guards/scenario checks pass. Same32 MiB producer
+guard, under64 KiB text across attempts, original cumulative budget/floor and
+protected archives. Run the existing rigid/query regressions on the same binary
+afterward because the indexed-command ABI was extracted. No host/game rebuild.
+
+GPU46/PID37480 terminates0; visibility3/PID5612 passes72 cases in1.27/1.28 s.
+Rigid15/PID30452 passes46 cases in1.28/1.29 s; occlusion6/PID28096 passes8 cases
+in1.04/1.05 s. All validation0/0, one known missing overlay loader message,
+no exported raw/image bytes. GPU47/PID32088 then compile-checks noncopyable /
+nonmovable budget reservations with no shader/behavior change; terminal0.
+GPU46 remains the pixel-tested fixture;47 is compile-only.334 Python checks
+pass. Actual executable/log hashes and the unconnected runtime accounting work
+are recorded in2209 native-depth-visibility evidence. Host121 is not restamped.
+
+Retired18 superseded stdout/stderr files,48,815 logical B: GPU42/43/44/45/46,
+visibility1/2, rigid14 and occlusion5. Each replacement is inspected and passes;
+44's resolved missing-span failure is preserved here, not an unresolved GPU/game
+failure. Logs are reproducible from source/commands; no source, active build tree,
+profile, game data,945 accepted/956 failure pixels or protected runtime evidence
+was removed. The final257 B deletion produced no measured immediate free-space
+gain; no isolated physical-reclaim credit is claimed for the text cleanup.
+
+Final GPU fixture14,550,168 B/15 files (+1,671,551), five generated new visibility
+shader headers149,285 B and aggregate attachment logs241,730 B/152 files
+(+13,773 after cleanup). Counted retained net+1,834,609 B (~1.75 MiB), for
+expanded executable/PDB/object coverage and the final distinct GPU proof. All
+attempts produced62,588 B of attachment text before cleanup, below64 KiB and
+the unchanged10 MiB aggregate cap. Other source/Git/CMake/Ninja bytes are not
+allocated in that subtotal; retained diagnostics remain under the original cap.
+
+Ending pre-commit free80,920,801,280 B is35,368,960 B below the continuation's
+first reading; this is drive-wide change, not solely the counted retained bytes.
+Scoped root writes are Ninja metadata and the fixture; NVIDIA DXCache has no
+files modified since22:09. No renderer/compiler/fixture process remains live.
+Raw/image archives are unchanged, no asset/profile/perf/dump output was produced,
+and no prior cleanup is double-credited. Original3 GiB allowance and floor remain.

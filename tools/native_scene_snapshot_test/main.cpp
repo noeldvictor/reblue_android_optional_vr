@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
       const auto &caps = device->getCapabilities();
       Require(caps.attachmentResolve && caps.multiview &&
           (caps.depthAttachmentResolveModes & (1u << uint32_t(RenderResolveMode::MIN))), "Required native features missing");
-      std::cout << "GPU=" << native->physicalDeviceProperties.deviceName << "; images=8x8; raw bytes=0\n";
+      std::cout << "GPU=" << native->physicalDeviceProperties.deviceName << "; image dimensions are case-specific; raw bytes=0\n";
       if (rigid) CheckNativeRigid(*device);
       else if (occlusion) CheckNativeOcclusion(*device);
       else if (visibility) CheckNativeDepthVisibility(*device);

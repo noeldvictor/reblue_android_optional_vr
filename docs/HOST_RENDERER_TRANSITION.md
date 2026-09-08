@@ -211,17 +211,34 @@ The separate observation tool is ready for a changed implementation; it is not
 a reason to repeat diagnostic-only boots. Controlled hidden/visible game pixels,
 the tree-gap investigation, stereo and the full desktop gate remain required.
 
-Source-only checkpoint for this bundle: `native_depth_visibility.*` and the
-`native_visibility_*` shaders draft a current-depth maximum pyramid and native
-indexed indirect commands. The existing `native_scene_snapshot_test --visibility`
-fixture contains intended command/pyramid/pixel checks, but has not been compiled
-or run. The 330 existing Python source/scenario checks pass; they do not validate
-the new shaders or GPU behavior. Next review shader compilation, readback offset
-alignment and MSAA pixel coverage, then run the bounded GPU fixture. Runtime
-queue ordering, fence-retained work owners, aggregate in-flight limits and
-GPU-visible emission accounting are unconnected. Keep exact-camera query-history
-safety unchanged until its replacement is connected and verified. No host binary
-was rebuilt for this source checkpoint.
+The GPU side of this bundle is now built and verified: `native_depth_visibility.*`
+and `native_visibility_*` build a current-depth maximum pyramid and native indexed
+commands. GPU46/visibility3 pass72 Vulkan cases, including perspective, odd sizes,
+all1/2/4/8 MSAA samples, ordered same-image camera/depth changes and actual indirect
+pixels. Shared byte/owner budgets include readback; scratch refresh allocates no
+new buffers. `DrawCommand` records exactly once; `Seal`/`CollectAfterFence` validate
+the real command fields and distinguish generated/culled/drawn instances. GPU47
+adds a compile-verified noncopyable reservation (no shader/behavior change).
+334 Python checks,46 rigid cases and8 query regressions pass; Vulkan validation0/0.
+
+Next connected runtime work: retain the native depth owner and per-primitive
+world bounds with `NativeRigidBatchItem`; preserve authored ordering and exact
+batch camera/depth compatibility in `draw_queue.cpp`. Reuse shared-budget work
+across a recording, explicitly refresh after intervening non-monotonic depth
+writes, and reset emitter binding state after compute. Route actual native draws
+through `DrawCommand`, seal before submission, collect only after the real frame
+fence, then retire work before native image owners. Retain one budget across all
+in-flight slots, not a fresh budget per draw. This runtime consumer is unconnected.
+
+Existing scene/cutout validators assume submitted/emitted/retired draw equality;
+GPU-zeroed commands cannot be counted as emitted to preserve that assumption.
+Add explicit pending/culled/visible classification and causal lifecycle/parser
+regressions while preserving900 actual visible-emission windows, generation/source
+retirement and250 ms readiness. Mere command generation must never satisfy output
+acceptance. Remove old query-history production calls when its last consumer is
+migrated; do not relax temporal safety or exempt the selected regression asset.
+No host executable/game run was produced for this GPU-only checkpoint.
+[Current-depth GPU contract and integration findings](../research/20260907_2209_native-depth-visibility.md).
 
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB
