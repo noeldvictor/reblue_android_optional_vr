@@ -1,5 +1,6 @@
 // CPU contract checks: native interface doubles, no GPU allocation/submission.
 #include "gpu/native_target_images.h"
+#include "gpu/draw_order.h"
 #include "gpu/host_post_output.h"
 #include "gpu/native_post_images.h"
 #include "gpu/native_image_lease.h"
@@ -1401,6 +1402,26 @@ void RigidLifecycle() {
 }
 void RigidBatches() {
   using namespace bd::gpu::scene;
+  struct Ordered { int key, sequence; bool barrier; };
+  std::array<Ordered,9> order{{{0,0,true},{3,1,false},{1,2,false},{-5,3,true},
+      {-9,4,true},{3,5,false},{1,6,false},{1,7,false},{2,8,true}}};
+  const auto ordered_barrier = [](const Ordered &draw) { return draw.barrier; };
+  StableSortDrawRuns(std::span(order),ordered_barrier,[](const auto &a, const auto &b) { return a.key < b.key; });
+  const int expected[]{0,2,1,3,4,6,7,5,8};
+  for (size_t i = 0; i < order.size(); ++i) assert(order[i].sequence == expected[i]);
+  const size_t expected_ends[]{1,3,4,5,8,9};
+  size_t run = 0;
+  for (size_t first = 0; first < order.size();) {
+    const auto end = DrawOrderRunEnd(std::span(order),first,ordered_barrier);
+    assert(end == expected_ends[run++]);
+    // A prepass may only be pulled forward inside this same run, never across
+    // an ordered native draw. Adjacent barriers remain separate singleton runs.
+    for (size_t index = first; index < end; ++index)
+      assert(!order[index].barrier || end == first+1);
+    first = end;
+  }
+  assert(run == std::size(expected_ends));
+  assert(DrawOrderRunEnd(std::span(order),order.size(),ordered_barrier) == order.size());
   int token = 0;
   NativeRigidBatchItem a;
   a.geometry = std::make_shared<NativeGeometry>();
@@ -1557,6 +1578,13 @@ void SceneCommands() {
     assert(scope && scope->ClearPending());
     assert(scope->Matches(sources[0]->image.get(), sources[1]->image.get()));
     assert(!scope->Matches(sources[1]->image.get(), sources[0]->image.get()));
+    assert(!scope->WritesImage(nullptr));
+    SceneSource unrelated;
+    assert(!scope->WritesImage(&unrelated));
+    for (uint32_t role = 0; role < 2; ++role) {
+      assert(scope->WritesImage(sources[role]->image.get()));
+      if (samples > 1) assert(scope->WritesImage(resolved[role].texture));
+    }
     SceneCommandRecorder recorder;
     const uint32_t attachment_count = samples > 1 ? 4u : 2u;
     assert(scope->Bind(recorder) == attachment_count && recorder.writes.size() == attachment_count);

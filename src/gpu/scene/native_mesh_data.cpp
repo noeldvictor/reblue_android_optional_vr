@@ -172,6 +172,22 @@ std::optional<NativeBounds> BuildNativeMeshBounds(const NativeMeshData &mesh) {
   return result.Valid() ? std::optional(result) : std::nullopt;
 }
 
+std::optional<float> BuildNativeMeshWaveWeight(const NativeMeshData &mesh) {
+  if (mesh.attributes.empty() || !ValidateNativeMesh(mesh)) return {};
+  const auto colour = std::find_if(mesh.attributes.begin(), mesh.attributes.end(), [](const auto &attribute) {
+    return attribute.semantic == MeshSemantic::Color && attribute.index == 0;
+  });
+  if (colour == mesh.attributes.end()) return {};
+  const auto &stream = mesh.streams[0];
+  float result = 0;
+  for (const auto index : mesh.indices) {
+    const uint64_t vertex = uint64_t(int64_t(index)+mesh.base_vertex);
+    Reader reader{std::span(stream.bytes).subspan(size_t(vertex*stream.stride+colour->offset),4)};
+    result = (std::max)(result,std::abs(std::bit_cast<float>(uint32_t(reader.Get()))));
+  }
+  return result;
+}
+
 bool EncodeNativeMesh(const NativeMeshData &mesh, std::vector<uint8_t> &file) {
   file.clear();
   if (!ValidateNativeMesh(mesh))

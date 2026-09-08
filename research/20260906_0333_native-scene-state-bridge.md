@@ -4542,3 +4542,72 @@ change includes unattributed system activity, not all producer output or cleanup
 No new raw/images/OS dumps are required by these fixtures. Native material
 publication, live queue/image lifetimes, conservative wave bounds and game
 art/pixel/sequence/both-eye qualification remain open; full goal not narrowed.
+
+### Native water shared queue/geometry (2026-09-08, source333ce83 dirty)
+
+Same cumulative exception/floor62,509,998,080B and all raw/image/diagnostic caps.
+First measured free80,213,200,896B; before first producer80,215,789,568B. No live
+renderer/build jobs at preflight. Existing fixture tree17,207,057B/19files
+(16,144B above the preceding ledger's metadata measurement), logs280,732B/172files.
+No game launch/profile overrides, assets, recooking, extraction, captures or new
+shader regeneration. Existing shader programs reused. Planned/enforced free-drop:
+GPU build48MiB initial/32MiB later, CPU build32MiB, tests16MiB, host192MiB;
+300s producers/30s tests,10MiB cumulative logs. Independent CPU/GPU trees were
+built concurrently for the final feedback-guard change, with both supervised.
+
+GPU58/PID36552,59/576,60/3732 pass; water6/32492 fails120validation errors due
+to premature setup framebuffer destruction. Corrected lifetime passes water7/
+37792 and final8/37092 (16two-eye cases,1.23s,validation0/0). Full failed log cause/
+hash remains in20260908_0509_native-water-queue.md; no comparison relaxed.
+Rigid20/29716 passes55cases,1.23s,validation0/0. CPU output53/33924 and30/34480
+pass; final output54/32200 and31/27540 pass,0.57s.370Python checks pass. Host136/
+33668 and137/29092 pass,0codegen writes/no guest objects; two existing unrelated
+deprecation warnings in the final host build. No producer live. No live water
+caller yet; host134/run969 remains the last game evidence. Profile116B/hash
+unchanged. Image110KiB/raw budgets and protected historical evidence unchanged.
+
+Current GPU fixture17,787,549B/19files: growth580,492B from this turn's preflight,
+596,636B from prior ledger. Texture fixture77,501,216B/132files, up139,969B.
+Host EXE/PDB grow184,320B combined; exact final hashes in the new report. These
+replace existing products, no copies; no new compiled shader headers. Other host
+object/metadata and source/Git bytes are separate from these selected measurements.
+
+After passing replacement, removed22exact log files: GPU builds57/58/59,
+water5/6/7, rigid19, CPU output build53/test30, host135/136 stdout/stderr.
+Logical99,972B; immediate free80,210,419,712->80,210,530,304B,110,592B physical
+interval gain. Removed water6's diagnosed fixture-failure full text, preserving
+cause/hash and the causal passing regression; no unresolved game evidence removed.
+Keep GPU60/water8/rigid20/output54+31/host137 plus first shader build52 and live
+host134 logs. Read-only cleanup inspection found older CPU29 was a timeout;
+it and CPU build52 are preserved, not silently relabeled successful/superseded.
+
+Logs now285,449B/176files, net4,717B retained growth (104,689B new minus99,972B
+retired). Selected fixture/log/EXE/PDB growth925,642B against prior ledger;
+909,498B using this turn's observed GPU tree baseline. Ending free80,210,530,304B
+(~74.70GiB),2,670,592B below first reading. That is drive-wide activity, not all
+attributed to selected outputs; cleanup credited once. No protected raw/image set,
+original game data, profile, dependency or active build tree was removed.
+
+Final ordering audit in the same bundle: existing opt-in depth/eye sorts and
+whole-queue legacy prepass hoisting ignored native ordering barriers. The shared
+sort/prepass run helper now preserves them; blended gathering also stops there.
+CPU55/PID26132 fails a fixture-local `barrier` name collision; renamed predicate,
+CPU56/PID38044 and test32/PID21864 pass0.50s. Host138/PID32948 passes with0codegen
+writes/no guest objects. No shader/GPU input change; water8/rigid20 evidence reused
+with its actual fixture provenance. No game run, captures or profile change.
+
+Retired8additional superseded logs after replacement: host137, CPU builds54/55,
+CPU test31 stdout/stderr;8,122B logical. Immediate free80,209,911,808->
+80,209,928,192B,16,384B physical interval gain. CPU55's compile-error cause/hash
+remains in the water queue report; full old stdout retired. Both cleanup passes
+total30files/108,094B logical,126,976B physical interval gains, counted once.
+Current logs283,620B/176files: net2,888B growth,110,982B gross new minus108,094B
+retired. Keep GPU60/water8/rigid20/CPU56+32/host138 and protected prior purposes.
+
+Final texture fixture77,690,448B/132files (up329,201B), GPU fixture unchanged
+17,787,549B/19files, final EXE/PDB growth193,024B combined. Selected retention
+growth1,121,749B against prior ledger (1,105,605B using this turn's observed GPU
+baseline). Ending free80,209,928,192B (~74.70GiB),3,272,704B below first reading;
+drive-wide movement includes other object/metadata/source/Git/system activity.
+All producers terminal. Queue source/fixtures built; live water admission and
+full authored/pixel/sequence/stereo acceptance remain unqualified.

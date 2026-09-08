@@ -47,6 +47,8 @@ struct NativeGeometry {
   // never discover them later from a translated draw or source declaration.
   NativeVertexInputHandle rigid_vertex_input;
   NativeVertexInputHandle layered_rigid_vertex_input; // explicit TexCoord2, no substituted UV
+  NativeVertexInputHandle water_vertex_input; // authored tangent, resolved at load
+  std::optional<float> wave_weight; // indexed maximum |COLOR0.r|, CPU-derived
   uint32_t strides[16]{};
   plume::RenderVertexBufferView streams[16]{};
   uint32_t stream_mask = 0;

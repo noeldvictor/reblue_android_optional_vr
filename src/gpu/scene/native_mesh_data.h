@@ -54,6 +54,9 @@ bool ValidateNativeMesh(const NativeMeshData &mesh);
 // Derive once from checked v2 indexed positions, including signed base vertex.
 // Reuses persisted bytes/identity; v1 has no native position contract and refuses.
 std::optional<NativeBounds> BuildNativeMeshBounds(const NativeMeshData &mesh);
+// Indexed COLOR0 red magnitude used by native water displacement. No assumed
+// [0,1] colour range and no unused vertex may enlarge/shrink this mesh's bound.
+std::optional<float> BuildNativeMeshWaveWeight(const NativeMeshData &mesh);
 // Stable identity of a valid self-describing payload; zero rejects v1/invalid.
 uint64_t NativeMeshContentId(const NativeMeshData &mesh);
 bool EncodeNativeMesh(const NativeMeshData &mesh, std::vector<uint8_t> &file);

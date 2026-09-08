@@ -9,6 +9,7 @@
 #include "gpu/scene/native_mesh_cook.h"
 #include "gpu/scene/native_mesh_storage.h"
 #include "gpu/scene/native_rigid_program.h"
+#include "gpu/scene/native_water_program.h"
 
 #include <algorithm>
 #include <bit>
@@ -84,6 +85,9 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
                                           NativeVertexInputHandle vertex_input) {
   const auto bounds = BuildNativeMeshBounds(data); // CPU payload, before map/upload.
   if (!data.attributes.empty() && !bounds) return {};
+  auto water_input = NativeWaterVertexInput(data, s.vertex_inputs);
+  const auto wave_weight = water_input ? BuildNativeMeshWaveWeight(data) : std::nullopt;
+  if (water_input && !wave_weight) return {};
   u32 bytes = Align(u32(data.indices.size() * 4));
   for (const auto &stream : data.streams)
     bytes += Align(u32(stream.bytes.size()));
@@ -117,6 +121,8 @@ std::shared_ptr<const NativeGeometry> Upload(Store &s, const NativeMeshData &dat
   result->vertex_input = std::move(vertex_input);
   result->rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs);
   result->layered_rigid_vertex_input = NativeRigidVertexInput(data, s.vertex_inputs, true);
+  result->water_vertex_input = std::move(water_input);
+  result->wave_weight = wave_weight;
   result->count = u32(data.indices.size());
   result->base_vertex = data.base_vertex;
   result->start_index = chunk.used / 4;

@@ -284,18 +284,22 @@ speedup remain unproven. Source-input imports, receiver descriptors and outgoing
 state remain; water setup is host code, but its draws are still a legacy family.
 [Writer-ordered connection and causal failure](research/20260908_0337_native-visual-inputs.md).
 
-**Native water shader built; live routing still pending (host135):** semantic
-water materials, named mesh attributes and explicit image bindings now feed an
-independent native shader program. Sixteen two-eye GPU cases pass: instanced
-indirect drawing, planar/cube reflections, retained scene snapshots, shoreline
-depth, animated bump/wave inputs, lighting/fog, transparency and depth-write
-policy. The existing 55 rigid GPU cases also pass; both suites report zero
-validation errors/warnings. These are small production-program fixtures, not
-game-scene qualification. Live water still uses its legacy draw family. Next is
-the generation-safe material/image handoff into the existing ordered scene
-queue, including late writers and snapshot ordering. The native wave basis and
-material changes still need art-style/sequence review; no speedup is claimed.
-[Water shader interface, tests and remaining connection](research/20260908_0435_native-water-program.md).
+**Native water queue support built; live admission still pending (host138):**
+the existing native draw store/emitter now supports water's own instance format,
+six retained image/view owners, consecutive ordered instancing and fence
+retirement. Load-owned meshes supply tangent inputs and indexed wave bounds;
+sampling an active attachment or MSAA resolve is refused. Depth/eye sorting,
+blended gathering and legacy prepasses respect ordered native barriers. No second
+queue or translated constant-gather path was added.
+
+Sixteen two-eye GPU cases pass using the production water packer/image binder,
+including producer retirement before drawing and owner release after the fence.
+The 55 rigid GPU regressions and CPU batch/scene-owner checks pass; GPU validation
+reports zero errors/warnings. **The game does not yet call the new water submission
+entry.** Its ordered material/image publication and family admission remain to
+be connected, so no additional live guest-rendering path is claimed removed.
+Authored water pixels, sequences, reloads, both-eye game coverage and speedup
+remain unqualified. [Queue ownership, tests and next connection](research/20260908_0509_native-water-queue.md).
 
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded

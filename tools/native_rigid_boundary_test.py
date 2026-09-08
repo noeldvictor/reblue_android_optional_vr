@@ -91,7 +91,9 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         self.assertIn("++cutouts.emitted", note)
         self.assertIn("cutouts.textured_emitted +=", note)
         retire = direct.split("void DrainNativeRigidDrawsLocked", 1)[1]
-        self.assertIn("record->input.object_data.flags.x & RigidCutout", retire)
+        self.assertIn("record->Cutout()", retire)
+        batch = (ROOT / "src/gpu/scene/native_rigid_batch.h").read_text()
+        self.assertIn("!water && (input.object_data.flags.x & RigidCutout)", batch)
         self.assertIn("cutouts.textured_retired +=", retire)
         self.assertIn("[native-cutout-family]", direct)
 
@@ -138,9 +140,9 @@ class NativeRigidBoundaryTest(unittest.TestCase):
 
     def test_native_batches_use_owned_storage_and_shared_queue_without_translated_gather(self):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
-        for required in ("PackNativeRigidBatch(items,packed,FrameStatFrameCount(),slot)",
+        for required in ("PackNativeRigidBatch(items,output,FrameStatFrameCount(),slot)",
                          "PlanNativeRigidStorage(", "minStorageBufferOffsetAlignment",
-                         "std::memcpy(upload.memory+prefix,packed.data(),placement->bytes)",
+                         "std::memcpy(upload.memory+prefix,packed,placement->bytes)",
                          "store.batches[slot].clear()", "draw.native_indirect = indirect.ref"):
             self.assertIn(required, direct)
         queue = (ROOT / "src/gpu/draw_queue.cpp").read_text()

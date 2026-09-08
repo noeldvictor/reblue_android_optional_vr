@@ -9,6 +9,7 @@ namespace bd::gpu::scene {
 struct NativeRigidDrawStore;
 struct NativeRigidBatchItem;
 struct NativeRigidSceneSubmission;
+struct NativeWaterSceneSubmission;
 bool NativeRigidShadowEnabled();
 bool NativeRigidSceneEnabled();
 bool NativeRigidDeferredEnabled();
@@ -22,6 +23,10 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
 // Owns every input through final light resolution and queue retention. The stack
 // argument is used only for the outgoing, temporary compatibility light mirror.
 bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32_t stack);
+// Completed semantic inputs only, at the ordered material/snapshot boundary.
+// Shares the native queue, upload arena, visibility and fence-retained owners.
+// This does not import a source object or opt legacy water into native admission.
+bool SubmitNativeWaterScenePackets(NativeWaterSceneSubmission submission);
 // Called only after the shared emitter records a real draw command.
 void NoteNativeRigidEmission(const QueuedDraw &draw, std::span<const NativeRigidBatchItem *const> items);
 // Shared queue calls this under the renderer lock after exact batch admission.

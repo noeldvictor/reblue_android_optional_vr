@@ -6,6 +6,7 @@
  *            See LICENSE file in the project root for full license text.
  */
 #include "gpu/draw_queue.h"
+#include "gpu/draw_order.h"
 
 #include <cmath>
 #include "gpu/frame_stats.h"
@@ -125,6 +126,7 @@ void GatherBlendedGroups() {
     size_t target = p;
     for (size_t q = p; q-- > first;) {
       const QueuedDraw &e = g_queue[q];
+      if (e.native_rigid && !e.reorderable) break;
       const void *ep =
           e.instanced_pipeline ? e.instanced_pipeline : e.pipeline;
       if (ep == dp && e.batch_key == d.batch_key &&
@@ -464,6 +466,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
   // flushing. Snapshot their actual offsets before emitting another layout.
   // Restore through the same explicit binding core, not a guessed zero window.
   const auto resume_bindings = EngineGraphicsBindings(state());
+  const auto ordered_native = [](const QueuedDraw &draw) { return draw.native_rigid && !draw.reorderable; };
 
   if (REXCVAR_GET(bd_draw_sort)) {
     // Opaque first, grouped by pipeline, near to far inside each group.
@@ -476,7 +479,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
     // result depends on what is already in the framebuffer, so reordering them
     // against each other changes the image - this is the one constraint in the
     // whole rewrite that cannot be relaxed.
-    std::stable_sort(g_queue.begin(), g_queue.end(),
+    StableSortDrawRuns(std::span(g_queue), ordered_native,
                      [](const QueuedDraw &a, const QueuedDraw &b) {
                        if (a.blended != b.blended)
                          return !a.blended;
@@ -506,7 +509,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
   // which is one of the things that pass does that the passes the tiler does
   // bin do not.
   if (REXCVAR_GET(bd_draw_eye_major)) {
-    std::stable_sort(g_queue.begin(), g_queue.end(),
+    StableSortDrawRuns(std::span(g_queue), ordered_native,
                      [](const QueuedDraw &a, const QueuedDraw &b) {
                        const float ax = a.has_viewport ? a.viewport.x : -1.0f;
                        const float bx = b.has_viewport ? b.viewport.x : -1.0f;
@@ -573,11 +576,12 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
   for (const QueuedDraw &d : g_queue)
     if (d.prepass_pipeline && d.color_pipeline)
       ++prepassed;
-  if (prepassed) {
+  const auto emit_prepass_run = [&](size_t first, size_t end) {
+    if (!prepassed) return;
     static std::vector<const QueuedDraw *> order;
     order.clear();
     order.reserve(prepassed);
-    for (const QueuedDraw &d : g_queue)
+    for (const QueuedDraw &d : std::span(g_queue).subspan(first,end-first))
       if (d.prepass_pipeline && d.color_pipeline)
         order.push_back(&d);
     std::stable_sort(order.begin(), order.end(),
@@ -592,6 +596,8 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
       EmitOne(cmd, d, st);
     }
+  };
+  if (prepassed) {
     static u32 told = 0;
     if (told < 3 && g_queue.size() > 100) {
       ++told;
@@ -659,8 +665,15 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
   u32 groups = 0, grouped_draws = 0, emitted = 0;
   bool refresh_native_depth = true;
   static std::vector<u32> records;
+  size_t prepass_end = 0;
   for (size_t i = 0; i < g_queue.size();) {
     const QueuedDraw &q = g_queue[i];
+    if (i >= prepass_end) {
+      prepass_end = DrawOrderRunEnd(std::span(g_queue),i,ordered_native);
+      emit_prepass_run(i,prepass_end);
+      // A newly recorded legacy prepass can change the native depth input.
+      if (prepassed) refresh_native_depth = true;
+    }
     if (split_every > 0 && since_split >= static_cast<u32>(split_every)) {
       cmd->setFramebuffer(nullptr);
       st.framebuffer = nullptr;
@@ -671,10 +684,14 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
     if (q.native_rigid) {
       std::array<const scene::NativeRigidBatchItem *,scene::kNativeRigidBatchLimit> items{};
       size_t candidates = 0;
-      const auto limit = instancing && q.reorderable ? items.size() : size_t(1);
+      // Consecutive water instances keep primitive order within the indirect
+      // draw. They may coalesce, but never move across another queued entry or
+      // a material/snapshot flush. Ordinary blended admission is unchanged.
+      const auto limit = instancing && (q.reorderable || q.native_rigid->water) ? items.size() : size_t(1);
       while (candidates < limit && i+candidates < g_queue.size()) {
         const auto &candidate = g_queue[i+candidates];
-        if (!candidate.native_rigid || (candidates && !candidate.reorderable)) break;
+        if (!candidate.native_rigid || (candidates && !candidate.reorderable &&
+            !(q.native_rigid->water && candidate.native_rigid->water))) break;
         items[candidates++] = candidate.native_rigid.get();
       }
       const auto n = scene::NativeRigidBatchLength(std::span(items).first(candidates),

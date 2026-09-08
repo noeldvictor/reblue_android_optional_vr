@@ -75,6 +75,14 @@ public:
         sources_[1]->image.get() == depth;
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
+  // Includes ordinary MSAA resolve destinations: a single-sample image is not
+  // safe to sample merely because it is different from the multisample source.
+  bool WritesImage(const plume::RenderTexture *image) const {
+    if (!image) return false;
+    for (uint32_t role = 0; role < 2; ++role)
+      if ((sources_[role] && sources_[role]->image.get() == image) || resolved_[role].texture == image) return true;
+    return false;
+  }
   NativeTargetImageHandle DepthOwner() const { return sources_[1]; }
   const NativeTargetShape *ColorShape() const { return sources_[0] ? &sources_[0]->shape : nullptr; }
   bool ClearPending() const { return clear_.has_value(); }

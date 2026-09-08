@@ -8,6 +8,7 @@
 #include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_rigid_lifecycle_bridge.h"
 #include "gpu/scene/native_rigid_program.h"
+#include "gpu/scene/native_water_program.h"
 #include "gpu/scene/native_sampler_bridge.h"
 #include "gpu/scene/native_scene_result_bridge.h"
 #include "gpu/scene/native_lighting_bridge.h"
@@ -51,7 +52,7 @@ struct NativeRigidDrawStore {
     bool sealed = false;
     std::span<const NativeDepthVisibilityReceipt> receipts;
   };
-  struct Program { NativeVertexInputHandle input; NativeRigidPrograms shaders; };
+  struct Program { NativeVertexInputHandle input; NativeRigidPrograms shaders; NativePipelineHandle water; };
   // Immutable program variants remain bounded; per-draw descriptors/geometry
   // survive exactly their recording slot's fence. Upload pages have their own
   // shared bounded arena and are never read back as a CPU data source.
@@ -62,6 +63,9 @@ struct NativeRigidDrawStore {
   std::shared_ptr<NativeDepthVisibilityBudget> visibility_budget = std::make_shared<NativeDepthVisibilityBudget>();
   std::array<std::vector<Visibility>, kNumFrames> visibility;
   std::array<NativeRigidInstanceGPU, kNativeRigidBatchLimit> scratch;
+  std::array<NativeWaterInstanceGPU, kNativeRigidBatchLimit> water_scratch;
+  uint64_t water_submitted = 0, water_emitted = 0, water_culled = 0, water_retired = 0;
+  uint32_t water_reported_frame = 0;
   uint64_t submitted = 0, suppressed = 0, retired = 0;
   uint32_t reported_frame = 0;
   uint64_t emitted = 0, scene_submitted = 0, scene_emitted = 0, scene_retired = 0, scene_suppressed = 0;
@@ -96,7 +100,7 @@ void StageNativeItem(QueuedDraw &draw, std::shared_ptr<NativeRigidBatchItem> ite
   item->frame = FrameStatFrameCount(); item->slot = Video::CurrentFrameSlot();
   BatchRequire(item->Ready(item->frame,item->slot), "incomplete native instance");
   state().native_rigid_draws->records[item->slot].push_back(item);
-  if (item->input.object_data.flags.x & RigidCutout) {
+  if (item->Cutout()) {
     auto &store = *state().native_rigid_draws;
     ++(item->view == 3 ? store.scene_cutouts : store.shadow_cutouts).submitted;
   }
@@ -395,6 +399,108 @@ bool SubmitNativeRigidScenePackets(NativeRigidSceneSubmission submission, uint32
   }
   return true;
 }
+bool SubmitNativeWaterScenePackets(NativeWaterSceneSubmission submission) {
+  BatchRequire(NativeRigidSceneEnabled() && submission.instance && submission.model_generation &&
+      submission.frame == FrameStatFrameCount() && !submission.plans.empty() && submission.plans.size() <= 4096,
+      "stale or incomplete owned water submission");
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  auto *commands = ActiveNativeSceneCommands(s.render_target ? s.render_target->texture : nullptr,
+      s.depth_stencil ? s.depth_stencil->texture : nullptr);
+  BatchRequire(s.ready && s.device && s.command_list_open && commands, "native water scene scope unavailable");
+  const auto *shape = commands->ColorShape();
+  const auto camera = commands->Camera(submission.frame,3);
+  BatchRequire(shape && shape->layers == 1 && camera, "live stereo water camera producer remains unconnected");
+  if (!s.native_rigid_draws) s.native_rigid_draws = std::make_shared<NativeRigidDrawStore>();
+  auto &store = *s.native_rigid_draws;
+  auto &records = store.records[Video::CurrentFrameSlot()];
+  BatchRequire(records.size() <= 4096 && submission.plans.size() <= 4096-records.size(), "water draw retention capacity");
+  struct Pending { QueuedDraw draw; std::shared_ptr<NativeRigidBatchItem> item; };
+  std::vector<Pending> pending;
+  pending.reserve(submission.plans.size());
+  for (const auto &plan : submission.plans) {
+    const auto &geometry = plan.geometry;
+    BatchRequire(geometry && geometry->id && geometry->canonical_vertices && geometry->water_vertex_input &&
+        geometry->stream_mask == 1 && geometry->strides[0] && geometry->strides[0] <= 255 &&
+        geometry->streams[0].buffer.ref && geometry->index.buffer.ref && geometry->count,
+        "load-owned water geometry or tangent unavailable");
+    const auto bounds = NativeWaterWorldBounds(*geometry,plan.input);
+    BatchRequire(bounds.has_value() && plan.images.Ready(plan.input.image_layers), "water wave bounds or image ownership unavailable");
+    for (uint32_t role = 0; role < 6; ++role)
+      BatchRequire(plan.samplers[role].comparisonEnabled == (role == 5), "water comparison sampler role mismatch");
+    for (const auto &eye : plan.input.pass_data.world_to_clip)
+      BatchRequire(std::memcmp(&eye,camera->world_to_clip.data(),sizeof(RenderMatrix)) == 0,
+          "water camera changed before ordered submission");
+    for (uint32_t role = 0; role < 6; ++role)
+      BatchRequire(!commands->WritesImage(plan.images.Image(role)),
+          "water sampled image aliases an active attachment or resolve");
+    auto program = std::find_if(store.programs.begin(),store.programs.end(),[&](const auto &entry) {
+      return entry.water && entry.input == geometry->water_vertex_input;
+    });
+    if (program == store.programs.end()) {
+      BatchRequire(store.programs.size() < 8, "native program capacity reached");
+      auto shader = CreateNativeWaterProgram(*s.device,geometry->water_vertex_input);
+      BatchRequire(bool(shader), "native water shader creation failed");
+      store.programs.push_back({geometry->water_vertex_input,{},std::move(shader)});
+      program = store.programs.end()-1;
+    }
+    PipelineState pipeline_state;
+    pipeline_state.native_program = program->water.get();
+    pipeline_state.vertexStrides[0] = uint8_t(geometry->strides[0]);
+    pipeline_state.renderTargetFormat = shape->format;
+    pipeline_state.depthStencilFormat = plume::RenderFormat::D32_FLOAT_S8_UINT;
+    pipeline_state.sampleCount = static_cast<plume::RenderSampleCounts>(shape->samples);
+    pipeline_state.zWriteEnable = plan.depth_write;
+    pipeline_state.cullMode = plan.cull;
+    bool blend_dirty = false;
+    ApplyBlendState(plan.blend,pipeline_state,blend_dirty);
+    SanitizePipelineState(pipeline_state);
+    auto *pipeline = GetOrCreatePipeline(pipeline_state);
+    BatchRequire(pipeline != nullptr, "native water pipeline unavailable");
+    auto water = std::make_shared<NativeWaterBatchData>();
+    water->input = plan.input; water->images = plan.images;
+    for (uint32_t role = 0; role < 6; ++role) {
+      water->samplers[role] = ResolveSamplerLocked(plan.samplers[role]);
+      BatchRequire(water->samplers[role] != nullptr, "native water sampler unavailable");
+    }
+    auto item = std::make_shared<NativeRigidBatchItem>();
+    item->water = std::move(water); item->geometry = geometry; item->world_bounds = bounds;
+    item->model_generation = submission.model_generation; item->instance = submission.instance;
+    item->scene_depth = commands->DepthOwner();
+    QueuedDraw draw;
+    draw.pipeline = pipeline; draw.bindings.layout = program->water->Layout();
+    draw.vertex_views[0] = geometry->streams[0]; draw.input_slots[0] = plume::RenderInputSlot(0,geometry->strides[0]);
+    draw.vertex_count = 1; draw.index_view = geometry->index; draw.has_index_buffer = draw.indexed = true;
+    draw.count = geometry->count; draw.start_index = geometry->start_index; draw.base_vertex = geometry->base_vertex;
+    draw.framebuffer = commands->Framebuffer();
+    draw.viewport = plume::RenderViewport(0,0,float(shape->width),float(shape->height));
+    draw.scissor = plume::RenderRect(0,0,shape->width,shape->height); draw.has_viewport = true;
+    draw.render_view = 3; draw.zwrite = plan.depth_write;
+    // Water remains an ordering barrier, including ostensibly opaque variants:
+    // neighbouring material scopes can publish snapshots or late authored data.
+    draw.reorderable = false;
+    BatchRequire(draw.bindings.Valid(), "native water descriptor layout unavailable");
+    pending.push_back({std::move(draw),std::move(item)});
+  }
+  records.reserve(records.size()+pending.size());
+  if (!s.draw_framebuffer_bound) {
+    DrawQueueFlush(s.command_list);
+    BindNativeSceneCommands(s,*commands); ApplyNativeSceneClear(s,*commands); s.draw_framebuffer_bound = true;
+  }
+  for (auto &entry : pending) {
+    StageNativeItem(entry.draw,std::move(entry.item));
+    DrawQueuePush(entry.draw);
+  }
+  store.water_submitted += pending.size();
+  if (!DrawQueueEnabled()) DrawQueueFlush(s.command_list);
+  if (store.water_submitted == pending.size() || submission.frame-store.water_reported_frame >= 300) {
+    BD_INFO("[native-water-scene] frame {} submitted {} emitted {} culled {} fence-retired {}; instance {} generation {}; owned water packets in shared native queue",
+        submission.frame,store.water_submitted,store.water_emitted,store.water_culled,store.water_retired,
+        submission.instance,submission.model_generation);
+    store.water_reported_frame = submission.frame;
+  }
+  return true;
+}
 void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw, bool refresh_depth) {
   auto &s = state();
   BatchRequire(s.native_rigid_draws && s.ready && s.device && s.command_list_open, "native batch device unavailable");
@@ -402,9 +508,19 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   const auto slot = Video::CurrentFrameSlot();
   auto &batches = store.batches[slot];
   BatchRequire(items.size() <= kNativeRigidBatchLimit && batches.size() < 4096, "native batch capacity");
-  const auto packed = std::span(store.scratch).first(items.size());
-  BatchRequire(PackNativeRigidBatch(items,packed,FrameStatFrameCount(),slot), "stale or incompatible native batch");
+  BatchRequire(!items.empty() && items[0], "empty native batch");
   const auto &first = *items[0];
+  const void *packed;
+  const auto stride = uint32_t(first.water ? sizeof(NativeWaterInstanceGPU) : sizeof(NativeRigidInstanceGPU));
+  if (first.water) {
+    const auto output = std::span(store.water_scratch).first(items.size());
+    BatchRequire(PackNativeWaterBatch(items,output,FrameStatFrameCount(),slot), "stale or incompatible water batch");
+    packed = output.data();
+  } else {
+    const auto output = std::span(store.scratch).first(items.size());
+    BatchRequire(PackNativeRigidBatch(items,output,FrameStatFrameCount(),slot), "stale or incompatible native batch");
+    packed = output.data();
+  }
   BatchRequire(draw.pipeline == first.pipeline && draw.bindings.layout == first.layout && draw.framebuffer == first.framebuffer &&
       draw.indexed && draw.has_index_buffer && !draw.translated_instance_records, "native queue contract changed");
   uint64_t alignment = 16;
@@ -412,24 +528,31 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   alignment = static_cast<plume::VulkanDevice &>(*s.device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment;
 #endif
   BatchRequire(alignment <= 65536, "storage alignment unsupported");
-  const auto placement = PlanNativeRigidStorage(uint32_t(items.size()),uint32_t(alignment));
+  const auto placement = PlanNativeRigidStorage(uint32_t(items.size()),uint32_t(alignment),stride);
   BatchRequire(placement.has_value(), "native storage placement refused");
   const auto upload = AllocateHostUpload(placement->reserve,uint32_t(alignment));
   BatchRequire(upload.memory != nullptr, "bounded native instance upload refused");
   const auto offset = placement->Offset(upload.ref.offset);
   const auto prefix = uint32_t(offset-upload.ref.offset);
   BatchRequire(prefix <= upload.size && placement->bytes <= upload.size-prefix, "native storage slice outside upload");
-  std::memcpy(upload.memory+prefix,packed.data(),placement->bytes);
+  std::memcpy(upload.memory+prefix,packed,placement->bytes);
   NativeRigidDescriptorSchema schema;
   NativeRigidDrawStore::Batch batch;
   batch.items.assign(items.begin(),items.end());
   batch.constants = schema.sets[0].create(s.device.get());
   BatchRequire(bool(batch.constants), "native storage descriptor unavailable");
-  const plume::RenderBufferStructuredView view(sizeof(NativeRigidInstanceGPU),offset/sizeof(NativeRigidInstanceGPU));
+  const plume::RenderBufferStructuredView view(stride,offset/stride);
   batch.constants->setBuffer(0,upload.ref.ref,placement->bytes,&view);
   draw.bindings = {}; draw.bindings.layout = first.layout;
   draw.bindings.set_count = 1; draw.bindings.sets[0] = batch.constants.get();
-  if (first.view == 1 && first.albedo[0]) {
+  if (first.water) {
+    NativeWaterDescriptorSchema water_schema;
+    batch.images = water_schema.sets[1].create(s.device.get());
+    batch.samplers = water_schema.sets[2].create(s.device.get());
+    BatchRequire(batch.images && batch.samplers && BindNativeWaterImages(*first.water,*batch.images,*batch.samplers),
+        "water image owners or descriptor contract unavailable");
+    draw.bindings.set_count = 3; draw.bindings.sets[1] = batch.images.get(); draw.bindings.sets[2] = batch.samplers.get();
+  } else if (first.view == 1 && first.albedo[0]) {
     batch.images = schema.sets[1].create(s.device.get()); batch.samplers = schema.sets[2].create(s.device.get());
     BatchRequire(batch.images && batch.samplers, "native cutout descriptors unavailable");
     // Only slot0 is sampled. Populate inactive slots from that same retained
@@ -462,7 +585,7 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
     NativeOcclusionView view;
     view.frame = first.frame;
     view.scope = {depth->identity,depth->shape.width,depth->shape.height,depth->shape.samples};
-    view.camera.world_to_clip = std::bit_cast<RenderMatrix>(first.input.pass_data.world_to_clip[0]);
+    view.camera.world_to_clip = std::bit_cast<RenderMatrix>(first.Pass().world_to_clip[0]);
     if (!store.visibility_program) store.visibility_program = CreateNativeDepthVisibilityProgram(*s.device);
     auto &works = store.visibility[slot];
     uint32_t selected = 0;
@@ -498,11 +621,15 @@ void ResolveNativeRigidEmission(NativeRigidDrawStore &store, std::span<const Nat
   const auto instances = uint32_t(items.size()), render_view = items[0]->view;
   for (const auto *item : items) {
     BatchRequire(item && item->output.Resolve(visible), "native draw resolved before recording or more than once");
-    if (visible && (item->input.object_data.flags.x & RigidCutout)) {
+    if (visible && item->Cutout()) {
       auto &cutouts = render_view == 3 ? store.scene_cutouts : store.shadow_cutouts;
       ++cutouts.emitted;
       cutouts.textured_emitted += (item->input.object_data.flags.x & RigidAlbedo) != 0;
     }
+  }
+  if (items[0]->water) {
+    if (visible) store.water_emitted += instances; else store.water_culled += instances;
+    return;
   }
   if (!visible) { store.scene_culled += instances; return; }
   if (items[0]->regression) NoteNativeRigidEmitted(items[0]->model_generation,render_view,instances);
@@ -556,7 +683,8 @@ void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   for (const auto &record : store.records[slot]) {
     BatchRequire(record->output.Retire(), "native record retired with pending or duplicate output classification");
     const bool visible = record->output.Visible();
-    if (visible && (record->input.object_data.flags.x & RigidCutout)) {
+    if (record->water) { ++store.water_retired; continue; }
+    if (visible && record->Cutout()) {
       auto &cutouts = record->view == 3 ? store.scene_cutouts : store.shadow_cutouts;
       ++cutouts.retired;
       cutouts.textured_retired += (record->input.object_data.flags.x & RigidAlbedo) != 0;

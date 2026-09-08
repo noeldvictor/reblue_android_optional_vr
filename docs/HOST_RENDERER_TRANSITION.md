@@ -388,8 +388,23 @@ not live water conversion: no game hook or queue admission changed. Native wave
 deformation/material changes need authored-scene/art review. See
 [water program evidence](../research/20260908_0435_native-water-program.md).
 
-Next connected work: attach these native water parameters/images/geometry to
-the existing ordered scene queue. Reuse the current
+Water queue/geometry checkpoint (host138): `SubmitNativeWaterScenePackets` now
+uses the existing native store, upload arena, descriptor emitter, current-depth
+visibility and fence retirement. Water packets retain all six image/view owners,
+have their own976B instance ABI and can coalesce consecutively without reordering.
+Native mesh load supplies tangent inputs and indexed maximum absolute colour-red
+weight; queue bounds include world-Y wave displacement. Active colour/depth and
+MSAA resolve destinations cannot be sampled. Legacy depth/eye sorters, blended
+gathering and depth-prepass scheduling now preserve ordered native boundaries.
+16 two-eye GPU cases exercise the
+shared packer/binder and owner retirement; CPU scene/batch tests and55 rigid GPU
+regressions pass. The fixture does not execute `DrawQueueFlush`, and no game
+producer calls the new submission entry yet. No new live family is converted.
+[Queue evidence and limitations](../research/20260908_0509_native-water-queue.md).
+
+Next connected work: publish completed water values and image owners from the
+ordered material writer and admit the family into the existing mixed scene
+consumer, calling `SubmitNativeWaterScenePackets`. Reuse the current
 water update/refraction setup, instance/model/mesh owners and native scene-image
 publications. Remove this family's per-entry legacy material/resource execution,
 not just another callback helper; preserve authored updates, reflections,
@@ -398,8 +413,10 @@ fixtures plus fresh water consumption/retirement and mixed cold/reload checks.
 Publish completed material values with native instance/generation identity after
 the resource writer, not a draw-time descriptor lookup. The current import copies
 final parameter destinations; it is not yet installed in a frame-bounded owner.
-Retain image leases through the real queue/fence and extend load-owned geometry
-with the validated tangent input. Displacement requires conservative native bounds.
+Connect real image leases to the queue's retained roles; keep producer command
+framebuffers/resolve owners alive through their fences too. Load-owned tangent
+and displacement metadata now exist; apply displaced bounds before live walk
+culling as well as queued visibility. Do not recreate these owners/helpers.
 The shader supports per-eye cameras/image layers; their actual game producers,
 water shadow-view variants and all authored controls remain integration work.
 Do not freeze late values or weaken unknown-writer refusal. Receiver descriptors,

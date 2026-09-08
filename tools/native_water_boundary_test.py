@@ -47,6 +47,42 @@ class NativeWaterBoundaryTest(unittest.TestCase):
         self.assertIn("native_water_program.cpp", cmake)
         self.assertIn("NAME native_water_pixels", cmake)
 
+    def test_water_reuses_native_queue_emit_and_fence_owners(self):
+        direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
+        submit = direct.split("bool SubmitNativeWaterScenePackets(", 1)[1].split(
+            "void PrepareNativeRigidBatchDraw(", 1)[0]
+        for required in ("NativeWaterWorldBounds", "CreateNativeWaterProgram", "StageNativeItem",
+                         "DrawQueuePush", "draw.reorderable = false", "ResolveSamplerLocked", "commands->WritesImage"):
+            self.assertIn(required, submit)
+        for forbidden in ("bd::mem", "__imp__", "ResolveGuest", "ReadNativeWaterMaterial"):
+            self.assertNotIn(forbidden, submit)
+        emit = direct.split("void PrepareNativeRigidBatchDraw(", 1)[1]
+        for required in ("PackNativeWaterBatch", "BindNativeWaterImages", "first.Pass()",
+                         "record->output.Retire()", "++store.water_retired"):
+            self.assertIn(required, emit)
+        fixture = (ROOT / "tools/native_scene_snapshot_test/water.cpp").read_text()
+        for required in ("PackNativeWaterBatch", "BindNativeWaterImages", "weak_geometry.expired()",
+                         "weak_snapshot.expired()", "queue->waitForCommandFence"):
+            self.assertIn(required, fixture)
+        queue = (ROOT / "src/gpu/draw_queue.cpp").read_text()
+        self.assertIn("q.reorderable || q.native_rigid->water", queue)
+        self.assertIn("q.native_rigid->water && candidate.native_rigid->water", queue)
+        self.assertEqual(queue.count("StableSortDrawRuns(std::span(g_queue), ordered_native"), 2)
+        self.assertIn("prepass_end = DrawOrderRunEnd", queue)
+        self.assertIn("emit_prepass_run(i,prepass_end)", queue)
+        self.assertIn("if (e.native_rigid && !e.reorderable) break", queue)
+
+    def test_wave_metadata_is_produced_from_native_cpu_asset_before_upload(self):
+        upload = (ROOT / "src/gpu/scene/native_mesh.cpp").read_text().split(
+            "std::shared_ptr<const NativeGeometry> Upload(", 1)[1].split(
+            "std::shared_ptr<const NativeGeometry> Import(", 1)[0]
+        self.assertLess(upload.index("BuildNativeMeshWaveWeight"), upload.index("buffer->map()"))
+        self.assertIn("result->water_vertex_input = std::move(water_input)", upload)
+        self.assertIn("result->wave_weight = wave_weight", upload)
+        bounds = (ROOT / "src/gpu/scene/native_water_scene.h").read_text()
+        for required in ("TransformNativeBounds", "1.5 * std::abs", "std::nextafter"):
+            self.assertIn(required, bounds)
+
 
 if __name__ == "__main__":
     unittest.main()

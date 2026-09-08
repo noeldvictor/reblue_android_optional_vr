@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_water_program.h"
 #include "gpu/scene/native_water_material_source.h"
+#include "gpu/scene/native_rigid_batch.h"
 #include "gpu/scene/native_scene_snapshot.h"
 #include "gpu/draw_bindings.h"
 #include <plume_vulkan.h>
@@ -81,6 +82,43 @@ void CheckImport() {
   auto singular = Identity(); singular[0] = 0;
   Need(!BuildNativeWaterInstance(singular,*changed,Pass(),bottom,{1,1,1},0), "Water singular transform");
 }
+void CheckWaveBounds() {
+  NativeMeshData mesh;
+  mesh.attributes = {{MeshSemantic::Position,0,0},{MeshSemantic::Color,0,16}};
+  mesh.layout = NativeMeshLayoutId(mesh.attributes); mesh.base_vertex = -1; mesh.indices = {1,2,3};
+  mesh.streams.push_back({0,32,std::vector<uint8_t>(4*32)});
+  const float points[4][3]{{-1,-2,0},{2,0,1},{0,3,-1},{100,100,100}};
+  const float weights[]{-2,.5f,1,1000};
+  const auto write = [&](uint32_t offset, float value) {
+    const auto word = std::bit_cast<uint32_t>(value);
+    for (uint32_t byte = 0; byte < 4; ++byte) mesh.streams[0].bytes[offset+byte] = uint8_t(word>>(8*byte));
+  };
+  for (uint32_t vertex = 0; vertex < 4; ++vertex) {
+    for (uint32_t axis = 0; axis < 3; ++axis) write(vertex*32+axis*4,points[vertex][axis]);
+    write(vertex*32+12,1); write(vertex*32+16,weights[vertex]);
+  }
+  NativeGeometry geometry;
+  geometry.bounds = BuildNativeMeshBounds(mesh); geometry.wave_weight = BuildNativeMeshWaveWeight(mesh);
+  Need(geometry.bounds && geometry.wave_weight == 2.f,"Water signed base/indexed HDR colour weight excludes unused vertices");
+  auto world = Identity(); world[0] = -2; world[1] = .5f; world[5] = 3; world[9] = -.25f; world[13] = 5;
+  NativeWaterMaterial material; material.wave_amplitude = -.75f;
+  auto input = BuildNativeWaterInstance(world,material,Pass(),{Identity(),Identity()},{1,1,1},0);
+  Need(bool(input),"Water bound instance");
+  const auto bounds = NativeWaterWorldBounds(geometry,*input);
+  Need(bool(bounds),"Water transformed/deformed bound");
+  for (uint32_t phase = 0; phase < 256; ++phase) for (uint32_t vertex = 0; vertex < 3; ++vertex) {
+    const float y = points[vertex][0]*world[1]+points[vertex][1]*world[5]+points[vertex][2]*world[9]+world[13] +
+        material.wave_amplitude*weights[vertex]*(std::sin(float(phase)*.37f)+.5f*std::sin(float(phase)*1.13f));
+    Need(y >= bounds->min[1] && y <= bounds->max[1],"Water conservative negative-amplitude/sheared world-Y displacement");
+  }
+  mesh = {}; // retained metadata survives source destruction
+  Need(NativeWaterWorldBounds(geometry,*input) == bounds,"Water bound source retirement");
+  geometry.wave_weight.reset(); Need(!NativeWaterWorldBounds(geometry,*input),"Water missing indexed weight refuses");
+  geometry.wave_weight = -1; Need(!NativeWaterWorldBounds(geometry,*input),"Water invalid indexed weight refuses");
+  geometry.wave_weight = (std::numeric_limits<float>::max)();
+  input->object_data.material.waves.x = (std::numeric_limits<float>::max)();
+  Need(!NativeWaterWorldBounds(geometry,*input),"Water unrepresentable displacement refuses");
+}
 std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uint32_t bytes, RenderBufferFlags flags) {
   auto buffer = device.createBuffer(RenderBufferDesc::UploadBuffer(bytes,flags));
   Need(bool(buffer), "Water upload allocation");
@@ -92,12 +130,13 @@ std::unique_ptr<RenderBuffer> Upload(RenderDevice &device, const void *data, uin
 }
 struct Image {
   std::shared_ptr<NativeTargetImage> owner;
-  std::unique_ptr<RenderTextureView> view;
   std::vector<std::unique_ptr<RenderTextureView>> layer_views;
   std::vector<std::unique_ptr<RenderFramebuffer>> framebuffers;
 };
 Image MakeImage(RenderDevice &device, uint32_t layers, bool cube = false, bool depth = false) {
   Image result; result.owner = std::make_shared<NativeTargetImage>();
+  static uint64_t identity = 0;
+  result.owner->identity = ++identity;
   const auto format = depth ? RenderFormat::D32_FLOAT_S8_UINT : RenderFormat::R16G16B16A16_FLOAT;
   auto desc = depth ? RenderTextureDesc::DepthTarget(size,size,format) :
       RenderTextureDesc::ColorTarget(size,size,format,{},nullptr,cube ? RenderTextureFlag::CUBE : RenderTextureFlag::NONE);
@@ -108,8 +147,8 @@ Image MakeImage(RenderDevice &device, uint32_t layers, bool cube = false, bool d
   RenderTextureViewDesc view;
   view.format = format; view.dimension = cube ? RenderTextureViewDimension::TEXTURE_CUBE : RenderTextureViewDimension::TEXTURE_2D_ARRAY;
   view.mipLevels = 1; view.arraySize = layers;
-  result.view = result.owner->image->createTextureView(view);
-  Need(result.view && static_cast<VulkanTextureView *>(result.view.get())->vk,"Water sampled image view");
+  result.owner->view = result.owner->image->createTextureView(view);
+  Need(result.owner->view && static_cast<VulkanTextureView *>(result.owner->view.get())->vk,"Water sampled image view");
   for (uint32_t layer = 0; layer < layers; ++layer) {
     view.dimension = RenderTextureViewDimension::TEXTURE_2D; view.arraySize = 1; view.arrayIndex = layer;
     result.layer_views.push_back(result.owner->image->createTextureView(view));
@@ -124,13 +163,13 @@ Image MakeImage(RenderDevice &device, uint32_t layers, bool cube = false, bool d
 }
 std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   NativeMeshData mesh; mesh.streams.push_back({0,80,{}});
-  mesh.attributes = {{MeshSemantic::Position,0,0},{MeshSemantic::Normal,0,16},{MeshSemantic::TexCoord,0,32},
-                     {MeshSemantic::Color,0,48},{MeshSemantic::Tangent,0,64}};
+  mesh.attributes = {{MeshSemantic::Position,0,0},{MeshSemantic::Normal,0,16},{MeshSemantic::Tangent,0,32},
+                     {MeshSemantic::TexCoord,0,48},{MeshSemantic::Color,0,64}};
   NativeVertexInputLibrary library;
   auto input = NativeWaterVertexInput(mesh,library); Need(bool(input),"Water named mesh input");
   auto program = CreateNativeWaterProgram(device,input); Need(bool(program),"Production water program");
-  mesh.attributes.pop_back(); Need(!NativeWaterVertexInput(mesh,library),"Missing water tangent refuses");
-  mesh = {}; input.reset(); // the production program retains its immutable input
+  auto missing = mesh; missing.attributes.erase(missing.attributes.begin()+2);
+  Need(!NativeWaterVertexInput(missing,library),"Missing water tangent refuses");
   std::array<NativeWaterInstanceGPU,3> instances{};
   std::array<NativeWaterMaterial,2> materials;
   auto pass = Pass();
@@ -165,13 +204,22 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
         mode == 5 ? WaterDiffuse|WaterFog|WaterShadow : lit ? WaterDiffuse|WaterFog : 0);
     Need(bool(packed),"Water instance packing"); instances[i+1] = *packed;
   }
-  auto storage = Upload(device,instances.data(),sizeof(instances),RenderBufferFlag::STORAGE);
-  struct Vertex { RigidFloat4 position,normal,uv,colour,tangent; };
+  struct Vertex { RigidFloat4 position,normal,tangent,uv,colour; };
   std::array<Vertex,4> vertices;
   const float xy[4][2]{{-1,-1},{1,-1},{1,1},{-1,1}};
   for (uint32_t i = 0; i < 4; ++i) vertices[i] = {{xy[i][0],xy[i][1],.5f,1},{0,0,1,0},
-      {xy[i][0],xy[i][1],0,0},{1,1,1,1},{1,0,0,0}};
+      {1,0,0,0},{xy[i][0],xy[i][1],0,0},{1,1,1,1}};
   const uint16_t indices[]{0,1,2,0,2,3};
+  mesh.layout = NativeMeshLayoutId(mesh.attributes);
+  mesh.indices.assign(std::begin(indices),std::end(indices));
+  mesh.streams[0].bytes.resize(sizeof(vertices));
+  std::memcpy(mesh.streams[0].bytes.data(),vertices.data(),sizeof(vertices));
+  auto geometry = std::make_shared<NativeGeometry>();
+  geometry->id = NativeMeshContentId(mesh); geometry->canonical_vertices = true;
+  geometry->water_vertex_input = input; geometry->bounds = BuildNativeMeshBounds(mesh);
+  geometry->wave_weight = BuildNativeMeshWaveWeight(mesh);
+  Need(geometry->id && geometry->bounds && geometry->wave_weight == 1.f,"Indexed native water geometry and wave weight");
+  mesh = {}; missing = {}; input.reset(); // source retires; geometry/program keep native metadata
   auto vb = Upload(device,vertices.data(),sizeof(vertices),RenderBufferFlag::VERTEX);
   auto ib = Upload(device,indices,sizeof(indices),RenderBufferFlag::INDEX);
   struct Indexed { uint32_t count, instances, first; int32_t base; uint32_t instance; };
@@ -183,8 +231,6 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   NativeWaterDescriptorSchema schema;
   std::array<std::unique_ptr<RenderDescriptorSet>,3> sets;
   for (uint32_t i = 0; i < 3; ++i) { sets[i] = schema.sets[i].create(&device); Need(bool(sets[i]),"Water descriptors"); }
-  const RenderBufferStructuredView storage_view(sizeof(NativeWaterInstanceGPU));
-  sets[0]->setBuffer(0,storage.get(),sizeof(instances),&storage_view);
   RenderSamplerDesc sampler_desc;
   sampler_desc.minFilter = sampler_desc.magFilter = RenderFilter::NEAREST; sampler_desc.mipmapMode = RenderMipmapMode::NEAREST;
   sampler_desc.addressU = sampler_desc.addressV = sampler_desc.addressW = RenderTextureAddressMode::CLAMP;
@@ -194,10 +240,6 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   sampler_desc.comparisonEnabled = true; sampler_desc.comparisonFunc = RenderComparisonFunction::LESS_EQUAL;
   auto sun_sampler = device.createSampler(sampler_desc);
   Need(sampler && bump_sampler && sun_sampler,"Water samplers");
-  for (uint32_t i = 0; i < 6; ++i) {
-    sets[1]->setTexture(i,images[i].owner->image.get(),RenderTextureLayout::SHADER_READ,images[i].view.get());
-    sets[2]->setSampler(i,i == 5 ? sun_sampler.get() : i == 0 ? bump_sampler.get() : sampler.get());
-  }
   const auto *target = colour.owner->image.get();
   RenderFramebufferDesc fb; fb.colorAttachments = &target; fb.colorAttachmentsCount = 1;
   fb.depthAttachment = depth.owner->image.get(); fb.viewMask = 3;
@@ -252,6 +294,85 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   Need(CopySceneSnapshot(*commands,*scene,images[2].owner->Sampled()),"Water ordered native snapshot");
   scene->Bind(*commands); Need(!scene->ApplyClear(*commands),"Water snapshot resume must not clear");
   commands->clearColor(0,blend ? RenderColor(.125f,.25f,.5f,1) : RenderColor(9,8,7,1)); // must NOT change retained snapshot samples
+  // Retire the producer owners before the draw. The real batch representation
+  // must retain native image AND view, not fixture-local pointers or source slots.
+  auto bump = std::make_shared<NativeTextureGpu>(), environment = std::make_shared<NativeTextureGpu>();
+  bump->image = std::move(images[0].owner->image); bump->view = std::move(images[0].owner->view);
+  bump->dimension = RenderTextureViewDimension::TEXTURE_2D_ARRAY;
+  environment->image = std::move(images[4].owner->image); environment->view = std::move(images[4].owner->view);
+  environment->dimension = RenderTextureViewDimension::TEXTURE_CUBE;
+  std::array<NativeRigidBatchItem,2> items;
+  std::array<const NativeRigidBatchItem *,2> pointers{&items[0],&items[1]};
+  for (uint32_t n = 0; n < 2; ++n) {
+    auto water = std::make_shared<NativeWaterBatchData>(); water->input = instances[n+1];
+    water->images = {bump,environment,images[1].owner,images[2].owner,images[3].owner,images[5].owner};
+    water->samplers = {bump_sampler.get(),sampler.get(),sampler.get(),sampler.get(),sampler.get(),sun_sampler.get()};
+    auto &item = items[n]; item.water = std::move(water); item.geometry = geometry;
+    item.world_bounds = NativeWaterWorldBounds(*geometry,item.water->input);
+    item.frame = 17; item.slot = 1; item.view = 3; item.instance = n+1; item.model_generation = 29;
+    item.pipeline = pipeline.get(); item.layout = program->Layout(); item.framebuffer = framebuffer.get();
+    item.scene_depth = depth.owner;
+    Need(item.Ready(17,1),"Water complete native batch admission");
+    Need(!item.output.Retire(),"Water pending output cannot retire");
+  }
+  const std::weak_ptr<const NativeGeometry> weak_geometry = geometry;
+  const std::weak_ptr<const NativeTextureGpu> weak_bump = bump;
+  const std::weak_ptr<const NativeTargetImage> weak_snapshot = images[2].owner;
+  geometry.reset(); bump.reset(); environment.reset();
+  // Producer references retire now; framebuffer/view command resources from
+  // the setup clears independently remain pinned until THEIR submission fence.
+  for (auto &image : images) image.owner.reset();
+  Need(!weak_geometry.expired() && !weak_bump.expired() && !weak_snapshot.expired(),"Queued water retains retired producers");
+  if (mode == 0) {
+    std::array<NativeWaterInstanceGPU,2> packed{};
+    packed[0].object_data.material.tint.x = 123;
+    Need(!PackNativeWaterBatch(pointers,packed,18,1) && packed[0].object_data.material.tint.x == 123,
+        "Water stale frame rejects transactionally");
+    Need(!PackNativeWaterBatch(pointers,packed,17,2),"Water stale frame slot refuses");
+    const auto saved = items[1];
+    items[1].model_generation++;
+    Need(NativeRigidBatchLength(pointers,17,1) == 1,"Water model generation batch barrier");
+    items[1] = saved;
+    auto changed = std::make_shared<NativeWaterBatchData>(*items[1].water);
+    changed->input.pass_data.world_to_clip[1] = PackRigidMatrix(Identity()); items[1].water = changed;
+    Need(NativeRigidBatchLength(pointers,17,1) == 1,"Water second-eye camera batch barrier");
+    *changed = *saved.water; changed->images.snapshot = changed->images.planar;
+    Need(items[1].Ready(17,1) && NativeRigidBatchLength(pointers,17,1) == 1,"Water ordered snapshot publication batch barrier");
+    changed->images.bottom.reset();
+    Need(!items[1].Ready(17,1) && !PackNativeWaterBatch(pointers,packed,17,1),"Water missing native image owner refuses");
+    *changed = *saved.water; changed->input.image_layers.y = 1;
+    Need(!items[1].Ready(17,1),"Water declared image layers must match retained image");
+    items[1] = saved; items[1].water.reset();
+    Need(!SameNativeRigidBatch(items[0],items[1]),"Water and rigid GPU ABIs never mix");
+    items[1] = saved;
+    std::array<NativeRigidInstanceGPU,2> rigid{};
+    Need(!PackNativeRigidBatch(pointers,rigid,17,1),"Water cannot pack into rigid storage stride");
+    std::array<const NativeRigidBatchItem *,3> barrier{&items[0],nullptr,&items[1]};
+    Need(NativeRigidBatchLength(barrier,17,1) == 1,"Non-native ordered entry is a water batch barrier");
+    for (uint32_t align = 1; align <= 1024; align *= 2) {
+      const auto plan = PlanNativeRigidStorage(256,align,sizeof(NativeWaterInstanceGPU));
+      Need(bool(plan),"Bounded 256-water instance placement");
+      for (uint32_t offset : {0u,1u,17u,4095u,65535u})
+        Need(plan->Offset(offset)%align == 0 && plan->Offset(offset)%sizeof(NativeWaterInstanceGPU) == 0 &&
+            plan->Offset(offset)-offset+plan->bytes <= plan->reserve,"Water arena alignment/headroom");
+    }
+    Need(!PlanNativeRigidStorage(257,16,sizeof(NativeWaterInstanceGPU)) &&
+        !PlanNativeRigidStorage(1,16,12),"Water arena record/stride limit");
+  }
+  instances = {};
+  Need(PackNativeWaterBatch(pointers,std::span(instances).subspan(1),17,1),"Production native water instance gathering");
+  const auto alignment = uint32_t(static_cast<VulkanDevice &>(device).physicalDeviceProperties.limits.minStorageBufferOffsetAlignment);
+  const auto placement = PlanNativeRigidStorage(3,alignment,sizeof(NativeWaterInstanceGPU));
+  Need(bool(placement),"Water structured upload placement");
+  const auto offset = placement->Offset(32); // deliberately misaligned arena allocation
+  std::vector<uint8_t> upload(placement->reserve+32);
+  Need(offset%alignment == 0 && offset%sizeof(NativeWaterInstanceGPU) == 0 &&
+      offset+sizeof(instances) <= upload.size(),"Water element/byte aligned storage slice");
+  std::memcpy(upload.data()+offset,instances.data(),sizeof(instances));
+  auto storage = Upload(device,upload.data(),uint32_t(upload.size()),RenderBufferFlag::STORAGE);
+  const RenderBufferStructuredView storage_view(sizeof(NativeWaterInstanceGPU),offset/sizeof(NativeWaterInstanceGPU));
+  sets[0]->setBuffer(0,storage.get(),sizeof(instances),&storage_view);
+  Need(BindNativeWaterImages(*items[0].water,*sets[1],*sets[2]),"Production owned water image bindings");
   GraphicsBindings bindings; bindings.layout = program->Layout(); bindings.set_count = 3;
   for (uint32_t i = 0; i < 3; ++i) bindings.sets[i] = sets[i].get();
   GraphicsBindingState binding_state; Need(ApplyGraphicsBindings(*commands,bindings,binding_state),"Water explicit bindings");
@@ -260,6 +381,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   const RenderIndexBufferView index_view({ib.get(),0},sizeof(indices),RenderFormat::R16_UINT);
   commands->setVertexBuffers(0,&vertex_view,1,&slot); commands->setIndexBuffer(&index_view);
   commands->drawIndexedIndirect(indirect.get(),0,1,sizeof(Indexed));
+  for (auto &item : items) Need(item.output.Record() && item.output.Resolve(true),"Water real command receipt");
   commands->setFramebuffer(nullptr);
   auto readback = device.createBuffer(RenderBufferDesc::ReadbackBuffer(2*colour_bytes+2*pixels_per_eye*4));
   Need(bool(readback),"Water readback allocation");
@@ -288,6 +410,12 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
   auto &native_fence = *static_cast<VulkanCommandFence *>(fence.get());
   Need(vkWaitForFences(native_fence.device->vk,1,&native_fence.vk,VK_TRUE,5'000'000'000ULL) == VK_SUCCESS,"Water fence timeout");
   queue->waitForCommandFence(fence.get());
+  for (auto &item : items) Need(item.output.Retire() && !item.output.Retire(),"Water exactly-once fence retirement");
+  // Free descriptors before their owners. Real DrainSlot clears both only after
+  // the fence; this fixture checks the same receipt/lease boundary, not a game run.
+  for (auto &image : images) { image.framebuffers.clear(); image.layer_views.clear(); }
+  sets = {}; items = {};
+  Need(weak_geometry.expired() && weak_bump.expired() && weak_snapshot.expired(),"Water image/geometry leases release after fence");
   auto &native_buffer = *static_cast<VulkanBuffer *>(readback.get());
   Need(vmaInvalidateAllocation(native_buffer.device->allocator,native_buffer.allocation,0,VK_WHOLE_SIZE) == VK_SUCCESS,"Water readback invalidate");
   const auto *mapped = static_cast<const uint16_t *>(readback->map()); Need(mapped != nullptr,"Water readback map");
@@ -371,6 +499,7 @@ std::vector<float> Run(RenderDevice &device, uint32_t mode, float phase = 0) {
 } // namespace
 void CheckNativeWater(RenderDevice &device) {
   CheckImport();
+  CheckWaveBounds();
   for (uint32_t mode = 0; mode < 6; ++mode) Run(device,mode);
   for (uint32_t mode = 8; mode <= 13; ++mode) Run(device,mode);
   for (uint32_t mode : {6u,7u}) {
