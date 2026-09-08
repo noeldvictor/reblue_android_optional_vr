@@ -867,6 +867,29 @@ class RigidSceneScenarioTest(unittest.TestCase):
         self.assertEqual(verify_rigid_scene("\n".join(self.rows())),
                          dict(submitted_delta=50, emitted_delta=50, retired_delta=50))
 
+    def gpu_rows(self):
+        rows = self.rows()
+        rows[2] = rows[2].replace("emitted 99", "emitted 80").replace("retired 98", "retired 80")
+        rows[2] += " visibility pending 5 culled 15 retired-culled 15 resources-retired 95;"
+        rows[4] = rows[4].replace("emitted 149", "emitted 120").replace("retired 148", "retired 120")
+        rows[4] += " visibility pending 4 culled 26 retired-culled 26 resources-retired 146;"
+        return rows
+
+    def test_gpu_classification_preserves_visible_output_and_all_resource_retirement(self):
+        result = verify_rigid_scene("\n".join(self.gpu_rows()))
+        self.assertEqual(result,dict(submitted_delta=50,emitted_delta=40,retired_delta=40,
+                                    pending=4,culled_delta=11,retired_culled_delta=11,resource_retired_delta=51))
+
+    def test_gpu_generation_culling_or_retirement_alone_cannot_qualify_output(self):
+        text = "\n".join(self.gpu_rows())
+        no_output = text.replace("emitted 120", "emitted 80").replace("retired 120", "retired 80")
+        no_output = no_output.replace("culled 26", "culled 66")
+        with self.assertRaises(Pending): verify_rigid_scene(no_output)
+        for bad in (text.replace("pending 4", "pending 5"), text.replace("culled 26", "culled 25"),
+                    text.replace("resources-retired 146", "resources-retired 145"),
+                    text.replace("visibility pending 4", "visibility pending invalid")):
+            with self.assertRaises(ValueError): verify_rigid_scene(bad)
+
     def test_queue_only_stale_reset_or_wrong_scene_cannot_pass(self):
         text = "\n".join(self.rows())
         for bad in (text.replace("emitted 149", "emitted 99").replace("retired 148", "retired 98"),
@@ -897,6 +920,7 @@ class RigidBatchScenarioTest(unittest.TestCase):
         result = verify_rigid_batches(self.text())
         self.assertEqual(result,dict(scene_instances_delta=50,scene_calls_delta=50,
                                     shadow_instances_delta=50,shadow_calls_delta=50,merged_instances_delta=0))
+        self.assertEqual(verify_rigid_batches(self.text().replace("indirect calls", "visible indirect calls")),result)
 
     def test_each_consumer_must_advance_in_the_ready_scene(self):
         text = self.text()
@@ -1167,6 +1191,29 @@ class OcclusionObservationTest(unittest.TestCase):
         for bad in (text + "\n[error] fault", text + "\n[native-object-input-mismatch]",
                     text + "\n[shutdown] complete", "x"*(2*MAX_LOG_BYTES+1),
                     text.replace("queried 180", "queried 150")):
+            with self.assertRaises(ValueError): observe_occlusion(bad)
+
+    def current_rows(self):
+        rows = self.rows()
+        rows[2] = "[native-depth-vis] frame 1500 snapshots 50 generated 100 draw-recorded 100 fence-collected 95 visible-instances 100 culled-instances 5; buffers 4096 owners 2;"
+        rows[4] = "[native-depth-vis] frame 1800 snapshots 100 generated 200 draw-recorded 200 fence-collected 195 visible-instances 200 culled-instances 10; buffers 1024 owners 1;"
+        return rows
+
+    def test_current_depth_observation_requires_fresh_draws_and_fence_classification(self):
+        text = "\n".join(self.current_rows())
+        self.assertEqual(observe_occlusion(text),dict(mode="current-depth",frame=1800,snapshots_delta=50,
+                         generated_delta=100,draw_recorded_delta=100,collected_delta=100,visible_delta=100,skipped_delta=5))
+        with self.assertRaises(Pending): split_rigid_reload(text)
+        for bad in (text.replace("culled-instances 10", "culled-instances 5"),
+                    text.replace("bg41_01", "bg42_01"),text+"\n[native-rigid-reload] title requested"):
+            with self.assertRaises(Pending): observe_occlusion(bad)
+
+    def test_current_depth_observation_rejects_impossible_generation_and_budget(self):
+        text = "\n".join(self.current_rows())
+        for bad in (text.replace("draw-recorded 200", "draw-recorded 201"),
+                    text.replace("fence-collected 195", "fence-collected 201"),
+                    text.replace("buffers 1024", "buffers 67108865"),text.replace("owners 1;", "owners 17;"),
+                    text.replace("culled-instances 10", "culled-instances invalid")):
             with self.assertRaises(ValueError): observe_occlusion(bad)
 
 

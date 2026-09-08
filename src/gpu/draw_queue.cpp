@@ -13,6 +13,7 @@
 #include "gpu/scene/node_tag.h"
 #include "gpu/scene/native_rigid_draw.h"
 #include "gpu/scene/native_rigid_batch.h"
+#include "gpu/native_depth_visibility.h"
 #include "gpu/frag_census.h"
 #include "gpu/vertex_pull.h"
 
@@ -254,7 +255,10 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
   const bool counted = FragCensusBegin(
       cmd, d.ps_hash, d.visual_va, d.render_view,
       FragCensusFlags(d.blended, d.tex_opaque, d.zwrite, d.tex_slot0_only));
-  if (d.native_indirect.ref)
+  if (d.native_visibility) {
+    if (!d.native_visibility->DrawCommand(*cmd,d.native_visibility_command))
+      throw std::runtime_error("native GPU visibility draw command refused");
+  } else if (d.native_indirect.ref)
     cmd->drawIndexedIndirect(d.native_indirect.ref,d.native_indirect.offset,1,sizeof(scene::NativeRigidIndexedCommand));
   else if (d.indexed)
     cmd->drawIndexedInstanced(d.count, instance_count, d.start_index,
@@ -263,8 +267,7 @@ void EmitOne(plume::RenderCommandList *cmd, const QueuedDraw &d,
     cmd->drawInstanced(d.count, instance_count, d.start_vertex,
                        first_instance);
   ++g_binding_draws;
-  scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,
-      d.native_rigid && d.native_rigid->regression ? d.native_rigid->model_generation : 0, native_items);
+  scene::NoteNativeRigidEmission(d,native_items);
   if (counted)
     FragCensusEnd(cmd);
 }
@@ -369,7 +372,7 @@ static bool BisectDrops(u32 &index_in_frame) {
 
 void DrawQueuePush(const QueuedDraw &draw) {
   if (draw.native_rigid && (draw.translated_instance_records || draw.instanced_pipeline || draw.pulled_pipeline ||
-      draw.record_index != ~0u || draw.native_indirect.ref || draw.prepass_pipeline || draw.color_pipeline)) {
+      draw.record_index != ~0u || draw.native_indirect.ref || draw.native_visibility || draw.prepass_pipeline || draw.color_pipeline)) {
     BD_ERROR("[native-rigid-batch] refused hybrid native/translated queue record");
     throw std::runtime_error("invalid native queue record");
   }
@@ -654,6 +657,7 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
   const i32 split_every = REXCVAR_GET(bd_pass_split_draws);
   u32 since_split = 0;
   u32 groups = 0, grouped_draws = 0, emitted = 0;
+  bool refresh_native_depth = true;
   static std::vector<u32> records;
   for (size_t i = 0; i < g_queue.size();) {
     const QueuedDraw &q = g_queue[i];
@@ -680,7 +684,11 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
         throw std::runtime_error("stale native queue record");
       }
       QueuedDraw d = q;
-      scene::PrepareNativeRigidBatchDraw(std::span(items).first(n),d);
+      scene::PrepareNativeRigidBatchDraw(std::span(items).first(n),d,refresh_native_depth);
+      // Compute ended rendering. Restore every explicit binding before drawing;
+      // no ambient pipeline/framebuffer cache may survive this interruption.
+      if (d.native_visibility) st = {};
+      refresh_native_depth = !d.native_visibility;
       if (d.pipeline != prev) { ++pipeline_binds; prev = d.pipeline; }
       opaque += n; dmin = (std::min)(dmin,d.depth); dmax = (std::max)(dmax,d.depth);
       EmitOne(cmd,d,st,n,0,std::span(items).first(n));
@@ -689,6 +697,10 @@ void DrawQueueFlush(plume::RenderCommandList *cmd) {
       i += n;
       continue;
     }
+
+    // Non-native draws may overwrite depth non-monotonically. The next native
+    // segment must sample current depth again, even if its image/camera matches.
+    refresh_native_depth = true;
 
     // A run of consecutive draws sharing this one's group key becomes one
     // instanced draw; its records are committed to the GPU contiguously, in

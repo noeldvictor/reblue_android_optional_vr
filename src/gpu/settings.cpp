@@ -1240,21 +1240,14 @@ REXCVAR_DEFINE_BOOL(bd_stereo_test, false, kCvarGroup,
 // the guest's light box recentred and zoomed onto the camera frustum's near
 // part, in the light's own clip space, so the map's texels land where the
 // camera looks. Stage 5's first piece (2026-09-03).
-// Host occlusion culling (gpu/occlusion_cull.h): a view-space cube proxy per
-// node under an occlusion query at the end of the scene pass; a node whose
-// proxy passed no sample two frames running is not drawn. Stage 8's second
-// half, desktop first (2026-09-03).
 // One line per queued scene draw into logs/draw_ledger.txt, to diff a frame
 // with a hole against its neighbour (tools/capture_seq.py names the frame).
 REXCVAR_DEFINE_BOOL(bd_draw_ledger, false, kCvarGroup,
                     "Write every queued scene draw to logs/draw_ledger.txt.");
-// On since 2026-09-04. The walk notes each camera-view node's sphere, the
-// scene pass draws the proxies under occlusion queries at its end, and a node
-// whose proxy drew nothing last frame has its draws dropped by the queue. A
-// village frame notes 84 nodes, reads 33 occluded and skips 30 draws; 120
-// consecutive captures show no popping (0 neighbour jumps over 6%).
+// Native rigid batches consume current owned depth on the GPU. Old temporal
+// query pools and source-address filters are removed, not a fallback mode.
 REXCVAR_DEFINE_BOOL(bd_occlusion_cull, true, kCvarGroup,
-                    "Occlusion-cull scene nodes by last frame's proxy queries.");
+                    "Generate native rigid visibility from current-depth pyramids; uncertain bounds stay visible.");
 REXCVAR_DEFINE_BOOL(bd_occlusion_diag, true, kCvarGroup,
                     "Log the occlusion culling counters every 300 frames.");
 REXCVAR_DEFINE_BOOL(bd_shadow_fit, true, kCvarGroup,

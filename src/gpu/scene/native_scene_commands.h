@@ -75,6 +75,7 @@ public:
         sources_[1]->image.get() == depth;
   }
   plume::RenderFramebuffer *Framebuffer() const { return framebuffer_; }
+  NativeTargetImageHandle DepthOwner() const { return sources_[1]; }
   const NativeTargetShape *ColorShape() const { return sources_[0] ? &sources_[0]->shape : nullptr; }
   bool ClearPending() const { return clear_.has_value(); }
   std::optional<NativeOcclusionView> OcclusionView(uint32_t frame) const {

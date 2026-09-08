@@ -16,6 +16,7 @@
 #include "gpu/draw_bindings.h"
 
 namespace bd::gpu {
+class NativeDepthVisibilityWork;
 namespace scene { struct NativeRigidBatchItem; }
 
 // Blue Dragon submits about a thousand individually placed scene nodes a frame,
@@ -140,6 +141,8 @@ struct QueuedDraw {
   std::shared_ptr<const scene::NativeRigidBatchItem> native_rigid;
   // Populated only by native batch preparation, never an inherited binding.
   plume::RenderBufferReference native_indirect{};
+  NativeDepthVisibilityWork *native_visibility = nullptr; // Frame-slot retained, never a producer-owned pointer.
+  uint32_t native_visibility_command = 0;
   // The instanced twin that pulls its vertices from the record's streams
   // (gpu/vertex_pull.h); set only when this draw's pull info staged.
   plume::RenderPipeline *pulled_pipeline = nullptr;

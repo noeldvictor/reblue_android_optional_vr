@@ -10,6 +10,25 @@
 #include <limits>
 
 namespace bd::gpu::scene {
+// Per retained draw, not a frame estimate. Generation, actual command recording,
+// GPU visibility and resource retirement are different events.
+class NativeRigidOutputReceipt {
+public:
+  bool Record() { if (recorded_) return false; recorded_ = true; return true; }
+  bool Resolve(bool visible) {
+    if (!recorded_ || resolved_) return false;
+    resolved_ = true; visible_ = visible; return true;
+  }
+  bool Retire() {
+    if (!resolved_ || retired_) return false;
+    retired_ = true; return true;
+  }
+  bool Recorded() const { return recorded_; }
+  bool Visible() const { return resolved_ && visible_; }
+  bool Culled() const { return resolved_ && !visible_; }
+private:
+  bool recorded_ = false, resolved_ = false, visible_ = false, retired_ = false;
+};
 struct NativeRigidEpoch {
   struct Counts { uint64_t submitted = 0, emitted = 0, retired = 0; };
   uint64_t generation = 0, first_instance = 0;

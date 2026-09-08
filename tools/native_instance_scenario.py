@@ -109,24 +109,40 @@ def observe_occlusion(text):
         raise ValueError("occlusion observation exceeds 800 KiB")
     if re.search(r"\[(?:error|critical)\]|\[native-[^\]]*-mismatch\]|\[shutdown\]", text):
         raise ValueError("runtime failure or shutdown before occlusion observation")
-    pattern = re.compile(r"\[native-occ\] frame (\d+) requested (\d+) queried (\d+) "
+    current_depth = "[native-depth-vis]" in text
+    pattern = re.compile(r"\[native-depth-vis\] frame (\d+) snapshots (\d+) generated (\d+) draw-recorded (\d+) "
+                         r"fence-collected (\d+) visible-instances (\d+) culled-instances (\d+); buffers (\d+) owners (\d+);"
+                         if current_depth else r"\[native-occ\] frame (\d+) requested (\d+) queried (\d+) "
                          r"fence-collected (\d+) zero (\d+) native-skipped (\d+);")
     contexts, metrics = [], []
     for index, line in enumerate(text.splitlines()):
         if "[native-material-context]" in line:
             contexts.append((index, line))
         match = pattern.search(line)
+        if current_depth and "[native-depth-vis]" in line and not match:
+            raise ValueError("malformed current-depth visibility evidence")
         if match:
             values = tuple(map(int, match.groups()))
-            if not (values[4] <= values[3] <= values[2] <= values[1]) or values[5] > values[1]:
+            if current_depth:
+                if (not values[4] <= values[3] <= values[2] or
+                        not values[4] <= values[5]+values[6] <= values[4]*256 or
+                        values[7] > 64*1024*1024 or values[8] > 16):
+                    raise ValueError("inconsistent or over-budget current-depth GPU counters")
+            elif not (values[4] <= values[3] <= values[2] <= values[1]) or values[5] > values[1]:
                 raise ValueError("inconsistent native query counters")
             metrics.append((index, values))
         # A context from before teardown cannot authorize a title/loading image.
         if "[native-rigid-reload] title requested" in line or "[native-rigid-lifecycle] source-retired" in line:
             contexts.append((index, "lifecycle transition"))
     a, b = recent_field_samples(contexts, metrics)
-    if metrics[-1][0] < contexts[-1][0] or any(y < x for x, y in zip(a, b)):
+    monotonic_fields = 7 if current_depth else len(a)
+    if metrics[-1][0] < contexts[-1][0] or any(y < x for x, y in zip(a[:monotonic_fields], b[:monotonic_fields])):
         raise Pending("need current, monotonic field occlusion samples")
+    if current_depth:
+        if b[0] <= a[0] or any(b[i] <= a[i] for i in (1,2,3,4,5,6)):
+            raise Pending("current-depth snapshots, real draws, collected visible and culled instances must advance")
+        return dict(mode="current-depth", frame=b[0], snapshots_delta=b[1]-a[1], generated_delta=b[2]-a[2],
+                    draw_recorded_delta=b[3]-a[3], collected_delta=b[4]-a[4], visible_delta=b[5]-a[5], skipped_delta=b[6]-a[6])
     if b[0] <= a[0] or any(b[i] <= a[i] for i in (1, 2, 3, 5)):
         raise Pending("native queries, collection and skips must advance in the ready field")
     return dict(frame=b[0], requests_delta=b[1]-a[1], queries_delta=b[2]-a[2],
@@ -451,9 +467,10 @@ def verify_rigid_scene(text):
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
         raise ValueError("rigid scene diagnostic exceeds 400 KiB")
     metric = re.compile(r"\[native-rigid-scene\] frame (\d+) submitted (\d+) emitted (\d+) suppressed (\d+) fence-retired (\d+); node (\d+) instance (\d+) generation (\d+);")
+    visibility = re.compile(r"visibility pending (\d+) culled (\d+) retired-culled (\d+) resources-retired (\d+);")
     contexts, metrics = [], []
     for index, line in enumerate(text.splitlines()):
-        if "[native-rigid-scene] selected node refused:" in line:
+        if re.search(r"\[native-rigid-scene\].*refused", line):
             raise ValueError("direct rigid scene refused; no fallback qualification")
         if "[native-material-context]" in line:
             contexts.append((index, line))
@@ -462,19 +479,35 @@ def verify_rigid_scene(text):
             values = tuple(map(int, match.groups()))
             if values[5] != 64 or not values[6] or not values[7] or values[2] > values[1] or values[4] > values[2]:
                 raise ValueError("invalid rigid scene identity/emission/fence counts")
+            classified = visibility.search(line)
+            if "visibility pending" in line and not classified:
+                raise ValueError("malformed native visibility classification")
+            if classified:
+                pending, culled, retired_culled, resources_retired = map(int,classified.groups())
+                if (pending > 8192 or values[1] != values[2]+culled+pending or retired_culled > culled or
+                        resources_retired != values[4]+retired_culled or resources_retired > values[1]):
+                    raise ValueError("native submitted/visible/culled/pending/retired conservation failed")
+                values += (pending,culled,retired_culled,resources_retired)
             metrics.append((index, values))
     a, b = recent_field_samples(contexts, metrics)
+    if len(a) != len(b):
+        raise ValueError("cannot join historical and GPU-classified scene evidence")
+    if len(a) == 12 and any(b[i] < a[i] for i in (9,10,11)):
+        raise ValueError("native GPU classification counters regressed")
     if (b[0] <= a[0] or any(b[i]-a[i] < 32 for i in (1,2,4)) or
-            b[3] < a[3] or b[5:] != a[5:] or b[1]-a[1] != b[2]-a[2]):
+            b[3] < a[3] or b[5:8] != a[5:8] or (len(a) == 8 and b[1]-a[1] != b[2]-a[2])):
         raise Pending("need fresh direct scene submissions, real draw emission and fence retirement")
-    return dict(submitted_delta=b[1]-a[1], emitted_delta=b[2]-a[2], retired_delta=b[4]-a[4])
+    result = dict(submitted_delta=b[1]-a[1], emitted_delta=b[2]-a[2], retired_delta=b[4]-a[4])
+    if len(a) == 12:
+        result.update(pending=b[8],culled_delta=b[9]-a[9],retired_culled_delta=b[10]-a[10],resource_retired_delta=b[11]-a[11])
+    return result
 
 
 def verify_rigid_batches(text):
     """Native instance/indirect emissions; zero merged instances is explicit, not coverage of merging."""
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
         raise ValueError("rigid batch diagnostic exceeds 400 KiB")
-    metric = re.compile(r"\[native-rigid-batch\] frame (\d+) scene instances (\d+) indirect calls (\d+) shadow instances (\d+) indirect calls (\d+) merged instances (\d+);")
+    metric = re.compile(r"\[native-rigid-batch\] frame (\d+) scene instances (\d+) (?:visible )?indirect calls (\d+) shadow instances (\d+) (?:visible )?indirect calls (\d+) merged instances (\d+);")
     contexts, metrics = [], []
     for index, line in enumerate(text.splitlines()):
         if "[native-rigid-batch] refused" in line:

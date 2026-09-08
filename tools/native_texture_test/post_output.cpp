@@ -1112,6 +1112,16 @@ void RigidScenePacket() {
 }
 void RigidLifecycle() {
   using namespace bd::gpu::scene;
+  NativeRigidOutputReceipt receipt;
+  assert(!receipt.Visible() && !receipt.Culled() && !receipt.Recorded());
+  assert(!receipt.Resolve(true) && !receipt.Retire());
+  assert(receipt.Record() && !receipt.Record() && !receipt.Retire());
+  assert(!receipt.Visible()); // CPU-recorded / generated is not visible output.
+  assert(receipt.Resolve(false) && receipt.Culled() && !receipt.Visible());
+  assert(!receipt.Resolve(true) && receipt.Retire() && !receipt.Retire());
+  receipt = {};
+  assert(receipt.Record() && receipt.Resolve(true) && receipt.Visible() && !receipt.Culled());
+  assert(receipt.Retire());
   using Event = NativeRigidLifecycle::Event;
   NativeRigidLifecycle lifecycle;
   assert(!lifecycle.Loaded(0) && !lifecycle.Find(0));
@@ -1164,6 +1174,9 @@ void RigidLifecycle() {
   assert(!window.Step(true,epoch));
   epoch.views[0].emitted = epoch.views[1].emitted = 899;
   assert(!window.Step(true,epoch));
+  NativeRigidOutputReceipt hidden;
+  assert(hidden.Record() && hidden.Resolve(false) && hidden.Retire());
+  assert(!window.Step(true,epoch)); // Retiring a GPU-zeroed draw cannot supply emission900.
   epoch.views[0].emitted = epoch.views[1].emitted = 900;
   assert(window.Step(true,epoch));
   NativeRigidReloadReadiness readiness{false,true,(2ull<<32)|4101};
@@ -1245,9 +1258,20 @@ void RigidBatches() {
   a.view = b.view = 3;
   assert(!NativeRigidBatchLength(pair,8,1));
   a.albedo[0] = std::make_shared<NativeTextureGpu>(); a.shadow = std::make_shared<NativeTargetImage>();
+  a.scene_depth = std::make_shared<NativeTargetImage>();
   a.input.object_data.flags = {RigidAlbedo,1,0,0};
   a.shadow_sampler = reinterpret_cast<RenderSampler *>(&token); a.albedo_samplers.fill(a.shadow_sampler);
   b = a; assert(NativeRigidBatchLength(pair,8,1) == 2);
+  b.scene_depth = std::make_shared<NativeTargetImage>(); assert(NativeRigidBatchLength(pair,8,1) == 1);
+  b = a; b.scene_depth.reset(); assert(!b.Ready(8,1));
+  b = a; b.input.pass_data.world_to_clip[0].rows[3].x = 1;
+  assert(NativeRigidBatchLength(pair,8,1) == 1); // One visibility command has one exact camera.
+  b = a;
+  a.world_bounds = NativeBounds{{-2,-3,-4},{0,1,2}}; b.world_bounds = NativeBounds{{1,2,3},{4,5,6}};
+  auto union_bounds = NativeRigidBatchBounds(pair);
+  assert((union_bounds && *union_bounds == NativeBounds{{-2,-3,-4},{4,5,6}}));
+  b.world_bounds.reset(); assert(!NativeRigidBatchBounds(pair)); // Unknown sibling must keep batch visible.
+  b = a;
   b.shadow_sampler = nullptr; assert(NativeRigidBatchLength(pair,8,1) == 1);
   a.albedo[1] = std::make_shared<NativeTextureGpu>(); a.albedo[2] = std::make_shared<NativeTextureGpu>();
   a.input.object_data.flags.y = 3; b = a;

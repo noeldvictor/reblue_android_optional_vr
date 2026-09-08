@@ -13,7 +13,7 @@
 #include "gpu/device.h"
 #include "gpu/draw_queue.h"
 #include "gpu/frame_stats.h"
-#include "gpu/occlusion_cull.h"
+#include "gpu/native_depth_visibility.h"
 #include "gpu/host_upload.h"
 #include "gpu/sampler_cache.h"
 #include "gpu/pipeline/pipeline_cache.h"
@@ -26,6 +26,8 @@
 #include <plume_vulkan.h>
 #endif
 
+REXCVAR_DECLARE(bool, bd_occlusion_cull);
+REXCVAR_DECLARE(bool, bd_occlusion_diag);
 REXCVAR_DEFINE_BOOL(bd_native_rigid_shadow, false, kCvarGroup,
     "Fail-closed native opaque and phase1 cutout rigid caster families; no template warm-up.");
 REXCVAR_DEFINE_BOOL(bd_native_rigid_scene, false, kCvarGroup,
@@ -35,6 +37,16 @@ struct NativeRigidDrawStore {
   struct Batch {
     std::unique_ptr<plume::RenderDescriptorSet> constants;
     std::unique_ptr<plume::RenderDescriptorSet> images, samplers;
+    std::vector<const NativeRigidBatchItem *> items;
+    uint32_t visibility_work = ~0u, visibility_command = 0;
+  };
+  struct Visibility {
+    std::unique_ptr<NativeDepthVisibilityWork> work;
+    NativeTargetImageHandle depth;
+    NativeOcclusionView view;
+    const plume::RenderCommandList *recording = nullptr;
+    bool sealed = false;
+    std::span<const NativeDepthVisibilityReceipt> receipts;
   };
   struct Program { NativeVertexInputHandle input; NativeRigidPrograms shaders; };
   // Immutable program variants remain bounded; per-draw descriptors/geometry
@@ -43,6 +55,9 @@ struct NativeRigidDrawStore {
   std::vector<Program> programs;
   std::array<std::vector<std::shared_ptr<const NativeRigidBatchItem>>, kNumFrames> records;
   std::array<std::vector<Batch>, kNumFrames> batches;
+  NativeDepthVisibilityProgramHandle visibility_program;
+  std::shared_ptr<NativeDepthVisibilityBudget> visibility_budget = std::make_shared<NativeDepthVisibilityBudget>();
+  std::array<std::vector<Visibility>, kNumFrames> visibility;
   std::array<NativeRigidInstanceGPU, kNativeRigidBatchLimit> scratch;
   uint64_t submitted = 0, suppressed = 0, retired = 0;
   uint32_t reported_frame = 0;
@@ -54,6 +69,9 @@ struct NativeRigidDrawStore {
   uint64_t family_emitted = 0, family_retired = 0;
   uint64_t scene_family_multi_nodes = 0, scene_family_primitives = 0, scene_family_layered = 0;
   uint64_t scene_family_emitted = 0, scene_family_retired = 0;
+  uint64_t scene_culled = 0, scene_retired_culled = 0, scene_resource_retired = 0;
+  uint64_t visibility_commands = 0, visibility_drawn = 0, visibility_collected = 0, visibility_snapshots = 0;
+  uint64_t visibility_visible = 0, visibility_culled = 0;
   struct Cutouts {
     uint64_t submitted = 0, emitted = 0, retired = 0, textured_emitted = 0, textured_retired = 0;
   } scene_cutouts, shadow_cutouts;
@@ -237,8 +255,6 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   struct Pending {
     QueuedDraw draw;
     std::shared_ptr<NativeRigidBatchItem> item;
-    uint32_t primitive;
-    std::optional<NativeBounds> bounds;
   };
   std::vector<Pending> pending;
   pending.reserve(plans->size());
@@ -303,17 +319,14 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
     item->model_generation = pose.model_generation; item->instance = pose.instance;
     item->regression = geometry->id == 0x258694267A8DBAEEull;
     item->albedo = plan.albedo; item->shadow = plan.shadow;
-    const auto bounds = geometry->bounds
+    item->scene_depth = commands->DepthOwner();
+    item->world_bounds = geometry->bounds
         ? TransformNativeBounds(*geometry->bounds,std::bit_cast<RenderMatrix>(plan.object.world)) : std::nullopt;
-    pending.push_back({std::move(draw),std::move(item),plan.primitive,bounds});
+    pending.push_back({std::move(draw),std::move(item)});
   }
   store.scene_suppressed += plans->size()-pending.size();
-  // Every authored state/light effect and every sibling preflight happens first.
-  // Query history can omit GPU work, never the ordered producer side effects.
-  const auto occlusion_view = commands->OcclusionView(FrameStatFrameCount());
-  std::erase_if(pending, [&](const Pending &entry) {
-    return OcclusionCullRequest({pose.instance, pose.model_generation, node, entry.primitive}, occlusion_view, entry.bounds);
-  });
+  // Every authored effect and sibling preflight still runs. Visibility is now
+  // decided from current depth at emission, not previous-frame query history.
   if (!pending.empty() && !s.draw_framebuffer_bound) {
     DrawQueueFlush(s.command_list);
     BindNativeSceneCommands(s, *commands); ApplyNativeSceneClear(s, *commands); s.draw_framebuffer_bound = true;
@@ -333,11 +346,18 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   const auto frame = FrameStatFrameCount();
   if (SelectedNativeRigidShadow(*model) &&
       (store.scene_reported_generation != pose.model_generation || frame-store.scene_reported_frame >= 300)) {
-    BD_INFO("[native-rigid-scene] frame {} submitted {} emitted {} suppressed {} fence-retired {}; node {} instance {} generation {}; owned packet and native program, no node interpreter/template/replay",
+    BD_INFO("[native-rigid-scene] frame {} submitted {} emitted {} suppressed {} fence-retired {}; node {} instance {} generation {}; visibility pending {} culled {} retired-culled {} resources-retired {}; owned packet and native program, no node interpreter/template/replay",
         frame, store.scene_submitted, store.scene_emitted, store.scene_suppressed, store.scene_retired,
-        node, pose.instance, pose.model_generation);
-    BD_INFO("[native-rigid-batch] frame {} scene instances {} indirect calls {} shadow instances {} indirect calls {} merged instances {}; native storage records, no translated gather",
+        node, pose.instance, pose.model_generation, store.scene_submitted-store.scene_emitted-store.scene_culled,
+        store.scene_culled,store.scene_retired_culled,store.scene_resource_retired);
+    BD_INFO("[native-rigid-batch] frame {} scene instances {} visible indirect calls {} shadow instances {} visible indirect calls {} merged instances {}; native storage records, no translated gather",
         frame, store.scene_emitted, store.scene_batches, store.emitted, store.shadow_batches, store.merged_instances);
+    if (REXCVAR_GET(bd_occlusion_diag)) {
+      const auto used = store.visibility_budget->Used();
+      BD_INFO("[native-depth-vis] frame {} snapshots {} generated {} draw-recorded {} fence-collected {} visible-instances {} culled-instances {}; buffers {} owners {}; current depth, no temporal history",
+          frame,store.visibility_snapshots,store.visibility_commands,store.visibility_drawn,store.visibility_collected,
+          store.visibility_visible,store.visibility_culled,used.bytes,used.owners);
+    }
     BD_INFO("[native-scene-family] frame {} multi-primitive nodes {} submitted {} layered {} emitted {} fence-retired {}; excludes selected regression",
         frame, store.scene_family_multi_nodes, store.scene_family_primitives, store.scene_family_layered,
         store.scene_family_emitted, store.scene_family_retired);
@@ -351,7 +371,7 @@ bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
   }
   return true;
 }
-void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw) {
+void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw, bool refresh_depth) {
   auto &s = state();
   BatchRequire(s.native_rigid_draws && s.ready && s.device && s.command_list_open, "native batch device unavailable");
   auto &store = *s.native_rigid_draws;
@@ -378,6 +398,7 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
   std::memcpy(upload.memory+prefix,packed.data(),placement->bytes);
   NativeRigidDescriptorSchema schema;
   NativeRigidDrawStore::Batch batch;
+  batch.items.assign(items.begin(),items.end());
   batch.constants = schema.sets[0].create(s.device.get());
   BatchRequire(bool(batch.constants), "native storage descriptor unavailable");
   const plume::RenderBufferStructuredView view(sizeof(NativeRigidInstanceGPU),offset/sizeof(NativeRigidInstanceGPU));
@@ -410,50 +431,123 @@ void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> it
     draw.bindings.set_count = 3; draw.bindings.sets[1] = batch.images.get(); draw.bindings.sets[2] = batch.samplers.get();
   }
   const NativeRigidIndexedCommand command{draw.count,uint32_t(items.size()),draw.start_index,draw.base_vertex,0};
-  const auto indirect = UploadHostData(&command,sizeof(command),4);
-  BatchRequire(indirect.memory && draw.bindings.Valid(), "native indirect upload or bindings refused");
-  draw.native_indirect = indirect.ref;
+  if (first.view == 3 && REXCVAR_GET(bd_occlusion_cull)) {
+    const auto &depth = first.scene_depth;
+    BatchRequire(depth && depth->shape.layers == 1 && depth->layout == plume::RenderTextureLayout::DEPTH_WRITE,
+        "current native depth is unavailable for visibility");
+    NativeOcclusionView view;
+    view.frame = first.frame;
+    view.scope = {depth->identity,depth->shape.width,depth->shape.height,depth->shape.samples};
+    view.camera.world_to_clip = std::bit_cast<RenderMatrix>(first.input.pass_data.world_to_clip[0]);
+    if (!store.visibility_program) store.visibility_program = CreateNativeDepthVisibilityProgram(*s.device);
+    auto &works = store.visibility[slot];
+    uint32_t selected = 0;
+    while (selected < works.size() && (works[selected].depth != depth || works[selected].recording != s.command_list ||
+        works[selected].view.frame != first.frame || works[selected].sealed)) ++selected;
+    if (selected == works.size()) {
+      BatchRequire(works.size() < 16, "visibility recording owner capacity");
+      auto work = NativeDepthVisibilityWork::Create(*s.device,store.visibility_program,depth,view,store.visibility_budget);
+      BatchRequire(work && work->RecordDepth(*s.command_list), "bounded current-depth visibility allocation or snapshot refused");
+      works.push_back({std::move(work),depth,view,s.command_list});
+      ++store.visibility_snapshots;
+    } else if (refresh_depth || works[selected].view.camera.world_to_clip != view.camera.world_to_clip) {
+      BatchRequire(works[selected].work->RefreshDepth(*s.command_list,view), "fresh native depth snapshot refused");
+      works[selected].view = view; ++store.visibility_snapshots;
+    }
+    auto &work = *works[selected].work;
+    batch.visibility_work = selected; batch.visibility_command = work.CommandCount();
+    const auto indirect = work.RecordCommand(*s.command_list,view,NativeRigidBatchBounds(items),command);
+    BatchRequire(indirect.has_value(), "current-depth native command refused");
+    draw.native_indirect = *indirect; draw.native_visibility = &work;
+    draw.native_visibility_command = batch.visibility_command; ++store.visibility_commands;
+  } else {
+    const auto indirect = UploadHostData(&command,sizeof(command),4);
+    BatchRequire(indirect.memory != nullptr, "native indirect upload refused");
+    draw.native_indirect = indirect.ref;
+  }
+  BatchRequire(draw.bindings.Valid(), "native batch bindings refused");
   batches.push_back(std::move(batch));
 }
-void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances, uint64_t generation,
-                            std::span<const NativeRigidBatchItem *const> items) {
-  auto &s = state();
-  if (!s.native_rigid_draws) return;
-  auto &store = *s.native_rigid_draws;
-  for (const auto &program : store.programs) if (bindings.layout == program.shaders.scene->Layout()) {
-    BatchRequire(items.size() == instances, "native emission lost its instance records");
-    // Count each actually emitted packet, not the first instance's flags: scene
-    // batches can share a shader/pipeline while their material flags differ.
-    for (const auto *item : items) if (item->input.object_data.flags.x & RigidCutout) {
+namespace {
+void ResolveNativeRigidEmission(NativeRigidDrawStore &store, std::span<const NativeRigidBatchItem *const> items, bool visible) {
+  BatchRequire(!items.empty(), "empty native emission receipt");
+  const auto instances = uint32_t(items.size()), render_view = items[0]->view;
+  for (const auto *item : items) {
+    BatchRequire(item && item->output.Resolve(visible), "native draw resolved before recording or more than once");
+    if (visible && (item->input.object_data.flags.x & RigidCutout)) {
       auto &cutouts = render_view == 3 ? store.scene_cutouts : store.shadow_cutouts;
       ++cutouts.emitted;
       cutouts.textured_emitted += (item->input.object_data.flags.x & RigidAlbedo) != 0;
     }
-    if (generation) NoteNativeRigidEmitted(generation,render_view,instances);
-    else if (render_view == 1) store.family_emitted += instances;
-    else if (render_view == 3) store.scene_family_emitted += instances;
-    if (render_view == 3 && bindings.set_count == 3) { store.scene_emitted += instances; ++store.scene_batches; }
-    else if (render_view == 1 && (bindings.set_count == 1 || bindings.set_count == 3)) { store.emitted += instances; ++store.shadow_batches; }
-    if (instances > 1) store.merged_instances += instances;
-    return;
+  }
+  if (!visible) { store.scene_culled += instances; return; }
+  if (items[0]->regression) NoteNativeRigidEmitted(items[0]->model_generation,render_view,instances);
+  else if (render_view == 1) store.family_emitted += instances;
+  else if (render_view == 3) store.scene_family_emitted += instances;
+  if (render_view == 3) { store.scene_emitted += instances; ++store.scene_batches; }
+  else { store.emitted += instances; ++store.shadow_batches; }
+  if (instances > 1) store.merged_instances += instances;
+}
+}
+void NoteNativeRigidEmission(const QueuedDraw &draw, std::span<const NativeRigidBatchItem *const> items) {
+  if (!draw.native_rigid) return;
+  auto &s = state();
+  BatchRequire(s.native_rigid_draws && !items.empty(), "native emission lost its instance records");
+  auto &store = *s.native_rigid_draws;
+  for (const auto *item : items) BatchRequire(item && item->output.Record(), "native draw command recorded twice");
+  if (draw.native_visibility) ++store.visibility_drawn;
+  else ResolveNativeRigidEmission(store,items,true);
+}
+void SealNativeRigidVisibilityLocked(VideoState &s) {
+  if (!s.native_rigid_draws) return;
+  for (auto &entry : s.native_rigid_draws->visibility[Video::CurrentFrameSlot()]) {
+    BatchRequire(!entry.sealed && entry.recording == s.command_list && entry.work->Seal(*s.command_list),
+        "native visibility receipt copy missing before submission");
+    entry.sealed = true;
   }
 }
 void DrainNativeRigidDrawsLocked(VideoState &s, uint32_t slot) {
   if (!s.native_rigid_draws || slot >= kNumFrames) return;
   auto &store = *s.native_rigid_draws;
+  // DrainSlot is reached only after this slot's real submission fence. Collect
+  // while batch items, image owners and all work buffers still exist.
+  for (auto &entry : store.visibility[slot]) {
+    BatchRequire(entry.sealed, "native visibility work retired without submission sealing");
+    const auto receipts = entry.work->CollectAfterFence();
+    BatchRequire(receipts.has_value(), "native visibility GPU receipt integrity failure");
+    entry.receipts = *receipts;
+  }
+  for (const auto &batch : store.batches[slot]) if (batch.visibility_work != ~0u) {
+    const auto &entry = store.visibility[slot].at(batch.visibility_work);
+    BatchRequire(batch.visibility_command < entry.receipts.size(), "missing native visibility command receipt");
+    const auto &receipt = entry.receipts[batch.visibility_command];
+    BatchRequire(receipt.draw_recorded && receipt.requested_instances == batch.items.size(), "GPU command generation was not a real native draw");
+    const auto emitted = receipt.EmittedInstances();
+    BatchRequire(!emitted || emitted == batch.items.size(), "partial native batch visibility is not supported");
+    ResolveNativeRigidEmission(store,batch.items,emitted != 0);
+    ++store.visibility_collected;
+    store.visibility_visible += emitted;
+    store.visibility_culled += receipt.requested_instances-emitted;
+  }
   for (const auto &record : store.records[slot]) {
-    if (record->input.object_data.flags.x & RigidCutout) {
+    BatchRequire(record->output.Retire(), "native record retired with pending or duplicate output classification");
+    const bool visible = record->output.Visible();
+    if (visible && (record->input.object_data.flags.x & RigidCutout)) {
       auto &cutouts = record->view == 3 ? store.scene_cutouts : store.shadow_cutouts;
       ++cutouts.retired;
       cutouts.textured_retired += (record->input.object_data.flags.x & RigidAlbedo) != 0;
     }
     if (record->regression) NoteNativeRigidFenceRetired(record->model_generation,record->view);
-    else if (record->view == 1) ++store.family_retired;
-    else if (record->view == 3) ++store.scene_family_retired;
-    if (record->view == 3) ++store.scene_retired;
+    else if (visible && record->view == 1) ++store.family_retired;
+    else if (visible && record->view == 3) ++store.scene_family_retired;
+    if (record->view == 3) {
+      ++store.scene_resource_retired;
+      if (visible) ++store.scene_retired; else ++store.scene_retired_culled;
+    }
     else ++store.retired;
   }
   store.records[slot].clear();
   store.batches[slot].clear();
+  store.visibility[slot].clear();
 }
 } // namespace bd::gpu::scene

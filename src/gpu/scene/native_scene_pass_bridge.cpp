@@ -21,7 +21,6 @@
 #include "gpu/host_targets.h"
 #include "gpu/native_target_images.h"
 #include "gpu/foveation.h"
-#include "gpu/occlusion_cull.h"
 #include "gpu/resource_bridge.h"
 #include <rex/cvar.h>
 #include <rex/hook.h>
@@ -374,7 +373,6 @@ bool End(PPCContext &ctx, uint32_t source) {
     auto &s = state();
     std::lock_guard lock(s.mutex);
     DrawQueueFlush(s.command_list);
-    OcclusionCullEmit(s, *pass.commands);
     if (pass.resolves) FinishNativeSceneResolves(s, *pass.resolves);
     else {
       // Flush the pass (including zero-draw clears), then expose the actual

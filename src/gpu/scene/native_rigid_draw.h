@@ -18,10 +18,10 @@ bool SubmitNativeRigidShadow(const NativeInstancePose &pose, uint32_t node,
 bool SubmitNativeRigidScene(const NativeInstancePose &pose, uint32_t node,
                             const std::optional<PrimitivePolicyInputs> &inputs);
 // Called only after the shared emitter records a real draw command.
-void NoteNativeRigidEmission(const GraphicsBindings &bindings, uint32_t render_view, uint32_t instances, uint64_t generation,
-                            std::span<const NativeRigidBatchItem *const> items);
+void NoteNativeRigidEmission(const QueuedDraw &draw, std::span<const NativeRigidBatchItem *const> items);
 // Shared queue calls this under the renderer lock after exact batch admission.
 // Creates explicit storage/image bindings and one indexed indirect command.
-void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw);
+void PrepareNativeRigidBatchDraw(std::span<const NativeRigidBatchItem *const> items, QueuedDraw &draw, bool refresh_depth);
+void SealNativeRigidVisibilityLocked(VideoState &state);
 void DrainNativeRigidDrawsLocked(VideoState &state, uint32_t slot);
 } // namespace bd::gpu::scene

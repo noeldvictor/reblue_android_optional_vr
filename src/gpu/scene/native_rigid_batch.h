@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_rigid_scene.h"
 #include "gpu/native_indexed_command.h"
+#include "gpu/scene/native_rigid_lifecycle.h"
 #include <numeric>
 
 namespace bd::gpu::scene {
@@ -15,6 +16,9 @@ struct NativeRigidBatchItem {
   std::shared_ptr<const NativeGeometry> geometry;
   std::array<NativeTextureGpuHandle, 3> albedo;
   NativeTargetImageHandle shadow;
+  NativeTargetImageHandle scene_depth;
+  std::optional<NativeBounds> world_bounds;
+  mutable NativeRigidOutputReceipt output;
   std::array<const plume::RenderSampler *, 3> albedo_samplers{};
   const plume::RenderSampler *shadow_sampler = nullptr;
   const plume::RenderPipeline *pipeline = nullptr;
@@ -31,7 +35,7 @@ struct NativeRigidBatchItem {
       const bool textured = (flags.x & RigidAlbedo) != 0;
       if (flags.y != uint32_t(textured) || textured != bool(flags.x & RigidCutout) ||
           bool(albedo[0]) != textured || bool(albedo_samplers[0]) != textured ||
-          albedo[1] || albedo[2] || albedo_samplers[1] || albedo_samplers[2] || shadow || shadow_sampler) return false;
+          albedo[1] || albedo[2] || albedo_samplers[1] || albedo_samplers[2] || shadow || shadow_sampler || scene_depth) return false;
     }
     if (view == 3) {
       const auto layers = input.object_data.flags.y;
@@ -40,18 +44,34 @@ struct NativeRigidBatchItem {
         if (!albedo_samplers[n] || (n < layers && !albedo[n]) || (n >= layers && albedo[n])) return false;
     }
     return frame == expected_frame && slot == expected_slot && model_generation && instance && geometry && pipeline && layout && framebuffer &&
-        (view == 1 || (view == 3 && shadow && shadow_sampler));
+        (view == 1 || (view == 3 && shadow && shadow_sampler && scene_depth));
   }
 };
 inline bool SameNativeRigidBatch(const NativeRigidBatchItem &a, const NativeRigidBatchItem &b) {
   return a.frame == b.frame && a.slot == b.slot && a.view == b.view && a.model_generation == b.model_generation &&
       a.regression == b.regression && a.geometry == b.geometry && a.pipeline == b.pipeline && a.layout == b.layout && a.framebuffer == b.framebuffer &&
       a.albedo == b.albedo && a.shadow == b.shadow && a.albedo_samplers == b.albedo_samplers && a.shadow_sampler == b.shadow_sampler &&
+      a.scene_depth == b.scene_depth && std::bit_cast<RenderMatrix>(a.input.pass_data.world_to_clip[0]) ==
+          std::bit_cast<RenderMatrix>(b.input.pass_data.world_to_clip[0]) &&
       a.viewport.x == b.viewport.x && a.viewport.y == b.viewport.y &&
       a.viewport.width == b.viewport.width && a.viewport.height == b.viewport.height &&
       a.viewport.minDepth == b.viewport.minDepth && a.viewport.maxDepth == b.viewport.maxDepth &&
       a.scissor.left == b.scissor.left && a.scissor.top == b.scissor.top &&
       a.scissor.right == b.scissor.right && a.scissor.bottom == b.scissor.bottom;
+}
+// Batch visibility is all-or-nothing. Any uncertain sibling keeps the entire
+// instanced command visible; never cull based only on the first instance.
+inline std::optional<NativeBounds> NativeRigidBatchBounds(std::span<const NativeRigidBatchItem *const> items) {
+  std::optional<NativeBounds> bounds;
+  for (const auto *item : items) {
+    if (!item || !item->world_bounds || !item->world_bounds->Valid()) return {};
+    if (!bounds) bounds = item->world_bounds;
+    else for (uint32_t axis=0;axis<3;++axis) {
+      bounds->min[axis] = (std::min)(bounds->min[axis],item->world_bounds->min[axis]);
+      bounds->max[axis] = (std::max)(bounds->max[axis],item->world_bounds->max[axis]);
+    }
+  }
+  return bounds;
 }
 // Only a consecutive compatible prefix. A non-native/ordered draw is a barrier;
 // the shared queue's existing safe reorder runs may bring compatible nodes closer.

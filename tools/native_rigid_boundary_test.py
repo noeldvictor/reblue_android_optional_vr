@@ -70,8 +70,8 @@ class NativeRigidBoundaryTest(unittest.TestCase):
                          "store.scene_emitted += instances", "draw.bindings.set_count = 3"):
             self.assertIn(required, direct)
         emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
-        self.assertIn("scene::NoteNativeRigidEmission(d.bindings, d.render_view, instance_count,", emitter)
-        self.assertIn("d.native_rigid && d.native_rigid->regression ? d.native_rigid->model_generation : 0", emitter)
+        self.assertIn("scene::NoteNativeRigidEmission(d,native_items)", emitter)
+        self.assertIn("items[0]->regression", direct)
         lights = (ROOT / "src/gpu/scene/native_selected_lights_bridge.cpp").read_text()
         preview = lights.split("std::optional<NativeSceneLightTicket> FindNativeSceneLights(", 1)[1].split(
             "bool CommitNativeSceneLights(", 1)[0]
@@ -83,9 +83,9 @@ class NativeRigidBoundaryTest(unittest.TestCase):
         direct = (ROOT / "src/gpu/scene/native_rigid_draw.cpp").read_text()
         emitter = (ROOT / "src/gpu/draw_queue.cpp").read_text()
         self.assertIn("EmitOne(cmd,d,st,n,0,std::span(items).first(n))", emitter)
-        self.assertIn("model_generation : 0, native_items)", emitter)
-        note = direct.split("void NoteNativeRigidEmission(", 1)[1].split("void DrainNativeRigidDrawsLocked", 1)[0]
-        self.assertIn("items.size() == instances", note)
+        self.assertIn("scene::NoteNativeRigidEmission(d,native_items)", emitter)
+        note = direct.split("void ResolveNativeRigidEmission(", 1)[1].split("void DrainNativeRigidDrawsLocked", 1)[0]
+        self.assertIn("item->output.Resolve(visible)", note)
         self.assertIn("for (const auto *item : items)", note)
         self.assertIn("++cutouts.emitted", note)
         self.assertIn("cutouts.textured_emitted +=", note)
