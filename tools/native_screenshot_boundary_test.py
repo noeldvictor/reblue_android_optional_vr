@@ -18,6 +18,7 @@ class ScreenshotBoundaryTest(unittest.TestCase):
 
     def test_probe_is_opt_in_bounded_and_never_overwrites(self):
         source = (ROOT / "src/gpu/screenshot.cpp").read_text()
+        self.assertIn('#include "core/settings.h"', source)
         for required in ("REXCVAR_DEFINE_BOOL(bd_native_frame_probe, false", "g_probe_attempted = true",
                          "std::array<char,65>", "probe->Accept(frame)", "ScreenshotPlan::kBudget-used",
                          "CREATE_NEW", "110u*1024", "capture->frame", "capture->input", "capture->output"):

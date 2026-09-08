@@ -13,6 +13,7 @@ from native_instance_scenario import verify_scene_lights
 from native_instance_scenario import verify_caster_family
 from native_instance_scenario import verify_cutout_family
 from native_instance_scenario import observe_occlusion
+from native_instance_scenario import verify_frame_probe
 from native_instance_scenario import (
     MAX_LOG_BYTES, Pending, READY, verify, verify_texture_tables,
     verify_vertex_inputs, verify_movement, verify_canonical_geometry, verify_shadow_policies,
@@ -1215,6 +1216,55 @@ class OcclusionObservationTest(unittest.TestCase):
                     text.replace("buffers 1024", "buffers 67108865"),text.replace("owners 1;", "owners 17;"),
                     text.replace("culled-instances 10", "culled-instances invalid")):
             with self.assertRaises(ValueError): observe_occlusion(bad)
+
+
+class FrameProbeTest(unittest.TestCase):
+    def rows(self):
+        fields = "request 1 frame 1810 slot 1 input 000000000007 output 000000000009 descriptor 11 size 65x3"
+        return OcclusionObservationTest().current_rows() + [
+            "[native-frame-probe] recorded " + fields + "; awaiting submission fence",
+            "[native-frame-probe] saved " + fields + " bytes 1000; post-gamma, GPU fence complete"]
+
+    def verify(self, rows=None, request="1 1800 1920", size=1000, extent=(65, 3)):
+        return verify_frame_probe("\n".join(rows or self.rows()), request, size, extent)
+
+    def test_exact_saved_frame_and_file_contract(self):
+        self.assertEqual(self.verify()["frame"], 1810)
+        for size, extent in ((999, (65, 3)), (112641, (65, 3)), (1000, (3, 65))):
+            with self.assertRaises(ValueError):
+                self.verify(size=size, extent=extent)
+
+    def test_missing_duplicate_and_out_of_order_receipts(self):
+        rows = self.rows()
+        with self.assertRaises(Pending): self.verify(rows[:-1])
+        for bad in (rows + rows[-1:], rows[:-1] + rows[-2:], rows[:-2] + rows[-2:][::-1]):
+            with self.assertRaises(ValueError): self.verify(bad)
+
+    def test_saved_identity_cannot_change(self):
+        for before, after in (("1810", "1811"), ("slot 1", "slot 0"), ("000000000007", "000000000008"),
+                              ("descriptor 11", "descriptor 12"), ("65x3", "64x3")):
+            rows = self.rows(); rows[-1] = rows[-1].replace(before, after)
+            with self.assertRaises(ValueError): self.verify(rows)
+
+    def test_request_shape_range_and_stale_observation(self):
+        for request in ("", "1 1800", "0 1800 1920", "1 1800 1921", "1 1800 4294967296",
+                        "1 1820 1920", "1 1799 1919", "1 1800 1920 junk", "1"*65):
+            with self.assertRaises(ValueError): self.verify(request=request)
+
+    def test_transition_error_or_wrong_context_cannot_authorize_pixels(self):
+        rows = self.rows()
+        for transition in ("[native-material-context] mode Loading", "[native-rigid-reload] title requested",
+                           "[native-rigid-lifecycle] source-retired", "[error] failure", "[shutdown] requested"):
+            for at in (-1, -2):
+                bad = rows.copy(); bad.insert(at, transition)
+                with self.assertRaises(ValueError): self.verify(bad)
+
+    def test_bad_native_contracts_and_oversized_log(self):
+        text = "\n".join(self.rows())
+        for bad in (text.replace("slot 1", "slot 2"), text.replace("000000000007", "000000000009"),
+                    text.replace("descriptor 11", "descriptor 4294967295"), text.replace("65x3", "0x3"),
+                    text.replace("GPU fence complete", "pending"), "x"*(2*MAX_LOG_BYTES+1)):
+            with self.assertRaises(ValueError): verify_frame_probe(bad, "1 1800 1920", 1000, (65, 3))
 
 
 if __name__ == "__main__":

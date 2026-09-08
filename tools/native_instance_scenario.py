@@ -149,6 +149,60 @@ def observe_occlusion(text):
                 collected_delta=b[3]-a[3], skipped_delta=b[5]-a[5])
 
 
+def verify_frame_probe(text, request_text, image_size, image_extent):
+    """Validate provenance only; the actual image still requires visual review."""
+    if len(text.encode("utf-8")) > 2 * MAX_LOG_BYTES:
+        raise ValueError("frame probe log exceeds 800 KiB")
+    request = re.fullmatch(r"[ \r\n]*([0-9]+)[ \r\n]+([0-9]+)[ \r\n]+([0-9]+)[ \r\n]*", request_text)
+    if len(request_text.encode("utf-8")) > 64 or not request:
+        raise ValueError("malformed frame probe request")
+    identity, first, last = map(int, request.groups())
+    if not (0 < identity < 2**64 and 0 < first <= last < 2**32 and last-first <= 120):
+        raise ValueError("frame probe request exceeds identity/frame limits")
+    fields = (r"request (\d+) frame (\d+) slot (\d+) input ([0-9A-F]+) output ([0-9A-F]+) "
+              r"descriptor (\d+) size (\d+)x(\d+)")
+    recorded = re.compile(r"\[native-frame-probe\] recorded " + fields + r"; awaiting submission fence$")
+    saved = re.compile(r"\[native-frame-probe\] saved " + fields + r" bytes (\d+); post-gamma, GPU fence complete$")
+    rows = text.splitlines()
+    records, receipts = [], []
+    for index, line in enumerate(rows):
+        if "[native-frame-probe]" not in line:
+            continue
+        record, receipt = recorded.search(line), saved.search(line)
+        if record:
+            records.append((index, record.groups()))
+        elif receipt:
+            receipts.append((index, receipt.groups()))
+        else:
+            raise ValueError("malformed or failed frame probe receipt")
+    if len(records) > 1 or len(receipts) > 1:
+        raise ValueError("frame probe must record and publish exactly once")
+    if not records or not receipts:
+        raise Pending("waiting for recorded frame and real-fence JPEG receipt")
+    (record_index, record), (saved_index, receipt) = records[0], receipts[0]
+    if record_index >= saved_index or record != receipt[:8]:
+        raise ValueError("frame probe recorded/saved identities differ or arrive out of order")
+    req, frame, slot, source, target, descriptor, width, height = (
+        int(value, 16 if i in (3, 4) else 10) for i, value in enumerate(record))
+    if (req != identity or not first <= frame <= last or slot >= 2 or
+            not 0 < source < 2**64 or not 0 < target < 2**64 or source == target or
+            descriptor >= 2**32-1 or not 0 < width <= 2048 or not 0 < height <= 1200):
+        raise ValueError("frame probe identity, interval or native image contract is invalid")
+    if image_extent != (width, height) or not 0 < image_size <= 110*1024 or image_size != int(receipt[8]):
+        raise ValueError("frame probe JPEG dimensions/byte count do not match the fence receipt")
+    observation = observe_occlusion("\n".join(rows[:record_index]))
+    if observation.get("mode") != "current-depth" or observation["frame"] != first:
+        raise ValueError("frame probe does not follow its fresh current-depth observation")
+    for line in rows[record_index:saved_index+1]:
+        if (("[native-material-context]" in line and READY not in line) or
+                "[native-rigid-reload] title requested" in line or
+                "[native-rigid-lifecycle] source-retired" in line or
+                re.search(r"\[(?:error|critical)\]|\[shutdown\]", line)):
+            raise ValueError("scene/lifetime changed before frame-probe collection")
+    return dict(request=req, frame=frame, slot=slot, input=source, output=target,
+                descriptor=descriptor, width=width, height=height, bytes=image_size)
+
+
 def verify_texture_tables(text, comparison=True):
     if len(text.encode("utf-8")) > MAX_LOG_BYTES:
         raise ValueError("texture-table diagnostic exceeds 400 KiB")
@@ -901,6 +955,8 @@ def main():
     parser.add_argument("--rigid-reload", action="store_true", help="two independent field epochs and actual selected-source/fence retirement")
     parser.add_argument("--occlusion-observation", action="store_true",
                         help="standalone fresh-culling image trigger, NOT reload or pixel acceptance")
+    parser.add_argument("--frame-probe", nargs=2, type=Path, metavar=("REQUEST", "JPEG"),
+                        help="standalone bounded JPEG/frame/fence provenance check; pixels still need review")
     parser.add_argument("--receiver-setup", action="store_true", help="host receiver callback and fresh retained packet reads in each requested epoch")
     parser.add_argument("--scene-lights", action="store_true", help="owned scene/object handoffs and fresh native reads in each requested epoch")
     parser.add_argument("--caster-family", action="store_true", help="non-regression multi-primitive native caster emissions and fence retirement")
@@ -913,15 +969,34 @@ def main():
     args = parser.parse_args()
     reload = None
     try:
-        if args.occlusion_observation and any(value for name, value in vars(args).items()
-                                              if name not in ("log", "occlusion_observation")):
-            raise ValueError("occlusion observation is separate from acceptance switches")
-        limit = MAX_LOG_BYTES * (2 if args.rigid_reload or args.occlusion_observation else 1)
+        for standalone in ("occlusion_observation", "frame_probe"):
+            if getattr(args, standalone) and any(value for name, value in vars(args).items()
+                                                if name not in ("log", standalone)):
+                raise ValueError("image observation is separate from acceptance switches")
+        limit = MAX_LOG_BYTES * (2 if args.rigid_reload or args.occlusion_observation or args.frame_probe else 1)
         with args.log.open("rb") as source:
             data = source.read(limit + 1)
         if len(data) > limit:
             raise ValueError(f"instance diagnostic exceeds {limit // 1024} KiB")
         text = data.decode("utf-8")
+        if args.frame_probe:
+            from io import BytesIO
+            from PIL import Image
+            request_path, jpeg_path = args.frame_probe
+            with request_path.open("rb") as source:
+                request = source.read(65).decode("ascii")
+            with jpeg_path.open("rb") as source:
+                jpeg = source.read(110*1024+1)
+            if not 0 < len(jpeg) <= 110*1024:
+                raise ValueError("frame probe JPEG exceeds its byte limit")
+            with Image.open(BytesIO(jpeg)) as image:
+                if image.format != "JPEG" or not (0 < image.width <= 2048 and 0 < image.height <= 1200):
+                    raise ValueError("frame probe must be a bounded, unresized JPEG")
+                image.load()
+                result = verify_frame_probe(text, request, len(jpeg), image.size)
+            print("OBSERVED: renderer frame/fence provenance; pixels NOT qualified " +
+                  ", ".join(f"{k}={v}" for k, v in result.items()))
+            return 0
         if args.occlusion_observation:
             print("OBSERVED: fresh native culling; reload/pixels NOT qualified " +
                   ", ".join(f"{k}={v}" for k, v in observe_occlusion(text).items()))

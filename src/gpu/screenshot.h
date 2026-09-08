@@ -54,8 +54,8 @@ std::vector<uint8_t> EncodeJpeg(const Capture &c, size_t maximum_bytes);
 
 // Render thread: called once per Present, after the gamma pass and before the
 // ImGui overlay, with the swapchain back texture (COLOR_WRITE) and its bound
-// framebuffer. No-op unless a request is latched or a prior copy is ready to
-// map. When it records a copy it briefly unbinds the framebuffer for the copy
+// framebuffer. No-op unless a request is latched. Completed copies are collected
+// separately at the slot-fence boundary. Recording briefly unbinds for the copy
 // and rebinds back_fb so the overlay draws normally.
 void ServiceOnPresent(VideoState &s, plume::RenderTexture *back,
                       plume::RenderFramebuffer *back_fb, uint32_t width, uint32_t height,

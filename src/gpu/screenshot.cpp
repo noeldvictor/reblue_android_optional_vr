@@ -9,6 +9,7 @@
 #include "gpu/device.h"
 #include "gpu/frame_stats.h"
 #include "core/logging.h"
+#include "core/settings.h"
 #include <rex/cvar.h>
 #include <array>
 #include <atomic>

@@ -4017,3 +4017,52 @@ new game run is qualified. This remains a WIP source/fixture checkpoint;
 the live supervisor/request receipt integration and renderer-owned image gate
 are pending, and run962's image discrepancy remains unresolved. No additional
 build, game run or capture was launched for the commit/push request.
+
+### Frame-probe integration follow-up
+
+Previous turn made progress: 08d7525 and both preceding commits pushed to
+origin/main. On resumption free79,953,272,832 B; texture fixture73,466,070 B/131,
+GPU fixture14,961,203 B/17, attachment logs291,851 B/162. No matching renderer or
+build producer is live. Host125 reuses the configured target after the missing
+settings-header fix:192 MiB peak/free-drop guard,300 s,10 MiB aggregate build
+logs and stop on guest objects. Existing screenshot1 GPU pixels remain valid;
+no shader/readback behavior changed. Add bounded request/receipt integration to
+the existing scenario/supervisor, not another game harness. New image remains
+blocked on its own overlap preflight until protected evidence can be retained
+within the same10 MiB ceiling. No raw capture or new asset allowance.
+
+Host125/PID26916/session72215 terminal0:27 emitted build steps, codegen0 written
+and1 module up to date, no guest objects. Actual stamp08d7525 dirty. EXE48,755,712 B
+SHA256 B7BBBCA8917FB8A9307BBEC7E0905CB4F2A82999EDF03AD93F184D0965E41269;
+PDB109,924,352 B SHA256 8BCB437ED1426E829D5C3193F8E86FF3222F25E28D3E155F9ECF9E372FAABBB1.
+350 Python checks pass for source/scenario contracts, including request/frame/
+source/dimensions/bytes/fence-order validation; the local supervisor now uses
+that existing parser and a one-shot exclusive request, not PrintWindow, in its
+FrameProbe mode. The full strict reload gate remains independent of the image.
+
+Completed storage work before the new producer:
+- `native_material_pass_window.png` lossless IDAT recompression:1,794,992 ->
+  1,697,263 B,97,729 logical B reclaimed. All non-IDAT chunks, filtered scanline
+  bytes and decoded1920x1080 RGBA pixels are identical. Old file SHA256
+  a5f158a89958e1bc9674e557b8f81b2f6df47abf8e01d0086414eaa770b7cb90;
+  new6ab19caaf33ab84953ca859f3e02c2a6bb2cfe6e53f8f0be57e4f48f2f8e582d;
+  decoded pixel SHA2565e6185e301d117fda5c88fcb8ab54319362adcac67da236fad5e92fcac07c1f5.
+  Exact filtered data/CRC/Pillow decode checked before atomic replacement;
+  <=4 MiB temporary overlap, no resized/recoloured or AI-altered evidence.
+- Retained960/961 text is now lossless
+  `logs/retained-native-runtime-960-961.zip`,198,143 B instead of1,287,359 B.
+  Both entry length/SHA256 and unchanged source were checked before removing
+  plain copies.960 SHA256517D72619B74980777D0E2C1C737834DD0728B7CE5EF44228CEB4575F36C5DCF;
+  961 SHA2567AA01668CDEA82D187C1204B3109D2C5FF7D057FCA74A6DF15A1F7BF4408675C.
+  All failure/reload evidence remains checksum-recoverable;1,089,216 logical B
+  reclaimed, <=2 MiB temporary overlap. Archives remain counted by the supervisor.
+- Removed8 superseded output42/CPU25/GPU47/host123 stdout/stderr files,32,240 B,
+  after output43/CPU26/GPU48/host125 replacement proof. No failure log removed.
+Total logical cleanup1,219,185 B, credited once. Free79,952,560,128 B after cleanup;
+drive-wide changes are not an isolated physical savings claim. Image archive now
+10,313,391 B;172,369 B headroom covers one110 KiB JPEG. Diagnostic preflight before
+cleanup was78,204,042 B and refused the run; archive/log cleanup now frees1,121,456 B
+there. Planned run963 retains at most800 KiB log +110 KiB JPEG +64 B request,
+300 s/192 MiB/free-floor limits, no raw/perf/dump/asset outputs, original profile
+restored in guaranteed cleanup. The new observation is the actual post-gamma
+frame/source/fence, needed to distinguish962's stale-window/presentation cases.
