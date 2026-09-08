@@ -719,6 +719,8 @@ bool StageNativeWaterForObject(const NativeInstancePose &pose, uint32_t node) {
   };
   require(node < pose.transforms.size() && scope->alpha_inputs && scope->deferred_inputs,
       "Native water producer lost pose/alpha/depth ownership");
+  const auto render_pose = ResolveNativeRenderPose(pose);
+  require(bool(render_pose),"Native water render pose unavailable");
   std::vector<uint32_t> references;
   require(ComposeMaterialAlphaReferences(program->ranges,mesh->policies,*scope->alpha_inputs,references),
       "Native water whole-node alpha references unavailable");
@@ -781,11 +783,11 @@ bool StageNativeWaterForObject(const NativeInstancePose &pose, uint32_t node) {
       depth.centre = {(*program->bounds)[0],(*program->bounds)[1],(*program->bounds)[2]};
       depth.radius = (*program->bounds)[3];
     }
-    const auto key = EvaluateDeferredDepth(depth,pose.transforms[node],camera->view);
+    const auto key = EvaluateDeferredDepth(depth,render_pose->transforms[node],camera->view);
     require(key.has_value(),"Native water sort key unavailable");
     const auto &env = bridge->image_leases[5];
     pending.push_back({scope->pose,node,i,FrameStatFrameCount(),references[i],*key,policy.cull,
-        policy.shadow_allowed,env.cube ? env.cube : env.primary,*lights,std::move(bridge)});
+        policy.shadow_allowed,env.cube ? env.cube : env.primary,*lights,std::move(bridge),render_pose});
   }
   require(StageNativeDeferredWater(scope->visual,pending),"Native water deferred staging refused");
   return true;

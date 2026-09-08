@@ -35,6 +35,18 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         for forbidden in ("PPCContext", "REX_", "bd::mem", "GuestBuffer", "NodeTag", "ofstream"):
             self.assertNotIn(forbidden, self.core)
 
+    def test_render_timing_is_owned_after_handoff_and_shared_by_native_consumers(self):
+        handoff = self.bridge.split("void Handoff(", 1)[1].split("} // namespace", 1)[0]
+        self.assertLess(handoff.index("PublishCompletedTransfer("), handoff.index("ObserveRenderTick("))
+        render = self.bridge.split("ResolveNativeRenderPose(", 1)[1].split("bool CopyNativeInstanceWorld", 1)[0]
+        self.assertIn("source.get() != &completed", render)
+        self.assertIn("store.render_phase->frame != frame", render)
+        self.assertIn("store.instances.ReadRender(source, *store.render_phase)", render)
+        for forbidden in ("bd::mem", ".Publish(", ".Create(", "HostHeap", "ReadVS"):
+            self.assertNotIn(forbidden, render)
+        self.assertIn("NativeSkinCasterBounds(*program,*render_pose,index)", self.walk)
+        self.assertIn("(native_render_node ? render_pose : instance_pose)", self.walk)
+
     def test_model_lease_is_attached_before_pose_and_used_without_source_lookup(self):
         self.assertIn("FindLoadedNativeModel(graph)", self.bridge)
         self.assertIn("store.instances.Create(generation, model)", self.bridge)

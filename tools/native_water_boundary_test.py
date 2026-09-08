@@ -6,6 +6,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeWaterBoundaryTest(unittest.TestCase):
+    def test_render_pose_drives_water_sort_and_draw_but_not_legacy_world_export(self):
+        producer = (ROOT / "src/gpu/scene/native_material_texture_bridge.cpp").read_text().split(
+            "bool StageNativeWaterForObject(", 1)[1]
+        self.assertIn("const auto render_pose = ResolveNativeRenderPose(pose)", producer)
+        self.assertIn("EvaluateDeferredDepth(depth,render_pose->transforms[node],camera->view)", producer)
+        self.assertIn("*lights,std::move(bridge),render_pose", producer)
+        bridge = (ROOT / "src/gpu/scene/native_refraction_material_bridge.cpp").read_text()
+        self.assertIn("PublishNativeWorld(pending_->pose->transforms[pending_->node])", bridge)
+        submit = bridge.split("bool NativeWaterMaterialScope::Submit(", 1)[1]
+        self.assertLess(submit.index("sorted world differs from completed native pose"),
+                        submit.index("ResolveNativeRenderPose(*pose)"))
+        self.assertIn("pending_ ? pending_->render_pose", submit)
+        self.assertIn("BuildNativeWaterInstance(render_pose->transforms[node]", submit)
+        self.assertNotIn("BuildNativeWaterInstance(pose->transforms[node]", submit)
+
     def test_shaders_consume_owned_values_not_translated_constants(self):
         files = ("src/gpu/scene/native_water_shader.h",
                  "src/gpu/shaders/hlsl/native_water_vs.hlsl",

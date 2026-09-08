@@ -22,6 +22,9 @@ struct NativeWaterDeferred {
   NativeTextureGpuHandle environment;
   NativeSceneLightRecipe lights;
   std::shared_ptr<const NativeWaterProducerBridge> bridge;
+  // Raw completed pose above serves the outgoing mixed-frame state export.
+  // Native sort/deformation/bounds use this immutable render-time lease.
+  std::shared_ptr<const NativeInstancePose> render_pose;
 
   NativeVisualIdentity Identity() const {
     return pose ? NativeVisualIdentity{pose->instance,pose->model_generation} : NativeVisualIdentity{};
@@ -33,6 +36,9 @@ struct NativeWaterDeferred {
   bool Valid(uint32_t current_frame) const {
     const auto *program = Program();
     return Identity() && frame == current_frame && std::isfinite(depth) && lights.update &&
+        render_pose && render_pose->instance == pose->instance &&
+        render_pose->model_generation == pose->model_generation && render_pose->model == pose->model &&
+        render_pose->transforms.size() == pose->transforms.size() &&
         cull <= PrimitiveCull::Back &&
         program && program->valid && primitive < program->ranges.size() &&
         primitive < program->geometries.size() && program->geometries[primitive] &&

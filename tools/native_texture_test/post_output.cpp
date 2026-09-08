@@ -1197,6 +1197,86 @@ void RigidScenePacket() {
   assert(plan->pass.shadow_filter.z == .65f/1024 && plan->shadow == depth && plan->albedo[0] == albedo);
   auto good = packet;
   {
+    // Render-pose ownership must reach actual rigid/skin scene and shadow
+    // plans, not just a standalone interpolation helper. Both cull paths use
+    // the same endpoint as the packet and its queued palette lease.
+    auto rigid_geometry = std::make_shared<NativeGeometry>(*geometry);
+    rigid_geometry->id = 101;
+    rigid_geometry->bounds = NativeBounds{{-1,-2,-3},{1,2,3}};
+    auto skin_geometry = std::make_shared<NativeGeometry>(*rigid_geometry);
+    skin_geometry->id = 102; skin_geometry->skin_influences = 1;
+    skin_geometry->skin_bounds = {{1,{{-1,-1,-1},{1,1,1}}}};
+    skin_geometry->skin_scene_vertex_input = geometry->rigid_vertex_input;
+    skin_geometry->skin_shadow_vertex_input = geometry->rigid_vertex_input;
+    ModelMaterialImport rigid_source;
+    rigid_source.source_mesh = 100; rigid_source.program = program;
+    rigid_source.program.geometries = {rigid_geometry}; rigid_source.source_bindings.resize(1);
+    rigid_source.program.shadow_policies = {NativeShadowPolicy::Receive};
+    auto skin_source = rigid_source; skin_source.source_mesh = 200;
+    skin_source.program.ranges[0].shader.vertex_bones = 1;
+    skin_source.program.ranges[0].skin = DecodeNativeSkinBinding(std::array<uint16_t,1>{1});
+    skin_source.program.skin_geometries = {skin_geometry};
+    const std::array<ModelNodeSourceBinding,2> nodes{{{0,100},{1,200}}};
+    ModelMaterialRegistry models;
+    assert(models.Publish(1,{rigid_source,skin_source},nodes));
+    auto model = models.FindModel(1);
+    NativeInstanceRegistry instances;
+    const auto id = instances.Create(model->Generation(),model);
+    std::array<RenderMatrix,2> transforms{identity,identity};
+    transforms[0][12] = 2; transforms[1][12] = 7;
+    assert(instances.Publish(id,0,transforms) && instances.Transfer(id,0,1,2) &&
+        instances.ObserveRenderTick(id,10,true));
+    transforms[0][0] = 2; transforms[0][12] = 3; transforms[1][12] = 8;
+    assert(instances.Publish(id,0,transforms) && instances.Transfer(id,0,1,2) &&
+        instances.ObserveRenderTick(id,11,true));
+    auto completed = instances.Read(id,1);
+    auto rendered = instances.ReadRender(completed,{11,20,.5f,true});
+    assert(rendered && rendered != completed && rendered->transforms[0][0] == 1.5f &&
+        rendered->transforms[0][12] == 2.5f && rendered->transforms[1][12] == 7.5f);
+    const auto *rigid_program = model->FindNode(0), *skin_program = model->FindNode(1);
+    assert(rigid_program && skin_program && rigid_program->skin_geometries.empty());
+    const auto rigid_bounds = NativeSkinCasterBounds(*rigid_program,*rendered,0);
+    const auto skin_bounds = NativeSkinCasterBounds(*skin_program,*rendered,1);
+    assert(rigid_bounds && rigid_bounds->min[0] < 1 && rigid_bounds->max[0] > 4 &&
+        rigid_bounds->min[0] > .99f && rigid_bounds->max[0] < 4.01f);
+    assert(skin_bounds && skin_bounds->min[0] < 6.5f && skin_bounds->max[0] > 8.5f);
+    // A mixed node unions transformed rigid and joint-local skin bounds. An
+    // absent late skin sibling must still refuse the whole node.
+    auto mixed = *rigid_program;
+    mixed.ranges.push_back(skin_program->ranges[0]); mixed.geometries.push_back(rigid_geometry);
+    mixed.skin_geometries = {nullptr,skin_geometry};
+    const auto mixed_bounds = NativeSkinCasterBounds(mixed,*rendered,0);
+    assert(mixed_bounds && mixed_bounds->min[0] == rigid_bounds->min[0] &&
+        mixed_bounds->max[0] == skin_bounds->max[0]);
+    mixed.skin_geometries.pop_back(); assert(!NativeSkinCasterBounds(mixed,*rendered,0));
+    auto rigid_packet = good;
+    rigid_packet.pose = completed; rigid_packet.geometry = rigid_geometry;
+    rigid_packet.world = completed->transforms[0];
+    auto skin_packet = rigid_packet; skin_packet.node = 1; skin_packet.shader.vertex_bones = 1;
+    assert(BindNativeRenderPose(rigid_packet,rendered) && BindNativeRenderPose(skin_packet,rendered));
+    auto rigid_plan = PrepareNativeRigidScene(*rigid_program,rigid_packet,receiver);
+    auto skin_plan = PrepareNativeRigidScene(*skin_program,skin_packet,receiver);
+    assert(rigid_plan && std::bit_cast<RenderMatrix>(rigid_plan->object.world) == rendered->transforms[0]);
+    assert(skin_plan && skin_plan->skin_pose == rendered && skin_plan->skin_bounds == skin_bounds);
+    PrimitivePolicyInputs shadow_policy; shadow_policy.phase = 1;
+    auto rigid_shadow = PrepareNativeRigidShadow(*rigid_program,rendered->transforms[0],shadow_policy,*good.camera);
+    auto skin_shadow = PrepareNativeRigidShadow(*skin_program,rendered->transforms[1],shadow_policy,*good.camera,{},rendered.get());
+    assert(rigid_shadow && std::bit_cast<RenderMatrix>(rigid_shadow->front().object.world) == rendered->transforms[0]);
+    assert(skin_shadow && skin_shadow->front().skin_bounds == skin_bounds);
+    const std::array<std::shared_ptr<const NativeInstancePose>,2> palettes{rendered,skin_plan->skin_pose};
+    const auto palette = PlanNativeSkinPalette(palettes);
+    assert(palette && palette->poses.size() == 1 && palette->matrices == 2 &&
+        palette->ranges[0].x == palette->ranges[1].x);
+    NativeRigidSceneSubmission delayed{id,model->Generation(),1,20,false,{*skin_plan}};
+    auto next = instances.ReadRender(completed,{11,21,.75f,true});
+    assert(next && next->transforms[1][12] == 7.75f && completed->transforms[1][12] == 8 &&
+        delayed.plans[0].skin_pose->transforms[1][12] == 7.5f);
+    instances.Retire(id); models.Retire(1); model.reset();
+    assert(!instances.ReadRender(completed,{11,22,.5f,true}) &&
+        delayed.plans[0].skin_pose->model && delayed.plans[0].skin_bounds == skin_bounds &&
+        std::bit_cast<RenderMatrix>(rigid_plan->object.world)[12] == 2.5f);
+  }
+  {
     // An explicit family must have owned Toon values, not whichever registers
     // or another material's settings survived. Ordinary remains unchanged.
     packet.surface = NativeSceneSurface::Toon;
@@ -2146,7 +2226,7 @@ void CheckNativeWaterDeferredQueue() {
   assert(models.Publish(10,{source},std::span(&node,1)));
   auto model = models.FindModel(10);
   auto pose = std::make_shared<NativeInstancePose>(NativeInstancePose{23,model->Generation(),model,{identity}});
-  NativeWaterDeferred water{pose,0,0,7,123,-2,PrimitiveCull::Front,true,{},{{},9},{}};
+  NativeWaterDeferred water{pose,0,0,7,123,-2,PrimitiveCull::Front,true,{},{{},9},{},pose};
   assert(water.Valid(7) && !water.Valid(8));
   NativeDeferredQueue queue;
   const NativeWaterDeferred good = water;
@@ -2194,6 +2274,33 @@ void CheckNativeWaterDeferredQueue() {
   const auto last = queue.TakeWater(2);
   assert(last && last->primitive == 1 && queue.EndDrain() && queue.Entries().empty());
   assert(!queue.EndDrain());
+  {
+    NativeInstanceRegistry instances;
+    auto current_model = models.FindModel(10);
+    const auto id = instances.Create(current_model->Generation(),current_model);
+    auto world = identity;
+    assert(instances.Publish(id,0,{&world,1}) && instances.Transfer(id,0,1,1) &&
+        instances.ObserveRenderTick(id,1,true));
+    world[12] = 1;
+    assert(instances.Publish(id,0,{&world,1}) && instances.Transfer(id,0,1,1) &&
+        instances.ObserveRenderTick(id,2,true));
+    auto completed = instances.Read(id,1);
+    auto render = instances.ReadRender(completed,{2,9,.5f,true});
+    auto moving = good; moving.pose = completed; moving.render_pose = render; moving.frame = 9;
+    assert(moving.Valid(9) && render->transforms[0][12] == .5f && completed->transforms[0][12] == 1);
+    auto invalid = moving; invalid.render_pose.reset(); assert(!invalid.Valid(9));
+    auto wrong = std::make_shared<NativeInstancePose>(*render);
+    invalid.render_pose = wrong; ++wrong->instance; assert(!invalid.Valid(9));
+    wrong->instance = id; ++wrong->model_generation; assert(!invalid.Valid(9));
+    wrong->model_generation = completed->model_generation; wrong->model.reset(); assert(!invalid.Valid(9));
+    wrong->model = completed->model; wrong->transforms.clear(); assert(!invalid.Valid(9));
+    assert(queue.StageWater(std::span(&moving,1),0,9));
+    instances.Retire(id); models.Retire(10); current_model.reset(); moving = {};
+    assert(queue.BeginDrain(9));
+    auto queued = queue.TakeWater(0);
+    assert(queued && queued->Valid(9) && queued->pose->transforms[0][12] == 1 &&
+        queued->render_pose->transforms[0][12] == .5f && queued->Program() && queue.EndDrain());
+  }
 }
 void CheckScreenshotContracts();
 void CheckToonProducer() {

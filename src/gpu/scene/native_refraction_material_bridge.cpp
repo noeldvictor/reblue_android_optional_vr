@@ -453,7 +453,12 @@ bool NativeWaterMaterialScope::Submit(bool stencil_pending) {
       (receive && program.shadow_policies[*primitive] == NativeShadowPolicy::Receive ? WaterShadow : 0);
   const auto projection = bottom ? bottom->world_to_bottom : RenderMatrix{};
   const std::array<uint32_t,3> layers{images.planar.image.layers,images.snapshot.image.layers,images.bottom.image.layers};
-  auto input = BuildNativeWaterInstance(pose->transforms[node],output->material,pass,{projection,projection},layers,flags);
+  // Staged work keeps its frame's exact pose even after a later source handoff.
+  // The remaining sorted-entry adapter compares raw values BEFORE resolving
+  // render time. Neither route exports blended matrices to legacy consumers.
+  const auto render_pose = pending_ ? pending_->render_pose : ResolveNativeRenderPose(*pose);
+  if (!render_pose || node >= render_pose->transforms.size()) return refuse("native water render pose");
+  auto input = BuildNativeWaterInstance(render_pose->transforms[node],output->material,pass,{projection,projection},layers,flags);
   if (!input || !SetNativeWaterCutout(*input,alpha->enabled,uint32_t(alpha->compare),alpha->threshold) ||
       !images.Ready(input->image_layers) || !NativeWaterWorldBounds(*geometry,*input)) return refuse("water GPU values/image leases/wave bounds");
   NativeWaterScenePlan plan;

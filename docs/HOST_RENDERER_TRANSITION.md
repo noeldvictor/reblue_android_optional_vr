@@ -738,20 +738,24 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    [Current consumer, exact evidence and storage](../research/20260908_1143_native-skinned-shadow-consumer.md).
    [Connection verification and exact refusals](../research/20260908_1100_native-skin-caster-verification.md).
    [Exact contract and evidence](../research/20260908_1410_native-skin-assets.md).
-   **Render-pose source checkpoint (2026-09-08, after host164):** completed
+   **Native render-pose connection (2026-09-08, host165):** completed
    handoffs now record host tick endpoints in the existing bounded instance
    owner. Native culling, scene/shadow plans and retained skin palettes request
    the same immutable frame-phase pose; raw completed poses still feed source
    comparisons and unconverted consumers. No guest interpolation scratch is
-   added. Regression source covers timing, discontinuities, late writers,
-   generation identity, packet binding, pinned lifetimes and the shared budget.
-   This is an unbuilt checkpoint requested for commit/push, not new runtime
-   evidence. Next build/run the material and post-output C++ fixtures, add the
-   rigid-only render-bounds regression, link the host, then qualify unlocked-FPS
-   interpolation and renderer-owned pixels under the existing storage gate.
+   added. Admitted native water now retains the same render lease for sorting,
+   drawing and wave bounds; raw poses still serve outgoing mixed-frame world
+   exports. Material44/CPU42 and output80/CPU52 pass timing, discontinuities,
+   late writers, identity, rigid-only/mixed/skin bounds, actual scene/shadow
+   plans, water queue retirement and shared-budget tests.390 Python checks and
+   host165 pass, without guest object compilation; no shader changes or new game
+   run. Next qualify unlocked-FPS interpolation in fresh ready-field/reload
+   epochs and renderer-owned pixels under the existing storage gate. The known
+   title/window discrepancy still precludes another unchanged PrintWindow run.
    Original animation evaluation/collision/effect side effects, conditional
    source-palette copying, secondary palettes and legacy interpolation remain.
    Do not restamp host164/run971 as verification of this source.
+   [Render-pose connection, verification and remaining gates](../research/20260908_1440_native-render-poses.md).
 3. **Specialized producers and complete host frame.** Dynamic vertices,
    effects/particles, UI, secondary shadows, reflections, remaining frame/pass
    scheduling and presentation. Remove guest rendering, register/resource

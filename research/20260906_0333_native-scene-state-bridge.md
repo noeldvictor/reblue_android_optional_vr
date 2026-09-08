@@ -5554,3 +5554,85 @@ scene and visual failure. Image10434657B/13 leaves51103B.13:34:23 free7841591296
 48566272B below13:22:35 drive-wide; other activity separate. No new cache/hlsl
 files observed. Source/host/GPU binaries unchanged, no raw growth/budget reset.
 See20260908_1334_native-toon-live.md. Push approval still pending; no retry/bypass.
+
+### 2026-09-08 render-pose integration after source checkpoint11c193a
+
+Previous turn made progress: committed timed pose ownership and its native
+culling/scene/shadow connection;388 artifact-free Python checks pass. The new
+C++ behavior source and host were not built. Push again rejected by security
+review; exact owner approval remains pending, no retry on this continuation.
+This bundle verifies the existing owner through actual rigid/skin bounds,
+scene/shadow plans, shared palette and delayed lifetime, without new shaders,
+assets or another owner. Original animation/conditional source copy remain.
+
+14:20 preflight free72185679872B; material8402235B/41files,
+texture85137417B/134files, attachment logs406877B/196files, host
+EXE49090560B/PDB111763456B unchanged. Transient compiler32152/ninja31824
+were observed, then both IDs were confirmed absent before launch; no owned
+producer was resumed or duplicated. Read-only pagefile inspection shows2048MiB
+allocated, unchanged from the prior checkpoint. No recent host object writes
+observed, and selected fixture/log sizes do not explain the drive-wide decline
+since13:34.14:23 free71245791232B; do not attribute unrelated drive activity to
+source or claim reclaimed bytes. No cleanup or producer output yet.
+
+Plan existing material44/CPU42 and output78/CPU51, one producer at a time,
+64MiB per-build and8MiB per-test free-drop guards; then host165 with192MiB
+link-overlap guard only if current storage fits. Actual launch free/floor printed
+by existing300s supervisor;10MiB aggregate logs and original cumulative3GiB
+exception/floor62509998080B unchanged. Selected retained growth estimate below
+4MiB. Preserve prior pass/failure evidence until replacement passes, then
+remove exact superseded build/test logs. No raw/image/profile/game producer
+authorized by this preflight; any live validation needs its own bounded check.
+
+Material44/PID29428/session1133 passes17 host fixture edges, no guest work;
+actual launch71454695424B/end71454560256B. CPU42/PID37928 passes native_material_data
+0.15s (CTest0.18s), including all new timing/lifetime/budget behavior.
+Output78/PID32904 stops at the64MiB free-drop guard within5s, before emitting
+an object or compiler diagnostic. The supervisor terminates its exact child
+tree; subsequent process inspection finds no compiler. Its stdout/stderr and
+temporary object are0B; retain the stop condition here, not a claimed code failure.
+14:26 free70317436928B;14:27 free69872472064B. Selected fixture growth is only
+143771B (material now8546006B), texture remains85137417B; new logs3559B.
+Read-only current write-rate inspection shows no large active writer at that
+instant; it does not explain prior allocation or authorize stopping other apps.
+Owner was asked asynchronously about concurrent downloads/builds.14:28:37 and
+14:29:13 free68136939520/68136763392B show the rapid decline has paused. Retry
+output79 only after a fresh stable-space/process preflight, with the SAME64MiB
+guard and cumulative floor, not a budget increase or duplicate producer.
+
+14:29:53 free68136730624B confirms stability. Output79/PID35532 passes two
+edges, actual launch68199460864B/end68199329792B. CPU51/PID17556/session62003
+fails the new fixture's model publication assertion, then CTest terminates at
+30s. Cause is the fixture's omitted per-range shadow-policy vector; production
+ModelMaterialRegistry correctly refuses mismatched vectors. Added explicit
+Receive policy, with no change to production admission. Owner requests no new
+PrintWindow retry remain in force; no renderer was launched.
+
+The connected source audit also found native water still consuming raw poses.
+Extend its existing deferred record with the same registry-owned render lease:
+sort, native water inputs and wave bounds use it; outgoing legacy world exports
+keep the raw completed pose. No new source index or copied matrix cache.
+Add real queue/retirement and identity tests to the same post-output fixture.
+388 Python checks pass. Rebuild output80/CPU52 under unchanged64/8MiB guards;
+14:34 free68192808960B, no rapid decline or owned producer remaining.
+
+Output80/PID28908 passes, launch68192673792B/end68192649216B. CPU52/PID36244
+passes0.63s (CTest0.65s), launch68192387072B/end68192276480B. Host165/PID36932/
+session41506 passes, codegen0written and no guest objects; actual launch
+68191940608B/end68191191040B.390 artifact-free Python checks pass. All producers
+terminal. No game/profile/image/raw/GPU-shader run; unchanged shader evidence
+is not new unlocked-FPS motion or pixel evidence. Exact binaries and remaining
+interfaces are recorded in20260908_1440_native-render-poses.md.
+
+14:39 pre-cleanup free68190777344B,3994902528B below14:20 drive-wide. Selected
+material8546006B (+143771), texture85276304B (+138887), host49102848B (+12288),
+PDB111812608B (+49152), logs417805B (+10928). Removed14 exact superseded logs:
+material43/CPU41, output77/CPU50, output79/CPU51 and host164 stdout/stderr,
+after44/42,80/52 and165 pass. Also removed the identified0B interrupted output78
+object. The fixture-policy failure is explained above and covered by52; retain
+the storage-stop logs78/76 and all game/pixel/unresolved-failure evidence.
+Logical8308B reclaimed, measured free68188495872->68188516352B (+20480B).
+Logs now409497B/198; texture134files, same bytes. Selected net retained growth
+346718B for current fixture/host binaries and verification, not duplicated trees.
+Other object/source/Git/system activity is separate; no old cleanup recredited,
+no game data/profile/assets removed, no raw/image growth or budget reset.
