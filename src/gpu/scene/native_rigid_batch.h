@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_rigid_scene.h"
+#include "gpu/native_indexed_command.h"
 #include <numeric>
 
 namespace bd::gpu::scene {
@@ -86,10 +87,4 @@ inline std::optional<NativeRigidStoragePlan> PlanNativeRigidStorage(uint32_t cou
   const auto bytes = uint32_t(count*sizeof(NativeRigidInstanceGPU));
   return NativeRigidStoragePlan{bytes,quantum,bytes+quantum-1};
 }
-struct NativeRigidIndexedCommand {
-  uint32_t index_count, instance_count, first_index;
-  int32_t base_vertex;
-  uint32_t first_instance;
-};
-static_assert(sizeof(NativeRigidIndexedCommand) == 20 && offsetof(NativeRigidIndexedCommand, first_instance) == 16);
 } // namespace bd::gpu::scene

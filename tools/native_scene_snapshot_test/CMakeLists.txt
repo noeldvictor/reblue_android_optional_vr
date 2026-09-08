@@ -1,6 +1,6 @@
-add_executable(native_scene_snapshot_test main.cpp rigid.cpp occlusion.cpp
+add_executable(native_scene_snapshot_test main.cpp rigid.cpp occlusion.cpp visibility.cpp
     ../../src/gpu/scene/native_rigid_program.cpp ../../src/gpu/native_occlusion_program.cpp
-    ../../src/gpu/scene/native_mesh_data.cpp)
+    ../../src/gpu/scene/native_mesh_data.cpp ../../src/gpu/native_depth_visibility.cpp)
 target_include_directories(native_scene_snapshot_test PRIVATE ../../src ../.. "${REBLUE_GEN_DIR}")
 target_link_libraries(native_scene_snapshot_test PRIVATE plume user32)
 target_compile_features(native_scene_snapshot_test PRIVATE cxx_std_23)
@@ -11,3 +11,5 @@ add_test(NAME native_rigid_pixels COMMAND native_scene_snapshot_test --rigid)
 set_tests_properties(native_rigid_pixels PROPERTIES TIMEOUT 30)
 add_test(NAME native_occlusion_pixels COMMAND native_scene_snapshot_test --occlusion)
 set_tests_properties(native_occlusion_pixels PROPERTIES TIMEOUT 30)
+add_test(NAME native_depth_visibility_pixels COMMAND native_scene_snapshot_test --visibility)
+set_tests_properties(native_depth_visibility_pixels PROPERTIES TIMEOUT 30)

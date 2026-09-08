@@ -165,6 +165,14 @@ visibility, tree-gap investigation and stereo culling remain open.** No timing
 gain or complete host-owned frame is claimed; no safety checks were relaxed.
 [Indexed bounds, strict reload proof and remaining visibility gates](research/20260907_2107_native-indexed-bounds.md).
 
+**Source-only prototype checkpoint:** current-depth maximum-pyramid compute
+shaders and a GPU-generated indexed-command fixture are now checked in. The
+existing 330 Python source/scenario checks pass, but this prototype has not been
+compiled or GPU-tested. Runtime queue/fence integration, aggregate in-flight
+resource limits and moving-camera/changing-occluder pixel proof remain pending;
+the game still uses the existing exact-camera query-history path. This checkpoint
+does not replace the tested binary or qualify a new rendering result.
+
 The preceding host119/run959 passed the full strict cold/reload checks and
 supplies fresh **multi-instance batching evidence**: its reloaded
 300-frame window emits 9,515 native scene instances in 7,893 indirect calls, with

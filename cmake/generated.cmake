@@ -68,6 +68,19 @@ endif()
 # Native depth-query shaders shared by runtime and the GPU fixture.
 reblue_host_shader(occ_proxy_ps ps_6_0)
 reblue_host_shader(native_occ_proxy_vs vs_6_1)
+foreach(shader IN ITEMS native_visibility_depth_cs native_visibility_depth_ms_cs native_visibility_reduce_cs native_visibility_cull_cs)
+    reblue_host_shader(${shader} cs_6_0)
+endforeach()
+reblue_host_shader(native_visibility_mask_ps ps_6_0)
+if(TARGET native_scene_snapshot_test)
+    add_custom_target(native_visibility_shader_headers DEPENDS
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_visibility_depth_cs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_visibility_depth_ms_cs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_visibility_reduce_cs.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_visibility_mask_ps.hlsl.spirv.h"
+        "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_visibility_cull_cs.hlsl.spirv.h")
+    add_dependencies(native_scene_snapshot_test native_visibility_shader_headers)
+endif()
 if(TARGET native_scene_snapshot_test)
     add_custom_target(native_occlusion_shader_headers DEPENDS
         "${REBLUE_GEN_DIR}/src/gpu/shaders/hlsl/native_occ_proxy_vs.hlsl.spirv.h"

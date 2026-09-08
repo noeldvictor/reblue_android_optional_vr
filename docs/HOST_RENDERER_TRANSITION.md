@@ -211,6 +211,18 @@ The separate observation tool is ready for a changed implementation; it is not
 a reason to repeat diagnostic-only boots. Controlled hidden/visible game pixels,
 the tree-gap investigation, stereo and the full desktop gate remain required.
 
+Source-only checkpoint for this bundle: `native_depth_visibility.*` and the
+`native_visibility_*` shaders draft a current-depth maximum pyramid and native
+indexed indirect commands. The existing `native_scene_snapshot_test --visibility`
+fixture contains intended command/pyramid/pixel checks, but has not been compiled
+or run. The 330 existing Python source/scenario checks pass; they do not validate
+the new shaders or GPU behavior. Next review shader compilation, readback offset
+alignment and MSAA pixel coverage, then run the bounded GPU fixture. Runtime
+queue ordering, fence-retained work owners, aggregate in-flight limits and
+GPU-visible emission accounting are unconnected. Keep exact-camera query-history
+safety unchanged until its replacement is connected and verified. No host binary
+was rebuilt for this source checkpoint.
+
 The superseded940 mono reload JPEG was reviewed and retired, leaving172,616 B
 image headroom;945 accepted and956 tree-gap images remain. The planned110 KiB
 run960 image was not produced. Preserve960's timeout evidence along with957/948/941.
