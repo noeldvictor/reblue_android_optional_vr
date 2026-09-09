@@ -149,19 +149,19 @@ eyes remain unqualified. Host175 does not inherit live qualification from174.
 slot-clock advancement, ordered layers and native TRS working values. They no
 longer exchange per-layer guest scratch buffers. Completed values feed the
 existing native skeleton evaluator through a one-shot, model-generation check.
-The live diagnostic records **30,460 matching controller transactions**, including
-empty plans, with 3,996 samples, 8 mixes, 4,012 advancing slot clocks and 3,991
+The latest live diagnostic records **108,986 matching controller transactions**, including
+empty plans, with 13,815 samples, 23 mixes, 14,601 advancing slot clocks and 13,805
 native channel handoffs. The six previously rejected handoffs are now connected:
 all six post-controller updates match, reuse native channels and pass their
 completed values to the native skeleton, with **zero changed-channel refusals**.
 The late phase owns its fixed-step clocks and ordered layers instead of calling
 the guest slot/sampler chain. Standalone slot sampling also uses the same owner,
 but that separate attachment route was not exercised in this run.
-5,028 controller calls retained the original at model/controller admission.
-Those admission refusals still need classification. CPU tests, 413 source/scenario checks
+18,116 controller calls retained the original at model/controller admission.
+Those admission refusals still need classification. CPU tests, 415 source/scenario checks
 and the host build pass, without guest objects or shaders rebuilding.
 
-The run reached the opening event, not the full field/reload gate. Strict
+The run reached post-event field samples, not the full field/reload gate. Strict
 comparison executes the original once; this is not a speedup measurement.
 Gameplay/effect updates still run once. Outgoing channel bytes and their
 late-writer validation reads remain, along with source slot selection, special
@@ -176,14 +176,16 @@ Defaults and the full desktop/both-eye gate are unchanged; no Quest work.
 [Selected-motion residency, runtime evidence and next work](research/20260908_1745_selected-motion-residency.md).
 [Clip math/source contract and regressions](research/20260908_1612_native-animation-clips.md).
 
-**Source-only checkpoint (not yet built/live-qualified):** selected-track sampling
-now feeds controller layers, and a cutscene root-motion hook reuses owned model
-names/rest transforms and the existing clip residency owner. The outgoing
-root-motion record and original cutscene placement remain. All 415 Python
-source/scenario checks pass; C++ behavior fixtures, a host build and fresh
-root-motion/controller regression coverage are pending. The live results above
-still describe host179/run984, not this newer source.
-[Checkpoint and pending verification](research/20260908_2040_selected-animation-checkpoint.md).
+**Selected-track connection (host180/run985):** controller layers now evaluate
+only selected animation tracks. C++ tests cover keyed/cubic parity, reordered
+joint identities, dormant bytes and transactional refusals; the host build and
+live controller/late-layer comparisons pass. A cutscene root-motion hook shares
+the same model/clip owners, but the 60-second run produced no root-path
+observation: its combined root-motion gate **did not pass**. Root math has CPU
+coverage; actual root/cutscene integration still needs a different observation.
+The outgoing root record and original cutscene placement remain. No speedup,
+motion-pixel or full desktop/VR qualification is claimed.
+[Behavior tests, exact live scope and remaining root gate](research/20260908_2052_selected-animation-verification.md).
 
 ### How much is left?
 

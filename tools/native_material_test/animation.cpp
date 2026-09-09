@@ -784,6 +784,14 @@ void TestIndexedAnimationAssets() {
     }
     const auto before=records;
     auto working=animation_source::ControllerLayer::Decode(before);
+    const std::array<animation_source::ChannelRecord,1> root_input{before[2]};
+    auto root=animation_source::SampleRootMotion(*asset,names[2],skeleton[0],.25f,
+        animation_source::ControllerLayer::Decode(root_input));
+    auto root_expected=before[2];
+    root_expected[0]=(root_expected[0]&~(type == 0 ? 3u : 7u))|1u;
+    for (unsigned axis=0; axis<3; ++axis) root_expected[2+axis]=std::bit_cast<uint32_t>(float(axis+1));
+    Require(root && root->Encode()[0] == root_expected,
+            "indexed one-joint request uses descriptor zero, not model pose two; TR masks and dormant payloads survive");
     const std::array<std::string_view,31> invalid_exclusions{};
     const NativeAnimationFilter ignored{"an overlong ignored indexed filter",invalid_exclusions,false};
     Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,0,true,records,ignored) &&
@@ -838,6 +846,85 @@ void TestIndexedAnimationAssets() {
 NativeJointName ControllerName(std::string_view text) {
   NativeJointName name{{},uint8_t(text.size())};
   std::ranges::copy(text,name.bytes.begin()); return name;
+}
+void TestSelectedTrackAndRootMotion() {
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u};
+  std::array<NativeSkeletonJoint,3> skeleton;
+  skeleton[0].pose_index=2; skeleton[1].pose_index=0; skeleton[1].parent=0;
+  skeleton[2].pose_index=1; skeleton[2].parent=0;
+  for (bool cubic : {false,true}) {
+    auto source=cubic ? CubicSource() : ClipSource();
+    auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);});
+    Require(asset.has_value(),"selected sampling imports existing keyed/cubic representations");
+    source.words.clear();
+    std::vector<animation_source::ChannelRecord> initial(3);
+    for (auto &record : initial) { record.fill(0x7fc01234); record[0]=256|64|7; record[1]=0xDEADBEEF; }
+    for (int step=-1; step<=129; ++step) {
+      const float seconds=float(step)/128;
+      auto expected=initial;
+      Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,seconds,1,2,false,expected),
+              "whole-layer reference evaluates source-free keyed/cubic root records");
+      for (const auto &joint : skeleton) {
+        const auto index=joint.pose_index;
+        const std::array<animation_source::ChannelRecord,1> input{initial[index]};
+        auto root=animation_source::SampleRootMotion(*asset,names[index],joint,seconds,
+            animation_source::ControllerLayer::Decode(input));
+        Require(root && root->Encode()[0] == expected[index],
+                "selected root matches all whole-layer words through clamped endpoints, interior samples and dormant payloads");
+      }
+    }
+    const std::array<animation_source::ChannelRecord,1> input{initial[2]};
+    auto missing=animation_source::SampleRootMotion(*asset,0x1234,skeleton[0],.25f,
+        animation_source::ControllerLayer::Decode(input));
+    auto expected=input[0]; expected[1]=0x1234;
+    Require(missing && missing->Encode()[0] == expected,
+            "missing named root track changes only the authored header and preserves even active dormant bytes");
+    Require(!animation_source::SampleRootMotion(*asset,names[2],skeleton[0],NAN,
+                animation_source::ControllerLayer::Decode(input)) &&
+            !animation_source::SampleRootMotion(*asset,names[2],skeleton[0],0,animation_source::ControllerLayer(2)),
+            "root refuses nonfinite clocks and non-single output extents");
+    NativeJointChannels selected; selected.translation={42,43,44};
+    Require(!asset->SampleTarget(0x1234,2,0,selected) && selected.translation == JointVector{42,43,44},
+            "missing selected target never modifies caller output");
+  }
+  ClipSource source;
+  auto clip=Import(source); source.words.clear();
+  Require(clip.has_value(),"model-bound clip for nonordinal pose selection");
+  std::vector<NativeJointChannels> all;
+  Require(clip->Sample(.25f,all),"whole clip sampling remains source-free");
+  for (size_t ordinal=0; ordinal<clip->Tracks().size(); ++ordinal) {
+    NativeJointChannels selected;
+    Require(clip->SampleTrack(ordinal,.25f,selected),"select immutable clip ordinal");
+    const auto &expected=all[clip->Tracks()[ordinal].pose_index];
+    Require(selected.translation == expected.translation && selected.rotation == expected.rotation && selected.scale == expected.scale &&
+            selected.translated == expected.translated && selected.rotated == expected.rotated && selected.scaled == expected.scaled,
+            "selected ordinal respects sparse/reordered model pose identities");
+  }
+  NativeJointChannels sentinel; sentinel.translation={42,43,44};
+  Require(!clip->SampleTrack(clip->Tracks().size(),0,sentinel) && !clip->SampleTrack(0,INFINITY,sentinel) &&
+          sentinel.translation == JointVector{42,43,44},"invalid ordinal/time refuses transactionally");
+
+  std::vector<NativeAnimationTrack> tracks(2);
+  tracks[0].translation.push_back({0,{1,2,3}}); tracks[1].pose_index=1;
+  auto splines=std::make_unique<NativeAnimationSplines>(); splines->translation.active=true;
+  splines->translation.axes[0]={{0,0,std::numeric_limits<float>::max(),false},{10000,0,-std::numeric_limits<float>::max(),false}};
+  tracks[1].splines=std::move(splines);
+  auto selective_clip=NativeAnimationClip::Create(2,10000,std::move(tracks),128*1024);
+  Require(selective_clip.has_value(),"finite imported curves can overflow only when evaluated");
+  auto selective=NativeAnimationAsset::Create(std::move(*selective_clip),{1,2},128*1024);
+  Require(selective.has_value(),"selected tracks reuse the same bounded native asset");
+  std::array<NativeSkeletonJoint,2> siblings; siblings[1].pose_index=1;
+  const std::array selected_names{1u,2u};
+  animation_source::ControllerLayer layer(2);
+  Require(!selective->Clip().Sample(5000,all) && layer.Apply(*selective,selected_names,siblings,5000,1,0,true,{},false) &&
+          layer.channels[0].translation == JointVector{1,2,3} && !layer.channels[1].translated,
+          "selected subtree does not evaluate an unrelated overflowing curve or allocate whole-clip samples");
+  const auto before=layer.Encode();
+  Require(!layer.Apply(*selective,selected_names,siblings,5000,1,1,true,{},false) && layer.Encode() == before,
+          "selected overflow still refuses without partial layer publication");
+  const std::array missing_names{3u,4u};
+  Require(!layer.Apply(*selective,missing_names,siblings,NAN,1,0,true,{},false) && layer.Encode() == before,
+          "missing named tracks cannot bypass nonfinite clock refusal");
 }
 void TestNativeControllerPlan() {
   Require(animation_source::ControllerSourceExtentFits(512,6,false) &&
@@ -1063,6 +1150,7 @@ void TestAnimationClips() {
   TestConstantTimesAndScaleTail(); TestNamedAnimationSelection();
   TestFirstMatchAnimationDescriptors();
   TestIndexedAnimationAssets();
+  TestSelectedTrackAndRootMotion();
   TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

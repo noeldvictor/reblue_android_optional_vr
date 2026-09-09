@@ -6632,3 +6632,84 @@ source/Git and unrelated activity are outside this subtotal. Final diagnostics
 78073945B;420377B/212buildlogs. Same75MiB stop/100MiB ceiling/floor62509998080B,
 13window images10434657B unchanged. README/active queue updated for this bundle;
 commit/push explicit source/tests/docs only. Full goal remains active/incomplete.
+
+### 2026-09-08 selected-track/root-motion verification aftercecde3e
+
+Previous checkpoint made progress: selected sampling/root hook source and415
+guards were committed/pushed with C++/live acceptance explicitly pending.
+Current clean synchronized main inspected; no producer remains live. Main read
+devloop/guest-source skills; the full disk policy and same cumulative ledger
+remain authoritative. Added source-free keyed/cubic selected-root parity,
+indexed descriptor0, dormant payload, ordinal, missing-target and selected-only
+overflow/refusal fixtures before launching any producer.
+
+First measured free63447175168B after fixture edits; buildlogs420377B/212files,
+fixturetree10470066B/43files, hostEXE49293824B/PDB113348608B. No budget reset.
+Plan material63/CPU61 thenhost180 in existing trees/j4 bounded wrapper. Fixture
+64MiB/CPU8MiB/host192MiB maximum free-drop,300s,10MiB aggregate build logs;
+same floor62509998080B/100MiB diagnostics/75MiB runtime stop. Expected fixture
+overlap<16MiB and host<192MiB. Retain latest passing62/60/179 receipts until
+replacements pass,984 live evidence and all unresolved failures. No new raw,
+image, perf, cache or dump producer. Live root comparison requires a new bounded
+observation and full diagnostic overlap to fit before profile mutation/launch.
+
+Material63/PID31120 terminal1: fixture-only nested std::array CTAD copied a
+record instead of creating a one-record span. Explicit ChannelRecord,1 extents
+fix all occurrences; material64/PID38820 build0,CPU61/PID34880 PASS0.12s/CTest0.13s.
+Host180/PID14964/session49891 terminal0, private animation bridge and version
+consumers; codegen0writes, no guest objects/shaders. EXE49301504B/PDB113389568B,
+SHA25600370FA4BA7FBD8E7F0E135880C8273C82CC9EDAC67A9944B9D7CDE74F9D25B6.
+FixtureEXE1325056B SHA25685F283CF0EFACB3E609A59E54B1C624751E87B0D3336FEAD3502377200CBABB0;
+tree10574334B/43files.415 Python guards/scenario tests PASS0.226s.
+
+After passing replacements, eight exact verified ordinary files removed:
+material62/CPU60/host179 receipts and resolved63 compile-error text.24483B logical;
+free63446626304->63446654976,28672B observed reclaimed. Logs are reproducible,
+not recoverable from Git; concise63 cause retained here. No active build tree,
+game data or unresolved failure evidence removed.984 remains latest live text.
+
+Inspected full existing runtime operator; RootAnimationProbe adds positive equal
+root completed/checked counts and positive sampled tracks to UNCHANGED controller
+and late-layer observations. Its actual selected source/root output comparison
+is new coverage, not a retry for absent authored subtrees.60s/400KiB text/192MiB
+free-drop; no raw/image/perf/cache/dumps, exact profile restoration. Preflight
+diagnostics78073945B; plus full400KiB=78483545B below78643200B stop (159655B
+headroom), buildlogs420377B/212files, free63446654976B. Original profile matches
+2F1BC38D... independently. No previous process live; run985 is the next producer.
+
+Run985/PID22788/session2473 terminal20:51:26, operator exit1: requested root
+observation not reached in60s. No root completion/absence/refusal record; do NOT
+call the combined observation passing. Controllerframe2290 has108986 matching
+transactions,13815samples,23mixes,13240interior-CLIP times,14601advancing clocks,
+13805handoffs,changed0;18116admission refusals remain unclassified. Late6matching
+transactions/samples/reuses/handoffs,refused0. Skeleton2251 has14421 matching
+evaluations/publications,wrong0/unavailable0. Context2266 is post-eventFieldActive,
+not independent reload/motion-pixel/both-eye evidence. Canonical import122->121/
+93432B is observed again,prepare-refused0.984's controller/late/import evidence
+is replaced by985; root/model/name/state runtime acceptance stays pending.
+Next needs a reachable root-request caller/content condition or changed
+observation; no unchanged retry, threshold reduction or speedup claim.
+
+Run985 text267079B SHA256EE9C04E7E05A1529B8A946417356946D2026715724D46E15B3B160DFF30E7B44,
+retained for current comparison and unresolved root coverage. Exact profile
+hash2F1BC38D... independently restored. No producer remains live; timestamp
+inventory found no new raw/perf/cache/dump files. No further producer queued.
+After validating replacement purposes, exact984log118995B removed (old hash
+03C9EECD... remains in its historical report). Free63445491712->63445614592,
+122880B observed reclaim. Total this turn9text files143478B logical/151552B
+observed reclaimed (148KiB), not prior cleanup credit. Deleted text is not in
+Git; tests/builds reproducible,984source/hash findings retained. Preserve985
+and975/979/980/971/962 unresolved evidence, game data, profiles and active trees.
+
+Pre-commit free63445598208B (59.09GiB),1576960B drive-wide additional use since
+first63447175168B measurement after fixture edits. Partial attributed retained
+growth300992B: fixturetree+104268B,hostEXE/PDB+48640B,buildlogs0B,985replacing984
++148084B. The larger log retains newly tested post-event controller behavior
+and the missing-root observation; other hostobjects/buildmetadata/source/Git and
+unrelated activity are outside this subtotal. Diagnostics78222029B from prior
+full accounting plus net runtime text; buildlogs420377B/212files remeasured.
+Full400KiB incoming overlap would leave only11571B under75MiB, so any next
+producer must remeasure/reconcile rather than assume it fits. Same100MiB ceiling,
+62509998080B cumulative floor,13images10434657B and historical raw gate unchanged.
+README/queue distinguish CPU/build/live controller evidence from unqualified
+root/cutscene integration. Full goal remains active, desktop/VR gate incomplete.

@@ -883,18 +883,24 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    opening event, not interactive/reload/pixel qualification. Untracked writes
    still compare every boundary word; first difference now has bounded provenance.
    Run984 re-verifies canonicalization and supersedes177/983 runtime/build text.
-   **Source-only checkpoint after471b554:** selected-track sampling feeds the
-   native controller layer owner, and root-motion request8218FC98 uses owned
-   model names/rest transforms and selected clip residency. Outgoing48B root
-   data and original cutscene placement remain. All415 Python source/scenario
-   checks pass, but this source has NOT been C++-built or live-qualified.
-   Before qualification, add causal behavior fixtures for selected-vs-whole
-   sampling, indexed first-descriptor root selection, missing targets, dormant
-   payloads and transactional failures; then build and obtain fresh root-motion
-   plus controller/late regression evidence. Host179/run984 remains the last
-   built/live evidence. No queued build/run resumed for the owner's commit/push
-   request; no reduced runtime criteria or changed defaults.
-   [Source checkpoint and exact pending gates](../research/20260908_2040_selected-animation-checkpoint.md).
+   **Selected-track validation (host180/run985, aftercecde3e):** controller
+   layers sample selected tracks through the existing clip/model owners.
+   Material64/CPU61 pass keyed/cubic all-word root parity, indexed descriptor0,
+   reordered ordinals, dormant payloads and transactional failures. A selected
+   subtree avoids evaluating an unrelated overflowing curve; selecting that
+   curve still refuses without publication.415 guards and host180 pass; no
+   guest objects/shaders. Run985 has108986 matching controller transactions,
+   13815samples,23mixes,14601advancing clocks,13805handoffs,changed0; late6 matching
+   transactions/reuses/handoffs.18116 admission refusals remain unclassified.
+   Post-event field contexts are observed, but no root-path observation is logged:
+   the extra root-motion gate times out at60s and DOES NOT PASS. Do not relabel
+   controller coverage as root/cutscene evidence or repeat the unchanged boot.
+   Next recover a reachable root-request caller/content condition before another
+   root probe; its CPU math is covered, runtime model/name/state connection is not.
+   Outgoing48B root data and original cutscene placement remain.985 re-verifies
+   canonical import and replaces984 controller/late runtime text; retain985 for
+   the unresolved root-coverage gate. No motion-pixel/reload/both-eye claim.
+   [Selected sampling verification and pending root connection](../research/20260908_2052_selected-animation-verification.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
