@@ -6787,3 +6787,93 @@ superseded artifacts before another run; do not raise the cap or delete protecte
 Pre-documentation/commit recheck free63443554304B,2027520B additional drive-wide
 use since first measurement; unrelated drive activity is not attributed cleanup.
 README/queue and the new single-joint report record this connected checkpoint.
+
+### 2026-09-08 load-owned joint selection after4df3e0d
+
+Previous turn was progress:4df3e0d verified/committed/pushed one-joint consumers;
+working tree clean at entry. Read guest-source/devloop skills, full disk policy,
+render hook TOML and loader ownership frontier. Reused prior complete lookup/
+sampler/caller contracts and checked current source. The load producer now owns
+dense pose-to-source outgoing aliases in the existing model registry, separately
+from source-free NativeModelRenderData. This connects native joint lookup to
+the one-shot sampler and replaces controller SourceNode traversal and excluded
+joint name rereads with owned values. Legacy pointer/table exports remain.
+Generation, malformed/duplicate/partial/overflow bindings, source destruction,
+reordered hierarchy and exact shared-budget fixtures precede any producer.
+
+First measured free63437365248B after source edits; pre-build63442452480B.
+Fixturetree10588180B/43files,EXE49311232B/PDB113426432B,buildlogs418610B/212files;
+no matching producer live. Same cumulative floor62509998080B,100MiBdiagnostics,
+75MiBruntime stop,10MiBbuildlogs,13images10434657B and historical raw gate.
+Plan material66/CPU63 andhost183 in existing j4 trees:300s limits and64/8/192MiB
+maximum free-drop, fixture expected<16MiB,host<192MiB. No guest/shader build or
+new image/raw/perf/cache/dump producer. Keep65/62/182 until replacements pass.
+Run985 remains distinct protected missing-root/post-event evidence;986 remains
+the single-joint baseline. Current calculated diagnostics78340544B cannot fit
+full400KiB incoming runtime. Plan lossless compression of exact terminal985log
+267079B to one .gz, bounded1MiB overlap, verify full decompressed SHA256 before
+removing only its redundant plaintext. This preserves all failure evidence,
+does not lower checks, and is not permission for another boot until reaccounted.
+Operator already accounts retained-*.zip archives, so use retained-root985.zip
+instead of .gz; no accounting exclusion or new compression framework. Both are
+lossless; the retained member must reproduce all267079B and original SHA256.
+
+Material66/PID33608 build0; CPU63/PID31196 PASS0.12s/CTest0.14s.417 Python
+source/scenario checks PASS0.225s. Host183/PID28668/session99321 terminal0:
+shared model consumers and version users rebuild; codegen0writes, no guest
+objects or shaders. EXE49315840B/PDB113446912B; EXE SHA256
+28B26DA985D193602BC5BF9D79F216185AE98B4B71B30FE6C8AB8809B18D71D5.
+FixtureEXE1353728B SHA256251CF22468AB63F6E07B5A77A161DFDBE45D18E788A5B4FB9AB4BFBE4FC94425;
+tree10682023B/43files. All matching producer processes0 before cleanup/runtime.
+
+Lossless retained-root985.zip is44650B, SHA256
+D1493DE16E6AC0EA0665905EA10A150EE021605DCD8FB475201B0AB9CAF822DA.
+Its sole reblue_985.log member is267079B and full decompressed SHA256 equals
+EE9C04E7E05A1529B8A946417356946D2026715724D46E15B3B160DFF30E7B44.
+Compression free63439679488->63439634432 consumes45056B observed. Then remove
+only exact verified redundant985plaintext and superseded65/62/182 build/test
+receipts:7ordinary files270003B logical,free63439306752->63439585280,
+278528B observed deletion reclaim. Net observed compression/deletion saving
+233472B (228KiB); no earlier cleanup credit.985 remains fully recoverable from
+the ZIP, test/build receipts reproducible and historical hashes retained.
+No game/profile/active tree or unresolved evidence discarded.
+
+New JointSelectionProbe adds positive matching lookup/found observations to
+UNCHANGED single-joint/controller/late requirements. Owned exclusions are
+reported separately, not assumed present. Parser clean. Runtime full accounting
+78121884B plus400KiB=78531484B leaves111716B below unchanged75MiB stop;
+buildlogs422379B/212files,free63438999552B. Profile2F1BC38D... independently
+confirmed. Run987 planned60s/400KiB/192MiB free-drop, no raw/image/perf/cache/
+dumps, guaranteed exact profile restoration. This tests changed load-owned
+lookup reaching the sampler, not an unchanged retry or root985 qualification.
+
+Run987/PID29524/session40387 terminal21:37:48, explicit observation-complete
+operator exit1, not a crash. At1092:732 matching/found native lookups,refused0;
+291 completed/checked/sampled single joints,weighted0,refused0. Main30556
+matching transactions,5044 admission refusals,4008samples,8mixes,3851interior,
+4024advancing clocks,4003handoffs,changed0; late6 matching updates/samples/reuses/
+handoffs,refused0. Owned exclusions0, so that changed authored route remains
+CPU-only. Skeleton1054 has3563 matching evaluations/publications,wrong0/
+unavailable0; context1069 isFieldActive bg41_01,event1. Lookup441 at792 grows
+to732 at1092 with291 new samples. Not post-event/reload/motion/both-eye evidence.
+Canonical122->121track/93432B import passes again,prepare-refused0.
+
+987log119516B SHA256BD44625AA229AE3BF952BC149E70970311A03454C069B33CE8C9D1E6EF433317.
+Profile hash2F1BC38D... independently restored. Matching producers0; timestamp
+inventory since21:37:16 finds0new capture/perf/cache/dump files. No next producer.
+Validated987 replaces986's single-joint/controller/late/import purposes; exact
+986text120282B removed, hash62CF629B... retained in the historical report.
+Free63438856192->63438979072,122880B observed additional reclaim. Total current
+turn8files390285B logical deleted,401408B observed deletion reclaim, minus45056B
+archive allocation =356352B net observed cleanup (348KiB).985 is fully recoverable
+from ZIP;986 is superseded text, not recoverable from Git, with findings retained.
+No prior cleanup credited again; all unresolved failures and game data preserved.
+
+Partial attributed retained change -100495B: fixture+93843B,EXE/PDB+25088B,
+buildlogs+3769B,987replacing986 -766B,985lossless archive -222429B. This excludes
+hostobjects/buildmetadata/source/Git/system activity. Calculated diagnostics
+78121118B and buildlogs422379B/212files; next full400KiB overlap would leave
+112482B under75MiB, requiring fresh remeasurement. Pre-doc free63438979072B,
+1613824B drive-wide free increase since first63437365248B, not all cleanup.
+README/queue and the new report distinguish live lookup/sampling from pending
+owned exclusions, root/content, motion/pixels and full desktop/VR acceptance.

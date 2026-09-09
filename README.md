@@ -187,15 +187,18 @@ The outgoing root record and original cutscene placement remain. No speedup,
 motion-pixel or full desktop/VR qualification is claimed.
 [Behavior tests, exact live scope and remaining root gate](research/20260908_2052_selected-animation-verification.md).
 
-**Single-joint consumers (host182/run986; opt-in):** checked joint selection now
-connects placement/attachment callers to the existing native model, clip and
-rest-channel owners. Admitted samples bypass the guest packed-key/weighted-helper
-chain; the original graph lookup, caller placement and outgoing channel record
-remain adapters. The opening-event diagnostic records **289 matching samples,
-zero refusals**, with matching controller and late-layer checks. C++ fixtures,
-416 source/scenario checks and the host build pass. Fractional weights have CPU
-coverage but were not observed live; individual caller coverage, the separate
-cutscene-root gate, motion pixels, reloads and both eyes remain pending.
+**Single-joint consumers (host183/run987; opt-in):** load-owned joint bindings now
+replace the original ID-tree lookup and connect placement/attachment callers to
+native model, clip and rest-channel owners. Admitted samples bypass the guest
+packed-key/weighted-helper chain. The opening-event diagnostic records **732
+matching lookups and 291 matching samples, zero lookup/sample refusals**; controller
+and late-layer checks also match. C++ fixtures, 417 source/scenario checks and the
+host build pass. Controller exclusions now use owned joints/names, but this run
+observed none. Fractional weights and excluded-joint inputs have CPU coverage,
+not live qualification. Caller placement, pointer/channel exports and source slot
+selection remain adapters; individual caller coverage, the separate cutscene-root
+gate, motion pixels, reloads and both eyes remain pending.
+[Load-owned selection, live comparison and storage](research/20260908_2138_native-joint-selection.md).
 [Single-joint connection, verification and remaining interfaces](research/20260908_2113_native-single-joint-animation.md).
 
 ### How much is left?

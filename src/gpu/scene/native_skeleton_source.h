@@ -56,12 +56,13 @@ std::optional<RenderMatrix> ReadRoot(const std::array<uint64_t,5> &pairs,
 // Camera-facing nodes need a separate owned view contract, never identity math.
 template <class ReadWord>
 std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, ReadWord &&read,
-    std::vector<uint32_t> *animation_targets = nullptr) {
+    std::vector<uint32_t> *animation_targets = nullptr, std::vector<uint32_t> *source_nodes = nullptr) {
   struct Pending { uint32_t source, parent; };
   std::vector<Pending> pending;
   std::vector<NativeSkeletonJoint> joints;
   std::unordered_set<uint32_t> visited;
   std::vector<std::pair<uint32_t,uint32_t>> targets;
+  std::vector<uint32_t> sources;
   std::unordered_set<uint32_t> names;
   bool unique_names = true;
   if (root) pending.push_back({root,kNativeSkeletonRoot});
@@ -97,10 +98,16 @@ std::optional<std::vector<NativeSkeletonJoint>> ReadSkeleton(uint32_t root, Read
     }
     const auto parent = static_cast<uint32_t>(joints.size());
     joints.push_back(joint);
+    if (source_nodes) sources.push_back(item.source);
     if (*sibling) pending.push_back({*sibling,item.parent});
     if (*child) pending.push_back({*child,parent});
   }
   if (!ValidNativeSkeleton(joints)) return {};
+  if (source_nodes) {
+    std::vector<uint32_t> dense(joints.size());
+    for (size_t n=0; n<joints.size(); ++n) dense[joints[n].pose_index]=sources[n];
+    *source_nodes=std::move(dense);
+  }
   if (animation_targets) {
     std::vector<uint32_t> dense;
     if (unique_names) {

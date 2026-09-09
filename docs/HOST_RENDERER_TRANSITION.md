@@ -916,6 +916,23 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    Next connect placement/source selection to owned consumers and retire the
    lookup/export adapters, preserving strict comparisons and unresolved evidence.
    [Single-joint contracts and scoped live evidence](../research/20260908_2113_native-single-joint-animation.md).
+   **Load-owned selection (host183/run987):** the completed model producer now
+   publishes dense outgoing joint aliases in the existing generation/budget
+   registry, outside native render data. Admitted ID lookups no longer traverse
+   guest nodes; native controller exclusions no longer use SourceNode or reread
+   model names. Their owned inputs feed the existing layer/sampler consumers.
+   Material66/CPU63 and417 guards pass source destruction, reordered IDs,
+   malformed/partial/aliased bindings, retirement/reuse and exact budgets.
+   Run987 observes732 matching/found lookups and291 matching samples,refused0;
+   main30556 matching,4003 handoffs,changed0 and6 matching late updates. Owned
+   exclusions0: that authored route remains CPU-only, not live-qualified.
+   Opening-event context, no motion/reload/pixels/both-eye claim.987 replaces
+   986's sampler/import text;985's distinct root failure/post-event evidence is
+   preserved losslessly in retained-root985.zip with verified original hash.
+   Pointer/table/channel exports, source slot selection and caller placement
+   remain. Remove those at their native consumers; no new reverse-node framework
+   or unchanged boots for absent authored exclusions/root/subtree content.
+   [Connected selection, exact evidence and remaining adapters](../research/20260908_2138_native-joint-selection.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

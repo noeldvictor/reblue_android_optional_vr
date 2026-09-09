@@ -59,6 +59,7 @@ struct Store {
   uint64_t slot_publications=0, slot_reused=0, late_refused=0;
   uint64_t root_requests=0, root_checks=0, root_tracks=0, root_absent=0, root_refused=0;
   uint64_t joint_requests=0, joint_checks=0, joint_samples=0, joint_weighted=0, joint_refused=0;
+  uint64_t joint_lookups=0, joint_lookup_checks=0, joint_lookup_found=0, joint_lookup_refused=0, owned_exclusions=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -100,6 +101,9 @@ void Report(Store &store) {
   if (store.joint_requests || store.joint_refused)
     BD_INFO("[native-animation-joint] frame {} completed {} checked {} sampled {} weighted {} refused {}; generation-checked selection and owned single-track channels; placement adapter remains",
         frame,store.joint_requests,store.joint_checks,store.joint_samples,store.joint_weighted,store.joint_refused);
+  if (store.joint_lookups || store.joint_lookup_refused || store.owned_exclusions)
+    BD_INFO("[native-animation-selection] frame {} completed {} checked {} found {} refused {}; owned exclusions {}; load-owned joints; outgoing pointers remain",
+        frame,store.joint_lookups,store.joint_lookup_checks,store.joint_lookup_found,store.joint_lookup_refused,store.owned_exclusions);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -391,20 +395,6 @@ std::optional<std::vector<uint32_t>> PointerVector(uint64_t begin_address, uint6
   }
   return values;
 }
-std::optional<uint32_t> SourceNode(uint32_t graph, uint32_t pose, size_t count) {
-  const auto first=Word(uint64_t(graph)+16); if (!first || !*first) return {};
-  std::vector<uint32_t> pending{*first}; std::unordered_set<uint32_t> seen;
-  while (!pending.empty()) {
-    const uint32_t node=pending.back(); pending.pop_back();
-    if (!seen.insert(node).second || seen.size() > count) return {};
-    const auto index=Word(node), child=Word(uint64_t(node)+56), sibling=Word(uint64_t(node)+60);
-    if (!index || !child || !sibling) return {};
-    if (*index == pose) return node;
-    if (*sibling) pending.push_back(*sibling);
-    if (*child) pending.push_back(*child);
-  }
-  return {};
-}
 bool RootMotion(PPCContext &ctx, uint8_t *base) {
   if (!Enabled() || controller_reference) return false;
   auto refuse=[&](const char *reason) {
@@ -472,13 +462,30 @@ bool RootMotion(PPCContext &ctx, uint8_t *base) {
   ++store.root_requests; store.root_tracks+=asset->FindTrack(key,asset->Indexed() ? 0u : joint->pose_index) != nullptr; Report(store);
   return true;
 }
-void PublishSelectedJoint(uint32_t graph, uint32_t pose, uint32_t node) {
-  if (!Enabled() || controller_reference || !node) return;
-  const auto model=FindLoadedNativeModel(graph);
-  if (!model || model->AnimationTargets().size() != model->Skeleton().size() ||
-      pose >= model->AnimationTargets().size() || Word(node) != pose ||
-      Word(uint64_t(node)+4) != model->AnimationTargets()[pose]) return;
-  selected_joint.Publish({graph,node,pose,model->Generation()});
+bool SelectJoint(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  const uint32_t graph=ctx.r3.u32, pose=ctx.r4.u32;
+  const auto selection=FindLoadedNativeJoint(graph,pose);
+  if (!selection) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.joint_lookup_refused; return false;
+  }
+  const auto &model=selection->model;
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    ReferenceScope reference;
+    __imp__sub_8227EF60(ctx,base);
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.joint_lookup_checks;
+    if (ctx.r3.u32 != selection->source_node) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-selection-drift] model {} joint {}; no fallback",model->Generation(),pose);
+      throw std::runtime_error("Native joint selection comparison failed");
+    }
+  }
+  ctx.r3.u64=selection->source_node;
+  if (selection->source_node && model->AnimationTargets().size() == model->Skeleton().size())
+    selected_joint.Publish({graph,selection->source_node,pose,model->Generation()});
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++store.joint_lookups; store.joint_lookup_found+=selection->source_node != 0; Report(store);
+  return true;
 }
 bool SingleJoint(PPCContext &ctx, uint8_t *base) {
   if (!Enabled() || controller_reference) { selected_joint.Clear(); return false; }
@@ -490,8 +497,8 @@ bool SingleJoint(PPCContext &ctx, uint8_t *base) {
   const auto selection=selected_joint.Take(ctx.r4.u32,LoadedNativeModelGeneration);
   const auto model=selection ? FindLoadedNativeModel(selection->graph) : nullptr;
   if (!model || model->Generation() != selection->generation) return refuse("selected model generation");
-  const auto joint=std::ranges::find(model->Skeleton(),selection->pose,&NativeSkeletonJoint::pose_index);
-  if (joint == model->Skeleton().end() || selection->pose >= model->AnimationTargets().size()) return refuse("owned joint");
+  const auto *joint=model->FindJoint(selection->pose);
+  if (!joint || selection->pose >= model->AnimationTargets().size()) return refuse("owned joint");
   std::shared_ptr<const NativeAnimationAsset> asset;
   { auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(ctx.r5.u32); }
   const float weight=float(ctx.f2.f64), seconds=float(ctx.f1.f64/30.0);
@@ -704,6 +711,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   }
   included_bytes[0]=0;
   std::vector<uint32_t> exclusions;
+  std::vector<NativeJointName> excluded_names;
   if (ctx.r5.u32) {
     const auto overlays=PointerVector(uint64_t(ctx.r5.u32)+4,uint64_t(ctx.r5.u32)+8,kNativeAnimationSlots);
     if (!overlays) return refuse("overlay names");
@@ -713,24 +721,25 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
       input.overlays[n]=skeleton_source::ReadJointName((*overlays)[n],Word);
       if (!input.overlays[n].Valid()) return refuse("overlay name extent");
       exclusions.push_back((*overlays)[n]);
+      excluded_names.push_back(input.overlays[n]);
     }
   }
   const auto excluded_nodes=PointerVector(uint64_t(visual)+4616,uint64_t(visual)+4620,30);
   if (!excluded_nodes || exclusions.size()+excluded_nodes->size() > 30) return refuse("excluded nodes");
   for (uint32_t pose : *excluded_nodes) {
-    const auto node=SourceNode(slot_graph,pose,*count);
-    if (!node) return refuse("unresolved excluded node");
-    exclusions.push_back(*node+64);
+    const auto selected=FindLoadedNativeJoint(slot_graph,pose);
+    const auto *joint=model->FindJoint(pose);
+    if (!selected || selected->model->Generation() != model->Generation() || !selected->source_node ||
+        !joint || !joint->animation_name.Valid()) return refuse("unresolved excluded node");
+    exclusions.push_back(selected->source_node+64); // outgoing legacy table only
+    excluded_names.push_back(joint->animation_name);
   }
   const bool write_exclusions=!exclusions.empty();
   if (!write_exclusions) for (uint32_t n=0; n<*exclusion_count; ++n) {
     const auto pointer=Word(0x82DBEC70+uint64_t(n)*4);
     if (!pointer) return refuse("inherited exclusions"); exclusions.push_back(*pointer);
-  }
-  std::vector<NativeJointName> excluded_names;
-  for (uint32_t pointer : exclusions) {
-    auto name=pointer ? skeleton_source::ReadJointName(pointer,Word) : NativeJointName{};
-    if (pointer && !name.Valid()) return refuse("excluded name"); excluded_names.push_back(name);
+    auto name=*pointer ? skeleton_source::ReadJointName(*pointer,Word) : NativeJointName{};
+    if (*pointer && !name.Valid()) return refuse("excluded name"); excluded_names.push_back(name);
   }
   const auto plan=PlanNativeAnimationController(input);
   if (!plan) return refuse("incomplete native layer plan");
@@ -805,6 +814,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     }
   }
   auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.controllers;
+  store.owned_exclusions+=excluded_nodes->size();
   for (size_t n=0; n<kNativeAnimationSlots; ++n)
     store.controller_advancing+=plan->advanced[n] && plan->slots[n].time_ticks != input.slots[n].time_ticks;
   store.controller_samples+=result->sampled; store.controller_mixes+=result->mixed;
@@ -882,10 +892,8 @@ REX_HOOK_RAW(sub_8218FC98) {
 }
 REX_HOOK_RAW(sub_8227EF60) {
   using namespace bd::gpu::scene::animation_bridge;
-  const uint32_t graph=ctx.r3.u32, pose=ctx.r4.u32;
   selected_joint.Clear();
-  __imp__sub_8227EF60(ctx,base);
-  PublishSelectedJoint(graph,pose,ctx.r3.u32);
+  if (!SelectJoint(ctx,base)) __imp__sub_8227EF60(ctx,base);
 }
 REX_HOOK_RAW(sub_8228A4E8) {
   using namespace bd::gpu::scene::animation_bridge;

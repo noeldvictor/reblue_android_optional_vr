@@ -248,16 +248,16 @@ bool PublishModelMaterials(uint32_t graph) {
                             ModelMaterialRegistry::kMaxBytes)
       return false;
   }
-  std::vector<uint32_t> animation_targets;
+  std::vector<uint32_t> animation_targets, joint_sources;
   auto skeleton = skeleton_source::ReadSkeleton(uint32_t(*root), [](uint64_t address) -> std::optional<uint32_t> {
     if ((address & 3) || address > UINT32_MAX-3) return {};
     const auto *word = bd::mem::try_at<const be_u32>(uint32_t(address));
     return word ? std::optional(uint32_t(*word)) : std::nullopt;
-  }, &animation_targets);
+  }, &animation_targets, &joint_sources);
   // Unconverted camera-facing/sparse skeletons do not invalidate independently
   // owned geometry. An empty skeleton cannot enter the native evaluator.
   return Models().Publish(graph, std::move(meshes), node_bindings,
-      skeleton ? std::move(*skeleton) : std::vector<NativeSkeletonJoint>{},std::move(animation_targets));
+      skeleton ? std::move(*skeleton) : std::vector<NativeSkeletonJoint>{},std::move(animation_targets),std::move(joint_sources));
 }
 
 std::shared_ptr<const ModelMaterialImport> FindCommands(const NodeTag &tag) {
@@ -277,6 +277,10 @@ uint64_t LoadedNativeModelGeneration(uint32_t source_model) {
 
 std::shared_ptr<const NativeModelRenderData> FindLoadedNativeModel(uint32_t source_model) {
   return Models().FindModel(source_model);
+}
+
+std::optional<ModelJointSourceSelection> FindLoadedNativeJoint(uint32_t source_model, uint32_t pose_index) {
+  return Models().FindJointSource(source_model,pose_index);
 }
 
 void NoteNativeModelNodeCandidate(const NativeInstancePose &pose, uint32_t index, uint32_t view, uint32_t technique) {

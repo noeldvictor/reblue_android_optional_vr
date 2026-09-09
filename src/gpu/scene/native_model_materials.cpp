@@ -9,6 +9,11 @@
 
 namespace bd::gpu::scene {
 
+const NativeSkeletonJoint *NativeModelRenderData::FindJoint(uint32_t pose_index) const {
+  const auto found=std::ranges::find(skeleton_,pose_index,&NativeSkeletonJoint::pose_index);
+  return found == skeleton_.end() ? nullptr : &*found;
+}
+
 const NativeModelMaterialProgram *NativeModelRenderData::FindNode(uint32_t matrix_index) const {
   const auto found = std::lower_bound(nodes_.begin(), nodes_.end(), matrix_index,
       [](const Node &node, uint32_t index) { return node.matrix_index < index; });
@@ -52,7 +57,7 @@ ModelMaterialRegistry::Model::~Model() {
 
 size_t ModelMaterialRegistry::RetainedBytes(
     std::span<const ModelMaterialImport> meshes, size_t mesh_capacity, size_t node_capacity, size_t joint_capacity,
-    size_t target_capacity) {
+    size_t target_capacity, size_t joint_source_capacity) {
   constexpr size_t limit = std::numeric_limits<size_t>::max();
   size_t bytes = sizeof(Model) + 256;
   auto add = [&](size_t count, size_t stride) {
@@ -66,6 +71,7 @@ size_t ModelMaterialRegistry::RetainedBytes(
   add(node_capacity, sizeof(NativeModelRenderData::Node));
   add(joint_capacity, sizeof(NativeSkeletonJoint));
   add(target_capacity, sizeof(uint32_t));
+  add(joint_source_capacity, sizeof(uint32_t));
   for (const auto &mesh : meshes) {
     add(mesh.program.ranges.capacity(), sizeof(NativeMaterialRange));
     add(mesh.program.materials.capacity(), sizeof(NativeMaterialHandle));
@@ -83,19 +89,27 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
                                      std::vector<ModelMaterialImport> meshes,
                                      std::span<const ModelNodeSourceBinding> nodes,
                                      std::vector<NativeSkeletonJoint> skeleton,
-                                     std::vector<uint32_t> animation_targets) {
+                                     std::vector<uint32_t> animation_targets,
+                                     std::vector<uint32_t> joint_sources) {
   std::lock_guard lock(mutex_);
   // A failed new load must not leave a previous allocation's recipes visible.
   // Existing leases remain valid, but cannot be found through a reused key.
   if (models_.erase(source_model))
     ++stats_.retired;
-  size_t bytes = RetainedBytes(meshes, meshes.capacity(), nodes.size(), skeleton.capacity(), animation_targets.capacity());
+  size_t bytes = RetainedBytes(meshes, meshes.capacity(), nodes.size(), skeleton.capacity(), animation_targets.capacity(), joint_sources.capacity());
   if (!source_model || stats_.published == UINT64_MAX || meshes.size() > kMaxMeshes || nodes.size() > kMaxMeshes || bytes > max_bytes_ ||
       accounting_->bytes.load() > max_bytes_ - bytes ||
       accounting_->live.load() >= max_models_ || (!skeleton.empty() && !ValidNativeSkeleton(skeleton)) ||
-      (!animation_targets.empty() && animation_targets.size() != skeleton.size())) {
+      (!animation_targets.empty() && animation_targets.size() != skeleton.size()) ||
+      (!joint_sources.empty() && joint_sources.size() != skeleton.size())) {
     ++stats_.refused;
     return false;
+  }
+  std::unordered_set<uint32_t> unique_sources;
+  for (uint32_t source : joint_sources) {
+    if (!source || (source&3) || source > UINT32_MAX-79 || !unique_sources.insert(source).second) {
+      ++stats_.refused; return false;
+    }
   }
   std::sort(meshes.begin(), meshes.end(), [](const auto &a, const auto &b) {
     return a.source_mesh < b.source_mesh;
@@ -131,6 +145,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   model->render.generation_ = model->generation;
   model->render.skeleton_ = std::move(skeleton);
   model->render.animation_targets_ = std::move(animation_targets);
+  model->joint_sources = std::move(joint_sources);
   model->render.nodes_.reserve(nodes.size());
   for (const auto &node : nodes) {
     const auto found = std::lower_bound(model->meshes.begin(), model->meshes.end(), node.source_mesh,
@@ -143,7 +158,7 @@ bool ModelMaterialRegistry::Publish(uint32_t source_model,
   std::sort(model->render.nodes_.begin(), model->render.nodes_.end(),
       [](const auto &a, const auto &b) { return a.matrix_index < b.matrix_index; });
   bytes = RetainedBytes(model->meshes, model->meshes.capacity(), model->render.nodes_.capacity(),
-                        model->render.skeleton_.capacity(),model->render.animation_targets_.capacity());
+                        model->render.skeleton_.capacity(),model->render.animation_targets_.capacity(),model->joint_sources.capacity());
   if (bytes > max_bytes_ || accounting_->bytes.load() > max_bytes_ - bytes) { ++stats_.refused; return false; }
   model->bytes = bytes;
   accounting_->bytes.fetch_add(bytes);
@@ -210,6 +225,15 @@ NativeModelRenderHandle ModelMaterialRegistry::FindModel(uint32_t source_model) 
   const auto found = models_.find(source_model);
   return found == models_.end() ? NativeModelRenderHandle{} :
       NativeModelRenderHandle(found->second, &found->second->render);
+}
+
+std::optional<ModelJointSourceSelection> ModelMaterialRegistry::FindJointSource(uint32_t source_model, uint32_t pose_index) const {
+  std::lock_guard lock(mutex_);
+  const auto found=models_.find(source_model);
+  if (found == models_.end() || found->second->joint_sources.empty()) return {};
+  const auto &model=found->second;
+  return ModelJointSourceSelection{{model,&model->render},
+      pose_index < model->joint_sources.size() ? model->joint_sources[pose_index] : 0u};
 }
 
 } // namespace bd::gpu::scene

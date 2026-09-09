@@ -102,8 +102,13 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
 
     def test_single_joint_calls_consume_generation_checked_selection_without_source_keys(self):
         lookup = self.animation_bridge.split("REX_HOOK_RAW(sub_8227EF60)", 1)[1].split("REX_HOOK_RAW", 1)[0]
-        self.assertLess(lookup.index("selected_joint.Clear()"), lookup.index("__imp__sub_8227EF60"))
-        self.assertLess(lookup.index("__imp__sub_8227EF60"), lookup.index("PublishSelectedJoint("))
+        self.assertLess(lookup.index("selected_joint.Clear()"), lookup.index("SelectJoint(ctx,base)"))
+        self.assertIn("if (!SelectJoint(ctx,base)) __imp__sub_8227EF60", lookup)
+        selection = self.animation_bridge.split("bool SelectJoint(", 1)[1].split("bool SingleJoint(", 1)[0]
+        self.assertIn("FindLoadedNativeJoint(graph,pose)", selection)
+        self.assertNotIn("Word(", selection)
+        self.assertLess(selection.index("ReferenceScope reference"), selection.index("__imp__sub_8227EF60"))
+        self.assertLess(selection.index("throw std::runtime_error"), selection.index("selected_joint.Publish("))
         sample = self.animation_bridge.split("bool SingleJoint(", 1)[1].split("bool LateLayers(", 1)[0]
         for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "SourceNode(", "bdSceneGraphFindNodeByName"):
             self.assertNotIn(forbidden, sample)
@@ -113,6 +118,16 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertLess(sample.index("throw std::runtime_error"), sample.index("auto *output="))
         self.assertIn("SameSampledChannelWord", sample)
         self.assertIn("TestJointSelectionHandoff()", self.animation_test)
+
+    def test_controller_excluded_joints_use_load_owned_selection_and_names(self):
+        self.assertIn("&animation_targets, &joint_sources", self.loader)
+        self.assertIn("std::move(joint_sources)", self.loader)
+        self.assertNotIn("SourceNode(", self.animation_bridge)
+        excluded = self.animation_bridge.split("for (uint32_t pose : *excluded_nodes)", 1)[1].split("const bool write_exclusions", 1)[0]
+        self.assertIn("FindLoadedNativeJoint(slot_graph,pose)", excluded)
+        self.assertIn("selected->model->Generation() != model->Generation()", excluded)
+        self.assertIn("excluded_names.push_back(joint->animation_name)", excluded)
+        self.assertNotIn("ReadJointName", excluded)
 
     def test_weighted_subtrees_share_visual_scope_and_preserve_controller_side_effects(self):
         hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]

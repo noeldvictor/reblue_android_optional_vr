@@ -95,6 +95,7 @@ public:
   const NativeModelMaterialProgram *FindNode(uint32_t matrix_index) const;
   size_t Nodes() const { return nodes_.size(); }
   std::span<const NativeSkeletonJoint> Skeleton() const { return skeleton_; }
+  const NativeSkeletonJoint *FindJoint(uint32_t pose_index) const;
   std::span<const uint32_t> AnimationTargets() const { return animation_targets_; }
   NativeModelRenderData(const NativeModelRenderData &) = delete;
   NativeModelRenderData &operator=(const NativeModelRenderData &) = delete;
@@ -108,6 +109,11 @@ private:
   std::vector<uint32_t> animation_targets_; // authored name keys, dense pose order
 };
 using NativeModelRenderHandle = std::shared_ptr<const NativeModelRenderData>;
+
+// Outgoing pointer adapter only: the model lease supplies immutable joint data,
+// while source_node is valid only at the live source boundary. Never persist it
+// in native poses/assets. A known absent pose has a model but source_node == 0.
+struct ModelJointSourceSelection { NativeModelRenderHandle model; uint32_t source_node = 0; };
 
 // Bounded import traversal, independent of source memory and visibility flags.
 // Shared meshes are imported once. Cyclic/aliased nodes are malformed trees.
@@ -157,7 +163,8 @@ public:
   bool Publish(uint32_t source_model, std::vector<ModelMaterialImport> meshes,
                std::span<const ModelNodeSourceBinding> nodes = {},
                std::vector<NativeSkeletonJoint> skeleton = {},
-               std::vector<uint32_t> animation_targets = {});
+               std::vector<uint32_t> animation_targets = {},
+               std::vector<uint32_t> joint_sources = {});
   void Retire(uint32_t source_model);
   std::shared_ptr<const ModelMaterialImport> Find(
       uint32_t source_model, uint32_t source_mesh);
@@ -168,12 +175,13 @@ public:
   ModelMaterialRegistryStats Stats() const;
   uint64_t Generation(uint32_t source_model) const;
   NativeModelRenderHandle FindModel(uint32_t source_model) const;
+  std::optional<ModelJointSourceSelection> FindJointSource(uint32_t source_model, uint32_t pose_index) const;
   // Logical retained vector storage plus a conservative per-model bookkeeping
   // allowance. Shared material assets and geometry have their own library/GPU
   // arena budgets; retired geometry currently remains in the bounded GPU cache.
   static size_t RetainedBytes(std::span<const ModelMaterialImport> meshes,
                               size_t mesh_capacity, size_t node_capacity = 0, size_t joint_capacity = 0,
-                              size_t target_capacity = 0);
+                              size_t target_capacity = 0, size_t joint_source_capacity = 0);
 
 private:
   struct Accounting {
@@ -183,6 +191,7 @@ private:
     uint64_t generation = 0;
     std::vector<ModelMaterialImport> meshes;
     NativeModelRenderData render;
+    std::vector<uint32_t> joint_sources; // temporary outgoing aliases, dense pose order
     std::shared_ptr<Accounting> accounting;
     size_t bytes = 0;
     ~Model();
