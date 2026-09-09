@@ -1,22 +1,23 @@
 /**
- * @brief Temporary gaze input/export guard; native eye values contain no addresses.
+ * @brief Shared animated-material boundary; source addresses never enter the native owner.
  * @copyright Copyright (c) 2026 reblue contributors
  * @license BSD 3-Clause, see LICENSE
  */
 #pragma once
-#include "gpu/scene/native_eye_material.h"
+#include "gpu/scene/native_material_uv.h"
 #include <algorithm>
 #include <bit>
 
-namespace bd::gpu::scene::eye_source {
+namespace bd::gpu::scene::material_uv_source {
 struct Binding { uint32_t table=0, count=0; };
 struct Publication {
   Binding binding;
-  NativeEyeMaterial material;
+  NativeMaterialUVs material;
   std::array<std::array<float,2>,2> output; // all four floats, even for one record
 };
 template<class Read>
-std::optional<Publication> ReadEyeControl(uint32_t visual, uint32_t controls, Read read) {
+std::optional<Publication> ReadEyeControl(uint32_t visual, uint32_t controls, Read read,
+    const NativeMaterialUVs *previous=nullptr) {
   if (!visual || (visual & 3) || visual > UINT32_MAX-3567 ||
       !controls || (controls & 3) || controls > UINT32_MAX-7) return {};
   const auto table=read(uint64_t(visual)+3560), count=read(uint64_t(visual)+3564);
@@ -33,26 +34,29 @@ std::optional<Publication> ReadEyeControl(uint32_t visual, uint32_t controls, Re
   const auto values=EvaluateNativeEyeUV(input);
   if (!values) return {};
   Publication result{{*table,*count},{},*values};
-  result.material.count=std::min(*count,2u);
-  for (uint32_t i=0; i<result.material.count; ++i) {
+  result.material.count=*count;
+  for (uint32_t i=0; i<std::min(*count,2u); ++i) {
     const uint64_t record=uint64_t(*table)+i*152;
     const auto selector=read(record+4), channel=read(record+8), enabled=read(record+20);
     if (!selector || !channel || !enabled) return {};
-    result.material.entries[i]={*selector,*channel,(*values)[i],*enabled != 0};
+    result.material.entries.push_back({i,*selector,*channel,(*values)[i],*enabled != 0,NativeMaterialUVOrigin::Eye});
   }
+  // The bridge validates the earlier writer BEFORE the eye caller changes its
+  // output. Keep untouched slots in that same owner, never freeze a prior table.
+  if (previous && previous->count == *count && previous->Valid())
+    for (const auto &entry : previous->entries) if (entry.slot >= 2) result.material.entries.push_back(entry);
   return result;
 }
 // Call only at object setup, after the caller's output copy and later writers.
 // This checks the outgoing adapter; it never imports it as native UV input.
 template<class Read>
-bool Matches(uint32_t visual, Binding binding, const NativeEyeMaterial &material, Read read) {
+bool Matches(uint32_t visual, Binding binding, const NativeMaterialUVs &material, Read read) {
   if (!material.Valid() || !binding.table || !binding.count || binding.count > 256 ||
-      material.count != std::min(binding.count,2u) ||
+      material.count != binding.count ||
       read(uint64_t(visual)+3560) != std::optional(binding.table) ||
       read(uint64_t(visual)+3564) != std::optional(binding.count)) return false;
-  for (uint32_t i=0; i<material.count; ++i) {
-    const uint64_t record=uint64_t(binding.table)+i*152;
-    const auto &entry=material.entries[i];
+  for (const auto &entry : material.entries) {
+    const uint64_t record=uint64_t(binding.table)+entry.slot*152;
     const auto enabled=read(record+20);
     if (!enabled || (*enabled != 0) != entry.enabled ||
         read(record+4) != std::optional(entry.selector) || read(record+8) != std::optional(entry.channel)) return false;
@@ -61,4 +65,4 @@ bool Matches(uint32_t visual, Binding binding, const NativeEyeMaterial &material
   }
   return true;
 }
-} // namespace bd::gpu::scene::eye_source
+} // namespace bd::gpu::scene::material_uv_source

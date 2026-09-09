@@ -58,7 +58,7 @@ struct Store {
   std::unordered_map<uint32_t, instance_source::Binding> sources;
   uint64_t imports = 0, refused = 0, reads = 0, unavailable = 0, checked = 0, wrong = 0;
   uint64_t handoffs = 0, handoff_missing = 0;
-  uint64_t eye_published=0, eye_reads=0, eye_changed=0;
+  uint64_t material_uv_published=0, material_uv_reads=0, material_uv_changed=0;
   uint64_t skeleton_updates = 0, skeleton_published = 0, skeleton_unavailable = 0, skeleton_checks = 0, skeleton_wrong = 0;
   std::array<uint64_t, size_t(SkeletonMissing::Count)> skeleton_missing{};
   uint32_t miss_examples = 0;
@@ -97,9 +97,9 @@ void Report(Store &store) {
     BD_INFO("[native-skeleton] frame {} evaluated {} update poses {} unavailable {}; checked {} wrong {}; ordinary skinned hierarchy, curve/late-writer/copy adapters remain",
         frame, store.skeleton_updates, store.skeleton_published, store.skeleton_unavailable, store.skeleton_checks, store.skeleton_wrong);
   store.frame = frame;
-  if (store.eye_published)
-    BD_INFO("[native-eye-owner] frame {} published {} reads {} changed {}; generation-owned material UV; outgoing late-write guard remains",
-        frame,store.eye_published,store.eye_reads,store.eye_changed);
+  if (store.material_uv_published)
+    BD_INFO("[native-material-uv-owner] frame {} published {} reads {} changed {}; shared controller/eye ownership; outgoing late-write guard remains",
+        frame,store.material_uv_published,store.material_uv_reads,store.material_uv_changed);
 }
 struct SkeletonEvaluationScope;
 thread_local SkeletonEvaluationScope *active_skeleton_evaluation = nullptr;
@@ -268,32 +268,32 @@ NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual) {
   return it == store.sources.end() ? NativeVisualIdentity{} :
       NativeVisualIdentity{it->second.instance, it->second.model_generation};
 }
-bool PublishNativeEyeMaterial(uint32_t visual, NativeVisualIdentity identity,
-    uint32_t table, uint32_t count, const NativeEyeMaterial &material) {
+bool PublishNativeMaterialUVs(uint32_t visual, NativeVisualIdentity identity,
+    uint32_t table, const NativeMaterialUVs &material) {
   auto &store=Instances(); std::lock_guard lock(store.mutex);
   const auto it=store.sources.find(visual);
   if (it == store.sources.end() || it->second.instance != identity.instance ||
       it->second.model_generation != identity.model_generation) return false;
-  it->second.eye={};
-  if (!store.instances.PublishEye(identity.instance,identity.model_generation,material)) return false;
-  it->second.eye={table,count}; ++store.eye_published;
+  it->second.material_uv={};
+  if (!store.instances.PublishMaterialUVs(identity.instance,identity.model_generation,material)) return false;
+  it->second.material_uv={table,material.count}; ++store.material_uv_published;
   return true;
 }
-void InvalidateNativeEyeMaterial(uint32_t visual) {
+void InvalidateNativeMaterialUVs(uint32_t visual) {
   auto &store=Instances(); std::lock_guard lock(store.mutex);
   if (const auto it=store.sources.find(visual); it != store.sources.end()) {
-    store.instances.InvalidateEye(it->second.instance); it->second.eye={};
+    store.instances.InvalidateMaterialUVs(it->second.instance); it->second.material_uv={};
   }
 }
-std::optional<NativeEyeMaterial> ReadNativeEyeMaterial(uint32_t visual, uint64_t generation) {
+std::shared_ptr<const NativeMaterialUVs> ReadNativeMaterialUVs(uint32_t visual, uint64_t generation) {
   if (!REXCVAR_GET(bd_native_instances) || !REXCVAR_GET(bd_native_animation) || !REXCVAR_GET(bd_native_skeleton)) {
-    InvalidateNativeEyeMaterial(visual); return {};
+    InvalidateNativeMaterialUVs(visual); return {};
   }
   auto &store=Instances(); std::lock_guard lock(store.mutex);
   const auto it=store.sources.find(visual);
-  if (it == store.sources.end() || !it->second.eye.table) return {};
-  auto material=instance_source::ReadEye(store.instances,it->second,visual,generation,Word);
-  ++(material ? store.eye_reads : store.eye_changed);
+  if (it == store.sources.end() || !it->second.material_uv.table) return {};
+  auto material=instance_source::ReadMaterialUVs(store.instances,it->second,visual,generation,Word);
+  ++(material ? store.material_uv_reads : store.material_uv_changed);
   return material;
 }
 namespace {

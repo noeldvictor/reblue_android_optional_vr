@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_effect_animation.h"
+#include "gpu/scene/native_material_uv.h"
 #include <bit>
 
 namespace bd::gpu::scene::animation_source {
@@ -94,6 +95,8 @@ struct EffectUpdate {
   std::array<uint32_t,9> timeline{}; // outgoing-only IDs/entries; not a native owner
   bool called=false, clock_written=false, transitioned=false;
   uint32_t translated=0, rotated=0;
+  uint32_t table=0, owned_offsets=0;
+  NativeMaterialUVs material;
   std::vector<UV> uv;
   template<class Write> void Publish(Write &&write) const {
     if (transitioned) for (size_t n=0; n<timeline.size(); ++n) write(uint64_t(visual)+2212+n*4,timeline[n]);
@@ -117,7 +120,7 @@ struct EffectUpdate {
 
 template<class Read>
 std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, double duration_scale,
-    std::span<const NativeJointChannels> channels, Read &&read) {
+    std::span<const NativeJointChannels> channels, Read &&read, const NativeMaterialUVs *previous=nullptr) {
   if (!visual || (visual&3) || uint64_t(visual)+3752 > uint64_t(UINT32_MAX)+1) return {};
   const auto records=read(uint64_t(visual)+3560);
   if (!records) return {};
@@ -155,6 +158,8 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
   if (!count) return {};
   if (int32_t(*count) <= 0) return result;
   if (*count > 256 || (*records&3) || uint64_t(*records)+uint64_t(*count)*152 > uint64_t(UINT32_MAX)+1) return {};
+  if (previous && (!previous->Valid() || previous->count != *count)) return {};
+  result.table=*records; result.material.count=*count;
   const auto overlaps=[](uint64_t a,uint64_t bytes,uint64_t b,uint64_t extent) { return a < b+extent && b < a+bytes; };
   const auto source=read(uint64_t(visual)+2628);
   if (!source || channels.size() > kMaxNativeJoints ||
@@ -165,6 +170,10 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
     const auto enabled=read(record+20);
     if (!enabled) return {};
     if (!*enabled) continue;
+    const auto selector=read(record+4), channel=read(record+8);
+    if (!selector || !channel) return {};
+    const auto *owned=previous ? previous->Find(n) : nullptr;
+    const bool owns_offset=owned && owned->enabled && owned->selector == *selector && owned->channel == *channel;
     NativeEffectUVMotion motion;
     const auto driver=read(record+120);
     if (!driver) return {};
@@ -180,9 +189,15 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
     }
     for (size_t axis=0; axis<2; ++axis) {
       if (motion.mode == NativeEffectUVMode::Scroll) {
-        const auto offset=read(record+28+axis*4), rate=read(record+36+axis*4);
-        if (!offset || !rate) return {};
-        motion.offset[axis]=std::bit_cast<float>(*offset); motion.rate[axis]=std::bit_cast<float>(*rate);
+        const auto rate=read(record+36+axis*4);
+        if (!rate) return {};
+        if (owns_offset) motion.offset[axis]=owned->uv[axis];
+        else {
+          const auto offset=read(record+28+axis*4);
+          if (!offset) return {};
+          motion.offset[axis]=std::bit_cast<float>(*offset);
+        }
+        motion.rate[axis]=std::bit_cast<float>(*rate);
       } else {
         const auto divisor=read(record+(motion.mode == NativeEffectUVMode::Rotation ? 52 : 44)+axis*4);
         if (!divisor || !read(record+28+axis*4)) return {}; // validate outgoing destination too
@@ -198,7 +213,9 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
     if (!uv) return {};
     result.translated+=motion.mode == NativeEffectUVMode::Translation;
     result.rotated+=motion.mode == NativeEffectUVMode::Rotation;
+    result.owned_offsets+=owns_offset && motion.mode == NativeEffectUVMode::Scroll;
     result.uv.push_back({uint32_t(record+28),*uv});
+    result.material.entries.push_back({n,*selector,*channel,*uv,true,NativeMaterialUVOrigin::Effect});
   }
   return result;
 }

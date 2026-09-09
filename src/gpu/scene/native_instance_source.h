@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_instance.h"
-#include "gpu/scene/native_eye_material_source.h"
+#include "gpu/scene/native_material_uv_source.h"
 #include <optional>
 
 namespace bd::gpu::scene::instance_source {
@@ -19,17 +19,17 @@ struct Binding {
   NativeInstanceId instance = 0;
   uint64_t model_generation = 0;
   uint32_t palettes[2]{};
-  eye_source::Binding eye;
+  material_uv_source::Binding material_uv;
 };
 template<class Read>
-std::optional<NativeEyeMaterial> ReadEye(NativeInstanceRegistry &registry, Binding &binding,
+std::shared_ptr<const NativeMaterialUVs> ReadMaterialUVs(NativeInstanceRegistry &registry, Binding &binding,
     uint32_t visual, uint64_t generation, Read read) {
-  auto material=registry.ReadEye(binding.instance,generation);
+  auto material=registry.ReadMaterialUVs(binding.instance,generation);
   if (generation == binding.model_generation && material &&
-      eye_source::Matches(visual,binding.eye,*material,read)) return material;
+      material_uv_source::Matches(visual,binding.material_uv,*material,read)) return material;
   // A late write/rebind must not resurrect an old publication if bytes change
   // back later. Only another producer publication can make this visible again.
-  registry.InvalidateEye(binding.instance); binding.eye={};
+  registry.InvalidateMaterialUVs(binding.instance); binding.material_uv={};
   return {};
 }
 inline bool TransferReady(std::optional<uint32_t> flags) {

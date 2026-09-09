@@ -7,7 +7,7 @@
 #include "gpu/scene/native_transform.h"
 #include "gpu/scene/native_pose_interpolation.h"
 #include "gpu/scene/native_model_materials.h"
-#include "gpu/scene/native_eye_material.h"
+#include "gpu/scene/native_material_uv.h"
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -183,25 +183,32 @@ public:
     std::lock_guard lock(mutex_);
     if (entries_.erase(id)) { accounting_->bytes.fetch_sub(kEntryBytes); ++stats_.retired; }
   }
-  // Eye controls are a late material writer, not a bone-palette lane. Fixed
-  // by-value snapshots share entry accounting and cannot alias source/reloads.
-  bool PublishEye(NativeInstanceId id, uint64_t generation, const NativeEyeMaterial &material) {
+  // All animated material writers share one immutable, budgeted publication.
+  // A late eye patch can preserve other controller slots without a second owner.
+  bool PublishMaterialUVs(NativeInstanceId id, uint64_t generation, const NativeMaterialUVs &material) {
     std::lock_guard lock(mutex_);
     const auto it=entries_.find(id);
     if (it == entries_.end() || it->second.model_generation != generation) return false;
-    it->second.eye.reset();
-    if (!material.Valid()) return false;
-    it->second.eye=material;
+    auto &slot=it->second.material_uv;
+    if (material.Valid() && slot && slot->Same(material)) return true;
+    slot.reset(); // failure cannot expose the preceding writer
+    if (!material.Valid() || !Fits(sizeof(MaterialOwner)+128+material.entries.size()*sizeof(NativeMaterialUVs::Entry))) return false;
+    auto owner=std::make_shared<MaterialOwner>();
+    owner->material=material;
+    const size_t bytes=sizeof(MaterialOwner)+128+owner->material.entries.capacity()*sizeof(NativeMaterialUVs::Entry);
+    if (!Fits(bytes)) return false;
+    owner->bytes=bytes; owner->accounting=accounting_; accounting_->bytes.fetch_add(bytes);
+    slot=std::shared_ptr<const NativeMaterialUVs>(owner,&owner->material);
     return true;
   }
-  std::optional<NativeEyeMaterial> ReadEye(NativeInstanceId id, uint64_t generation) const {
+  std::shared_ptr<const NativeMaterialUVs> ReadMaterialUVs(NativeInstanceId id, uint64_t generation) const {
     std::lock_guard lock(mutex_);
     const auto it=entries_.find(id);
-    return it != entries_.end() && it->second.model_generation == generation ? it->second.eye : std::nullopt;
+    return it != entries_.end() && it->second.model_generation == generation ? it->second.material_uv : nullptr;
   }
-  void InvalidateEye(NativeInstanceId id) {
+  void InvalidateMaterialUVs(NativeInstanceId id) {
     std::lock_guard lock(mutex_);
-    if (const auto it=entries_.find(id); it != entries_.end()) it->second.eye.reset();
+    if (const auto it=entries_.find(id); it != entries_.end()) it->second.material_uv.reset();
   }
   NativeInstanceStats Stats() const {
     std::lock_guard lock(mutex_);
@@ -211,6 +218,12 @@ public:
   }
 private:
   struct Accounting { std::atomic<size_t> bytes{0}; };
+  struct MaterialOwner {
+    NativeMaterialUVs material;
+    std::shared_ptr<Accounting> accounting;
+    size_t bytes=0;
+    ~MaterialOwner() { if (accounting) accounting->bytes.fetch_sub(bytes); }
+  };
   struct PoseOwner {
     NativeInstancePose pose;
     std::shared_ptr<Accounting> accounting;
@@ -227,7 +240,7 @@ private:
       NativePosePhase phase{};
       bool active = false, cached_valid = false;
     } render;
-    std::optional<NativeEyeMaterial> eye;
+    std::shared_ptr<const NativeMaterialUVs> material_uv;
   };
   static_assert(sizeof(Entry) <= kEntryBytes);
   std::shared_ptr<const NativeInstancePose> OwnPose(NativeInstanceId id, const Entry &entry,

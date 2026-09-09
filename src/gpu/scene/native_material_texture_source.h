@@ -6,7 +6,7 @@
 #pragma once
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_material_data.h"
-#include "gpu/scene/native_eye_material.h"
+#include "gpu/scene/native_material_uv.h"
 #include <bit>
 #include <cmath>
 
@@ -51,9 +51,9 @@ std::optional<NativeMaterialObjectInputs> ReadMaterialObjectInputs(uint32_t visu
 // an owned lease, a known no-op, or explicitly unavailable, never a source key.
 template <class Image, class Read, class Capture>
 std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
-    uint32_t visual, Read read, Capture capture, const NativeEyeMaterial *eye = nullptr) {
+    uint32_t visual, Read read, Capture capture, const NativeMaterialUVs *animated = nullptr) {
   if (!visual || (visual & 3) || visual > UINT32_MAX - 3751) return {};
-  if (eye && !eye->Valid()) return {};
+  if (animated && !animated->Valid()) return {};
   const uint64_t object = visual;
   const auto mode = read(object + 3000), special_route = read(object + 3128);
   if (!mode || !special_route || *mode == 11 || *special_route) return {};
@@ -79,6 +79,7 @@ std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
     if (*records) {
       const auto count = read(object + 3564);
       if (!count || *count > 256) return {};
+      if (animated && animated->count != *count) return {};
       result.overrides.reserve(*count);
       for (uint32_t i = 0; i < *count; ++i) {
         const uint64_t record = uint64_t(*records) + i * 152;
@@ -91,10 +92,10 @@ std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
         entry.selector = *selector; entry.channel = *channel;
         if (*uv_on) {
           std::array<float, 2> offset;
-          if (eye && i < eye->count) {
-            const auto &owned=eye->entries[i];
-            if (!owned.enabled || owned.selector != *selector || owned.channel != *channel) return {};
-            offset=owned.uv; entry.native_eye=true;
+          if (const auto *owned=animated ? animated->Find(i) : nullptr) {
+            if (!owned->enabled || owned->selector != *selector || owned->channel != *channel) return {};
+            offset=owned->uv; entry.native_animated=true;
+            entry.native_eye=owned->origin == NativeMaterialUVOrigin::Eye;
           } else if (!floats(record + 28, offset)) return {};
           entry.uv = offset;
         }

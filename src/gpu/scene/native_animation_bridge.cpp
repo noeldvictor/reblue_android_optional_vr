@@ -8,7 +8,7 @@
 #include "gpu/scene/native_animation_placement.h"
 #include "gpu/scene/native_animation_selection_source.h"
 #include "gpu/scene/native_effect_animation_source.h"
-#include "gpu/scene/native_eye_material_source.h"
+#include "gpu/scene/native_material_uv_source.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_skeleton_source.h"
@@ -92,6 +92,7 @@ struct Store {
   uint64_t slot_selections=0, slot_selection_checks=0, slot_restarts=0, slot_ready=0, slot_absent=0, slot_selection_refused=0;
   uint64_t effects=0, effect_checks=0, effect_uv=0, effect_translated=0, effect_rotated=0, effect_transitions=0;
   uint64_t eyes=0, eye_checks=0, eye_refused=0, eye_off_center=0;
+  uint64_t material_uv_published=0, material_uv_refused=0, effect_owned_offsets=0, eye_preserved=0;
   std::array<EffectObservation,size_t(EffectAdmission::Count)> effect_observations{};
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
@@ -150,6 +151,9 @@ void Report(Store &store) {
   if (store.eyes || store.eye_refused)
     BD_INFO("[native-eye-control] frame {} completed {} checked {} refused {} off-center {}; native gaze to instance/material owner; caller scratch export remains",
         frame,store.eyes,store.eye_checks,store.eye_refused,store.eye_off_center);
+  if (store.material_uv_published || store.material_uv_refused)
+    BD_INFO("[native-animation-material-uv] frame {} published {} refused {} owned-scroll-inputs {} eye-preserved {}; shared owner feeds subsequent updates and native materials",
+        frame,store.material_uv_published,store.material_uv_refused,store.effect_owned_offsets,store.eye_preserved);
   for (size_t n=0; n<store.effect_observations.size(); ++n) {
     const auto &seen=store.effect_observations[n];
     if (seen.calls)
@@ -1012,7 +1016,9 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   // plan is admitted before the original or any source publication; pending cue
   // loads preserve the complete original controller once, including side effects.
   stage=EffectAdmission::Effects;
-  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word);
+  const auto identity=FindNativeVisualIdentity(visual);
+  const auto previous_uv=ReadNativeMaterialUVs(visual,model->Generation());
+  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word,previous_uv.get());
   if (!effects) return refuse("effect timeline/UV boundary");
   const auto records=result->output.Encode();
   stage=EffectAdmission::Output;
@@ -1072,6 +1078,10 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     }
   }
   effects->Publish([](uint64_t address,uint32_t value) { bd::mem::store<uint32_t>(uint32_t(address),value); });
+  const bool material_requested=effects->material.Valid();
+  const bool material_owned=material_requested && identity.model_generation == model->Generation() &&
+      PublishNativeMaterialUVs(visual,identity,effects->table,effects->material);
+  if (!material_owned) InvalidateNativeMaterialUVs(visual);
   if (!verify) {
     if (bd::mem::load<uint32_t>(visual+3440)) {
       ctx.fpscr.disableFlushMode();
@@ -1088,6 +1098,9 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   store.effects+=effects->called; store.effect_uv+=effects->uv.size();
   store.effect_translated+=effects->translated; store.effect_rotated+=effects->rotated;
   store.effect_transitions+=effects->transitioned;
+  store.material_uv_published+=material_owned;
+  store.material_uv_refused+=material_requested && !material_owned;
+  store.effect_owned_offsets+=effects->owned_offsets;
   store.owned_exclusions+=excluded_nodes->size();
   for (size_t n=0; n<kNativeAnimationSlots; ++n)
     store.controller_advancing+=plan->advanced[n] && plan->slots[n].time_ticks != input.slots[n].time_ticks;
@@ -1108,7 +1121,8 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
   // The original disables flush-to-zero before loading/evaluating controls.
   // Do so before native math too, not merely before its reference comparison.
   ctx.fpscr.disableFlushMode();
-  const auto publication=eye_source::ReadEyeControl(visual,ctx.r4.u32,Word);
+  const auto previous_uv=ReadNativeMaterialUVs(visual,identity.model_generation);
+  const auto publication=material_uv_source::ReadEyeControl(visual,ctx.r4.u32,Word,previous_uv.get());
   if (!publication) return refuse();
   const bool verify=REXCVAR_GET(bd_native_materials_verify);
   if (verify) {
@@ -1117,14 +1131,18 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
       if (bd::mem::load<uint32_t>(output+eye*8+axis*4) != std::bit_cast<uint32_t>(publication->output[eye][axis]))
         throw std::runtime_error("Native eye material source comparison failed");
   }
-  if (!PublishNativeEyeMaterial(visual,identity,publication->binding.table,publication->binding.count,publication->material))
-    throw std::runtime_error("Native eye material owner publication refused");
+  const bool material_owned=PublishNativeMaterialUVs(visual,identity,publication->binding.table,publication->material);
+  // Backpressure never replays side effects or exposes old values. The explicit
+  // outgoing route stays usable while this native publication is unavailable.
+  if (!material_owned) InvalidateNativeMaterialUVs(visual);
   // All three callers copy min(signed table count,2) records after this returns.
   // Preserve r6/r7; do not take a caller-specific count or expose its scratch as input.
   for (uint32_t eye=0; eye<2; ++eye) for (uint32_t axis=0; axis<2; ++axis)
     bd::mem::store<float>(output+eye*8+axis*4,publication->output[eye][axis]);
   auto &store=Clips(); std::lock_guard lock(store.mutex);
   ++store.eyes; store.eye_checks+=verify;
+  store.material_uv_published+=material_owned; store.material_uv_refused+=!material_owned;
+  store.eye_preserved+=material_owned ? publication->material.entries.size()-std::min(publication->material.count,2u) : 0;
   store.eye_off_center+=bd::mem::load<float>(ctx.r4.u32) != 0 || bd::mem::load<float>(ctx.r4.u32+4) != 0;
   Report(store);
   return true;
@@ -1196,7 +1214,10 @@ REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
 REX_HOOK_RAW(bdAnimationUpdate) {
   bd::gpu::scene::animation_bridge::CompletePlacementBeforeUpdate(ctx.r3.u32);
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
-  if (!bd::gpu::scene::animation_bridge::Controller(ctx,base)) __imp__bdAnimationUpdate(ctx,base);
+  if (!bd::gpu::scene::animation_bridge::Controller(ctx,base)) {
+    bd::gpu::scene::InvalidateNativeMaterialUVs(ctx.r3.u32);
+    __imp__bdAnimationUpdate(ctx,base);
+  }
 }
 REX_HOOK_RAW(AnimeData_method_4638) {
   if (!bd::gpu::scene::animation_bridge::AttachmentUpdate(ctx,base)) __imp__AnimeData_method_4638(ctx,base);
@@ -1217,8 +1238,10 @@ REX_HOOK_RAW(sub_822D3CB0) {
   if (!bd::gpu::scene::animation_bridge::LateLayers(ctx,base)) __imp__sub_822D3CB0(ctx,base);
 }
 REX_HOOK_RAW(sub_822BA028) {
-  bd::gpu::scene::InvalidateNativeEyeMaterial(ctx.r3.u32);
-  if (!bd::gpu::scene::animation_bridge::EyeMaterial(ctx,base)) __imp__sub_822BA028(ctx,base);
+  if (!bd::gpu::scene::animation_bridge::EyeMaterial(ctx,base)) {
+    bd::gpu::scene::InvalidateNativeMaterialUVs(ctx.r3.u32);
+    __imp__sub_822BA028(ctx,base);
+  }
 }
 REX_HOOK_RAW(sub_8218FC98) {
   using namespace bd::gpu::scene::animation_bridge;

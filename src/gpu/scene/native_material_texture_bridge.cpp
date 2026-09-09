@@ -87,6 +87,7 @@ struct Stats {
   uint64_t meshes = 0, reads = 0, missing = 0, checked = 0, wrong = 0;
   uint64_t draws = 0, images = 0, uv = 0;
   uint64_t eye_scopes=0, eye_values=0, eye_replay_reads=0, eye_packets=0;
+  uint64_t animated_scopes=0, animated_values=0, animated_packets=0;
   size_t peak_bytes = 0;
 };
 thread_local Stats stats;
@@ -146,8 +147,8 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
         !selected || *selected != *table || !offset || !fallback || !render_view) { ++stats.unsupported; return; }
     if (*phase == 1 && (!NativeRigidShadowEnabled() || *render_view != 1)) return;
     const auto model=FindLoadedNativeModel(*graph);
-    const auto eye=ReadNativeEyeMaterial(*visual,model ? model->Generation() : 0);
-    auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture, eye ? &*eye : nullptr);
+    const auto animated=ReadNativeMaterialUVs(*visual,model ? model->Generation() : 0);
+    auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture, animated.get());
     static uint32_t water_scope_examples = 0;
     if (*render_view == 3 && IsDeferredWaterResource(*visual,Word) && water_scope_examples < 3) {
       ++water_scope_examples;
@@ -203,7 +204,8 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     owned_ = std::move(publication); current = owned_.get();
     object_stats.publications += current->object.has_value();
     ++stats.scopes;
-    stats.eye_scopes+=eye.has_value() && !current->inputs.skip_overrides;
+    stats.eye_scopes+=animated && animated->HasEyes() && !current->inputs.skip_overrides;
+    stats.animated_scopes+=animated && !animated->entries.empty() && !current->inputs.skip_overrides;
   } catch (const std::exception &error) {
     ++stats.refused;
     if (stats.refused <= 3) BD_WARN("[native-material-textures] publication refused: {}", error.what());
@@ -360,6 +362,7 @@ NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialPro
     if (!ComposeMaterialTextures(std::span(program.texture_assignments), std::span(program.ranges),
         scope->inputs, lookup, mesh.values, 4096, scope->shadow_phase)) { ++stats.refused; return nullptr; }
     for (const auto &value : mesh.values) stats.eye_values+=value.native_eye_uv_mask != 0;
+    for (const auto &value : mesh.values) stats.animated_values+=value.native_animated_uv_mask != 0;
     if (scope->policy_inputs) {
       auto classify = [&](const PrimitivePolicyStep &step) {
         bool early_image = false;
@@ -513,6 +516,7 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
       FindNativePassCamera(scope->render_view),scope->toon);
   object_stats.packets += result.has_value();
   stats.eye_packets+=result.has_value() && mesh->values[primitive].native_eye_uv_mask != 0;
+  stats.animated_packets+=result.has_value() && mesh->values[primitive].native_animated_uv_mask != 0;
   return result;
 }
 
@@ -656,6 +660,8 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  BD_INFO("[native-material-uv-consumer] frame {} scopes {} composed {} packets {}; shared animated UV owner, no UV reimport as material input",
+      FrameStatFrameCount(),stats.animated_scopes,stats.animated_values,stats.animated_packets);
   BD_INFO("[native-eye-material] frame {} scopes {} composed {} replay-reads {} packets {}; owned eye UV selected by native material recipes, not a draw/pixel count",
       FrameStatFrameCount(),stats.eye_scopes,stats.eye_values,stats.eye_replay_reads,stats.eye_packets);
   BD_INFO("[native-material-sampler] {} checks wrong {}; {} owned-input draws; ordinary 2D recipes; cube/volume/inherited axes and direct submission pending",
