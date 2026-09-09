@@ -6,8 +6,13 @@
 #pragma once
 #include "gpu/scene/native_skeleton.h"
 #include <optional>
+#include <memory>
+#include <functional>
 
 namespace bd::gpu::scene {
+namespace material_image_source { struct LoadedAnimation; }
+std::shared_ptr<const material_image_source::LoadedAnimation> FindNativeImageAnimation(
+    uint32_t owner, const std::function<std::optional<uint32_t>(uint64_t)> &read);
 // One-shot, model-generation checked. Until every late writer is native, the
 // outgoing boundary must still compare unchanged before using the owned values.
 std::optional<std::vector<NativeJointChannels>> TakeNativeAnimationChannels(

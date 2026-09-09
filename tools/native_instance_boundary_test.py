@@ -48,11 +48,42 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("sizeof(instance_source::Binding)+512 <= NativeInstanceRegistry::kEntryBytes", self.bridge)
         for forbidden in ("PPCContext", "bd::mem", "REX_", "unordered_map", "uint32_t table", "source_read"):
             self.assertNotIn(forbidden, images)
-        for guard in ("262144", "visited >= 4096", "writes.size() >= 768", "*callback", "*capacity-*begin < 4"):
+        for guard in ("262144", "visited >= 4096", "writes.size() >= 768", ".procedural", "*capacity-*begin < 4"):
             self.assertIn(guard, image_source)
         for case in ("TestMaterialImageOwnership", "native material recaptured source texture",
                      "material reimported image pointer or descriptor", "pinned replacement charged",
                      "procedural selected key refuses", "no active key preserves cached selection"):
+            self.assertIn(case, fixture)
+
+    def test_ready_image_assets_feed_materials_through_existing_typed_residency(self):
+        root = Path(__file__).resolve().parents[1]
+        native = (root / "src/gpu/scene/native_image_animation.h").read_text(encoding="utf-8")
+        source = (root / "src/gpu/scene/native_image_animation_source.h").read_text(encoding="utf-8")
+        material = (root / "src/gpu/scene/native_material_image_source.h").read_text(encoding="utf-8")
+        runtime = (root / "src/gpu/scene/native_material_texture_bridge.cpp").read_text(encoding="utf-8")
+        fixture = (root / "tools/native_material_test/instances.cpp").read_text(encoding="utf-8")
+        for forbidden in ("PPCContext", "bd::mem", "source_read", "uint32_t owner", "uint32_t address", "0x82"):
+            self.assertNotIn(forbidden, native)
+        self.assertIn("asset->animation.Select(int32_t(time))", material)
+        self.assertIn("output.image=asset->animation.keys[selected].image", material)
+        self.assertNotIn("read(uint64_t(*window)", material)
+        self.assertNotIn("read(uint64_t(selected)+260)", material)
+        self.assertIn("FindNativeImageAnimation(owner,source_read)", runtime)
+        self.assertIn("++reads <= 262144", runtime)
+        self.assertIn("store.assets.Prepare<Asset>", self.animation_bridge)
+        self.assertIn("!asset->Matches(read) || !asset->MatchesImages(capture)", self.animation_bridge)
+        self.assertIn("guard.capacity()*sizeof(Word)", source)
+        self.assertIn("std::unordered_map<uint64_t,Entry> entries_", self.animation_asset)
+        self.assertEqual(self.animation_asset.count("std::unordered_map<"), 1)
+        for name in ("bdD2AnimLoadFile", "sub_821502F0"):
+            hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
+            self.assertLess(hook.index("RetireImages"), hook.index(f"__imp__{name}"))
+        poll = self.animation_bridge.split("REX_HOOK_RAW(AnimeData_PollLoadState)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(poll.index("__imp__AnimeData_PollLoadState"), poll.index("RegisterImages"))
+        self.assertIn("*before >= 1 && *before <= 5 && ctx.r3.u32 == 6", poll)
+        for case in ("image evaluation decoded source keys", "ready image windows and native leases imported once",
+                     "every late key/vector/texture word is rejected", "same source address with replaced GPU lease",
+                     "pinned image asset applies shared-budget backpressure", "native image animation survives complete source destruction"):
             self.assertIn(case, fixture)
 
     def test_ready_slot_selection_reuses_owned_clips_and_preserves_pending_original(self):

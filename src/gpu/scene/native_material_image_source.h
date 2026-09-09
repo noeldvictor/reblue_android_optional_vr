@@ -6,31 +6,12 @@
 #pragma once
 #include "gpu/scene/native_material_images.h"
 #include "gpu/scene/native_material_uv_program.h"
-#include <bit>
-#include <limits>
+#include "gpu/scene/native_image_animation_source.h"
 
 namespace bd::gpu::scene {
-struct NativeImageWindow {
-  float start=0, duration=0, end=0;
-  int32_t repeat=0;
-  bool loop=false;
-};
-// sub_82151E10: inclusive authored interval, indefinite zero-duration hold,
-// otherwise integer-period repeat. Last matching window wins; no match keeps
-// the preceding selection rather than clearing it.
-inline std::optional<bool> NativeImageWindowActive(const NativeImageWindow &window, int32_t frame) {
-  if (!std::isfinite(window.start) || !std::isfinite(window.duration) || !std::isfinite(window.end)) return {};
-  const float time=float(frame);
-  if (window.start >= 0 && window.start <= time && (window.end >= time || window.duration == 0)) return true;
-  if (!window.loop || !window.repeat) return false;
-  if (double(window.start) < double(INT32_MIN) || double(window.start) > double(INT32_MAX)) return {};
-  const int32_t elapsed=std::bit_cast<int32_t>(uint32_t(frame)-uint32_t(int32_t(window.start)));
-  if (elapsed < 0) return false;
-  const float period=float(double(float(window.repeat))*double(window.duration));
-  if (!std::isfinite(period) || period < 1 || double(period) > double(INT32_MAX)) return {};
-  return float(elapsed % int32_t(period)) < window.duration;
-}
 namespace material_image_source {
+enum class Refusal { Boundary, Asset, Time, Procedural, Scratch, HeldKey, Count };
+struct Trace { Refusal reason=Refusal::Boundary; uint32_t slot=0, owner=0; };
 struct Binding {
   uint32_t table=0, count=0;
   // Comparison/export associations only; never part of the native image owner.
@@ -41,7 +22,7 @@ struct Update {
   NativeMaterialImages images;
   struct Write { uint32_t address, value; };
   std::vector<Write> writes;
-  uint32_t selected=0, held=0;
+  uint32_t selected=0, held=0, owned_keys=0;
   template<class Store> void Publish(Store store) const {
     for (const auto &write : writes) store(write.address,write.value);
   }
@@ -65,8 +46,10 @@ bool Matches(uint32_t visual, const Binding &binding, const NativeMaterialImages
   }
   return true;
 }
-template<class Read, class Capture>
-std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &program, Read source_read, Capture capture) {
+template<class Read, class Capture, class Find>
+std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &program, Read source_read,
+    Capture capture, Find find, Trace *trace=nullptr) {
+  auto refuse=[&](Refusal reason)->std::optional<Update> { if (trace) trace->reason=reason; return {}; };
   if (!program.Valid() || !visual || (visual&3) || visual > UINT32_MAX-3567) return {};
   Update result;
   // A transaction-wide cap includes repeated catalog/window walks. Refuse before
@@ -90,6 +73,7 @@ std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &pr
   result.binding.table=*table; result.binding.count=*count;
   result.images.entries.resize(*count);
   for (uint32_t n=0; n<*count; ++n) {
+    if (trace) { trace->slot=n; trace->owner=0; trace->reason=Refusal::Boundary; }
     const auto &slot=program.slots[n];
     auto &output=result.images.entries[n];
     output.selector=slot.selector; output.channel=slot.channel; output.enabled=slot.image_enabled;
@@ -116,54 +100,50 @@ std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &pr
           catalog=read(uint64_t(*catalog)+4); if (!catalog) return {};
         }
         if (owner) {
+          if (trace) trace->owner=owner;
           const auto state=read(uint64_t(owner)+316), begin=read(uint64_t(owner)+324), end=read(uint64_t(owner)+328);
           if (!state || !begin || !end || *end < *begin || (*end-*begin)%4 || (*end-*begin)/4 > 4096) return {};
-          uint32_t chosen=0;
+          uint32_t chosen=UINT32_MAX;
+          std::shared_ptr<const LoadedAnimation> asset;
           if (*state == 6) {
-            const auto time_word=read(uint64_t(visual)+2224), windows=read(uint64_t(owner)+80);
-            if (!time_word || !windows) return {};
+            asset=find(owner);
+            if (!asset) return refuse(Refusal::Asset);
+            const auto time_word=read(uint64_t(visual)+2224);
+            if (!time_word) return refuse(Refusal::Time);
             const float time=std::bit_cast<float>(*time_word);
-            if (!std::isfinite(time) || double(time) < double(INT32_MIN) || double(time) > double(INT32_MAX)) return {};
-            if (*windows) {
-              const auto zero=read(0x82055230);
-              if (!zero || std::bit_cast<float>(*zero) != 0) return {};
-              const auto windows_end=read(uint64_t(owner)+84);
-              if (!windows_end || *windows_end < *windows || (*windows_end-*windows)%4 || (*windows_end-*windows)/4 > 4096) return {};
-              for (uint64_t cursor=*windows; cursor<*windows_end; cursor+=4) {
-                const auto window=read(cursor);
-                if (!window || !*window) return {};
-                const auto start=read(uint64_t(*window)+60), duration=read(uint64_t(*window)+64), last=read(uint64_t(*window)+68);
-                const auto loop=read(uint64_t(*window)+128), repeat=read(uint64_t(*window)+124);
-                if (!start || !duration || !last || !loop || !repeat) return {};
-                const auto active=NativeImageWindowActive({std::bit_cast<float>(*start),std::bit_cast<float>(*duration),
-                    std::bit_cast<float>(*last),int32_t(*repeat),*loop != 0},int32_t(time));
-                if (!active) return {};
-                if (*active) chosen=*window;
-              }
-            }
+            if (!std::isfinite(time) || double(time) < double(INT32_MIN) || double(time) > double(INT32_MAX))
+              return refuse(Refusal::Time);
+            const auto selection=asset->animation.Select(int32_t(time));
+            if (!selection) return refuse(Refusal::Time);
+            chosen=*selection;
           }
-          uint32_t selected=0;
+          uint32_t selected=UINT32_MAX;
           if (*state != 6) {
             if (!write(uint64_t(owner)+328,*begin)) return {};
-          } else if (chosen) {
-            const auto callback=read(uint64_t(chosen)+212), capacity=read(uint64_t(owner)+332);
+          } else if (chosen != UINT32_MAX) {
+            if (asset->animation.keys[chosen].procedural) return refuse(Refusal::Procedural);
+            const auto capacity=read(uint64_t(owner)+332);
             // Procedural selected-key updates and a growing scratch vector still
             // need their original side effects. Never partly execute then retry.
-            if (!callback || *callback || !capacity || !*begin || *capacity < *begin || *capacity-*begin < 4 ||
+            if (!capacity || !*begin || *capacity < *begin || *capacity-*begin < 4 ||
                 (*capacity-*begin)%4 || *end > *capacity ||
-                !write(*begin,chosen) || !write(uint64_t(owner)+328,*begin+4)) return {};
+                !write(*begin,asset->exports[chosen].key) || !write(uint64_t(owner)+328,*begin+4))
+              return refuse(Refusal::Scratch);
             selected=chosen; ++result.selected;
           } else if (*begin && *end != *begin) {
             const auto previous=read(*begin);
             if (!previous || !*previous) return {};
-            selected=*previous; ++result.held;
+            selected=asset->Index(*previous);
+            if (selected == UINT32_MAX) return refuse(Refusal::HeldKey);
+            ++result.held;
           }
-          if (selected) {
-            const auto texture=read(uint64_t(selected)+260);
-            const auto holder=texture && *texture ? read(uint64_t(*texture)+4) : std::nullopt;
-            const auto next=holder && *holder ? read(uint64_t(*holder)+24) : std::nullopt;
-            if (!next) return {};
-            if (*next) { image=*next; if (!write(destination,*image)) return {}; }
+          if (selected != UINT32_MAX) {
+            const auto next=asset->exports[selected].image;
+            if (next) {
+              image=next; if (!write(destination,*image)) return {};
+              output.image=asset->animation.keys[selected].image;
+              ++result.owned_keys;
+            }
           }
         }
       }
@@ -175,8 +155,9 @@ std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &pr
   // Missing non-null images are Unknown, not an invented Keep or stale texture.
   for (uint32_t n=0; n<*count; ++n) {
     auto &entry=result.images.entries[n];
-    entry.image=result.binding.sources[n] ? capture(result.binding.sources[n]) :
-        MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Keep};
+    if (entry.image.action != MaterialImageAction::Bind)
+      entry.image=result.binding.sources[n] ? capture(result.binding.sources[n]) :
+          MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Keep};
   }
   return result.images.Valid() ? std::optional(std::move(result)) : std::nullopt;
 }

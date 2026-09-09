@@ -11,6 +11,9 @@
 #include "gpu/scene/native_material_uv_source.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_animation_bridge.h"
+#include "gpu/scene/native_image_animation_source.h"
+#include "gpu/scene/native_texture_binding_bridge.h"
+#include "gpu/native_texture_mirror.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
@@ -55,6 +58,9 @@ REX_EXTERN(AnimeData_method_1A60);
 REX_EXTERN(sub_822D3CB0);
 REX_EXTERN(bdVisualObjectInitBones);
 REX_EXTERN(AnimeData_helper_928);
+REX_EXTERN(__imp__bdD2AnimLoadFile);
+REX_EXTERN(__imp__AnimeData_PollLoadState);
+REX_EXTERN(__imp__sub_821502F0);
 
 namespace bd::gpu::scene::animation_bridge {
 namespace {
@@ -94,6 +100,7 @@ struct Store {
   uint64_t eyes=0, eye_checks=0, eye_refused=0, eye_off_center=0;
   uint64_t material_uv_published=0, material_uv_refused=0, effect_owned_offsets=0, eye_preserved=0;
   uint64_t effect_owned_descriptors=0, eye_owned_descriptors=0;
+  uint64_t image_registered=0, image_loaded=0, image_reads=0, image_refused=0, image_changed=0;
   std::array<EffectObservation,size_t(EffectAdmission::Count)> effect_observations{};
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
@@ -122,6 +129,9 @@ void Report(Store &store) {
       store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic,
       store.registered,store.assets.Size(),store.prepare_refused,store.weighted,store.subtree,store.mixed,store.mix_checks,store.filtered,store.indexed);
   store.frame = frame;
+  if (store.image_registered || store.image_reads || store.image_refused)
+    BD_INFO("[native-image-animation] frame {} registered {} loaded {} reads {} refused {} changed {}; shared animation budget; native windows/leases, exact source guard remains",
+        frame,store.image_registered,store.image_loaded,store.image_reads,store.image_refused,store.image_changed);
   if (store.controllers || store.controller_refused)
     BD_INFO("[native-animation-controller] frame {} completed {} checked {} refused {}; samples {} mixes {} subtree {} interior {}; handoffs {} changed {}; advancing {}; native clocks/layers, one outgoing boundary; late-writer validation remains",
         frame,store.controllers,store.controller_checks,store.controller_refused,store.controller_samples,store.controller_mixes,
@@ -179,6 +189,38 @@ struct LoadScope {
 };
 void Retire(uint32_t owner) {
   auto &store = Clips(); std::lock_guard lock(store.mutex); store.assets.Retire(owner);
+}
+void RetireImages(uint32_t owner) {
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  store.assets.Invalidate<material_image_source::LoadedAnimation>(owner);
+}
+void RegisterImages(uint32_t owner) {
+  if (!Enabled() || Word(uint64_t(owner)+316) != std::optional(6u)) return;
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  const bool ready=store.assets.Register<material_image_source::LoadedAnimation>(owner,owner);
+  ++(ready ? store.image_registered : store.image_refused);
+}
+std::shared_ptr<const material_image_source::LoadedAnimation> PrepareImages(
+    uint32_t owner, const std::function<std::optional<uint32_t>(uint64_t)> &read) {
+  if (!Enabled()) return {};
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  using Asset=material_image_source::LoadedAnimation;
+  auto capture=[](uint32_t image) {
+    auto binding=CaptureNativeTexture(ResolveGuestTexture(image));
+    return binding.primary ? MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind,std::move(binding)} :
+        MaterialImageSelection<NativeTextureBinding>{};
+  };
+  store.assets.Prepare<Asset>(owner,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
+    auto asset=material_image_source::ReadAnimation(address,budget,read,capture);
+    ++(asset ? store.image_loaded : store.image_refused);
+    return asset;
+  });
+  auto asset=store.assets.Find<Asset>(owner);
+  if (asset && (!asset->Matches(read) || !asset->MatchesImages(capture))) {
+    store.assets.Invalidate<Asset>(owner); ++store.image_changed; return {};
+  }
+  store.image_reads+=bool(asset);
+  return asset;
 }
 void Import(uint32_t source) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -1159,6 +1201,10 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
 } // namespace bd::gpu::scene::animation_bridge
 
 namespace bd::gpu::scene {
+std::shared_ptr<const material_image_source::LoadedAnimation> FindNativeImageAnimation(
+    uint32_t owner, const std::function<std::optional<uint32_t>(uint64_t)> &read) {
+  return animation_bridge::PrepareImages(owner,read);
+}
 std::optional<std::vector<NativeJointChannels>> TakeNativeAnimationChannels(
     uint32_t visual, uint32_t graph, uint64_t generation, uint32_t source) {
   using namespace animation_bridge;
@@ -1188,6 +1234,27 @@ std::optional<RenderMatrix> TakeNativeAnimationPlacementRoot(
 }
 }
 
+REX_HOOK_RAW(bdD2AnimLoadFile) {
+  const uint32_t owner=ctx.r3.u32;
+  bd::gpu::scene::animation_bridge::RetireImages(owner);
+  __imp__bdD2AnimLoadFile(ctx,base);
+  // The synchronous path completes here; asynchronous parsing publishes only
+  // after PollLoadState has completed its children and texture readiness work.
+  bd::gpu::scene::animation_bridge::RegisterImages(owner);
+}
+REX_HOOK_RAW(AnimeData_PollLoadState) {
+  using namespace bd::gpu::scene::animation_bridge;
+  const uint32_t owner=ctx.r3.u32;
+  const auto before=Word(uint64_t(owner)+316);
+  __imp__AnimeData_PollLoadState(ctx,base); // recursive: never hold the store lock here
+  if (before && *before >= 1 && *before <= 5 && ctx.r3.u32 == 6) RegisterImages(owner);
+}
+REX_HOOK_RAW(sub_821502F0) {
+  // Actual data release, also reached without the allocating destructor. Remove
+  // lookup before key/texture destruction; native leases may outlive this call.
+  bd::gpu::scene::animation_bridge::RetireImages(ctx.r3.u32);
+  __imp__sub_821502F0(ctx,base);
+}
 REX_HOOK_RAW(sub_8217BD70) {
   const uint32_t owner = ctx.r3.u32;
   bd::gpu::scene::animation_bridge::Retire(owner);

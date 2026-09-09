@@ -7448,3 +7448,27 @@ fresh preflight mandatory.13windowimages10434657Bunchanged; no raw allowance.
 All producers terminal; retain80/77/193 and material-images193. README/queue and
 research/20260909_0140_native-material-images.md close this connected bundle,
 without shrinking the unfinished renderer/full desktop/both-eye objective.
+
+### 2026-09-09 ready image animation ownership after2741450
+
+Push-only housekeeping was no renderer progress. Continued the next connected
+boundary: ready loader registration -> existing typed8MiB animation residency ->
+owned image windows/texture leases -> real material update/instance publication.
+Strict source-word/GPU-identity guards remain; catalog and scratch exports are not
+retired. Reused completed source audits; new ready/release contracts recorded with
+the implementation evidence.426 artifact-free guards pass0.232s.
+First current free63547826176B; prebuild63544463360B. No jobs were live and no
+new artifacts produced yet. Same cumulative62509998080B floor/3GiB exception,
+diagnostic/raw limits and protected failures, no reset. Reuse material81/CPU78/
+host194 under300s/64/8/192MiB free-drop caps. Fixture peak estimate<16MiB, host
+<192MiB; no guest rebuild/shader changes, recook, captures or device work.
+Retain80/77/193 receipts and material-images193ZIP until their purposes are
+verified by replacements. Integration/live qualification pending at this entry.
+
+Material81/PID35644/session26019 build0; CPU78/PID32512 PASS0.12s/CTest0.13s.
+Fixture1666560B,tree11735092B/43files (+121929B). Host194/PID36456/session21925
+build0 through link14, codegen0writes/no guest objects or shaders. EXE49443328B/
+PDB114343936B (+238592B), SHA256E81E3BB47E76A904B192B8C2E80B8457B4EE8498BAA6136EA5BCE40C1F58FA3C.
+Banner2741450dirty; source commit does not restamp it. Free63542943744B after host.
+Live/pixel/reload/stereo pending; research/20260909_0208_native-image-animation-assets.md
+records exact source contracts and CPU coverage before the source checkpoint push.

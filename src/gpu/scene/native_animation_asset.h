@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 namespace bd::gpu::scene {
+namespace material_image_source { struct LoadedAnimation; }
 enum class NativeAnimationBinding { Name, Joint };
 // Stable authored name keys are import-time asset associations, not addresses.
 // The numeric track ordinal selects the same immutable clip sampler used by
@@ -93,25 +94,28 @@ public:
   void Retire(uint32_t owner) {
     std::erase_if(entries_,[&](const auto &entry){return entry.second.owner == owner;});
   }
-  void Invalidate(uint32_t source) { entries_.erase(source); }
+  template<class Asset = NativeAnimationAsset>
+  void Invalidate(uint32_t source) { entries_.erase(Key<Asset>(source)); }
+  template<class Asset = NativeAnimationAsset>
   bool Register(uint32_t owner, uint32_t source) {
-    Invalidate(source);
+    Invalidate<Asset>(source);
     if (!owner || !source || entries_.size() >= maximum_clips_ || RemainingBytes() < kEntryBytes) return false;
-    entries_.emplace(source,Entry{owner,std::make_shared<Charge>(accounting_,kEntryBytes)});
+    entries_.emplace(Key<Asset>(source),Entry{owner,std::make_shared<Charge>(accounting_,kEntryBytes)});
     return true;
   }
-  bool Publish(uint32_t owner, uint32_t source, NativeAnimationAsset asset) {
-    Invalidate(source);
+  template<class Asset = NativeAnimationAsset>
+  bool Publish(uint32_t owner, uint32_t source, Asset asset) {
+    Invalidate<Asset>(source);
     if (!owner || !source || entries_.size() >= maximum_clips_ ||
         asset.RetainedBytes() > AvailableAssetBytes()) return false;
-    if (!Register(owner,source)) return false;
-    auto &entry = entries_.at(source);
+    if (!Register<Asset>(owner,source)) return false;
+    auto &entry = entries_.at(Key<Asset>(source));
     entry.resident = std::make_shared<Resident>(std::move(asset),accounting_,entry.charge);
     return true;
   }
-  template <class Import>
+  template <class Asset = NativeAnimationAsset, class Import>
   bool Prepare(uint32_t source, uint32_t frame, Import &&import) {
-    const auto found = entries_.find(source);
+    const auto found = entries_.find(Key<Asset>(source));
     if (found == entries_.end()) return false; // never resurrect retired/in-flight backing
     auto &entry = found->second;
     entry.last_frame = frame;
@@ -132,17 +136,24 @@ public:
     // Keep this and the two preceding frames' selections, plus every lease.
     // Evict only dormant payloads; their loader registration remains bounded.
     for (auto &[key,candidate] : entries_) {
-      if (key != source && candidate.resident && candidate.resident.use_count() == 1 &&
+      if (key != Key<Asset>(source) && candidate.resident && candidate.resident.use_count() == 1 &&
           uint32_t(frame-candidate.last_frame) > 2) candidate.resident.reset();
     }
     return attempt();
   }
-  std::shared_ptr<const NativeAnimationAsset> Find(uint32_t source) const {
-    const auto entry = entries_.find(source);
+  template<class Asset = NativeAnimationAsset>
+  std::shared_ptr<const Asset> Find(uint32_t source) const {
+    const auto entry = entries_.find(Key<Asset>(source));
     return entry == entries_.end() || !entry->second.resident ? nullptr :
-        std::shared_ptr<const NativeAnimationAsset>(entry->second.resident,&entry->second.resident->asset);
+        std::shared_ptr<const Asset>(entry->second.resident,static_cast<const Asset *>(entry->second.resident->asset.get()));
   }
 private:
+  // One existing index and budget; disjoint typed keys prevent a motion source
+  // and an image-loader object at the same numeric address from aliasing.
+  template<class Asset> static uint64_t Key(uint32_t source) {
+    static_assert(std::is_same_v<Asset,NativeAnimationAsset> || std::is_same_v<Asset,material_image_source::LoadedAnimation>);
+    return uint64_t(!std::is_same_v<Asset,NativeAnimationAsset>)<<32 | source;
+  }
   struct Accounting { std::atomic<size_t> bytes{0}; };
   struct Charge {
     std::shared_ptr<Accounting> accounting;
@@ -155,11 +166,13 @@ private:
     Charge &operator=(const Charge &) = delete;
   };
   struct Resident {
-    NativeAnimationAsset asset;
+    std::shared_ptr<const void> asset;
     std::shared_ptr<Charge> entry_charge;
     Charge payload_charge;
-    Resident(NativeAnimationAsset value, std::shared_ptr<Accounting> budget, std::shared_ptr<Charge> entry)
-        : asset(std::move(value)), entry_charge(std::move(entry)), payload_charge(std::move(budget),asset.RetainedBytes()) {}
+    template<class Asset>
+    Resident(Asset value, std::shared_ptr<Accounting> budget, std::shared_ptr<Charge> entry)
+        : asset(std::make_shared<const Asset>(std::move(value))), entry_charge(std::move(entry)),
+          payload_charge(std::move(budget),static_cast<const Asset *>(asset.get())->RetainedBytes()) {}
   };
   struct Entry {
     uint32_t owner;
@@ -172,6 +185,6 @@ private:
   size_t RemainingBytes() const { const auto bytes=Bytes(); return bytes >= maximum_bytes_ ? 0 : maximum_bytes_-bytes; }
   size_t maximum_bytes_, maximum_clips_;
   std::shared_ptr<Accounting> accounting_ = std::make_shared<Accounting>();
-  std::unordered_map<uint32_t,Entry> entries_;
+  std::unordered_map<uint64_t,Entry> entries_;
 };
 } // namespace bd::gpu::scene

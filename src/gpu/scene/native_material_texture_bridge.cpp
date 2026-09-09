@@ -7,6 +7,7 @@
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_material_image_source.h"
+#include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_toon_source.h"
 #include "gpu/scene/native_material_alpha_source.h"
 #include "gpu/scene/native_alpha_bridge.h"
@@ -96,6 +97,8 @@ struct Stats {
   uint64_t animated_scopes=0, animated_values=0, animated_packets=0;
   uint64_t image_updates=0, image_checks=0, image_refused=0, image_selected=0, image_held=0, image_publications=0;
   uint64_t owned_image_scopes=0, owned_image_values=0, owned_image_packets=0;
+  uint64_t image_owned_keys=0;
+  std::array<uint64_t,size_t(material_image_source::Refusal::Count)> image_failures{};
   size_t peak_bytes = 0;
 };
 thread_local Stats stats;
@@ -151,9 +154,27 @@ bool UpdateNativeMaterialImages(PPCContext &ctx, uint8_t *base) {
   if (!program) return false;
   ctx.fpscr.disableFlushMode();
   std::optional<material_image_source::Update> update;
-  try { update=material_image_source::Prepare(visual,*program,Word,Capture); }
-  catch (const std::exception &) { ++stats.image_refused; return false; }
-  if (!update) { ++stats.image_refused; return false; }
+  material_image_source::Trace trace;
+  // Include imports and flat late-writer comparisons in the same old aggregate
+  // read ceiling, not just the remaining per-slot catalog and outgoing adapter.
+  size_t reads=0;
+  auto source_read=[&](uint64_t address)->std::optional<uint32_t> { return ++reads <= 262144 ? Word(address) : std::nullopt; };
+  try {
+    update=material_image_source::Prepare(visual,*program,source_read,Capture,
+        [&](uint32_t owner) { return FindNativeImageAnimation(owner,source_read); },&trace);
+  }
+  catch (const std::exception &error) {
+    if (++stats.image_refused <= 6) BD_WARN("[native-image-prepare-exception] {}",error.what());
+    return false;
+  }
+  if (!update) {
+    constexpr std::array reasons{"boundary","asset","time","procedural","scratch","held-key"};
+    ++stats.image_refused;
+    if (++stats.image_failures[size_t(trace.reason)] <= 3)
+      BD_INFO("[native-image-prepare-refused] {} visual {:08X} slot {} owner {:08X}; whole original before mutation",
+          reasons[size_t(trace.reason)],visual,trace.slot,trace.owner);
+    return false;
+  }
   if (REXCVAR_GET(bd_native_materials_verify)) {
     __imp__sub_821444E0(ctx,base);
     ++stats.image_checks;
@@ -169,6 +190,7 @@ bool UpdateNativeMaterialImages(PPCContext &ctx, uint8_t *base) {
   if (!published) { InvalidateNativeMaterialImages(visual); ++stats.image_refused; }
   else ++stats.image_publications;
   ++stats.image_updates; stats.image_selected+=update->selected; stats.image_held+=update->held;
+  stats.image_owned_keys+=update->owned_keys;
   return true; // never replay original side effects after completed publication
 }
 
@@ -705,9 +727,9 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
-  BD_INFO("[native-material-image-owner] frame {} updates {} checked {} refused {} selected {} held {} publications {}; scopes {} composed {} packets {}; native leases, catalog/cache exports and procedural fallback remain",
+  BD_INFO("[native-material-image-owner] frame {} updates {} checked {} refused {} selected {} held {} publications {}; scopes {} composed {} packets {}; owned-key-inputs {}; native leases, catalog/cache exports and procedural fallback remain",
       FrameStatFrameCount(),stats.image_updates,stats.image_checks,stats.image_refused,stats.image_selected,stats.image_held,
-      stats.image_publications,stats.owned_image_scopes,stats.owned_image_values,stats.owned_image_packets);
+      stats.image_publications,stats.owned_image_scopes,stats.owned_image_values,stats.owned_image_packets,stats.image_owned_keys);
   BD_INFO("[native-material-uv-consumer] frame {} scopes {} composed {} packets {}; shared animated UV owner, no UV reimport as material input",
       FrameStatFrameCount(),stats.animated_scopes,stats.animated_values,stats.animated_packets);
   BD_INFO("[native-eye-material] frame {} scopes {} composed {} replay-reads {} packets {}; owned eye UV selected by native material recipes, not a draw/pixel count",
