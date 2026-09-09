@@ -7104,3 +7104,69 @@ source/Git/external activity. Pre-final-doc free62958206976B,drive-wide gain
 75MiB and requires fresh measurement. All producers terminal; no next job queued.
 Final420guards pass0.225s. README/queue/report distinguish scrolling from the
 failed joint-driver gate; no motion/reload/pixel/both-eye/Quest/speedup claim.
+
+### 2026-09-08 effect input/admission census after876b633
+
+Previous owner turn confirmed push only (no renderer progress). Revalidated clean
+source and no game/build/test producers. First free62956847104B; pre-build
+62957199360B. Same cumulative3GiB exception/floor62509998080B and diagnostic/raw
+limits, no reset. Buildlogs420395B/212files, previous diagnostics78094375B.
+Changed observation: verification-only effect driver census BEFORE all native
+controller admission, partitioned by rejection stage. Unknown input is separate
+from zero authored drivers; no source writes, residency or changed eligibility.
+This resolves whether host186's missing drivers are absent or rejected, not a
+rendering dependency removal or replacement for its failed positive-driver gate.
+421 artifact-free guards pass0.233s. Reuse material73/CPU70/host187,300s and
+64/8/192MiB free-drop supervisors; expected fixture<16MiB/host<192MiB peak.
+No guest/shader rebuild or raw/image/perf/cache output. Keep72/69/186 receipts
+and all protected runtime evidence until actual replacement; remeasure full
+diagnostic overlap before the single60s/400KiB/192MiB runtime observation.
+
+Material73/PID37800 build0; CPU70/PID27768 PASS0.12s/CTest0.14s. Fixture
+1466880B SHA2562A3A6FBEBE586365A26F09777E8AA9C32F9F90321E83E0A55F00A278D71D9E99;
+fixture tree10993413B/43files (+21193B). Host187/PID32800/session26758 build0,
+codegen0writes, no guest objects/shaders. EXE49360384B (+4608B),PDB113684480B
+(+24576B),EXE SHA2561A977043C228F94F5DF3BFB02FDE715ADCF8BEE64671D587E3667A5ECCCA5595.
+Source/test checkpoint5006b1e pushed. All build handles terminal. Removed6 exact
+superseded72/69/186 receipts4709Blogical after replacement; free62956752896->
+62956761088B (8192B observed reclaim). Keep73/70/187, protected runtime evidence.
+
+Runtime preflight diagnostics78094357B,400KiBtext overlap fits; free62956761088B,
+floor62755434496B. Host187/PID31124/session79453 starts23:24:46,terminal23:25:48,
+exit1 requested positive-driver observation NOT reached. Fresh census2342:
+108890admitted/18100boundary-refused observations,unknown0/named0 in BOTH groups;
+no other rejection stages. Effect1117matching/2232UVs,drivers/transitions0;
+post-event1742/2042/2342 advance817/967/1117transactions and1632/1932/2232UVs.
+Controller108890matching/13793handoffs/changed0;late6matching;slot1475matching;
+skeleton14409matching,wrong0;material246188checks/wrong0. See the effect-input
+report for all limits and the distinction between ordinary UV writes and motion.
+All11settings applied; exact116Bprofile restored SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+Timestamp inventory0new raw/image/perf/cache/dump files. No unchanged retry.
+
+Read-only source/content scans reuse default.image and all1673installed IPKs;
+only1404selected .mdl records (2677866B) decompressed in memory,32MiB/30s limits.
+No UVCON,415UVEYE: next connected producer is authored gaze/eye UV, not a presumed
+opening-scene joint driver. No assets/tools/caches extracted or written.
+
+Full278014Blog SHA256909AC0C686F112D090A27FA85FD34BBCF08FF7EE31D5B864012A352A53801DD2
+retained losslessly as effect187ZIP50311B, SHA256
+9861ADCE4B92F7956A40C58A393D4E30657ACCFC500B7114225955E2506FE713.
+Sole member/name/length/full decompressed hash verified. Archive allocation:
+free63597686784->63597633536B (53248B). Deleted exact plaintext278014B and
+superseded effect186ZIP49644B after rechecking hashes,327658Blogical;
+free63597465600->63597797376B (331776B observed deletion reclaim). Current log
+is recoverable fromZIP; older186text is superseded/not recoverable fromGit.
+187preserves the failed gate and now explains absent-driver observations;
+retain until purposeful authored-effect replacement.988/985/other protected
+failure/pixel evidence unchanged. No image/motion/reload/both-eye/Quest gate waived.
+
+Total cleanup8files332367Blogical;339968Bobserved deletions minus53248Barchive
+allocation=286720B net280KiB reclaimed, no prior cleanup credited. Partial
+attributed retained growth51026B: fixture+21193B,EXE/PDB+29184B,buildlogs-18B,
+newZIP replacing186ZIP+667B; excludes hostobjects/buildmetadata/source/Git.
+Closing pre-doc free63597277184B (~59.2GiB),drive-wide gain640430080B versus first
+62956847104B; almost all is external activity, NOT claimed cleanup. Diagnostics
+78095024B,buildlogs420377B/212files; next400KiBoverlap leaves138576B below75MiB,
+fresh preflight required.13retainedwindow images10434657B unchanged. All producers
+terminal, none queued.421guards/CPU fixture/host build pass; diagnostic question
+answered but no additional renderer dependency removed. Goal remains active.

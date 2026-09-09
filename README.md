@@ -236,6 +236,15 @@ claim. Timeline/catalog inputs, outgoing material/channel storage and remaining
 effect callers still need migration; full desktop/both-eye acceptance stays open.
 [Connected implementation, failed live coverage gate and next decision](research/20260908_2305_native-effect-animation.md).
 
+**Coverage diagnosis (host187):** a pre-admission census found no named UV
+drivers in 108,890 accepted or 18,100 rejected controller observations, with
+zero unreadable observations. The installed 1,404 `.mdl` records contain 415
+`UVEYE` commands but no `UVCON` joint-driver commands. The next effect bundle
+therefore targets authored eye/gaze UV production and native material ownership,
+not another unchanged opening-scene probe. This diagnostic removes no additional
+rendering dependency; joint-driver, transition and pixel gates remain unqualified.
+[Source/content evidence and next connected boundary](research/20260908_2331_effect-input-coverage.md).
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

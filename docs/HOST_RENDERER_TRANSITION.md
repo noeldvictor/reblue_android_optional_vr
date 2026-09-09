@@ -987,12 +987,29 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    channel-consumer observation gate FAILS. No authored-channel/pixel acceptance.
    Controller108314 matching/13721 handoffs/changed0, late6 matching and ready
    selection1399 matching remain regression evidence, not substitutes for that
-   failed gate. Retained-effect186.zip preserves the whole log and supersedes
-   selection185's runtime purpose; placement988/root985 failures remain protected.
-   Before another effect probe, trace bdMdlTextFileParse's152B table inputs and
-   joint-driver enable/selection into an actual authored scene, or add a bounded
-   observation that distinguishes absent drivers from admission refusal. No
-   unchanged boot. [Source contracts, evidence and remaining ownership](../research/20260908_2305_native-effect-animation.md).
+   failed gate. Its runtime purpose is now superseded by retained-effect187.zip
+   below; placement988/root985 failures remain protected.
+   [Source contracts, evidence and remaining ownership](../research/20260908_2305_native-effect-animation.md).
+   **Effect coverage decision (source5006b1e,host187/PID31124):** pre-admission
+   census observes108890 admitted and18100 boundary-refused controllers, all
+   readable, zero named UV drivers in either partition.1117matching effect
+   transactions/2232UVs; post-event1742/2042/2342 samples advance, but positive
+   joint-driver gate still FAILS. No eligibility/comparison thresholds changed.
+   The complete model parser uses UVCON for joint names, UVSCR for scrolling,
+   UVRATE for divisors, UVEYE for eye controls. Read-only bounded scan of all1673
+   installed IPKs:1404 narrow-text .mdl records,415 UVEYE commands, no UVCON,
+   UVSCR or UVRATE. Not proof about binary/script-driven data or the whole game.
+   Next connected effect bundle: authored UVEYE/gaze inputs -> existing instance/
+   material owners -> native material consumers, including the late eye writer
+   sub_822BA028 and caller sub_822B8DF0. Do not freeze parser output across late
+   authored writes or make a second source-address cache. Finish the caller's
+   full ordering/lifetime audit before implementation; helper replacement alone
+   is not delivery. Keep UVCON/queued-transition qualification open, but do not
+   use absent opening-scene UVCON content as the next implementation gate.
+   Material73/CPU70,421guards and host187 pass; diagnostic-only, no additional
+   rendering dependency removed. Full log retained losslessly in effect187ZIP,
+   replacing186's explained missing-driver/scroll/selection/controller purpose.
+   [Source/content provenance, exact evidence and next boundary](../research/20260908_2331_effect-input-coverage.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
