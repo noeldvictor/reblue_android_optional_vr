@@ -7472,3 +7472,32 @@ PDB114343936B (+238592B), SHA256E81E3BB47E76A904B192B8C2E80B8457B4EE8498BAA6136E
 Banner2741450dirty; source commit does not restamp it. Free63542943744B after host.
 Live/pixel/reload/stereo pending; research/20260909_0208_native-image-animation-assets.md
 records exact source contracts and CPU coverage before the source checkpoint push.
+
+Source2f075dd pushed, then runtime PID28412/session79341,02:12:30..02:13:25.
+Preflight diagnostics78147439B/free63541719040B/floor63340392448B;
+60s/400KiB/192MiB,all14settings,original116Bprofile restored exactly. No raw/
+window/perf/cache/dump output. Prior MaterialProgram/UV/eye/controller/late
+observations reached (intentional diagnostic-stop exit1, not full qualification).
+Fresh idle1706->2006 image updates/checks/publications2034->2934,owned-key-inputs
+2556->4356,scopes603->903,packets26532->39732. Three scratch-preflight refusals
+unchanged; exact capacity/shape/readability predicate not logged. Fresh2034:
+883registrations/6imageimports/4577reads,refused0/changed0,sharedresidency1272792B.
+No motion-pixel/reload/stereo/full-frame/FPS/Quest claim. Current evidence selects
+catalog/selected-state ownership plus remaining scratch consumers, not a rerun.
+
+Full257919Blog retained in image-assets194ZIP52631B,ZIP SHA256
+B532E74A16B794CCDD1E95D976F77E3371E53AC5141B59E64222469817D05867,
+member SHA2563E0084A44B57FC219EAB459A7B7C289D30E724EDA0679D734AC5E442A43C95A1.
+Full entry/hash verified before replacing193's passing image/program/UV/eye
+purpose. Preserve new scratch evidence and all older unresolved failures.
+Six old80/77/193 receipts8988Blogical removed,free63541731328->63541743616,
+12288Breclaimed. ZIP allocation63540776960->63540723712=53248B. Plaintext and
+old193ZIP310021Blogical removed,free63540723712->63541035008=311296Breclaimed.
+Total8files319009Blogical,270336B net264KiBcleanup. Partial retained growth
+357066B=fixture121929+EXE/PDB238592+ZIP529-buildlogs3984, excludes hostobjects/
+metadata/source/Git/global activity. Free63541035008B (~59.2GiB),drivewide6791168B
+belowfirst63547826176B. Buildlogs420690B/212files. Current81/78/194receipts and
+image-assets194 retained; all producers terminal. No new raw/budget exception.
+Final scoped inventory:diagnostics78147968B; next400KiB log overlap leaves85632B
+below75MiB (fresh preflight required).13windowimages10434657B unchanged; no raw/
+perf/cache/dump files created by194. Free63540957184B before the final docs push.

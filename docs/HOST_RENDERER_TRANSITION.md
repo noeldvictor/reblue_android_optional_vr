@@ -1027,8 +1027,8 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    evaluation no longer imports them as input, but not all table reads are gone.
    Image writer/consumer extension follows below. Reuse existing owners and
    complete parser/binder/effect/eye contracts; no unchanged UVCON opening probe.
-   The material-program192ZIP is now superseded by material-images193 for its
-   verified descriptor/UV/eye purpose. Preserve effect187/placement988/root985
+   The material-program192ZIP was superseded by material-images193, now replaced
+   by image-assets194 for its verified descriptor/UV/eye/image purpose. Preserve effect187/placement988/root985
    and earlier pixel/reload failures; defaults unchanged.
    [Bind-owned descriptors, CPU/live evidence and next boundary](../research/20260909_0104_native-material-uv-programs.md).
    [Shared owner, connected verification and remaining interfaces](../research/20260909_0037_native-material-uv-ownership.md).
@@ -1049,16 +1049,34 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    scopes601->901, packets26444->39644 (+13200). Three pre-admission refusals
    remain unclassified and unchanged across that interval; no publication loss.
    Prior UV/eye/controller/late program gates reached; no pixel/reload/stereo,
-   full-frame or speedup qualification. Log retained as material-images193ZIP.
-   **Next:** import ready image key/catalog inputs at their loader/selection
-   lifetime into existing ownership, retire their repeated source walks, and
-   classify the three preflight refusals before claiming coverage of those
-   routes. Source catalogs/key windows, procedural selected-key callbacks,
-   allocation-dependent scratch, viewer overrides, separate late-image vector
-   and special image writers remain. Then retire final descriptor/UV/image
+   full-frame or speedup qualification. The193 log has now been replaced by194
+   for these verified purposes;193's historical report remains unchanged.
+   **Ready image assets (source2f075dd,host194/PID28412):** ready-load registration
+   and actual data-release hooks feed image windows/texture leases through the
+   existing8MiB animation residency, with disjoint typed keys in its one index.
+   Material selection evaluates native ordinals/leases rather than decoding key
+   windows or chasing selected texture chains. Exact flat source-word and GPU
+   identity guards still run at lookup; this is not elimination of all reads.
+   Material81/CPU78/426guards/host194 PASS. Fresh idle1706->2006: image updates/
+   checks/publications2034->2934,owned-key-inputs2556->4356,scopes603->903,
+   primitivepackets26532->39732 (+13200). Fresh2034:883ready registrations,
+   6image imports/4577reads,refused0/changed0; all prior UV/eye/controller/late
+   regression observations reached. Shared motion/image residency1272792B.
+   The current three whole-call refusals are all **scratch preflight**, not asset
+   import or procedural failures; exact capacity/malformed/readability subcause
+   was not logged. Do not retroactively assert193's causes or claim those paths
+   native. CPU tests retain tight budgets, type separation, every late-word/GPU
+   change and pinned source-retirement; live reload/pixels/stereo remain open.
+   **Next:** own catalog/selected-state inputs using the current loader/instance
+   owners and migrate the last scratch consumers. No repeated unchanged boot:
+   positive key-to-packet consumption and the scratch refusal category are known.
+   Procedural key updates, allocation-dependent scratch, viewer overrides,
+   separate late-image vector, special image writers and transient native-image
+   readiness beyond ready-load state remain. Retire descriptor/UV/image/key
    validation and outgoing scratch/table exports as their last consumers leave.
    No unchanged opening probe: positive image consumption is now observed.
    [Source contract, connected evidence and retained limitations](../research/20260909_0140_native-material-images.md).
+   [Ready image assets, shared lifetime and current evidence](../research/20260909_0208_native-image-animation-assets.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
