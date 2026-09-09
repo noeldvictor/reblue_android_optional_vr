@@ -239,11 +239,24 @@ effect callers still need migration; full desktop/both-eye acceptance stays open
 **Coverage diagnosis (host187):** a pre-admission census found no named UV
 drivers in 108,890 accepted or 18,100 rejected controller observations, with
 zero unreadable observations. The installed 1,404 `.mdl` records contain 415
-`UVEYE` commands but no `UVCON` joint-driver commands. The next effect bundle
-therefore targets authored eye/gaze UV production and native material ownership,
-not another unchanged opening-scene probe. This diagnostic removes no additional
-rendering dependency; joint-driver, transition and pixel gates remain unqualified.
+`UVEYE` commands but no `UVCON` joint-driver commands. This redirected the next
+bundle to authored gaze instead of another unchanged opening-scene probe.
+Joint-driver, transition and pixel gates remain unqualified.
 [Source/content evidence and next connected boundary](research/20260908_2331_effect-input-coverage.md).
+
+**Owned eye materials (2026-09-09; opt-in):** authored gaze now computes native
+UVs and publishes them through the existing generation-checked instance owner
+to actual native scene-material packets. Host188 records **976 matching eye
+updates**, including 216 off-center controls, and 13,200 additional eye-material
+packets between two post-event field samples. No late-write mismatches occurred.
+The admitted normal path removes the original eye calculation and UV re-import
+as material input; checked outgoing scratch/table exports remain for unmigrated
+callers. CPU tests cover material order, late writes, reloads and small UV values;
+422 guards and the host build pass. Final floating-point-mode correction is
+build/fixture verified separately from host188's live evidence. No new motion
+pixels, reload/stereo qualification or speedup claim. Next: migrate the other
+animated material writers into the same owner, then retire their source adapters.
+[Producer/consumer connection, live evidence and limits](research/20260909_0000_native-eye-materials.md).
 
 ### How much is left?
 

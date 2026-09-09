@@ -52,6 +52,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertEqual(eye.count("__imp__sub_822BA028"), 1)
         self.assertLess(eye.index("throw std::runtime_error"), eye.index("PublishNativeEyeMaterial"))
         self.assertIn("model->Generation() != identity.model_generation", eye)
+        self.assertLess(eye.index("ctx.fpscr.disableFlushMode()"), eye.index("eye_source::ReadEyeControl"))
         self.assertNotIn("ctx.r6", eye)
         self.assertNotIn("ctx.r7", eye)
         self.assertIn("std::optional<NativeEyeMaterial> eye;", self.core)

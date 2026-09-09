@@ -999,17 +999,35 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    UVRATE for divisors, UVEYE for eye controls. Read-only bounded scan of all1673
    installed IPKs:1404 narrow-text .mdl records,415 UVEYE commands, no UVCON,
    UVSCR or UVRATE. Not proof about binary/script-driven data or the whole game.
-   Next connected effect bundle: authored UVEYE/gaze inputs -> existing instance/
-   material owners -> native material consumers, including the late eye writer
-   sub_822BA028 and caller sub_822B8DF0. Do not freeze parser output across late
-   authored writes or make a second source-address cache. Finish the caller's
-   full ordering/lifetime audit before implementation; helper replacement alone
-   is not delivery. Keep UVCON/queued-transition qualification open, but do not
-   use absent opening-scene UVCON content as the next implementation gate.
+   This selected authored UVEYE/gaze -> existing instance/material ownership,
+   implemented below. Keep UVCON/queued-transition qualification open, but do
+   not use absent opening-scene UVCON content as the next implementation gate.
    Material73/CPU70,421guards and host187 pass; diagnostic-only, no additional
    rendering dependency removed. Full log retained losslessly in effect187ZIP,
    replacing186's explained missing-driver/scroll/selection/controller purpose.
    [Source/content provenance, exact evidence and next boundary](../research/20260908_2331_effect-input-coverage.md).
+   **Eye owner/material connection (source58d591a,host188/PID38012):** complete
+   actor and both viewer callers audited. Native gaze evaluation now publishes
+   fixed by-value material UVs in NativeInstanceRegistry, keyed by instance and
+   model generation, not a new visual-address cache. Actual material setup/
+   composition/scene packets consume these values; source table/UV reads only
+   validate the temporary outgoing adapter. Unknown late writes/rebinding clear
+   the owner permanently until republished; reload retires it with the instance.
+   976 exact eye comparisons,216 off-center calls,zero producer refusals;
+   field1748->2048 scopes632->932 and eye packets27808->41008 (+13200),owner
+   changed0. Skin emission/fence retirement advances separately. The bounded
+   observation reaches its requested gate, not the full desktop acceptance.
+   Final review moved non-flushing FP setup before native math and added a
+   subnormal regression; final binary's build coverage is separate from188live.
+   Material fixture/422guards/host build pass. Eye control/frame motion pixels,
+   reloads/both eyes remain pending; no FPS claim, defaults unchanged.
+   Next connected animated-material bundle: reuse the existing instance/material
+   owner for other UV/image writers and their authored bindings, then delete
+   outgoing scratch/table validation when the last consumer migrates. Reuse the
+   parser/binder/effect source contracts; do not re-audit unchanged bodies or
+   rerun188 just for a new stamp. Preserve effect187/placement988/root985 and
+   prior pixel/reload failures. No separate material-owner framework.
+   [Eye contracts, native consumer evidence and remaining interfaces](../research/20260909_0000_native-eye-materials.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

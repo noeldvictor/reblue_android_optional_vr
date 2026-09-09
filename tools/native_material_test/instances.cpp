@@ -38,6 +38,10 @@ void TestEyeMaterialOwnership() {
   control.gaze={1,1}; control.origin[0]=-std::numeric_limits<float>::max();
   control.maximum[0]=std::numeric_limits<float>::max();
   Require(!EvaluateNativeEyeUV(control), "overflowing rounded extent is not published");
+  control={}; control.gaze={1,0}; control.maximum[0]=std::numeric_limits<float>::denorm_min();
+  const auto tiny=EvaluateNativeEyeUV(control);
+  Require(tiny && std::bit_cast<uint32_t>((*tiny)[1][0]) == 1,
+      "authored subnormal UV is retained in the original non-flushing mode");
 
   constexpr uint32_t visual=0x10000, table=0x20000, gaze=0x30000;
   std::unordered_map<uint64_t,uint32_t> words{

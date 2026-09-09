@@ -1105,10 +1105,12 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
   const auto model=graph ? FindLoadedNativeModel(*graph) : nullptr;
   if (!identity || !model || model->Generation() != identity.model_generation ||
       (output & 3) || !Range(output,16)) return refuse();
+  // The original disables flush-to-zero before loading/evaluating controls.
+  // Do so before native math too, not merely before its reference comparison.
+  ctx.fpscr.disableFlushMode();
   const auto publication=eye_source::ReadEyeControl(visual,ctx.r4.u32,Word);
   if (!publication) return refuse();
   const bool verify=REXCVAR_GET(bd_native_materials_verify);
-  ctx.fpscr.disableFlushMode();
   if (verify) {
     __imp__sub_822BA028(ctx,base); // once, before publishing any native output
     for (uint32_t eye=0; eye<2; ++eye) for (uint32_t axis=0; axis<2; ++axis)

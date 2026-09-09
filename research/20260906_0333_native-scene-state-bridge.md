@@ -7170,3 +7170,72 @@ Closing pre-doc free63597277184B (~59.2GiB),drive-wide gain640430080B versus fir
 fresh preflight required.13retainedwindow images10434657B unchanged. All producers
 terminal, none queued.421guards/CPU fixture/host build pass; diagnostic question
 answered but no additional renderer dependency removed. Goal remains active.
+
+### 2026-09-08 authored eye owner/material connection after5c80bec
+
+Owner push-only turn changed no renderer state; resumed connected authored gaze
+producer -> existing native instance entry -> material import/composition. All
+three callers audited, including viewer paths; fixed outputs retain late-write
+validation and caller scratch export. No source-address cache or new owner index.
+Initial scoped free63589031936B; pre-build63589326848B. No live game/build/test
+processes. Same cumulative floor62509998080B,3GiB owner exception and protected
+failure/raw/image evidence. Buildlogs420377B/212files; fixture10993413B/43files.
+422 artifact-free source/scenario guards PASS0.239s. Existing material74/CPU71/
+host188 supervisors planned:300s,64/8/192MiB per-command free-drop ceilings,
+fixture expected <16MiB peak, host <192MiB; no guest/shader rebuild intended.
+Retain73/70/187 receipts until replacement checks pass. Fresh diagnostic-overlap
+measurement required before any bounded authored-eye runtime observation.
+
+Material74/PID32232/session99824 build0; CPU71/PID19680 PASS0.12s/CTest0.14s.
+Fixture1491968B SHA25681464302C64F9C5F6EF57EE68F5CAC79B9F83FE4FF61D8FE8CC97FEC52300E98;
+tree11088335B/43files (+94922B). Host188/PID27880/session14729 build0;
+host/version compilation through link step32 after no-op codegen (0writes), no guest objects or
+shader compilation. EXE49372672B,PDB113737728B (+65536B combined),EXE SHA256
+7369705DEA777D918C232A2FA442D36AED888D96098D5E45EC85C93D0D4F3D8E.
+Source/test58d591a committed/pushed; banner5c80becdirty describes that source.
+All producers terminal. Six exact73/70/187 superseded build receipts removed
+after replacement,4691Blogical;free63590383616->63590391808B,8192B measured
+reclaim. Protected runtime effect187ZIP and all unresolved failure evidence
+unchanged. New EyeMaterialProbe reuses existing runtime supervisor:60s,400KiB
+text,192MiB free-drop, no raw/image/perf/cook. It enables native scene/skin/
+deferred consumers and requires checked off-center gaze plus increasing eye
+material/native-packet counts after two idle field contexts. It is NOT the
+failed UVCON gate, nor a movement/reload/pixel qualification. Full preflight
+must fit before profile mutation/launch; exact profile restoration in finally.
+
+Runtime preflight78098318Bdiagnostics,409600Blog reserve,free63590260736B,
+floor63388934144B. Host188/PID38012/session61987 starts23:57:53,terminal23:58:48.
+Requested EyeMaterialProbe observation reached; wrapper exits1 via diagnostic
+stop, NOT a crash/test-suite pass. Eye2077=976exact matches,refused0,off-center216;
+owner1747->2047 reads631->931,changed0; idle field1748->2048 eye material
+packets27808->41008. Controller95738matching,late6matching,skeleton12813matching,
+wrong0. All14settings applied; exact116Bprofile restored with prior hash. No new
+raw/window/perf/cache/dumpfiles; no reload/motion-pixel/both-eye qualification.
+Full263502Blog hash1D64BA1D1BA65EFE8B4A3391197E817EBA21593E8C2BB3CEF1481DE4A81F3F75
+retained in eye188ZIP54079B,hashF10E5244C5BE0663952AC3E85F54359E271952A9CA687637DFCD4F93ED4A26D2.
+Sole member/name/length/full hash verified before plaintext removal. Archive
+allocation free63589076992->63589019648B (57344B); exact plaintext deletion
+free63589019648->63589285888B (266240Breclaim); net208896B. effect187ZIP remains
+protected for its missing-driver gate; other protected captures/failures unchanged.
+
+Final source review moved non-flushing FP setup before native eye evaluation,
+with subnormal CPU regression and source-order guard. Material75/PID19296 build0;
+CPU72/PID38160 PASS0.12s/CTest0.14s;422guardsPASS0.226s. Same300s/64/8/192MiB
+supervisors and cumulative budget. Host189/PID37628/session30178 build0 through
+link step12,codegen0writes,no guest objects/shaders. This final binary is
+NOT live-qualified by relabelling188. FinalEXE49372672B/PDB113737728B;
+EXE SHA2562CB159E945C45BF3A93D9FDCAEBCEC9F4151A0CD0D7D540DDAD92803EE0F3BA1.
+Fixture1491968B SHA256F05904CD831F572AFBC27218FE40E43FF6DD74ED8C4A859B54D9B0F796230861;
+tree11081699B/43files. Six74/71/188 receipts7985Blogical removed after replacement;
+free63454375936->63454392320B,16384Breclaim. Retain75/72/189 and runtimeeye188.
+
+Total13files276178Blogical deleted;290816Bmeasured deletions minus57344BZIP
+allocation=233472B net228KiB cleanup. No old cleanup credited. Partial retained
+growth207901B:fixture+88286B,EXE/PDB+65536B,ZIP+54079B,buildlogs net0. Excludes
+hostobjects/buildmetadata/source/Git. Final pre-doc free63450087424B (~59.1GiB),
+drive-wide138944512B loss fromfirst63589031936B; not attributable to the listed
+task files. Scoped runtime/cache/dump inventory contains only new54079BZIP;
+all game/build/test producers terminal. Do not claim external activity as cleanup.
+Diagnostics78149103B,buildlogs420377B/212files; next400KiBoverlap has84497B below
+75MiB stop, fresh preflight mandatory.13window images10434657B unchanged; no new
+raw allowance or budget reset. No next producer queued; goal remains active.
