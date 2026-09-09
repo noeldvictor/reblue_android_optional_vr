@@ -38,6 +38,7 @@ REXCVAR_DECLARE(bool, bd_host_walk);
 REXCVAR_DEFINE_BOOL(bd_native_rigid_hard_off, false, kCvarGroup,
     "Require load-owned rigid routing before culling and reject selected-family legacy entry in every view. Requires both native rigid paths.");
 REX_EXTERN(__imp__bdVisualObjectInitBones);
+REX_EXTERN(__imp__bdVisualObjectInitDebugDraw);
 REX_EXTERN(__imp__bdBoneInitSkinned);
 REX_EXTERN(__imp__sub_82140DF8);
 REX_EXTERN(__imp__sub_8213F5E8);
@@ -59,6 +60,7 @@ struct Store {
   uint64_t imports = 0, refused = 0, reads = 0, unavailable = 0, checked = 0, wrong = 0;
   uint64_t handoffs = 0, handoff_missing = 0;
   uint64_t material_uv_published=0, material_uv_reads=0, material_uv_changed=0;
+  uint64_t material_program_published=0, material_program_reads=0, material_program_changed=0, material_program_refused=0;
   uint64_t skeleton_updates = 0, skeleton_published = 0, skeleton_unavailable = 0, skeleton_checks = 0, skeleton_wrong = 0;
   std::array<uint64_t, size_t(SkeletonMissing::Count)> skeleton_missing{};
   uint32_t miss_examples = 0;
@@ -100,6 +102,9 @@ void Report(Store &store) {
   if (store.material_uv_published)
     BD_INFO("[native-material-uv-owner] frame {} published {} reads {} changed {}; shared controller/eye ownership; outgoing late-write guard remains",
         frame,store.material_uv_published,store.material_uv_reads,store.material_uv_changed);
+  if (store.material_program_published || store.material_program_refused)
+    BD_INFO("[native-material-uv-program] frame {} bound {} reads {} changed {} refused {}; bind-owned descriptors, late-writer guard remains",
+        frame,store.material_program_published,store.material_program_reads,store.material_program_changed,store.material_program_refused);
 }
 struct SkeletonEvaluationScope;
 thread_local SkeletonEvaluationScope *active_skeleton_evaluation = nullptr;
@@ -196,6 +201,24 @@ void Retire(uint32_t visual) {
     store.sources.erase(it);
   }
 }
+instance_source::Binding *EnsureInstance(Store &store, uint32_t visual, const NativeModelRenderHandle &model) {
+  const auto generation = model ? model->Generation() : 0;
+  auto it = store.sources.find(visual);
+  if (it != store.sources.end() && it->second.model_generation != generation) {
+    store.instances.Retire(it->second.instance);
+    store.sources.erase(it); it = store.sources.end();
+  }
+  if (!generation) {
+    ++store.refused; return nullptr;
+  }
+  if (it == store.sources.end()) {
+    const auto id = store.instances.Create(generation, model);
+    if (!id) return nullptr;
+    try { it = store.sources.emplace(visual, instance_source::Binding{id, generation, {}}).first; }
+    catch (...) { store.instances.Retire(id); throw; }
+  }
+  return &it->second;
+}
 void Attach(uint32_t visual) {
   if (!rex::system::XThread::GetCurrentThread()) { Retire(visual); return; }
   const auto input_source = instance_source::ReadPublication(
@@ -206,28 +229,36 @@ void Attach(uint32_t visual) {
     std::lock_guard lock(store.mutex);
     ++store.refused; Report(store); return;
   }
-  const auto graph = input_source->graph;
-  const auto model = FindLoadedNativeModel(graph);
-  const auto generation = model ? model->Generation() : 0;
+  const auto model = FindLoadedNativeModel(input_source->graph);
   auto &store = Instances();
   std::lock_guard lock(store.mutex);
-  auto it = store.sources.find(visual);
-  if (it != store.sources.end() && it->second.model_generation != generation) {
-    store.instances.Retire(it->second.instance);
-    store.sources.erase(it); it = store.sources.end();
-  }
-  if (!generation) {
-    ++store.refused; Report(store); return;
-  }
-  if (it == store.sources.end()) {
-    const auto id = store.instances.Create(generation, model);
-    if (!id) { Report(store); return; }
-    try { it = store.sources.emplace(visual, instance_source::Binding{id, generation, {}}).first; }
-    catch (...) { store.instances.Retire(id); throw; }
-  }
+  EnsureInstance(store,visual,model);
   // InitBones is not the last writer (runtime 898 proves later edits before
   // handoff). Establish identity here, but import no provisional matrix values.
   Report(store);
+}
+void BeginMaterialBinding(uint32_t visual) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  if (const auto it=store.sources.find(visual); it != store.sources.end()) {
+    store.instances.InvalidateMaterialUVProgram(it->second.instance);
+    it->second.material_program={}; it->second.material_uv={};
+  }
+}
+void BindMaterialProgram(uint32_t visual) {
+  if (!REXCVAR_GET(bd_native_instances) || !REXCVAR_GET(bd_native_animation) || !REXCVAR_GET(bd_native_skeleton)) return;
+  const auto graph=Word(uint64_t(visual)+2620);
+  const auto model=graph ? FindLoadedNativeModel(*graph) : nullptr;
+  const auto publication=material_uv_source::ReadProgram(visual,Word);
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  bool valid=model && publication;
+  if (valid) for (const auto &slot : publication->program.slots)
+    if (slot.mode != NativeEffectUVMode::Scroll && !model->FindJoint(slot.joint)) { valid=false; break; }
+  auto *binding=valid ? EnsureInstance(store,visual,model) : nullptr;
+  if (!binding || !store.instances.PublishMaterialUVProgram(binding->instance,binding->model_generation,publication->program)) {
+    ++store.material_program_refused; Report(store); return;
+  }
+  binding->material_program=publication->binding;
+  ++store.material_program_published; Report(store);
 }
 void Handoff(uint32_t container) {
   if (container < kVisualBoneContainer) return;
@@ -295,6 +326,17 @@ std::shared_ptr<const NativeMaterialUVs> ReadNativeMaterialUVs(uint32_t visual, 
   auto material=instance_source::ReadMaterialUVs(store.instances,it->second,visual,generation,Word);
   ++(material ? store.material_uv_reads : store.material_uv_changed);
   return material;
+}
+std::shared_ptr<const NativeMaterialUVProgram> ReadNativeMaterialUVProgram(uint32_t visual, uint64_t generation) {
+  if (!REXCVAR_GET(bd_native_instances) || !REXCVAR_GET(bd_native_animation) || !REXCVAR_GET(bd_native_skeleton)) {
+    BeginMaterialBinding(visual); return {};
+  }
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end() || !it->second.material_program.table) return {};
+  auto program=instance_source::ReadMaterialUVProgram(store.instances,it->second,visual,generation,Word);
+  ++(program ? store.material_program_reads : store.material_program_changed);
+  return program;
 }
 namespace {
 thread_local NativeVisualInputScope *active_visual_inputs = nullptr;
@@ -508,6 +550,18 @@ void RequireNativeRigidLegacyNode(uint32_t context, uint32_t mesh) {
 }
 } // namespace bd::gpu::scene
 
+REX_HOOK_RAW(bdVisualObjectInitDebugDraw) {
+  // Actual authored material/joint binder, despite the historical symbol name.
+  // Loading/name resolution remains an adapter; evaluators consume owned descriptors.
+  const uint32_t visual=ctx.r3.u32;
+  bd::gpu::scene::BeginMaterialBinding(visual);
+  __imp__bdVisualObjectInitDebugDraw(ctx,base);
+  try { bd::gpu::scene::BindMaterialProgram(visual); }
+  catch (const std::exception &error) {
+    bd::gpu::scene::BeginMaterialBinding(visual);
+    BD_WARN("[native-material-uv-program] binding publication failed: {}",error.what());
+  }
+}
 REX_HOOK_RAW(bdVisualObjectInitBones) {
   const uint32_t visual = ctx.r3.u32;
   bd::gpu::scene::SkeletonEvaluationScope evaluation(visual);

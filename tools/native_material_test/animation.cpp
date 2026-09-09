@@ -1495,11 +1495,29 @@ void TestNativeEffectConsumption() {
     scalar(record+28,2); scalar(record+32,3); scalar(record+36,4); scalar(record+40,-2);
     scalar(record+44,4); scalar(record+48,-2); scalar(record+52,90); scalar(record+56,45);
   }
+  for (uint32_t axis=0; axis<2; ++axis) {
+    scalar(records+60+axis*4,0); scalar(records+68+axis*4,1); scalar(records+76+axis*4,.5f);
+  }
+  const auto authored=material_uv_source::ReadProgram(visual,read);
+  Require(authored && authored->program.slots[1].mode == NativeEffectUVMode::Translation &&
+      authored->program.slots[2].mode == NativeEffectUVMode::Rotation, "binding imports native material and dense joint identities");
+  NativeInstanceRegistry registry;
+  instance_source::Binding binding{registry.Create(9),9,{}};
+  binding.material_program=authored->binding;
+  Require(registry.PublishMaterialUVProgram(binding.instance,9,authored->program), "binding publishes immutable descriptors");
+  const auto program=instance_source::ReadMaterialUVProgram(registry,binding,visual,9,read);
+  Require(bool(program), "evaluators acquire generation-checked binding descriptors");
+  const auto evaluation_read=[&](uint64_t address) {
+    Require(address != 0x8208EA64, "native evaluation uses its owned unit conversion");
+    for (uint32_t n=0; n<4; ++n) for (uint32_t offset : {4u,8u,12u,16u,20u,36u,40u,44u,48u,52u,56u,60u,64u,68u,72u,76u,80u,120u})
+      Require(address != records+n*152+offset, "controller and eye evaluation must not import authored descriptors");
+    return read(address);
+  };
   // Bound reader never provides packed channels at 0x16000: all values must be
   // consumed directly from the controller, without stealing skeleton's handoff.
-  auto update=PrepareEffectUpdate(visual,.5f,1,channels,read);
+  auto update=PrepareEffectUpdate(visual,.5f,1,channels,evaluation_read,nullptr,program.get());
   Require(update && update->uv.size() == 3 && update->translated == 1 && update->rotated == 1 &&
-          !update->transitioned && update->timeline[3] == std::bit_cast<uint32_t>(9.5f),
+          update->owned_descriptors == 3 && !update->transitioned && update->timeline[3] == std::bit_cast<uint32_t>(9.5f),
           "complete effect transaction admits clock plus scroll/translation/rotation drivers");
   Require(update->uv[0].value == std::array<float,2>{4,2} && update->uv[1].value == std::array<float,2>{.5f,0} &&
           Near(update->uv[2].value[0],.5f) && Near(update->uv[2].value[1],0),
@@ -1515,8 +1533,6 @@ void TestNativeEffectConsumption() {
 
   // Publish into the production instance owner, then forbid exported UV reads
   // inside the actual material importer. Only the late-write guard reads them.
-  NativeInstanceRegistry registry;
-  instance_source::Binding binding{registry.Create(9),9,{}};
   binding.material_uv={update->table,update->material.count};
   Require(registry.PublishMaterialUVs(binding.instance,9,update->material), "controller publishes shared material owner");
   const auto owned=instance_source::ReadMaterialUVs(registry,binding,visual,9,read);
@@ -1552,7 +1568,7 @@ void TestNativeEffectConsumption() {
   for (uint32_t axis=0; axis<2; ++axis) {
     scalar(records+60+axis*4,0); scalar(records+68+axis*4,1); scalar(records+76+axis*4,.5f);
   }
-  const auto eye=material_uv_source::ReadEyeControl(visual,gaze,read,owned.get());
+  const auto eye=material_uv_source::ReadEyeControl(visual,gaze,evaluation_read,owned.get(),program.get());
   Require(eye && eye->material.entries.size() == 3 && eye->material.count == 4 &&
       eye->material.entries[2].Same(owned->entries[2]) && eye->material.HasEyes(),
       "eye patch preserves untouched controller slot and full table count in the same owner");
@@ -1572,9 +1588,9 @@ void TestNativeEffectConsumption() {
       "material composition combines late eyes and preserved non-eye animated UV");
   const auto no_scroll_import=[&](uint64_t address) {
     Require(address != records+28 && address != records+32, "next controller must not reimport exported scroll offsets");
-    return read(address);
+    return evaluation_read(address);
   };
-  const auto next=PrepareEffectUpdate(visual,.5f,1,channels,no_scroll_import,after_eye.get());
+  const auto next=PrepareEffectUpdate(visual,.5f,1,channels,no_scroll_import,after_eye.get(),program.get());
   Require(next && next->owned_offsets == 1 && next->material.entries[0].uv == std::array<float,2>{2.25f,-.75f} &&
       !next->material.HasEyes(), "next controller advances late eye offsets as native input and updates writer provenance");
   next->Publish(word);
@@ -1584,9 +1600,12 @@ void TestNativeEffectConsumption() {
   Require(!instance_source::ReadMaterialUVs(registry,binding,visual,9,read), "late non-eye writer invalidates shared publication");
   next->Publish(word);
   Require(!instance_source::ReadMaterialUVs(registry,binding,visual,9,read), "restored output cannot resurrect invalidated shared owner");
+  Require(bool(instance_source::ReadMaterialUVProgram(registry,binding,visual,9,read)),
+      "offset-only writes do not invalidate unchanged authored descriptors");
   registry.Retire(binding.instance);
   const auto retained=values; source.words.clear(); controller.reset(); assets.fill({}); asset.reset();
-  Require(values == retained && after_eye->entries[0].uv[0] == .25f && owned->entries[0].uv[0] == 4,
+  Require(values == retained && after_eye->entries[0].uv[0] == .25f && owned->entries[0].uv[0] == 4 &&
+      program->slots[0].rate[0] == 4 && program->eye.origin[0] == .5f,
       "owned material values survive source/clip/controller destruction and instance retirement");
 
   // Catalog readiness, duration conversion and queued transition branches.

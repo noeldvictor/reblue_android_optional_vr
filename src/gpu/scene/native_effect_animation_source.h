@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_effect_animation.h"
 #include "gpu/scene/native_material_uv.h"
+#include "gpu/scene/native_material_uv_program.h"
 #include <bit>
 
 namespace bd::gpu::scene::animation_source {
@@ -95,7 +96,7 @@ struct EffectUpdate {
   std::array<uint32_t,9> timeline{}; // outgoing-only IDs/entries; not a native owner
   bool called=false, clock_written=false, transitioned=false;
   uint32_t translated=0, rotated=0;
-  uint32_t table=0, owned_offsets=0;
+  uint32_t table=0, owned_offsets=0, owned_descriptors=0;
   NativeMaterialUVs material;
   std::vector<UV> uv;
   template<class Write> void Publish(Write &&write) const {
@@ -122,7 +123,8 @@ struct EffectUpdate {
 // passing it here. Offset reuse does not itself check unknown outgoing writers.
 template<class Read>
 std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, double duration_scale,
-    std::span<const NativeJointChannels> channels, Read &&read, const NativeMaterialUVs *previous=nullptr) {
+    std::span<const NativeJointChannels> channels, Read &&read, const NativeMaterialUVs *previous=nullptr,
+    const NativeMaterialUVProgram *program=nullptr) {
   if (!visual || (visual&3) || uint64_t(visual)+3752 > uint64_t(UINT32_MAX)+1) return {};
   const auto records=read(uint64_t(visual)+3560);
   if (!records) return {};
@@ -161,6 +163,7 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
   if (int32_t(*count) <= 0) return result;
   if (*count > 256 || (*records&3) || uint64_t(*records)+uint64_t(*count)*152 > uint64_t(UINT32_MAX)+1) return {};
   if (previous && (!previous->Valid() || previous->count != *count)) return {};
+  if (program && (!program->Valid() || program->slots.size() != *count)) return {};
   result.table=*records; result.material.count=*count;
   const auto overlaps=[](uint64_t a,uint64_t bytes,uint64_t b,uint64_t extent) { return a < b+extent && b < a+bytes; };
   const auto source=read(uint64_t(visual)+2628);
@@ -169,6 +172,30 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
       (*source && overlaps(*records,uint64_t(*count)*152,*source,channels.size()*48))) return {};
   for (uint32_t n=0; n<*count; ++n) {
     const uint64_t record=uint64_t(*records)+n*152;
+    if (program) {
+      const auto &slot=program->slots[n];
+      if (!slot.enabled) continue;
+      auto motion=slot.Motion(*source != 0,program->radians_per_degree);
+      const auto *owned=previous ? previous->Find(n) : nullptr;
+      const bool owns_offset=owned && owned->enabled && owned->selector == slot.selector && owned->channel == slot.channel;
+      for (uint32_t axis=0; axis<2; ++axis) {
+        if (motion.mode == NativeEffectUVMode::Scroll && owns_offset) motion.offset[axis]=owned->uv[axis];
+        else {
+          const auto output=read(record+28+axis*4); // outgoing range / unconverted late offset writer
+          if (!output) return {};
+          if (motion.mode == NativeEffectUVMode::Scroll) motion.offset[axis]=std::bit_cast<float>(*output);
+        }
+      }
+      const auto uv=EvaluateNativeEffectUV(motion,delta,channels);
+      if (!uv) return {};
+      result.translated+=motion.mode == NativeEffectUVMode::Translation;
+      result.rotated+=motion.mode == NativeEffectUVMode::Rotation;
+      result.owned_offsets+=owns_offset && motion.mode == NativeEffectUVMode::Scroll;
+      ++result.owned_descriptors;
+      result.uv.push_back({uint32_t(record+28),*uv});
+      result.material.entries.push_back({n,slot.selector,slot.channel,*uv,true,NativeMaterialUVOrigin::Effect});
+      continue;
+    }
     const auto enabled=read(record+20);
     if (!enabled) return {};
     if (!*enabled) continue;

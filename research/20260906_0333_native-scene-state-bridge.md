@@ -7307,3 +7307,42 @@ fresh preflight.13window images10434657B unchanged; no new raw/budget exception.
 Production source is dd6a2dc; only precondition comments changed after host190.
 Connected tests and meaningful README/queue/report updates close this bundle;
 authored binding/image/late-writer/source-adapter and full desktop work remain.
+
+### 2026-09-09 bind-owned material descriptors after2691882
+
+Previous bundle made verified progress; current source adds binding-time authored
+UV programs to the existing instance registry, consumed by controller/eye math
+and existing material values/packets. Original name resolution and late-writer
+validation stay explicit; no second index/framework. Reused audited parser and
+binder contracts; reread the complete binder plus unchanged pso/frame TOMLs.
+424 artifact-free guards PASS0.229s. New CPU chain forbids descriptor/unit reads
+inside evaluation; source guards remain separate. Adds descriptor/UV shared-budget,
+pinned retirement, late descriptor/unit writes and generation invalidation tests.
+Initial measured free63561998336B,buildlogs423671B/212files; no live producers.
+Same cumulative floor62509998080B/3GiB exception, diagnostics78149834B before new
+receipts; no raw/image allowance. Reuse material77/CPU74/host191,300s and64/8/192MiB
+free-drop caps. Estimated fixture peak <16MiB and host <192MiB. Retain76/73/190
+receipts and animated-uv190 until corresponding replacements qualify. Runtime
+must add positive bind-owned descriptor consumption to existing UV/eye/controller/
+late gates, with fresh cumulative diagnostic preflight before any launch.
+
+Material77/PID35780/session66425 build0; CPU74/PID17696 PASS0.12s/CTest0.13s.
+Fixture1577984B SHA256C998BD095F1AB1771D01FEC02AB8952C906B1A529929E85C2991766DC8F9A721;
+tree11388904B/43files (+143531B). Host191/PID22648/session80746 stopped with
+compile error: missing REX_EXTERN original declaration for the new binder hook.
+No game run, no guest objects or shader compilation; codegen0writes. Added the
+declaration and source regression; host192 is the scoped retry under the same
+300s/192MiB/cumulative limits. Existing MaterialProgramProbe extends the ignored
+supervisor: positive bound/read descriptors without change/refusal and increasing
+effect-slot/eye descriptor consumption after fresh field contexts, AND all prior
+UV/eye/controller/late observations. Syntax passes, no old gate is weakened.
+
+Host192/PID36348/session80639 build0 through link18 after the declaration fix;
+codegen0writes,no guest objects/shaders. EXE49397760B/PDB113934336B (+125440B);
+EXE SHA256FBE640F3A6275CC0A5AD985B7818F6C6DE7826D8D398F4821C9101CF27356229.
+424guards pass again0.227s. Source/test checkpoint is build/CPU verified with
+live descriptor consumption pending; original program-binding/body and late
+source validation remain explicit. Next existing supervisor run requests
+MaterialProgramProbe plus all prior animated-UV/eye/controller/late observations,
+60s/400KiB/192MiB,no capture/perf/cook,exact116Bprofile restoration. Pre-run
+profile hash unchanged; never label host190's evidence as the new binary.

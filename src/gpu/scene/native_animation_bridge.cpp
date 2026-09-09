@@ -93,6 +93,7 @@ struct Store {
   uint64_t effects=0, effect_checks=0, effect_uv=0, effect_translated=0, effect_rotated=0, effect_transitions=0;
   uint64_t eyes=0, eye_checks=0, eye_refused=0, eye_off_center=0;
   uint64_t material_uv_published=0, material_uv_refused=0, effect_owned_offsets=0, eye_preserved=0;
+  uint64_t effect_owned_descriptors=0, eye_owned_descriptors=0;
   std::array<EffectObservation,size_t(EffectAdmission::Count)> effect_observations{};
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
@@ -154,6 +155,9 @@ void Report(Store &store) {
   if (store.material_uv_published || store.material_uv_refused)
     BD_INFO("[native-animation-material-uv] frame {} published {} refused {} owned-scroll-inputs {} eye-preserved {}; shared owner feeds subsequent updates and native materials",
         frame,store.material_uv_published,store.material_uv_refused,store.effect_owned_offsets,store.eye_preserved);
+  if (store.effect_owned_descriptors || store.eye_owned_descriptors)
+    BD_INFO("[native-animation-material-program] frame {} effect-slots {} eyes {}; native binding descriptors feed evaluated material UV",
+        frame,store.effect_owned_descriptors,store.eye_owned_descriptors);
   for (size_t n=0; n<store.effect_observations.size(); ++n) {
     const auto &seen=store.effect_observations[n];
     if (seen.calls)
@@ -1017,8 +1021,9 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   // loads preserve the complete original controller once, including side effects.
   stage=EffectAdmission::Effects;
   const auto identity=FindNativeVisualIdentity(visual);
+  const auto material_program=ReadNativeMaterialUVProgram(visual,model->Generation());
   const auto previous_uv=ReadNativeMaterialUVs(visual,model->Generation());
-  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word,previous_uv.get());
+  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word,previous_uv.get(),material_program.get());
   if (!effects) return refuse("effect timeline/UV boundary");
   const auto records=result->output.Encode();
   stage=EffectAdmission::Output;
@@ -1101,6 +1106,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   store.material_uv_published+=material_owned;
   store.material_uv_refused+=material_requested && !material_owned;
   store.effect_owned_offsets+=effects->owned_offsets;
+  store.effect_owned_descriptors+=effects->owned_descriptors;
   store.owned_exclusions+=excluded_nodes->size();
   for (size_t n=0; n<kNativeAnimationSlots; ++n)
     store.controller_advancing+=plan->advanced[n] && plan->slots[n].time_ticks != input.slots[n].time_ticks;
@@ -1121,8 +1127,9 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
   // The original disables flush-to-zero before loading/evaluating controls.
   // Do so before native math too, not merely before its reference comparison.
   ctx.fpscr.disableFlushMode();
+  const auto material_program=ReadNativeMaterialUVProgram(visual,identity.model_generation);
   const auto previous_uv=ReadNativeMaterialUVs(visual,identity.model_generation);
-  const auto publication=material_uv_source::ReadEyeControl(visual,ctx.r4.u32,Word,previous_uv.get());
+  const auto publication=material_uv_source::ReadEyeControl(visual,ctx.r4.u32,Word,previous_uv.get(),material_program.get());
   if (!publication) return refuse();
   const bool verify=REXCVAR_GET(bd_native_materials_verify);
   if (verify) {
@@ -1143,6 +1150,7 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
   ++store.eyes; store.eye_checks+=verify;
   store.material_uv_published+=material_owned; store.material_uv_refused+=!material_owned;
   store.eye_preserved+=material_owned ? publication->material.entries.size()-std::min(publication->material.count,2u) : 0;
+  store.eye_owned_descriptors+=material_program != nullptr;
   store.eye_off_center+=bd::mem::load<float>(ctx.r4.u32) != 0 || bd::mem::load<float>(ctx.r4.u32+4) != 0;
   Report(store);
   return true;

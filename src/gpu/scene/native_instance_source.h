@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_material_uv_source.h"
+#include "gpu/scene/native_material_uv_program_source.h"
 #include <optional>
 
 namespace bd::gpu::scene::instance_source {
@@ -20,7 +21,18 @@ struct Binding {
   uint64_t model_generation = 0;
   uint32_t palettes[2]{};
   material_uv_source::Binding material_uv;
+  material_uv_source::Binding material_program;
 };
+template<class Read>
+std::shared_ptr<const NativeMaterialUVProgram> ReadMaterialUVProgram(NativeInstanceRegistry &registry, Binding &binding,
+    uint32_t visual, uint64_t generation, Read read) {
+  auto program=registry.ReadMaterialUVProgram(binding.instance,generation);
+  if (generation == binding.model_generation && program &&
+      material_uv_source::MatchesProgram(visual,binding.material_program,*program,read)) return program;
+  registry.InvalidateMaterialUVProgram(binding.instance);
+  binding.material_program={}; binding.material_uv={};
+  return {};
+}
 template<class Read>
 std::shared_ptr<const NativeMaterialUVs> ReadMaterialUVs(NativeInstanceRegistry &registry, Binding &binding,
     uint32_t visual, uint64_t generation, Read read) {

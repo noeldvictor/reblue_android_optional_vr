@@ -18,6 +18,7 @@ bool PublishNativeMaterialUVs(uint32_t visual, NativeVisualIdentity identity,
     uint32_t table, const NativeMaterialUVs &material);
 void InvalidateNativeMaterialUVs(uint32_t visual);
 std::shared_ptr<const NativeMaterialUVs> ReadNativeMaterialUVs(uint32_t visual, uint64_t generation);
+std::shared_ptr<const NativeMaterialUVProgram> ReadNativeMaterialUVProgram(uint32_t visual, uint64_t generation);
 // Late handoff after authored scene preparation and known later writers.
 // Uses the existing bounded instance index; no source address survives in output.
 bool CollectNativeVisualInputs(std::span<const NativeVisualIdentity> requested,

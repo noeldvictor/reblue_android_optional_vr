@@ -8,6 +8,7 @@
 #include "gpu/scene/native_pose_interpolation.h"
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_material_uv.h"
+#include "gpu/scene/native_material_uv_program.h"
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -210,6 +211,32 @@ public:
     std::lock_guard lock(mutex_);
     if (const auto it=entries_.find(id); it != entries_.end()) it->second.material_uv.reset();
   }
+  bool PublishMaterialUVProgram(NativeInstanceId id, uint64_t generation, const NativeMaterialUVProgram &program) {
+    std::lock_guard lock(mutex_);
+    const auto it=entries_.find(id);
+    if (it == entries_.end() || it->second.model_generation != generation) return false;
+    auto &entry=it->second;
+    if (program.Valid() && entry.material_program && entry.material_program->Same(program)) return true;
+    entry.material_program.reset(); entry.material_uv.reset();
+    if (!program.Valid() || !Fits(sizeof(ProgramOwner)+128+program.slots.size()*sizeof(NativeMaterialUVProgram::Slot))) return false;
+    auto owner=std::make_shared<ProgramOwner>(); owner->program=program;
+    const size_t bytes=sizeof(ProgramOwner)+128+owner->program.slots.capacity()*sizeof(NativeMaterialUVProgram::Slot);
+    if (!Fits(bytes)) return false;
+    owner->bytes=bytes; owner->accounting=accounting_; accounting_->bytes.fetch_add(bytes);
+    entry.material_program=std::shared_ptr<const NativeMaterialUVProgram>(owner,&owner->program);
+    return true;
+  }
+  std::shared_ptr<const NativeMaterialUVProgram> ReadMaterialUVProgram(NativeInstanceId id, uint64_t generation) const {
+    std::lock_guard lock(mutex_);
+    const auto it=entries_.find(id);
+    return it != entries_.end() && it->second.model_generation == generation ? it->second.material_program : nullptr;
+  }
+  void InvalidateMaterialUVProgram(NativeInstanceId id) {
+    std::lock_guard lock(mutex_);
+    if (const auto it=entries_.find(id); it != entries_.end()) {
+      it->second.material_program.reset(); it->second.material_uv.reset();
+    }
+  }
   NativeInstanceStats Stats() const {
     std::lock_guard lock(mutex_);
     auto result = stats_;
@@ -218,6 +245,12 @@ public:
   }
 private:
   struct Accounting { std::atomic<size_t> bytes{0}; };
+  struct ProgramOwner {
+    NativeMaterialUVProgram program;
+    std::shared_ptr<Accounting> accounting;
+    size_t bytes=0;
+    ~ProgramOwner() { if (accounting) accounting->bytes.fetch_sub(bytes); }
+  };
   struct MaterialOwner {
     NativeMaterialUVs material;
     std::shared_ptr<Accounting> accounting;
@@ -241,6 +274,7 @@ private:
       bool active = false, cached_valid = false;
     } render;
     std::shared_ptr<const NativeMaterialUVs> material_uv;
+    std::shared_ptr<const NativeMaterialUVProgram> material_program;
   };
   static_assert(sizeof(Entry) <= kEntryBytes);
   std::shared_ptr<const NativeInstancePose> OwnPose(NativeInstanceId id, const Entry &entry,

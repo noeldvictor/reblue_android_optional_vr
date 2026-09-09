@@ -5,6 +5,7 @@
  */
 #pragma once
 #include "gpu/scene/native_material_uv.h"
+#include "gpu/scene/native_material_uv_program.h"
 #include <algorithm>
 #include <bit>
 
@@ -17,25 +18,35 @@ struct Publication {
 };
 template<class Read>
 std::optional<Publication> ReadEyeControl(uint32_t visual, uint32_t controls, Read read,
-    const NativeMaterialUVs *previous=nullptr) {
+    const NativeMaterialUVs *previous=nullptr, const NativeMaterialUVProgram *program=nullptr) {
   if (!visual || (visual & 3) || visual > UINT32_MAX-3567 ||
       !controls || (controls & 3) || controls > UINT32_MAX-7) return {};
   const auto table=read(uint64_t(visual)+3560), count=read(uint64_t(visual)+3564);
   if (!table || !*table || (*table & 3) || !count || !*count || *count > 256 ||
       uint64_t(*table)+uint64_t(*count)*152 > uint64_t(UINT32_MAX)+1) return {};
-  NativeEyeControl input;
+  if (program && (!program->Valid() || program->slots.size() != *count)) return {};
+  NativeEyeControl input=program ? program->eye : NativeEyeControl{};
   for (uint32_t axis=0; axis<2; ++axis) {
-    const auto gaze=read(uint64_t(controls)+axis*4), origin=read(uint64_t(*table)+76+axis*4);
-    const auto minimum=read(uint64_t(*table)+60+axis*4), maximum=read(uint64_t(*table)+68+axis*4);
-    if (!gaze || !origin || !minimum || !maximum) return {};
-    input.gaze[axis]=std::bit_cast<float>(*gaze); input.origin[axis]=std::bit_cast<float>(*origin);
-    input.minimum[axis]=std::bit_cast<float>(*minimum); input.maximum[axis]=std::bit_cast<float>(*maximum);
+    const auto gaze=read(uint64_t(controls)+axis*4);
+    if (!gaze) return {};
+    input.gaze[axis]=std::bit_cast<float>(*gaze);
+    if (!program) {
+      const auto origin=read(uint64_t(*table)+76+axis*4), minimum=read(uint64_t(*table)+60+axis*4), maximum=read(uint64_t(*table)+68+axis*4);
+      if (!origin || !minimum || !maximum) return {};
+      input.origin[axis]=std::bit_cast<float>(*origin);
+      input.minimum[axis]=std::bit_cast<float>(*minimum); input.maximum[axis]=std::bit_cast<float>(*maximum);
+    }
   }
   const auto values=EvaluateNativeEyeUV(input);
   if (!values) return {};
   Publication result{{*table,*count},{},*values};
   result.material.count=*count;
   for (uint32_t i=0; i<std::min(*count,2u); ++i) {
+    if (program) {
+      const auto &slot=program->slots[i];
+      result.material.entries.push_back({i,slot.selector,slot.channel,(*values)[i],slot.enabled,NativeMaterialUVOrigin::Eye});
+      continue;
+    }
     const uint64_t record=uint64_t(*table)+i*152;
     const auto selector=read(record+4), channel=read(record+8), enabled=read(record+20);
     if (!selector || !channel || !enabled) return {};

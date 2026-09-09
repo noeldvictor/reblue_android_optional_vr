@@ -83,6 +83,38 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
         self.assertLess(hook.index("InvalidateNativeMaterialUVs"), hook.index("__imp__bdAnimationUpdate"))
 
+    def test_authored_uv_binding_publishes_owned_descriptors_before_evaluation(self):
+        root = Path(__file__).resolve().parents[1]
+        program = (root / "src/gpu/scene/native_material_uv_program.h").read_text(encoding="utf-8")
+        boundary = (root / "src/gpu/scene/native_material_uv_program_source.h").read_text(encoding="utf-8")
+        hook = self.bridge.split("REX_HOOK_RAW(bdVisualObjectInitDebugDraw)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertIn("REX_EXTERN(__imp__bdVisualObjectInitDebugDraw);", self.bridge)
+        self.assertEqual(hook.count("__imp__bdVisualObjectInitDebugDraw"), 1)
+        self.assertLess(hook.index("BeginMaterialBinding(visual)"), hook.index("__imp__bdVisualObjectInitDebugDraw"))
+        self.assertLess(hook.index("__imp__bdVisualObjectInitDebugDraw"), hook.index("BindMaterialProgram(visual)"))
+        binding = self.bridge.split("void BindMaterialProgram(", 1)[1].split("void Handoff(", 1)[0]
+        self.assertIn("FindLoadedNativeModel(*graph)", binding)
+        self.assertIn("!model->FindJoint(slot.joint)", binding)
+        self.assertIn("EnsureInstance(store,visual,model)", binding)
+        self.assertIn("PublishMaterialUVProgram(", binding)
+        reader = self.bridge.split("ReadNativeMaterialUVProgram(uint32_t", 1)[1].split("namespace {", 1)[0]
+        for forbidden in ("ReadProgram(", "EnsureInstance", ".Create(", "PublishMaterialUVProgram("):
+            self.assertNotIn(forbidden, reader)
+        self.assertIn("material_uv_source::MatchesProgram", self.source)
+        self.assertIn("registry.InvalidateMaterialUVProgram", self.source)
+        for forbidden in ("PPCContext", "bd::mem", "read(", "0x82", "unordered_map", "source_node"):
+            self.assertNotIn(forbidden, program)
+        self.assertIn("ReadSlot(uint64_t(binding.table)+n*152,read)", boundary)
+        controller = self.animation_bridge.split("bool Controller(", 1)[1].split("bool EyeMaterial(", 1)[0]
+        self.assertLess(controller.index("ReadNativeMaterialUVProgram("), controller.index("ReadNativeMaterialUVs("))
+        self.assertIn("previous_uv.get(),material_program.get()", controller)
+        eye = self.animation_bridge.split("bool EyeMaterial(", 1)[1].split("} // namespace", 1)[0]
+        self.assertLess(eye.index("ReadNativeMaterialUVProgram("), eye.index("ReadNativeMaterialUVs("))
+        self.assertIn("previous_uv.get(),material_program.get()", eye)
+        self.assertIn("owner->program.slots.capacity()*sizeof(NativeMaterialUVProgram::Slot)", self.core)
+        self.assertIn("~ProgramOwner() { if (accounting) accounting->bytes.fetch_sub(bytes); }", self.core)
+        self.assertIn("controller and eye evaluation must not import authored descriptors", self.animation_test)
+
     def test_animation_registration_is_load_scoped_and_sampler_never_reads_source_keys(self):
         for name in ("sub_8217BD70", "sub_8217C5E8"):
             hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
@@ -118,7 +150,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
 
     def test_effects_consume_owned_channels_before_skeleton_and_material_publication(self):
         controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
-        self.assertIn("result->output.channels,Word,previous_uv.get())", controller)
+        self.assertIn("result->output.channels,Word,previous_uv.get(),material_program.get())", controller)
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("__imp__bdAnimationUpdate"))
         self.assertLess(controller.index("effects->Matches(Word)"), controller.index("auto *destination="))
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("completed_controller.Publish("))
@@ -373,7 +405,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("(native_render_node ? render_pose : instance_pose)", self.walk)
 
     def test_model_lease_is_attached_before_pose_and_used_without_source_lookup(self):
-        self.assertIn("FindLoadedNativeModel(graph)", self.bridge)
+        self.assertIn("FindLoadedNativeModel(input_source->graph)", self.bridge)
         self.assertIn("store.instances.Create(generation, model)", self.bridge)
         self.assertIn("slot = OwnPose(id, it->second, transforms)", self.core)
         self.assertIn("owner->pose.model = entry.model", self.core)

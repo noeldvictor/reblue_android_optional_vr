@@ -194,6 +194,73 @@ void TestMaterialUVBudgets() {
   }
   Require(survives && survives->Same(material), "material and accounting survive registry destruction");
 }
+void TestMaterialUVProgramOwnership() {
+  constexpr uint32_t visual=0x10000, table=0x20000;
+  std::unordered_map<uint64_t,uint32_t> words{{visual+3560,table},{visual+3564,2},
+      {0x8208EA64,std::bit_cast<uint32_t>(.017453292f)}};
+  for (uint32_t offset=0; offset<304; offset+=4) words[table+offset]=0;
+  const auto read=[&](uint64_t address)->std::optional<uint32_t> {
+    const auto it=words.find(address); return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  words[table+4]=3; words[table+20]=2; words[table+36]=std::bit_cast<uint32_t>(.25f);
+  words[table+152+4]=7; words[table+152+20]=1; words[table+152+120]=0x41000000;
+  words[table+152+12]=1; words[table+152+16]=1;
+  const auto publication=material_uv_source::ReadProgram(visual,read);
+  Require(publication && publication->program.Valid() && publication->program.slots[0].selector == 3 &&
+      publication->program.slots[1].joint == 1 && publication->program.slots[1].mode == NativeEffectUVMode::Rotation,
+      "binding decodes selectors, enabled modes and dense joint identity");
+  NativeInstanceRegistry registry;
+  instance_source::Binding binding{registry.Create(11),11,{}};
+  const auto base=registry.Stats().bytes;
+  const auto publish=[&] {
+    binding.material_program=publication->binding;
+    return registry.PublishMaterialUVProgram(binding.instance,11,publication->program);
+  };
+  Require(publish(), "program enters same bounded instance registry");
+  auto pinned=instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read);
+  const auto bytes=registry.Stats().bytes-base;
+  Require(pinned && bytes > sizeof(NativeMaterialUVProgram) && publish() &&
+      registry.ReadMaterialUVProgram(binding.instance,11) == pinned && registry.Stats().bytes == base+bytes,
+      "identical binding reuses immutable descriptor lease and accounted bytes");
+  NativeMaterialUVs uv{{{0,3,0,{0,0},true,NativeMaterialUVOrigin::Eye}},2};
+  for (uint32_t offset : {4u,8u,20u,36u,40u,44u,48u,52u,56u,60u,64u,68u,72u,76u,80u,120u}) {
+    Require(publish() && registry.PublishMaterialUVs(binding.instance,11,uv), "republish program and UVs before late write");
+    const auto before=words[table+offset]; words[table+offset]=offset == 120 ? 0x41000000 : before+1;
+    // Nonzero mode changes 2->3 are semantically identical enables.
+    if (offset == 20) words[table+offset]=0;
+    Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read) &&
+        !registry.ReadMaterialUVs(binding.instance,11), "late descriptor write retires both program and affected UV visibility");
+    words[table+offset]=before;
+    Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read), "matching old descriptor words cannot resurrect a binding");
+  }
+  Require(publish(), "republish before joint rebind"); words[table+152+12]=2;
+  Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read), "joint identity change invalidates descriptors");
+  words[table+152+12]=1; Require(publish(), "republish before table identity change"); words[visual+3560]=table+152;
+  Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read), "table replacement invalidates native program");
+  words[visual+3560]=table; Require(publish(), "republish before unit change"); words[0x8208EA64]^=1;
+  Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read), "unit conversion late write cannot change native evaluation silently");
+  words[0x8208EA64]^=1;
+  auto dormant=publication->program; dormant.slots[1].rate[0]=NAN;
+  Require(dormant.Valid(), "dormant nonfinite scroll payload remains admissible for a channel driver");
+  auto bad=publication->program; bad.slots.resize(257); Require(!bad.Valid(), "program slot capacity is bounded");
+  bad=publication->program; bad.slots[1].joint=kMaxNativeJoints; Require(!bad.Valid(), "joint identity is bounded");
+  bad=publication->program; bad.slots[0].rate[1]=-0.0f; Require(!bad.Same(publication->program), "binding identity preserves signed zero");
+  NativeInstanceRegistry tight(base+bytes);
+  const auto id=tight.Create(11);
+  Require(tight.PublishMaterialUVProgram(id,11,publication->program), "program fits exact accounted budget");
+  auto held=tight.ReadMaterialUVProgram(id,11);
+  Require(!tight.PublishMaterialUVs(id,11,uv) && tight.ReadMaterialUVProgram(id,11) == held,
+      "program and UV allocations compete under the same instance budget");
+  auto changed=publication->program; changed.slots[0].rate[0]=2;
+  Require(!tight.PublishMaterialUVProgram(id,11,changed) && !tight.ReadMaterialUVProgram(id,11),
+      "pinned descriptor replacement refuses without stale visibility");
+  held.reset(); Require(tight.PublishMaterialUVProgram(id,11,changed), "released descriptor overlap permits republish");
+  tight.Retire(id); Require(tight.Stats().bytes == 0, "tight descriptor budget returns to zero");
+  registry.Retire(binding.instance); words.clear();
+  Require(pinned->slots[0].rate[0] == .25f && registry.Stats().bytes == bytes,
+      "native descriptors survive source/instance destruction with pinned residency charged");
+  pinned.reset(); Require(registry.Stats().bytes == 0, "last descriptor lease releases accounted storage");
+}
 void TestSourceHandoff() {
   using namespace instance_source;
   constexpr uint32_t visual = 0x10000, container = visual + 2632;
@@ -570,6 +637,7 @@ void TestSkeleton() {
 void TestNativeInstances() {
   TestEyeMaterialOwnership();
   TestMaterialUVBudgets();
+  TestMaterialUVProgramOwnership();
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();
