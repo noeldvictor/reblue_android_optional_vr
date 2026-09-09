@@ -176,6 +176,15 @@ Defaults and the full desktop/both-eye gate are unchanged; no Quest work.
 [Selected-motion residency, runtime evidence and next work](research/20260908_1745_selected-motion-residency.md).
 [Clip math/source contract and regressions](research/20260908_1612_native-animation-clips.md).
 
+**Source-only checkpoint (not yet built/live-qualified):** selected-track sampling
+now feeds controller layers, and a cutscene root-motion hook reuses owned model
+names/rest transforms and the existing clip residency owner. The outgoing
+root-motion record and original cutscene placement remain. All 415 Python
+source/scenario checks pass; C++ behavior fixtures, a host build and fresh
+root-motion/controller regression coverage are pending. The live results above
+still describe host179/run984, not this newer source.
+[Checkpoint and pending verification](research/20260908_2040_selected-animation-checkpoint.md).
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

@@ -106,32 +106,41 @@ public:
 
   bool Sample(float seconds, std::vector<NativeJointChannels> &out) const {
     if (!std::isfinite(seconds)) return false;
-    seconds = std::clamp(seconds,0.0f,duration_);
     std::vector<NativeJointChannels> channels(joints_);
-    for (const auto &track : tracks_) {
-      auto &channel = channels[track.pose_index];
-      const auto *splines = track.splines.get();
-      const bool cubic_translation = splines && splines->translation.active;
-      const bool cubic_rotation = splines && splines->rotation.active;
-      const bool cubic_scale = splines && splines->scale.active;
-      channel.translated = cubic_translation || !track.translation.empty();
-      channel.rotated = cubic_rotation || !track.rotation.empty();
-      channel.scaled = cubic_scale || !track.scale.empty();
-      if (channel.translated) channel.translation = cubic_translation ? SampleSpline(splines->translation,seconds) : SampleCurve(track.translation,seconds,false);
-      if (channel.scaled) channel.scale = cubic_scale ? SampleSpline(splines->scale,seconds) : SampleCurve(track.scale,seconds,false);
-      if (channel.rotated) {
-        auto angles = cubic_rotation ? SampleSpline(splines->rotation,seconds) : SampleCurve(track.rotation,seconds,true);
-        for (auto &angle : angles) angle *= 2*std::numbers::pi_v<float>;
-        const float x=angles[0]*.5f, y=angles[1]*.5f, z=angles[2]*.5f;
-        channel.rotation = MultiplyJointQuaternions(
-            MultiplyJointQuaternions({0,0,std::sin(z),std::cos(z)}, {0,std::sin(y),0,std::cos(y)}),
-            {std::sin(x),0,0,std::cos(x)});
-      }
-      for (float value : channel.translation) if (!std::isfinite(value)) return false;
-      for (float value : channel.scale) if (!std::isfinite(value)) return false;
-      for (float value : channel.rotation) if (!std::isfinite(value)) return false;
-    }
+    for (size_t n=0; n<tracks_.size(); ++n)
+      if (!SampleTrack(n,seconds,channels[tracks_[n].pose_index])) return false;
     out = std::move(channels); return true;
+  }
+
+  // Ordinal in this immutable clip, not a model pose ID. Sparse/model-bound
+  // clips can assign a different pose_index; selected consumers need no full
+  // clip-sized temporary or evaluation of unrelated curves.
+  bool SampleTrack(size_t ordinal, float seconds, NativeJointChannels &out) const {
+    if (ordinal >= tracks_.size() || !std::isfinite(seconds)) return false;
+    seconds=std::clamp(seconds,0.0f,duration_);
+    NativeJointChannels channel;
+    const auto &track=tracks_[ordinal];
+    const auto *splines = track.splines.get();
+    const bool cubic_translation = splines && splines->translation.active;
+    const bool cubic_rotation = splines && splines->rotation.active;
+    const bool cubic_scale = splines && splines->scale.active;
+    channel.translated = cubic_translation || !track.translation.empty();
+    channel.rotated = cubic_rotation || !track.rotation.empty();
+    channel.scaled = cubic_scale || !track.scale.empty();
+    if (channel.translated) channel.translation = cubic_translation ? SampleSpline(splines->translation,seconds) : SampleCurve(track.translation,seconds,false);
+    if (channel.scaled) channel.scale = cubic_scale ? SampleSpline(splines->scale,seconds) : SampleCurve(track.scale,seconds,false);
+    if (channel.rotated) {
+      auto angles = cubic_rotation ? SampleSpline(splines->rotation,seconds) : SampleCurve(track.rotation,seconds,true);
+      for (auto &angle : angles) angle *= 2*std::numbers::pi_v<float>;
+      const float x=angles[0]*.5f, y=angles[1]*.5f, z=angles[2]*.5f;
+      channel.rotation = MultiplyJointQuaternions(
+          MultiplyJointQuaternions({0,0,std::sin(z),std::cos(z)}, {0,std::sin(y),0,std::cos(y)}),
+          {std::sin(x),0,0,std::cos(x)});
+    }
+    for (float value : channel.translation) if (!std::isfinite(value)) return false;
+    for (float value : channel.scale) if (!std::isfinite(value)) return false;
+    for (float value : channel.rotation) if (!std::isfinite(value)) return false;
+    out=channel; return true;
   }
 
 private:

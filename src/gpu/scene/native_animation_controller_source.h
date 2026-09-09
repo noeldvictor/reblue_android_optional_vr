@@ -58,12 +58,11 @@ struct ControllerLayer {
     const auto selected=SelectNativeAnimationNodes(skeleton,root,indexed ? false : subtree,indexed ? NativeAnimationFilter{} : filter);
     if (!selected) return false;
     if (std::abs(weight) < kNativeAnimationWeightEpsilon) return true;
+    if (!std::isfinite(seconds)) return false;
     if (!indexed) {
       std::unordered_set<uint32_t> unique;
       for (auto name : names) if (!unique.insert(name).second) return false;
     }
-    std::vector<NativeJointChannels> sampled;
-    if (!asset.Clip().Sample(seconds,sampled)) return false;
     auto result=reset ? ControllerLayer(channels.size()) : *this;
     for (size_t n=0; n<skeleton.size(); ++n) {
       const auto &joint=skeleton[n]; const auto index=joint.pose_index;
@@ -72,7 +71,9 @@ struct ControllerLayer {
       if (!selected->channels[n]) continue;
       const auto *track=asset.FindTrack(names[index],index);
       if (!track) { if (indexed) return false; continue; }
-      if (!BlendNativeChannels(value,sampled[track->pose_index],joint.blend_rest,weight,value,asset.ChannelMask())) return false;
+      NativeJointChannels sampled;
+      if (!asset.SampleTarget(names[index],index,seconds,sampled) ||
+          !BlendNativeChannels(value,sampled,joint.blend_rest,weight,value,asset.ChannelMask())) return false;
       header.flags=(header.flags&~7u) | (value.translated ? 1u : 0u) | (value.rotated ? 2u : 0u) | (value.scaled ? 4u : 0u);
       if (track->Animated()) header.flags|=128;
     }
@@ -92,6 +93,25 @@ struct ControllerLayer {
     output=std::move(result); return true;
   }
 };
+
+// A root-motion request is one selected joint, not a one-node hierarchy or a
+// whole-body sample. Dense source dispatch uses its FIRST descriptor even when
+// the selected model node has another pose identity; named clips use that name.
+inline std::optional<ControllerLayer> SampleRootMotion(const NativeAnimationAsset &asset,
+    uint32_t name, const NativeSkeletonJoint &joint, float seconds, ControllerLayer previous) {
+  if (!previous.Valid() || previous.channels.size() != 1 || !std::isfinite(seconds)) return {};
+  const auto track_index=asset.Indexed() ? 0u : joint.pose_index;
+  const auto *track=asset.FindTrack(name,track_index);
+  if (!asset.Indexed()) previous.boundary[0].name=name;
+  if (!track) return asset.Indexed() ? std::nullopt : std::optional(std::move(previous));
+  NativeJointChannels sampled;
+  auto &channel=previous.channels[0]; auto &header=previous.boundary[0];
+  if (!asset.SampleTarget(name,track_index,seconds,sampled) ||
+      !BlendNativeChannels(channel,sampled,joint.blend_rest,1,channel,asset.ChannelMask())) return {};
+  header.flags=(header.flags&~7u) | (channel.translated ? 1u : 0u) | (channel.rotated ? 2u : 0u) | (channel.scaled ? 4u : 0u);
+  if (track->Animated()) header.flags|=128;
+  return previous;
+}
 
 struct ControllerExecution {
   ControllerLayer output;

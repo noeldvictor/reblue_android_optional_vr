@@ -54,6 +54,10 @@ public:
     // Import creates one canonical first-match track per authored name.
     return &clip_.Tracks()[target->track];
   }
+  bool SampleTarget(uint32_t name_key, uint32_t joint, float seconds, NativeJointChannels &out) const {
+    const auto *track=FindTrack(name_key,joint);
+    return track && clip_.SampleTrack(size_t(track-clip_.Tracks().data()),seconds,out);
+  }
 private:
   NativeAnimationAsset(NativeAnimationClip clip, std::vector<Target> targets, size_t bytes,
       NativeAnimationBinding binding, uint32_t channel_mask)

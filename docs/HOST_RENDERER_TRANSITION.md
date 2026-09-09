@@ -883,6 +883,18 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    opening event, not interactive/reload/pixel qualification. Untracked writes
    still compare every boundary word; first difference now has bounded provenance.
    Run984 re-verifies canonicalization and supersedes177/983 runtime/build text.
+   **Source-only checkpoint after471b554:** selected-track sampling feeds the
+   native controller layer owner, and root-motion request8218FC98 uses owned
+   model names/rest transforms and selected clip residency. Outgoing48B root
+   data and original cutscene placement remain. All415 Python source/scenario
+   checks pass, but this source has NOT been C++-built or live-qualified.
+   Before qualification, add causal behavior fixtures for selected-vs-whole
+   sampling, indexed first-descriptor root selection, missing targets, dormant
+   payloads and transactional failures; then build and obtain fresh root-motion
+   plus controller/late regression evidence. Host179/run984 remains the last
+   built/live evidence. No queued build/run resumed for the owner's commit/push
+   request; no reduced runtime criteria or changed defaults.
+   [Source checkpoint and exact pending gates](../research/20260908_2040_selected-animation-checkpoint.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

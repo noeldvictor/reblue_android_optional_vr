@@ -32,6 +32,7 @@ REX_EXTERN(__imp__sub_8217C580);
 REX_EXTERN(__imp__bdVisualObjectAnimSlotUpdate);
 REX_EXTERN(__imp__bdAnimationUpdate);
 REX_EXTERN(__imp__sub_822D3CB0);
+REX_EXTERN(__imp__sub_8218FC98);
 REX_EXTERN(__imp__sub_82289888);
 REX_EXTERN(__imp__sub_8228A3E8);
 REX_EXTERN(__imp__sub_82284BE0);
@@ -54,6 +55,7 @@ struct Store {
   uint64_t controller_advancing=0;
   uint64_t late_controllers=0, late_checks=0, late_samples=0, late_reused=0, late_handoffs=0;
   uint64_t slot_publications=0, slot_reused=0, late_refused=0;
+  uint64_t root_requests=0, root_checks=0, root_tracks=0, root_absent=0, root_refused=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -89,6 +91,9 @@ void Report(Store &store) {
     BD_INFO("[native-animation-late] frame {} completed {} checked {} refused {}; samples {} reused {} handoffs {}; slot-published {} slot-reused {}; native layers continue to skeleton; untracked-write guard retained",
         frame,store.late_controllers,store.late_checks,store.late_refused,store.late_samples,
         store.late_reused,store.late_handoffs,store.slot_publications,store.slot_reused);
+  if (store.root_requests || store.root_absent || store.root_refused)
+    BD_INFO("[native-animation-root] frame {} completed {} checked {} tracks {} absent {} refused {}; owned model selection and single-track sampling; outgoing root-motion adapter remains",
+        frame,store.root_requests,store.root_checks,store.root_tracks,store.root_absent,store.root_refused);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -142,11 +147,10 @@ auto TakeCompletedLayer(uint32_t visual, uint32_t graph, uint64_t generation, ui
   }
   return result;
 }
-void PrepareSlot(uint32_t visual, uint32_t slot) {
-  const auto source = animation_source::SelectedSlotSource(visual,slot,Word);
-  if (!source || !*source) return;
+void PrepareClip(uint32_t source) {
+  if (!source) return;
   auto &store = Clips(); std::lock_guard lock(store.mutex);
-  store.assets.Prepare(*source,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
+  store.assets.Prepare(source,FrameStatFrameCount(),[&](uint32_t address,size_t budget) {
     animation_source::ImportTrace trace;
     uint64_t missing_word=0;
     auto asset = animation_source::ReadKeyedAsset(address,budget,[&](uint64_t word) {
@@ -161,6 +165,10 @@ void PrepareSlot(uint32_t visual, uint32_t slot) {
           address,trace.descriptors,trace.unique_names,asset->RetainedBytes());
     return asset;
   });
+}
+void PrepareSlot(uint32_t visual, uint32_t slot) {
+  const auto source=animation_source::SelectedSlotSource(visual,slot,Word);
+  if (source) PrepareClip(*source);
 }
 struct VisualScope {
   uint32_t previous;
@@ -389,6 +397,75 @@ std::optional<uint32_t> SourceNode(uint32_t graph, uint32_t pose, size_t count) 
     if (*child) pending.push_back(*child);
   }
   return {};
+}
+bool RootMotion(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  auto refuse=[&](const char *reason) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (++store.root_refused <= 4) BD_INFO("[native-animation-root-refused] {}; original root-motion request retained",reason);
+    return false;
+  };
+  const auto model=FindLoadedNativeModel(ctx.r4.u32);
+  const auto name=skeleton_source::ReadJointName(0x820702D0,Word);
+  if (!model || model->Skeleton().empty() || !name.Valid() ||
+      !std::ranges::all_of(model->Skeleton(),[](const auto &joint) { return joint.animation_name.Valid(); }))
+    return refuse("owned model/name");
+  const auto joint=std::ranges::find_if(model->Skeleton(),[&](const auto &value) { return value.animation_name.View() == name.View(); });
+  if (joint == model->Skeleton().end()) {
+    if (REXCVAR_GET(bd_native_materials_verify)) {
+      __imp__sub_8218FC98(ctx,base);
+      if (ctx.r3.u32 != 0) throw std::runtime_error("Native root-motion absent-node comparison failed");
+    }
+    ctx.r3.u32=0;
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.root_absent; Report(store); return true;
+  }
+  if (model->AnimationTargets().size() != model->Skeleton().size()) return refuse("owned joint binding");
+  const auto source=Word(uint64_t(ctx.r3.u32)+12);
+  std::shared_ptr<const NativeAnimationAsset> asset;
+  if (source) { auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(*source); }
+  if (!asset) return refuse("selected asset");
+  const auto compression=Word(kSamplerState), exclusions=Word(kSamplerState+4), depth=Word(kSamplerState+24), euler=Word(0x827A7EE4);
+  if (!compression || (asset->Indexed() && *compression) || !exclusions || !depth || !euler || ((*euler>>8)&255) ||
+      Word(0x820551AC) != std::bit_cast<uint32_t>(1.0f) || Word(0x82055230) != 0u) return refuse("sampler state");
+  const uint32_t destination=ctx.r5.u32;
+  if ((destination&3) || !Range(destination,48)) return refuse("root output");
+  std::array<animation_source::ChannelRecord,1> previous;
+  const auto *input=bd::mem::at<const be_u32>(destination);
+  for (size_t w=0; w<12; ++w) previous[0][w]=input[w];
+  ctx.fpscr.disableFlushMode();
+  const auto key=model->AnimationTargets()[joint->pose_index];
+  auto result=animation_source::SampleRootMotion(*asset,key,*joint,float(ctx.f1.f64/30.0),
+      animation_source::ControllerLayer::Decode(previous));
+  if (!result) return refuse("selected track");
+  const auto records=result->Encode();
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    ReferenceScope reference;
+    __imp__sub_8218FC98(ctx,base);
+    bool same=ctx.r3.u32 == 1 && Word(kSamplerState) == (asset->Indexed() ? *compression : 0u) &&
+        Word(kSamplerState+4) == *exclusions && Word(kSamplerState+24) == *depth;
+    size_t first_word=0;
+    for (size_t w=0; w<12; ++w) {
+      const uint32_t expected=input[w], actual=records[0][w];
+      const bool active=(w>=2 && w<5 && (records[0][0]&1)) || (w>=5 && w<9 && (records[0][0]&2)) ||
+          (w>=9 && (records[0][0]&4));
+      const float a=std::bit_cast<float>(actual), b=std::bit_cast<float>(expected);
+      const bool equal=active ? std::isfinite(a) && std::isfinite(b) && std::abs(a-b) <= 1e-4f*std::max(1.0f,std::abs(b)) : actual == expected;
+      if (same && !equal) first_word=w; same &= equal;
+    }
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.root_checks;
+    if (!same) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-root-drift] model {} joint {} word {}; no fallback",model->Generation(),joint->pose_index,first_word);
+      throw std::runtime_error("Native root-motion comparison failed");
+    }
+  }
+  auto *output=bd::mem::at<be_u32>(destination);
+  for (size_t w=0; w<12; ++w) output[w]=records[0][w];
+  if (!asset->Indexed()) bd::mem::store<uint32_t>(kSamplerState,0);
+  ctx.r3.u32=1;
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++store.root_requests; store.root_tracks+=asset->FindTrack(key,asset->Indexed() ? 0u : joint->pose_index) != nullptr; Report(store);
+  return true;
 }
 bool LateLayers(PPCContext &ctx, uint8_t *base) {
   if (!Enabled() || controller_reference) return false;
@@ -722,6 +799,16 @@ REX_HOOK_RAW(bdAnimationUpdate) {
 REX_HOOK_RAW(sub_822D3CB0) {
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
   if (!bd::gpu::scene::animation_bridge::LateLayers(ctx,base)) __imp__sub_822D3CB0(ctx,base);
+}
+REX_HOOK_RAW(sub_8218FC98) {
+  using namespace bd::gpu::scene::animation_bridge;
+  // Actual root-motion selection, not a speculative lookup/catalog sweep.
+  // Preparation obeys the existing residency/lifetime budget before sampling.
+  if (Enabled() && !controller_reference) {
+    const auto source=Word(uint64_t(ctx.r3.u32)+12);
+    if (source) PrepareClip(*source);
+  }
+  if (!RootMotion(ctx,base)) __imp__sub_8218FC98(ctx,base);
 }
 REX_HOOK_RAW(sub_82289888) {
   if (!bd::gpu::scene::animation_bridge::Sample(ctx,base,false)) __imp__sub_82289888(ctx,base);

@@ -68,7 +68,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         registration = self.animation_bridge.split("void Import(", 1)[1].split("thread_local uint32_t slot_graph", 1)[0]
         self.assertIn("store.assets.Register(loading_owner,source)", registration)
         self.assertNotIn("ReadKeyedAsset", registration)
-        slot = self.animation_bridge.split("void PrepareSlot(", 1)[1].split("bool Sample(", 1)[0]
+        slot = self.animation_bridge.split("void PrepareClip(", 1)[1].split("bool Sample(", 1)[0]
         self.assertIn("SelectedSlotSource(visual,slot,Word)", slot)
         self.assertIn("store.assets.Prepare", slot)
         self.assertIn("ReadKeyedAsset(address,budget,", slot)
@@ -76,6 +76,29 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("budget <= entry.failed_budget", self.animation_asset)
         self.assertIn("candidate.resident.use_count() == 1", self.animation_asset)
         self.assertIn("TestSelectedAnimationResidency()", self.animation_test)
+
+    def test_selected_tracks_are_sampled_only_after_node_selection(self):
+        layer = self.controller_source.split("bool Apply(", 1)[1].split("static bool Mix(", 1)[0]
+        self.assertNotIn(".Clip().Sample(", layer)
+        self.assertLess(layer.index("selected->channels[n]"), layer.index("asset.SampleTarget("))
+        self.assertIn("if (!std::isfinite(seconds)) return false;", layer)
+        self.assertIn("clip_.SampleTrack(size_t(track-clip_.Tracks().data())", self.animation_asset)
+        sample = self.animation.split("bool SampleTrack(", 1)[1].split("private:", 1)[0]
+        self.assertIn("ordinal >= tracks_.size()", sample)
+        self.assertLess(sample.index("if (!std::isfinite(value)) return false;"), sample.index("out=channel"))
+
+    def test_root_motion_reuses_owned_model_and_selected_asset_before_publication(self):
+        root = self.animation_bridge.split("bool RootMotion(", 1)[1].split("bool LateLayers(", 1)[0]
+        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "SourceNode(", "bdSceneGraphFindNodeByName"):
+            self.assertNotIn(forbidden, root)
+        self.assertIn("FindLoadedNativeModel(ctx.r4.u32)", root)
+        self.assertIn("animation_name.View() == name.View()", root)
+        self.assertIn("ReferenceScope reference", root)
+        self.assertLess(root.index("SampleRootMotion("), root.index("const auto records="))
+        self.assertLess(root.index("throw std::runtime_error(\"Native root-motion comparison failed\")"), root.index("auto *output="))
+        hook = self.animation_bridge.split("REX_HOOK_RAW(sub_8218FC98)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("PrepareClip(*source)"), hook.index("RootMotion(ctx,base)"))
+        self.assertIn("asset.Indexed() ? 0u : joint.pose_index", self.controller_source)
 
     def test_weighted_subtrees_share_visual_scope_and_preserve_controller_side_effects(self):
         hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
