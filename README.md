@@ -252,20 +252,25 @@ Ready image windows, texture leases and instance-bound image/effect catalogs use
 the existing shared 8 MiB animation residency. Native image and queued-effect
 selectors use owned indices, not linked-list traversal. Bind/append/clear hooks
 preserve first-match ordering and retire lookup before source destruction.
-Host195/source `0defa30` records **2,934 exact image-update comparisons** and
-**13,200 additional owned-image material packets** between two idle-field samples.
-Five catalog bindings served 3,982 lookups; six image imports served 4,293 lookups,
-with no bind/import/late-write failures. Three scratch-preflight refusals remain.
-UV/eye/controller/late regression observations, 427 source/scenario guards,
-connected C++ fixtures and the host build pass. CPU tests cover duplicate/pending
-selection, late writes, typed residency, generation reuse and pinned budgets.
-Exact source-word/GPU-identity comparison still reads the boundary; no speedup
-is inferred from ownership. Next own selected-state/clock inputs and retire
-scratch exports as their remaining consumers move. Procedural/viewer/late writers,
-validation and other outgoing adapters remain. Live
+The last completed catalog/image live check is host195/source `0defa30`:
+**2,934 exact image updates** and **13,200 additional owned-image material packets**
+between idle-field samples, with prior UV/eye/controller/late observations reached.
+Three scratch-preflight refusals remain.
+Newer source `77adb2a` gives instances persistent selected IDs, cue ordinals and
+clocks, shared by effect/controller and image updates. Its 428 source/scenario
+guards, connected C++ fixtures and host197 build pass. The 60-second live run
+recorded 2,034 exact image updates but reached only its first idle-field sample
+before the cap: **live state-reuse qualification remains incomplete**. The prior
+baseline and new partial log are both retained; no unchanged retry is queued.
+CPU tests forbid timeline reads inside both evaluators and cover consecutive
+updates, late writes, generation changes and pinned retirement. Exact source-word/
+GPU-identity guards, active-duration reads and outgoing exports still remain.
+Next migrate image cursors/procedural writers and remaining duration inputs, then
+retire scratch as its last consumers move. Other procedural/viewer/late writers
+and validation remain. Live
 joint-driven UVs, cue transitions and preserved non-eye slots remain unexercised.
 No motion-pixel, reload/stereo, whole-frame or speedup qualification is claimed.
-[Catalog ownership, verification and remaining dependencies](research/20260909_0237_native-image-catalog.md).
+[Material state ownership, verification and remaining dependencies](research/20260909_0300_native-material-timeline.md).
 
 ### How much is left?
 

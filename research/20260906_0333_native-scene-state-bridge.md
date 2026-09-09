@@ -7579,3 +7579,30 @@ Scoped inspection of host root/CMakeFiles since03:04 found only the expected
 single2.60MB bridge object, EXE/PDB and small Ninja/dependency metadata; it does
 not attribute the intervening25.56MB drive-wide drop to this task. Cumulative
 floor unchanged, sufficient guarded reserve; live acceptance still pending.
+
+Source77adb2a pushed. Eight superseded82/79/195/intermediate196 receipts8904B
+logical deleted after replacement,free63507963904->63507976192B,12288Breclaimed.
+Runtime197/PID28972/session28317,03:08:24..03:09:24;preflightdiagnostics78146171B,
+free63507857408B/floor63306530816B;60s/400KiB/192MiB,no captures/perf/cache/dumps.
+All14settings effective and original116Bprofile restored exactly. Hard timeout
+just after first idle context1620; no second idle context/fresh state report,
+so requested live regression/state gate NOT reached(exit1). Last state report
+1619published830/imports17/reads2845/changed0;first idle2034exact imageupdates.
+Positive pre-idle/native-consumer evidence is not stable-idle qualification.
+No unchanged retry; retain catalog195baseline and new197partial separately.
+
+Verified214831B member retained in timeline197ZIP43270B,ZIP SHA256
+5AF0CB60B55E23B4E1CDCCFB6AB64C0CC6FD93FF76EB2BCC67C5436C5688A26A,
+member SHA2568740A849390D7FE7819F122B9CE808BB92CDB8B912B25761EAFD482EE614B967.
+ZIP allocationfree63508467712->63508422656B,45056B. Verified plaintext only
+removed,free63508422656->63508639744B,217088Breclaimed. Total9files223735Blogical
+removed;12288+217088-45056=184320B net180KiBcleanup. No prior cleanup credited.
+Partial retained growth221990B=fixture80793+EXE/PDB99840+newZIP43270-buildlogs1913;
+excludes hostobjects/metadata/source/Git/global activity. Free63508639744B
+(~59.15GiB),27734016Blower than first63536373760B. Buildlogs418777B/212files.
+All producers terminal, owner profile restored, no queued run. Current83/80/197
+receipts retained; no raw/window allowance added. Pending live gate is documented
+in the new timeline report and active queue, not relabelled as a pass.
+Final scoped inventory:diagnostics78189441B; next400KiB overlap leaves44159B
+below75MiB, fresh preflight required.13windowimages10434657B unchanged; no new
+raw/perf/cache/dump output. Free63508168704B before the final documentation push.

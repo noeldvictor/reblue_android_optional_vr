@@ -90,3 +90,51 @@ The original cumulative ledger remains
 [scene-state bridge](20260906_0333_native-scene-state-bridge.md#2026-09-09-native-material-selection-and-clock-afterbf31b73).
 No capture, recook, download or device work requested; preserve catalog195 and
 older unresolved failures until a verified replacement serves the same purpose.
+
+## Live197: connected observations, strict idle gate incomplete
+
+Source77adb2a pushed before launch. Host197/PID28972/session28317 ran03:08:24..
+03:09:24 with the unchanged capture-free MaterialProgram/AnimatedUV/Eye/
+Controller/Late probe. All14settings effective;60s/400KiB/192MiB caps. Startup
+reached loading context720 at03:08:55, later than the previous run. The first
+idle-field context1620 arrived03:09:23.933, immediately before the hard cap.
+No second idle context or subsequent fresh state-producer report was captured.
+The wrapper exited1: requested animation observation **not reached**, not the
+usual successful-observation diagnostic stop. No unchanged retry launched.
+
+Observed state reports, all preceding the first idle marker:
+
+| Frame | Publications | Boundary imports | Reads | Late-write mismatches |
+| --- | ---: | ---: | ---: | ---: |
+| 1019 | 289 | 9 | 512 | 0 |
+| 1319 | 591 | 11 | 1712 | 0 |
+| 1619 | 830 | 17 | 2845 | 0 |
+
+Publications include completed boundary imports and native controller outputs;
+830-17=813native publications were observed. Imports increased during the authored
+opening event, so **stable idle reuse is not proven**. At first idle1620:
+image updates/checks/publications2034,selected2276/held18,owned-key-inputs2294,
+scopes603,composed/primitive material packets26532. Three scratch refusals:
+visual238200D8 slot2,owners25432220/25430F60/25435B60. Exact scratch predicate
+remains unknown. No image comparison exception or logged error/critical occurred.
+
+Earlier1344controller59548exact,7627handoffs/changed0,mixes8/interior7319;late6
+exact/reused/handoffs,refused0. Eye601exact/refused0/**off-center0**;UV1207
+publications/refused0/ownedscroll1204. These are pre-idle observations, **not**
+fresh field, gaze, stable reuse, motion, reload, queued transition or pixel/stereo
+qualification. Preserve catalog195 as the last completed catalog/image/program/
+UV/eye live diagnostic. Full desktop, host-frame and Quest gates remain open.
+
+Original116Bprofile restored exactly,SHA256
+`2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0`.
+Full214831Blog retained in `retained-material-timeline197.zip`43270B;
+ZIP SHA256`5AF0CB60B55E23B4E1CDCCFB6AB64C0CC6FD93FF76EB2BCC67C5436C5688A26A`,
+sole member`reblue_981.log`SHA256
+`8740A849390D7FE7819F122B9CE808BB92CDB8B912B25761EAFD482EE614B967`.
+Member name/size/decompressed hash verified before removing plaintext. Catalog195
+and all older unresolved evidence retained. Retire this partial log only after
+a purposeful connected-change run qualifies the missing state/idle window.
+
+Next: image cursors/procedural writers and active-duration ownership through the
+same owners, then remove scratch as its final consumers migrate. Combine the
+pending live state gate with that connected change rather than repeat this build.

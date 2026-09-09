@@ -1071,9 +1071,20 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    was not logged. Do not retroactively assert193's causes or claim those paths
    native. CPU tests retain tight budgets, type separation, every late-word/GPU
    change and pinned source-retirement; live reload/pixels/stereo remain open.
-   **Next:** own selected-state/clock inputs using the current loader/instance
-   owners and migrate the last scratch consumers. No repeated unchanged boot:
-   positive catalog/key-to-packet consumption and scratch refusal category are known.
+   **Instance-owned selection/clock (source77adb2a,host197/PID28972):** existing
+   instance entries now own IDs, cue ordinals, queue and time/rate; completed
+   binding/request/fallback writers publish, native controllers advance state
+   directly, and both effect/image evaluators consume it without timeline reads.
+   Material83/CPU80/428guards/host197 PASS. Live60s capped just after first idle
+   context1620;2034exact image updates/2294owned-key inputs observed, but no second
+   idle context or subsequent fresh state report. Stable-idle reuse and prior
+   live regression gates are **incomplete**, not passed. Last state report1619:
+   published830/imports17/reads2845/changed0, still before idle marker. Preserve
+   catalog195 passing baseline plus timeline197 partial; no unchanged retry.
+   **Next:** migrate image cursors/procedural writers and remaining active-duration
+   inputs through these same owners, then retire the last scratch consumers.
+   Group the pending state live gate with the next connected change; positive
+   catalog/key-to-packet consumption and scratch refusal category are already known.
    Procedural key updates, allocation-dependent scratch, viewer overrides,
    separate late-image vector, special image writers and transient native-image
    readiness beyond ready-load state remain. Retire descriptor/UV/image/key
@@ -1082,6 +1093,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    [Source contract, connected evidence and retained limitations](../research/20260909_0140_native-material-images.md).
    [Ready image assets, shared lifetime and current evidence](../research/20260909_0208_native-image-animation-assets.md).
    [Bind-owned catalog, both selectors and current live evidence](../research/20260909_0237_native-image-catalog.md).
+   [Native timeline, CPU connection and incomplete live window](../research/20260909_0300_native-material-timeline.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
