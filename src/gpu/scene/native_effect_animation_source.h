@@ -7,6 +7,7 @@
 #include "gpu/scene/native_effect_animation.h"
 #include "gpu/scene/native_material_uv.h"
 #include "gpu/scene/native_material_uv_program.h"
+#include "gpu/scene/native_image_catalog_source.h"
 #include <bit>
 
 namespace bd::gpu::scene::animation_source {
@@ -52,23 +53,13 @@ std::optional<EffectDrivers> ObserveEffectDrivers(uint32_t visual, Read &&read) 
 // Poll states 1..4 can load/allocate/change dependencies. Refuse before polling;
 // the complete original controller must execute once, never a partial replay.
 template<class Read>
-std::optional<uint32_t> ReadReadyEffect(uint32_t catalog, uint32_t id, Read &&read) {
-  if (!catalog || (catalog&3)) return {};
-  auto node=read(uint64_t(catalog)+16);
-  for (size_t visited=0; node && *node && visited<4096; ++visited) {
-    if (*node&3) return {};
-    const auto name=read(uint64_t(*node)+8);
-    if (!name) return {};
-    if (*name == id) {
-      const auto object=read(uint64_t(*node)+16);
-      if (!object || !*object || (*object&3)) return {};
-      const auto state=read(uint64_t(*object)+316);
-      if (!state || (*state >= 1 && *state <= 4)) return {};
-      return int32_t(*state) >= 6 ? *node : 0u; // first terminal match wins, even absent
-    }
-    node=read(uint64_t(*node)+4);
-  }
-  return node && !*node ? std::optional(0u) : std::nullopt;
+std::optional<uint32_t> ReadReadyEffect(const material_image_source::LoadedCatalog &catalog, uint32_t id, Read &&read) {
+  const auto ordinal=catalog.catalog.Cue(id);
+  if (ordinal == UINT32_MAX) return 0u;
+  const auto &entry=catalog.exports[ordinal];
+  const auto state=read(uint64_t(entry.owner)+316);
+  if (!state || (*state >= 1 && *state <= 4)) return {};
+  return int32_t(*state) >= 6 ? entry.node : 0u; // first terminal match wins, even absent
 }
 template<class Read>
 std::optional<double> ReadEffectDuration(uint32_t entry, double scale, Read &&read) {
@@ -124,7 +115,7 @@ struct EffectUpdate {
 template<class Read>
 std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, double duration_scale,
     std::span<const NativeJointChannels> channels, Read &&read, const NativeMaterialUVs *previous=nullptr,
-    const NativeMaterialUVProgram *program=nullptr) {
+    const NativeMaterialUVProgram *program=nullptr, const material_image_source::LoadedCatalog *catalog=nullptr) {
   if (!visual || (visual&3) || uint64_t(visual)+3752 > uint64_t(UINT32_MAX)+1) return {};
   const auto records=read(uint64_t(visual)+3560);
   if (!records) return {};
@@ -150,7 +141,8 @@ std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, do
   result.clock_written=clock.active;
   if (clock.active) timeline[3]=std::bit_cast<uint32_t>(step->time);
   if (step->transition) {
-    const auto a=ReadReadyEffect(visual+2248,timeline[7],read), b=ReadReadyEffect(visual+2248,timeline[8],read);
+    if (!catalog) return {};
+    const auto a=ReadReadyEffect(*catalog,timeline[7],read), b=ReadReadyEffect(*catalog,timeline[8],read);
     if (!a || !b) return {};
     if (*a != timeline[5] || *b != timeline[6]) {
       result.transitioned=true;

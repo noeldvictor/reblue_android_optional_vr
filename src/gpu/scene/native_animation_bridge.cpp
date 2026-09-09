@@ -61,6 +61,8 @@ REX_EXTERN(AnimeData_helper_928);
 REX_EXTERN(__imp__bdD2AnimLoadFile);
 REX_EXTERN(__imp__AnimeData_PollLoadState);
 REX_EXTERN(__imp__sub_821502F0);
+REX_EXTERN(__imp__sub_8218BB10);
+REX_EXTERN(__imp__sub_8218B4D8);
 
 namespace bd::gpu::scene::animation_bridge {
 namespace {
@@ -101,6 +103,7 @@ struct Store {
   uint64_t material_uv_published=0, material_uv_refused=0, effect_owned_offsets=0, eye_preserved=0;
   uint64_t effect_owned_descriptors=0, eye_owned_descriptors=0;
   uint64_t image_registered=0, image_loaded=0, image_reads=0, image_refused=0, image_changed=0;
+  uint64_t catalog_bound=0, catalog_reads=0, catalog_refused=0, catalog_changed=0;
   std::array<EffectObservation,size_t(EffectAdmission::Count)> effect_observations{};
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
@@ -129,6 +132,9 @@ void Report(Store &store) {
       store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic,
       store.registered,store.assets.Size(),store.prepare_refused,store.weighted,store.subtree,store.mixed,store.mix_checks,store.filtered,store.indexed);
   store.frame = frame;
+  if (store.catalog_bound || store.catalog_reads || store.catalog_refused)
+    BD_INFO("[native-image-catalog] frame {} bound {} reads {} refused {} changed {}; shared animation budget; instance-bound image/cue indices, exact late-write guard remains",
+        frame,store.catalog_bound,store.catalog_reads,store.catalog_refused,store.catalog_changed);
   if (store.image_registered || store.image_reads || store.image_refused)
     BD_INFO("[native-image-animation] frame {} registered {} loaded {} reads {} refused {} changed {}; shared animation budget; native windows/leases, exact source guard remains",
         frame,store.image_registered,store.image_loaded,store.image_reads,store.image_refused,store.image_changed);
@@ -1065,7 +1071,9 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   const auto identity=FindNativeVisualIdentity(visual);
   const auto material_program=ReadNativeMaterialUVProgram(visual,model->Generation());
   const auto previous_uv=ReadNativeMaterialUVs(visual,model->Generation());
-  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word,previous_uv.get(),material_program.get());
+  const auto catalog=FindNativeImageCatalog(visual,identity.instance,identity.model_generation,Word);
+  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),
+      result->output.channels,Word,previous_uv.get(),material_program.get(),catalog.get());
   if (!effects) return refuse("effect timeline/UV boundary");
   const auto records=result->output.Encode();
   stage=EffectAdmission::Output;
@@ -1201,6 +1209,33 @@ bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
 } // namespace bd::gpu::scene::animation_bridge
 
 namespace bd::gpu::scene {
+void RetireNativeImageCatalog(uint32_t visual) {
+  auto &store=animation_bridge::Clips(); std::lock_guard lock(store.mutex);
+  store.assets.Invalidate<material_image_source::LoadedCatalog>(visual);
+}
+void BindNativeImageCatalog(uint32_t visual, uint64_t instance, uint64_t generation) {
+  using namespace animation_bridge;
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  store.assets.Invalidate<material_image_source::LoadedCatalog>(visual);
+  if (!Enabled() || !instance || !generation) return;
+  auto catalog=material_image_source::ReadCatalog(visual,instance,generation,store.assets.AvailableAssetBytes(),Word);
+  const bool ready=catalog && store.assets.Publish(visual,visual,std::move(*catalog));
+  ++(ready ? store.catalog_bound : store.catalog_refused);
+}
+std::shared_ptr<const material_image_source::LoadedCatalog> FindNativeImageCatalog(
+    uint32_t visual, uint64_t instance, uint64_t generation,
+    const std::function<std::optional<uint32_t>(uint64_t)> &read) {
+  using namespace animation_bridge;
+  if (!Enabled()) return {};
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  using Asset=material_image_source::LoadedCatalog;
+  auto catalog=store.assets.Find<Asset>(visual);
+  if (catalog && !catalog->Matches(instance,generation,read)) {
+    store.assets.Invalidate<Asset>(visual); ++store.catalog_changed; return {};
+  }
+  store.catalog_reads+=bool(catalog);
+  return catalog; // no per-frame catalog import or revival after a late write
+}
 std::shared_ptr<const material_image_source::LoadedAnimation> FindNativeImageAnimation(
     uint32_t owner, const std::function<std::optional<uint32_t>(uint64_t)> &read) {
   return animation_bridge::PrepareImages(owner,read);
@@ -1234,6 +1269,26 @@ std::optional<RenderMatrix> TakeNativeAnimationPlacementRoot(
 }
 }
 
+REX_HOOK_RAW(sub_8218BB10) {
+  using namespace bd::gpu::scene;
+  const uint32_t container=ctx.r3.u32;
+  const uint32_t visual=container >= 2248 ? container-2248 : 0;
+  RetireNativeImageCatalog(visual);
+  __imp__sub_8218BB10(ctx,base); // parser and viewer append; never hold native locks
+  // During parsing identity may not exist yet; final material binding owns that
+  // import. Viewer replacement reuses only an already established instance.
+  const auto identity=FindNativeVisualIdentity(visual);
+  try { BindNativeImageCatalog(visual,identity.instance,identity.model_generation); }
+  catch (const std::exception &error) {
+    RetireNativeImageCatalog(visual);
+    BD_WARN("[native-image-catalog-bind] {}",error.what());
+  }
+}
+REX_HOOK_RAW(sub_8218B4D8) {
+  const uint32_t container=ctx.r3.u32;
+  bd::gpu::scene::RetireNativeImageCatalog(container >= 2248 ? container-2248 : 0);
+  __imp__sub_8218B4D8(ctx,base); // retire before unlink/destruction of image entries
+}
 REX_HOOK_RAW(bdD2AnimLoadFile) {
   const uint32_t owner=ctx.r3.u32;
   bd::gpu::scene::animation_bridge::RetireImages(owner);

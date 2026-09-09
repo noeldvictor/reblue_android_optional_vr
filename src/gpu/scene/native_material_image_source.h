@@ -7,6 +7,7 @@
 #include "gpu/scene/native_material_images.h"
 #include "gpu/scene/native_material_uv_program.h"
 #include "gpu/scene/native_image_animation_source.h"
+#include "gpu/scene/native_image_catalog_source.h"
 
 namespace bd::gpu::scene {
 namespace material_image_source {
@@ -48,11 +49,11 @@ bool Matches(uint32_t visual, const Binding &binding, const NativeMaterialImages
 }
 template<class Read, class Capture, class Find>
 std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &program, Read source_read,
-    Capture capture, Find find, Trace *trace=nullptr) {
+    Capture capture, Find find, const LoadedCatalog &catalog, Trace *trace=nullptr) {
   auto refuse=[&](Refusal reason)->std::optional<Update> { if (trace) trace->reason=reason; return {}; };
   if (!program.Valid() || !visual || (visual&3) || visual > UINT32_MAX-3567) return {};
   Update result;
-  // A transaction-wide cap includes repeated catalog/window walks. Refuse before
+  // A transaction-wide cap includes the remaining outgoing adapter. Refuse before
   // any guest mutation, allocation callback or publication on malformed cycles.
   size_t reads=0;
   auto read=[&](uint64_t address)->std::optional<uint32_t> {
@@ -82,23 +83,11 @@ std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &pr
     auto image=read(destination);
     if (!image) return {};
     if (slot.image_animation >= 0) {
-      auto catalog=read(uint64_t(visual)+2264);
-      if (!catalog) return {};
-      if (*catalog) {
+      if (!catalog.catalog.entries.empty()) {
         const auto id=read(uint64_t(visual)+2212+(slot.image_animation ? 4 : 0));
         if (!id) return {};
-        uint32_t owner=0;
-        for (size_t visited=0; *catalog; ++visited) {
-          if (visited >= 4096) return {};
-          const auto candidate=read(uint64_t(*catalog)+8), kind=read(uint64_t(*catalog)+12);
-          if (!candidate || !kind) return {};
-          if (*candidate == *id && int32_t(*kind) == slot.image_animation) {
-            const auto value=read(uint64_t(*catalog)+16);
-            if (!value || !*value) return {};
-            owner=*value; break;
-          }
-          catalog=read(uint64_t(*catalog)+4); if (!catalog) return {};
-        }
+        const auto ordinal=catalog.catalog.Image(*id,slot.image_animation);
+        const uint32_t owner=ordinal == UINT32_MAX ? 0 : catalog.exports[ordinal].owner;
         if (owner) {
           if (trace) trace->owner=owner;
           const auto state=read(uint64_t(owner)+316), begin=read(uint64_t(owner)+324), end=read(uint64_t(owner)+328);

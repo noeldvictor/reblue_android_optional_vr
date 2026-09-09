@@ -160,8 +160,10 @@ bool UpdateNativeMaterialImages(PPCContext &ctx, uint8_t *base) {
   size_t reads=0;
   auto source_read=[&](uint64_t address)->std::optional<uint32_t> { return ++reads <= 262144 ? Word(address) : std::nullopt; };
   try {
+    const auto catalog=FindNativeImageCatalog(visual,identity.instance,identity.model_generation,source_read);
+    if (!catalog) { ++stats.image_refused; return false; }
     update=material_image_source::Prepare(visual,*program,source_read,Capture,
-        [&](uint32_t owner) { return FindNativeImageAnimation(owner,source_read); },&trace);
+        [&](uint32_t owner) { return FindNativeImageAnimation(owner,source_read); },*catalog,&trace);
   }
   catch (const std::exception &error) {
     if (++stats.image_refused <= 6) BD_WARN("[native-image-prepare-exception] {}",error.what());

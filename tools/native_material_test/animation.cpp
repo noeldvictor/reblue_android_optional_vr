@@ -1618,37 +1618,53 @@ void TestNativeEffectConsumption() {
   word(visual+2240,20); word(visual+2244,21);
   word(visual+2264,entry); word(entry+8,20); word(entry+4,entry+32);
   word(entry+32+8,21); word(entry+32+16,object+512); word(object+512+316,6); word(entry+32+4,0);
-  auto transition=PrepareEffectUpdate(visual,1,1,{},read);
+  word(visual+2260,2); word(entry+12,1); word(entry+32+12,0);
+  auto catalog=material_image_source::ReadCatalog(visual,1,9,65536,read);
+  Require(catalog.has_value(), "cue catalog bound once before controller transition");
+  auto cue_read=[&](uint64_t address) {
+    Require(address != visual+2260 && address != visual+2264 &&
+        !(address >= entry && address < entry+64 && (address-entry)%32 != 16),
+        "effect selection must not walk source catalog or read authored IDs/kinds");
+    return read(address); // active duration still uses its outgoing entry+16 adapter
+  };
+  auto prepare_cue=[&] { return PrepareEffectUpdate(visual,1,1,{},cue_read,nullptr,nullptr,&*catalog); };
+  auto transition=prepare_cue();
   Require(transition && transition->transitioned && transition->timeline[0] == 20 && transition->timeline[1] == 21 &&
           transition->timeline[2] == 0xFEED && transition->timeline[3] == 0 &&
           transition->timeline[5] == entry && transition->timeline[6] == entry+32 && transition->timeline[7] == 0,
           "ready queued pair restarts both entries/time/rate, preserves loop bits and clears queue");
   word(visual+2236,entry+32);
-  Require(!PrepareEffectUpdate(visual,1,1,{},read),"both active cue durations must be available before a queued comparison");
+  Require(!prepare_cue(),"both active cue durations must be available before a queued comparison");
   scalar(object+512+312,8);
-  transition=PrepareEffectUpdate(visual,1,1,{},read);
+  transition=prepare_cue();
   Require(transition && !transition->transitioned && transition->timeline[0] == 7 && transition->timeline[7] == 20 &&
           transition->timeline[3] == std::bit_cast<uint32_t>(11.0f),"equal entry pair retains old IDs, queue and advanced clock");
   for (uint32_t state : {1u,2u,3u,4u}) {
     word(object+316,state); const auto unchanged=source.words;
-    Require(!ReadReadyEffect(visual+2248,20,read) && !PrepareEffectUpdate(visual,1,1,{},read) && source.words == unchanged,
+    Require(!ReadReadyEffect(*catalog,20,cue_read) && !prepare_cue() && source.words == unchanged,
             "pending first cue refuses without side effects or selecting a later duplicate");
   }
   word(entry+32+8,20);
-  Require(!ReadReadyEffect(visual+2248,20,read),"ready duplicate cannot replace the first pending effect entry");
+  Require(!catalog->Matches(1,9,read), "late cue edit invalidates catalog association");
+  catalog=material_image_source::ReadCatalog(visual,1,9,65536,read);
+  Require(catalog && !ReadReadyEffect(*catalog,20,cue_read),"ready duplicate cannot replace the first pending effect entry");
   word(entry+32+8,21);
+  catalog=material_image_source::ReadCatalog(visual,1,9,65536,read);
+  Require(catalog.has_value(), "explicit rebind restores authored catalog");
   for (uint32_t state : {0u,5u,UINT32_MAX}) {
     word(object+316,state);
-    Require(ReadReadyEffect(visual+2248,20,read) == 0u,"terminal nonready effect is known absent, not a poll or duplicate sweep");
+    Require(ReadReadyEffect(*catalog,20,cue_read) == 0u,"terminal nonready effect is known absent, not a poll or duplicate sweep");
   }
   word(object+316,6);
-  Require(ReadReadyEffect(visual+2248,20,read) == entry && ReadReadyEffect(visual+2248,22,read) == 0u,
+  Require(ReadReadyEffect(*catalog,20,cue_read) == entry && ReadReadyEffect(*catalog,22,cue_read) == 0u,
           "ready first effect and exhausted catalog are distinct known results");
   Require(ReadEffectDuration(entry,2,read) == 20 && ReadEffectDuration(entry,-2,read) == -20,
           "duration truncates to integer/float before existing double scaling");
   scalar(object+312,NAN);
   Require(ReadEffectDuration(entry,1,read) == double(INT32_MIN),"source duration NaN conversion preserves INT_MIN behavior");
-  word(entry+32+4,entry); Require(!ReadReadyEffect(visual+2248,99,read),"cyclic effect catalogs refuse within bounded traversal");
+  word(entry+32+4,entry);
+  Require(!catalog->Matches(1,9,read) && !material_image_source::ReadCatalog(visual,1,9,65536,read),
+      "cyclic effect catalogs invalidate and refuse at bind, not per-frame traversal");
   word(visual+2212,0); word(visual+3564,257);
   Require(!PrepareEffectUpdate(visual,1,1,{},read),"material record count shares the existing 256-record owner bound");
   word(visual+3564,UINT32_MAX);

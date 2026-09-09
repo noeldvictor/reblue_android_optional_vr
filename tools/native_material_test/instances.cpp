@@ -276,6 +276,67 @@ void TestMaterialUVProgramOwnership() {
       "native descriptors survive source/instance destruction with pinned residency charged");
   pinned.reset(); Require(registry.Stats().bytes == 0, "last descriptor lease releases accounted storage");
 }
+void TestNativeImageCatalog() {
+  using Asset=material_image_source::LoadedCatalog;
+  constexpr uint32_t visual=10000, first=20000, owner=30000;
+  std::unordered_map<uint64_t,uint32_t> words;
+  words[visual+2260]=4; words[visual+2264]=first;
+  for (uint32_t n=0; n<4; ++n) {
+    const auto node=first+n*32;
+    words[node+4]=n == 3 ? 0 : node+32;
+    words[node+8]=n == 2 ? 4 : 7;
+    words[node+12]=n == 0 ? 3 : 0;
+    words[node+16]=owner+n*512;
+  }
+  auto read=[&](uint64_t address)->std::optional<uint32_t> {
+    const auto found=words.find(address); return found == words.end() ? std::nullopt : std::optional(found->second);
+  };
+  auto load=[&](size_t budget) { return material_image_source::ReadCatalog(visual,91,12,budget,read); };
+  auto value=load(65536);
+  Require(value && value->catalog.Image(7,3) == 0 && value->catalog.Image(7,0) == 1 &&
+      value->catalog.Cue(7) == 0 && value->catalog.Cue(4) == 2 && value->catalog.Image(4,3) == UINT32_MAX &&
+      value->catalog.Cue(99) == UINT32_MAX, "native catalog preserves distinct image/cue first-match ordering");
+  Require(value->Matches(91,12,read) && !value->Matches(92,12,read) && !value->Matches(91,13,read),
+      "catalog requires exact instance and model generation");
+  const auto payload=value->RetainedBytes();
+  Require(load(payload).has_value() && !load(payload-1), "catalog import accounts actual index/export/guard capacities");
+  for (const auto &word : value->guard) {
+    words[word.address]^=4;
+    Require(!value->Matches(91,12,read), "every catalog late word rejects unchanged ownership");
+    words[word.address]^=4;
+  }
+  NativeAnimationResidency residency(payload+2*NativeAnimationResidency::kEntryBytes);
+  Require(residency.Publish(visual,visual,std::move(*value)) && residency.Register(visual,visual),
+      "catalog and motion reuse one index with disjoint typed keys");
+  Require(!residency.Find(visual) && !residency.Find<material_image_source::LoadedAnimation>(visual),
+      "catalog payload cannot alias motion or image animation at same source address");
+  auto no_asset=[](uint32_t,size_t)->std::optional<NativeAnimationAsset> { return {}; };
+  Require(!residency.Prepare(visual,100,no_asset) && residency.Find<Asset>(visual),
+      "budget pressure cannot evict bind-owned catalog into a per-frame import path");
+  auto pinned=residency.Find<Asset>(visual);
+  residency.Invalidate<Asset>(visual);
+  Require(!residency.Find<Asset>(visual) && residency.Size() == 1 &&
+      residency.Bytes() == payload+2*NativeAnimationResidency::kEntryBytes,
+      "catalog retirement removes lookup but keeps pinned payload charged");
+  auto replacement=load(payload);
+  Require(replacement && !residency.Publish(visual,visual,std::move(*replacement)),
+      "pinned catalog imposes shared rebind backpressure");
+  residency.Retire(visual); words.clear();
+  Require(pinned->catalog.Cue(7) == 0 && pinned->catalog.Image(7,0) == 1 &&
+      residency.Bytes() == payload+NativeAnimationResidency::kEntryBytes,
+      "native catalog selection survives complete source and instance retirement");
+  pinned.reset(); Require(residency.Bytes() == 0, "last catalog lease releases all charged bytes");
+  words[visual+2260]=0; words[visual+2264]=0;
+  Require(load(65536).has_value(), "empty catalog is a known native selection result");
+  words[visual+2264]=first;
+  Require(!load(65536), "catalog head/count mismatch refuses before publication");
+  words[visual+2260]=4097;
+  Require(!load(65536), "catalog entry bound enforced before allocation");
+  words[visual+2260]=1; words[first+4]=first; words[first+8]=7; words[first+12]=0; words[first+16]=owner;
+  Require(!load(65536), "catalog cycle refuses at binding");
+  words[first+4]=0; words[first+16]=UINT32_MAX-3;
+  Require(!load(65536), "catalog owner extent must cover readiness adapter");
+}
 void TestMaterialImageOwnership() {
   Require(NativeImageWindowActive({2,3,5,0,false},2) == true &&
       NativeImageWindowActive({2,3,5,0,false},5) == true &&
@@ -292,6 +353,7 @@ void TestMaterialImageOwnership() {
   for (uint32_t n=0; n<3752; n+=4) words[visual+n]=0;
   for (uint32_t n=0; n<4*152; n+=4) words[table+n]=0;
   words[visual+3560]=table; words[visual+3564]=4; words[visual+2264]=catalog;
+  words[visual+2260]=1;
   words[visual+2212]=7; words[visual+2216]=8; words[visual+2224]=std::bit_cast<uint32_t>(4.75f);
   words[catalog+4]=0; words[catalog+8]=7; words[catalog+12]=0; words[catalog+16]=owner;
   words[owner+316]=6; words[owner+80]=windows; words[owner+84]=windows+8;
@@ -328,6 +390,8 @@ void TestMaterialImageOwnership() {
   auto bound=material_uv_source::ReadProgram(visual,read);
   Require(bound.has_value(), "bind image enable/animation slot alongside UV descriptors");
   auto producer_read=[&](uint64_t address) {
+    if (address == visual+2260 || address == visual+2264 || (address >= catalog && address < catalog+20))
+      throw std::runtime_error("image selection walked source catalog");
     if (address >= table && address < table+4*152 && (address-table)%152 != 84)
       throw std::runtime_error("image producer reimported bind-owned descriptors");
     if (address == owner+80 || address == owner+84 || (address >= windows && address < windows+8) ||
@@ -352,8 +416,10 @@ void TestMaterialImageOwnership() {
   Require(ready && !residency.Find(owner) && residency.Bytes() == loaded_bytes,
       "typed image asset cannot be mistaken for motion; exact payload and guard accounting");
   captures=0;
+  const auto owned_catalog=material_image_source::ReadCatalog(visual,1,11,65536,read);
+  Require(owned_catalog.has_value(), "catalog imported at binding before image selection");
   auto update=material_image_source::Prepare(visual,bound->program,producer_read,capture,
-      [&](uint32_t address) { return address == owner ? ready : nullptr; });
+      [&](uint32_t address) { return address == owner ? ready : nullptr; },*owned_catalog);
   Require(update && update->selected == 2 && update->held == 0 && update->owned_keys == 2 && captures == 1 && words[cache] == 34000 &&
       words[table+84] == 43000, "complete immutable image transaction before source mutation");
   Require(update->images.entries[0].image.image == b && update->images.entries[1].image.image == c &&
@@ -363,11 +429,13 @@ void TestMaterialImageOwnership() {
   // imports an unregistered, changed or retired asset.
   material_image_source::Trace trace;
   auto prepare=[&](uint32_t visual_address,const NativeMaterialUVProgram &program,auto reader,auto image_capture) {
+    auto catalog_value=material_image_source::ReadCatalog(visual_address,1,11,65536,read);
+    if (!catalog_value) return std::optional<material_image_source::Update>{};
     auto value=material_image_source::ReadAnimation(owner,NativeAnimationResidency::kMaxBytes,read,image_capture);
     auto asset=value ? std::make_shared<const Asset>(std::move(*value)) : nullptr;
     captures=0;
     return material_image_source::Prepare(visual_address,program,reader,image_capture,
-        [&](uint32_t address)->std::shared_ptr<const Asset> { return address == owner ? asset : nullptr; },&trace);
+        [&](uint32_t address)->std::shared_ptr<const Asset> { return address == owner ? asset : nullptr; },*catalog_value,&trace);
   };
   auto write=[&](uint32_t address,uint32_t value) { words[address]=value; };
   update->Publish(write);
@@ -880,7 +948,7 @@ void TestNativeInstances() {
   TestEyeMaterialOwnership();
   TestMaterialUVBudgets();
   TestMaterialUVProgramOwnership();
-  TestMaterialImageOwnership();
+  TestNativeImageCatalog(); TestMaterialImageOwnership();
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();

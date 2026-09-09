@@ -195,6 +195,7 @@ void PublishEvaluatedPose(const SkeletonEvaluationScope &scope) {
 }
 void Retire(uint32_t visual) {
   RetireNativeAnimationChannels(visual);
+  RetireNativeImageCatalog(visual);
   auto &store = Instances();
   std::lock_guard lock(store.mutex);
   if (const auto it = store.sources.find(visual); it != store.sources.end()) {
@@ -206,6 +207,7 @@ instance_source::Binding *EnsureInstance(Store &store, uint32_t visual, const Na
   const auto generation = model ? model->Generation() : 0;
   auto it = store.sources.find(visual);
   if (it != store.sources.end() && it->second.model_generation != generation) {
+    RetireNativeImageCatalog(visual);
     store.instances.Retire(it->second.instance);
     store.sources.erase(it); it = store.sources.end();
   }
@@ -239,6 +241,7 @@ void Attach(uint32_t visual) {
   Report(store);
 }
 void BeginMaterialBinding(uint32_t visual) {
+  RetireNativeImageCatalog(visual);
   auto &store=Instances(); std::lock_guard lock(store.mutex);
   if (const auto it=store.sources.find(visual); it != store.sources.end()) {
     store.instances.InvalidateMaterialUVProgram(it->second.instance);
@@ -259,6 +262,9 @@ void BindMaterialProgram(uint32_t visual) {
     ++store.material_program_refused; Report(store); return;
   }
   binding->material_program=publication->binding;
+  // Lock order is instance -> animation; catalog lookup never calls back into
+  // the instance registry while holding the animation store lock.
+  BindNativeImageCatalog(visual,binding->instance,binding->model_generation);
   ++store.material_program_published; Report(store);
 }
 void Handoff(uint32_t container) {

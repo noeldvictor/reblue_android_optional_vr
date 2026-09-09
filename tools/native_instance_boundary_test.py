@@ -48,11 +48,43 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("sizeof(instance_source::Binding)+512 <= NativeInstanceRegistry::kEntryBytes", self.bridge)
         for forbidden in ("PPCContext", "bd::mem", "REX_", "unordered_map", "uint32_t table", "source_read"):
             self.assertNotIn(forbidden, images)
-        for guard in ("262144", "visited >= 4096", "writes.size() >= 768", ".procedural", "*capacity-*begin < 4"):
+        for guard in ("262144", "writes.size() >= 768", ".procedural", "*capacity-*begin < 4"):
             self.assertIn(guard, image_source)
         for case in ("TestMaterialImageOwnership", "native material recaptured source texture",
                      "material reimported image pointer or descriptor", "pinned replacement charged",
                      "procedural selected key refuses", "no active key preserves cached selection"):
+            self.assertIn(case, fixture)
+
+    def test_bind_catalog_connects_both_selectors_and_existing_lifetime(self):
+        root = Path(__file__).resolve().parents[1]
+        native = (root / "src/gpu/scene/native_image_catalog.h").read_text(encoding="utf-8")
+        source = (root / "src/gpu/scene/native_image_catalog_source.h").read_text(encoding="utf-8")
+        material = (root / "src/gpu/scene/native_material_image_source.h").read_text(encoding="utf-8")
+        runtime = (root / "src/gpu/scene/native_material_texture_bridge.cpp").read_text(encoding="utf-8")
+        fixture = (root / "tools/native_material_test/instances.cpp").read_text(encoding="utf-8")
+        for forbidden in ("PPCContext", "source_read", "uint32_t owner", "uint32_t node", "bd::mem", "unordered_map"):
+            self.assertNotIn(forbidden, native)
+        self.assertIn("*count > 4096", source)
+        self.assertIn("if (node) return {}", source)
+        self.assertIn("generation != model_generation", source)
+        self.assertIn("catalog.catalog.Image(*id,slot.image_animation)", material)
+        self.assertIn("catalog.catalog.Cue(id)", self.effect_source)
+        self.assertNotIn("visual)+2264", material)
+        ready = self.effect_source.split("ReadReadyEffect(", 1)[1].split("ReadEffectDuration(", 1)[0]
+        self.assertNotIn("+16", ready)
+        self.assertIn("FindNativeImageCatalog(visual,identity.instance,identity.model_generation,source_read)", runtime)
+        self.assertIn("material_program.get(),catalog.get()", self.animation_bridge)
+        lookup = self.animation_bridge.split("FindNativeImageCatalog(\n", 1)[1].split("FindNativeImageAnimation(", 1)[0]
+        self.assertNotIn("ReadCatalog(", lookup)
+        self.assertIn("catalog->Matches(instance,generation,read)", lookup)
+        self.assertIn("BindNativeImageCatalog(visual,binding->instance,binding->model_generation)", self.bridge)
+        for name in ("sub_8218BB10", "sub_8218B4D8"):
+            hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
+            self.assertLess(hook.index("RetireNativeImageCatalog"), hook.index(f"__imp__{name}"))
+        self.assertIn("candidate.evictable", self.animation_asset)
+        for case in ("image selection walked source catalog", "distinct image/cue first-match ordering",
+                     "every catalog late word", "pinned catalog imposes shared rebind backpressure",
+                     "catalog selection survives complete source", "catalog cycle refuses at binding"):
             self.assertIn(case, fixture)
 
     def test_ready_image_assets_feed_materials_through_existing_typed_residency(self):
@@ -211,7 +243,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
 
     def test_effects_consume_owned_channels_before_skeleton_and_material_publication(self):
         controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
-        self.assertIn("result->output.channels,Word,previous_uv.get(),material_program.get())", controller)
+        self.assertIn("result->output.channels,Word,previous_uv.get(),material_program.get(),catalog.get())", controller)
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("__imp__bdAnimationUpdate"))
         self.assertLess(controller.index("effects->Matches(Word)"), controller.index("auto *destination="))
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("completed_controller.Publish("))

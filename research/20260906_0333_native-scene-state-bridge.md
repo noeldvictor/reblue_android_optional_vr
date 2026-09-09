@@ -7501,3 +7501,25 @@ image-assets194 retained; all producers terminal. No new raw/budget exception.
 Final scoped inventory:diagnostics78147968B; next400KiB log overlap leaves85632B
 below75MiB (fresh preflight required).13windowimages10434657B unchanged; no raw/
 perf/cache/dump files created by194. Free63540957184B before the final docs push.
+
+### 2026-09-09 bind-owned image/cue catalog after095918a
+
+Push-only turn made no renderer changes. Continued connected catalog ownership:
+bind/append -> existing typed animation residency -> material-image and queued-cue
+selectors -> clear/rebind/instance-generation retirement. Source associations and
+clock/scratch exports remain explicit.427 Python guards pass0.225s (one old exact
+call-string guard updated for the new catalog argument; no behavior gate relaxed).
+First measured free63538749440B; prebuild63538348032B. No build/game jobs live.
+Existing fixture11735092B/43files,EXE1666560B;host EXE49443328B/PDB114343936B;
+buildlogs420690B/212files. Same62509998080B cumulative floor/3GiB exception,
+diagnostics/raw limits and protected evidence; no reset. Reuse material82/CPU79/
+host195 with300s/64/8/192MiB producer free-drop caps. Fixture peak<16MiB,
+host<192MiB; no guest/shader rebuild, captures, recook or device work. Retain
+81/78/194 and image-assets194ZIP until their verification purpose is replaced.
+Runtime acceptance remains pending; existing logs do not qualify new catalog code.
+
+Material82/PID32584/session32938 build0;CPU79/PID33636 PASS0.11s/CTest0.13s.
+Fixture1701888B/tree11892269B (+157177B). Host195/PID35132/session42600 build0,
+link14/17,codegen0writes/no guest objects/shaders. EXE49464320B/PDB114561024B
+(+238080B),SHA2567E4FDE836A36D2F4D35F108CD53B6C5E3C82D349533D359B0F5AF21AA7A90F1B.
+Banner095918adirty, live pending. Postbuild measured free63536758784B.

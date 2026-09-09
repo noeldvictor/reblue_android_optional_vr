@@ -11,7 +11,7 @@
 #include <unordered_set>
 
 namespace bd::gpu::scene {
-namespace material_image_source { struct LoadedAnimation; }
+namespace material_image_source { struct LoadedAnimation; struct LoadedCatalog; }
 enum class NativeAnimationBinding { Name, Joint };
 // Stable authored name keys are import-time asset associations, not addresses.
 // The numeric track ordinal selects the same immutable clip sampler used by
@@ -100,7 +100,8 @@ public:
   bool Register(uint32_t owner, uint32_t source) {
     Invalidate<Asset>(source);
     if (!owner || !source || entries_.size() >= maximum_clips_ || RemainingBytes() < kEntryBytes) return false;
-    entries_.emplace(Key<Asset>(source),Entry{owner,std::make_shared<Charge>(accounting_,kEntryBytes)});
+    entries_.emplace(Key<Asset>(source),Entry{owner,std::make_shared<Charge>(accounting_,kEntryBytes),{},0,0,false,
+        !std::is_same_v<Asset,material_image_source::LoadedCatalog>});
     return true;
   }
   template<class Asset = NativeAnimationAsset>
@@ -136,7 +137,7 @@ public:
     // Keep this and the two preceding frames' selections, plus every lease.
     // Evict only dormant payloads; their loader registration remains bounded.
     for (auto &[key,candidate] : entries_) {
-      if (key != Key<Asset>(source) && candidate.resident && candidate.resident.use_count() == 1 &&
+      if (key != Key<Asset>(source) && candidate.evictable && candidate.resident && candidate.resident.use_count() == 1 &&
           uint32_t(frame-candidate.last_frame) > 2) candidate.resident.reset();
     }
     return attempt();
@@ -151,8 +152,11 @@ private:
   // One existing index and budget; disjoint typed keys prevent a motion source
   // and an image-loader object at the same numeric address from aliasing.
   template<class Asset> static uint64_t Key(uint32_t source) {
-    static_assert(std::is_same_v<Asset,NativeAnimationAsset> || std::is_same_v<Asset,material_image_source::LoadedAnimation>);
-    return uint64_t(!std::is_same_v<Asset,NativeAnimationAsset>)<<32 | source;
+    static_assert(std::is_same_v<Asset,NativeAnimationAsset> || std::is_same_v<Asset,material_image_source::LoadedAnimation> ||
+        std::is_same_v<Asset,material_image_source::LoadedCatalog>);
+    constexpr uint64_t kind=std::is_same_v<Asset,NativeAnimationAsset> ? 0 :
+        std::is_same_v<Asset,material_image_source::LoadedAnimation> ? 1 : 2;
+    return kind<<32 | source;
   }
   struct Accounting { std::atomic<size_t> bytes{0}; };
   struct Charge {
@@ -181,6 +185,9 @@ private:
     uint32_t last_frame = 0;
     size_t failed_budget = 0;
     bool attempted = false;
+    // Bind-owned catalogs cannot be reimported by a per-frame lookup. They stay
+    // charged until explicit rebind/retirement, within the same fixed budget.
+    bool evictable = true;
   };
   size_t RemainingBytes() const { const auto bytes=Bytes(); return bytes >= maximum_bytes_ ? 0 : maximum_bytes_-bytes; }
   size_t maximum_bytes_, maximum_clips_;
