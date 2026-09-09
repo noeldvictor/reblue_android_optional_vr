@@ -36,6 +36,7 @@ template <class Image> struct MaterialTextureOverride {
   std::optional<std::array<float, 2>> uv;
   bool replaces_image = false;
   MaterialImageSelection<Image> image;
+  bool native_eye = false;
 };
 template <class Image> struct MaterialTextureInputs {
   std::array<float, 4> initial_uv{}, reset_uv{};
@@ -52,6 +53,7 @@ template <class Image> struct MaterialTextureValues {
   uint16_t image_mask = 0;
   std::array<float, 4> uv{}, secondary_uv{};
   bool owns_uv = false;
+  uint8_t native_eye_uv_mask = 0; // provenance of the offsets actually selected
   std::array<std::array<float,4>,3> colours{{{1,1,1,1},{1,1,1,1},{1,1,1,1}}};
   bool operator==(const MaterialTextureValues &) const = default;
 };
@@ -108,6 +110,8 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
               if (step.channel < 2) {
                 for (size_t c = 0; c < 2; ++c) state.uv[step.channel * 2 + c] = (*entry.uv)[c];
                 uv_overridden[step.channel] = true;
+                const uint8_t bit=uint8_t(1u << step.channel);
+                state.native_eye_uv_mask=(state.native_eye_uv_mask & ~bit) | (entry.native_eye ? bit : 0);
               }
               uv_match = true;
               break; // even this record's image is skipped
@@ -117,6 +121,7 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
           if (step.channel < 2 && !uv_match && uv_overridden[step.channel]) {
             for (size_t c = 0; c < 2; ++c) state.uv[step.channel * 2 + c] = inputs.reset_uv[step.channel * 2 + c];
             uv_overridden[step.channel] = false;
+            state.native_eye_uv_mask &= ~uint8_t(1u << step.channel);
           }
         }
         if (!early_image && shadow_phase && (step.channel != 0 || !step.shadow_alpha)) {

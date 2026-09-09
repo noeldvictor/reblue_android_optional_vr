@@ -31,6 +31,7 @@ REXCVAR_DEFINE_BOOL(bd_native_instances, true, kCvarGroup,
 REXCVAR_DEFINE_BOOL(bd_native_skeleton, false, kCvarGroup,
     "Host evaluation of load-owned ordinary skinned skeletons. Pending desktop qualification; native_materials_verify compares the original.");
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
+REXCVAR_DECLARE(bool, bd_native_animation);
 REXCVAR_DECLARE(bool, bd_native_rigid_scene);
 REXCVAR_DECLARE(bool, bd_native_rigid_shadow);
 REXCVAR_DECLARE(bool, bd_host_walk);
@@ -57,6 +58,7 @@ struct Store {
   std::unordered_map<uint32_t, instance_source::Binding> sources;
   uint64_t imports = 0, refused = 0, reads = 0, unavailable = 0, checked = 0, wrong = 0;
   uint64_t handoffs = 0, handoff_missing = 0;
+  uint64_t eye_published=0, eye_reads=0, eye_changed=0;
   uint64_t skeleton_updates = 0, skeleton_published = 0, skeleton_unavailable = 0, skeleton_checks = 0, skeleton_wrong = 0;
   std::array<uint64_t, size_t(SkeletonMissing::Count)> skeleton_missing{};
   uint32_t miss_examples = 0;
@@ -95,6 +97,9 @@ void Report(Store &store) {
     BD_INFO("[native-skeleton] frame {} evaluated {} update poses {} unavailable {}; checked {} wrong {}; ordinary skinned hierarchy, curve/late-writer/copy adapters remain",
         frame, store.skeleton_updates, store.skeleton_published, store.skeleton_unavailable, store.skeleton_checks, store.skeleton_wrong);
   store.frame = frame;
+  if (store.eye_published)
+    BD_INFO("[native-eye-owner] frame {} published {} reads {} changed {}; generation-owned material UV; outgoing late-write guard remains",
+        frame,store.eye_published,store.eye_reads,store.eye_changed);
 }
 struct SkeletonEvaluationScope;
 thread_local SkeletonEvaluationScope *active_skeleton_evaluation = nullptr;
@@ -262,6 +267,34 @@ NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual) {
   const auto it = store.sources.find(visual);
   return it == store.sources.end() ? NativeVisualIdentity{} :
       NativeVisualIdentity{it->second.instance, it->second.model_generation};
+}
+bool PublishNativeEyeMaterial(uint32_t visual, NativeVisualIdentity identity,
+    uint32_t table, uint32_t count, const NativeEyeMaterial &material) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end() || it->second.instance != identity.instance ||
+      it->second.model_generation != identity.model_generation) return false;
+  it->second.eye={};
+  if (!store.instances.PublishEye(identity.instance,identity.model_generation,material)) return false;
+  it->second.eye={table,count}; ++store.eye_published;
+  return true;
+}
+void InvalidateNativeEyeMaterial(uint32_t visual) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  if (const auto it=store.sources.find(visual); it != store.sources.end()) {
+    store.instances.InvalidateEye(it->second.instance); it->second.eye={};
+  }
+}
+std::optional<NativeEyeMaterial> ReadNativeEyeMaterial(uint32_t visual, uint64_t generation) {
+  if (!REXCVAR_GET(bd_native_instances) || !REXCVAR_GET(bd_native_animation) || !REXCVAR_GET(bd_native_skeleton)) {
+    InvalidateNativeEyeMaterial(visual); return {};
+  }
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end() || !it->second.eye.table) return {};
+  auto material=instance_source::ReadEye(store.instances,it->second,visual,generation,Word);
+  ++(material ? store.eye_reads : store.eye_changed);
+  return material;
 }
 namespace {
 thread_local NativeVisualInputScope *active_visual_inputs = nullptr;

@@ -86,6 +86,7 @@ struct Stats {
   uint64_t scopes = 0, unsupported = 0, refused = 0, override_scopes = 0;
   uint64_t meshes = 0, reads = 0, missing = 0, checked = 0, wrong = 0;
   uint64_t draws = 0, images = 0, uv = 0;
+  uint64_t eye_scopes=0, eye_values=0, eye_replay_reads=0, eye_packets=0;
   size_t peak_bytes = 0;
 };
 thread_local Stats stats;
@@ -144,7 +145,9 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     if (!visual || !graph || !*graph || !table || !phase || *phase > 1 ||
         !selected || *selected != *table || !offset || !fallback || !render_view) { ++stats.unsupported; return; }
     if (*phase == 1 && (!NativeRigidShadowEnabled() || *render_view != 1)) return;
-    auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture);
+    const auto model=FindLoadedNativeModel(*graph);
+    const auto eye=ReadNativeEyeMaterial(*visual,model ? model->Generation() : 0);
+    auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture, eye ? &*eye : nullptr);
     static uint32_t water_scope_examples = 0;
     if (*render_view == 3 && IsDeferredWaterResource(*visual,Word) && water_scope_examples < 3) {
       ++water_scope_examples;
@@ -154,7 +157,7 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     }
     if (!inputs) { ++stats.unsupported; return; }
     auto publication = std::make_unique<NativeObjectTextureState>();
-    publication->model = FindLoadedNativeModel(*graph);
+    publication->model = model;
     publication->generation = publication->model ? publication->model->Generation() : 0;
     if (pose && pose->model == publication->model) publication->pose = std::move(pose);
     if (*phase == 0) {
@@ -200,6 +203,7 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     owned_ = std::move(publication); current = owned_.get();
     object_stats.publications += current->object.has_value();
     ++stats.scopes;
+    stats.eye_scopes+=eye.has_value() && !current->inputs.skip_overrides;
   } catch (const std::exception &error) {
     ++stats.refused;
     if (stats.refused <= 3) BD_WARN("[native-material-textures] publication refused: {}", error.what());
@@ -355,6 +359,7 @@ NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialPro
     };
     if (!ComposeMaterialTextures(std::span(program.texture_assignments), std::span(program.ranges),
         scope->inputs, lookup, mesh.values, 4096, scope->shadow_phase)) { ++stats.refused; return nullptr; }
+    for (const auto &value : mesh.values) stats.eye_values+=value.native_eye_uv_mask != 0;
     if (scope->policy_inputs) {
       auto classify = [&](const PrimitivePolicyStep &step) {
         bool early_image = false;
@@ -507,6 +512,7 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
       FindNativeLightingPass(scope->render_view), FindNativeSamplerFilters(scope->render_view),
       FindNativePassCamera(scope->render_view),scope->toon);
   object_stats.packets += result.has_value();
+  stats.eye_packets+=result.has_value() && mesh->values[primitive].native_eye_uv_mask != 0;
   return result;
 }
 
@@ -550,6 +556,7 @@ const NativeMaterialTextureValues *FindNativeMaterialTextures(
     found = &value;
   }
   ++(found ? stats.reads : stats.missing);
+  stats.eye_replay_reads+=found && found->native_eye_uv_mask != 0;
   return found;
 }
 std::optional<NativePrimitivePolicy> FindNativePrimitivePolicy(
@@ -649,6 +656,8 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  BD_INFO("[native-eye-material] frame {} scopes {} composed {} replay-reads {} packets {}; owned eye UV selected by native material recipes, not a draw/pixel count",
+      FrameStatFrameCount(),stats.eye_scopes,stats.eye_values,stats.eye_replay_reads,stats.eye_packets);
   BD_INFO("[native-material-sampler] {} checks wrong {}; {} owned-input draws; ordinary 2D recipes; cube/volume/inherited axes and direct submission pending",
       sampler_checked, sampler_wrong, sampler_draws);
   BD_INFO("[native-material-feature] {} checks wrong {}; {} owned-input draws; ordinary material/pass switches; direct submission pending",

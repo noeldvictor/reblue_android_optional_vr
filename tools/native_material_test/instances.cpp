@@ -2,6 +2,7 @@
 #include "gpu/scene/native_instance_source.h"
 #include "gpu/scene/native_object_primitive.h"
 #include "gpu/scene/native_skeleton_source.h"
+#include "gpu/scene/native_material_texture_source.h"
 #include <barrier>
 #include <iostream>
 #include <limits>
@@ -19,6 +20,127 @@ RenderMatrix World(float x) {
   RenderMatrix m{};
   m[0] = m[5] = m[10] = m[15] = 1; m[12] = x;
   return m;
+}
+void TestEyeMaterialOwnership() {
+  NativeEyeControl control{{.5f,-.5f},{.4f,.6f},{.1f,.2f},{.9f,.8f}};
+  const auto values=EvaluateNativeEyeUV(control);
+  Require(values && std::abs((*values)[0][0]-.25f)<1e-7f &&
+      std::abs((*values)[1][0]-.65f)<1e-7f && std::abs((*values)[0][1]-.4f)<1e-7f &&
+      (*values)[0][1] == (*values)[1][1], "asymmetric authored limits and mirrored horizontal gaze");
+  control.gaze={-2,2};
+  const auto extrapolated=EvaluateNativeEyeUV(control);
+  Require(extrapolated && (*extrapolated)[0][0]>control.maximum[0] &&
+      (*extrapolated)[1][0]<control.minimum[0], "authored gaze is not clamped");
+  control.gaze={-0.0f,0.0f};
+  Require(EvaluateNativeEyeUV(control)->at(0) == control.origin, "signed zero uses origin");
+  control.gaze[0]=std::numeric_limits<float>::infinity();
+  Require(!EvaluateNativeEyeUV(control), "nonfinite gaze refuses complete publication");
+  control.gaze={1,1}; control.origin[0]=-std::numeric_limits<float>::max();
+  control.maximum[0]=std::numeric_limits<float>::max();
+  Require(!EvaluateNativeEyeUV(control), "overflowing rounded extent is not published");
+
+  constexpr uint32_t visual=0x10000, table=0x20000, gaze=0x30000;
+  std::unordered_map<uint64_t,uint32_t> words{
+      {visual+3560,table},{visual+3564,3},{visual+3000,0},{visual+3128,0},
+      {visual+3440,1},{visual+3572,0},{visual+3680,0},{visual+3712,~0u}};
+  const auto number=[&](uint64_t address,float value) { words[address]=std::bit_cast<uint32_t>(value); };
+  const auto read=[&](uint64_t address)->std::optional<uint32_t> {
+    if ((address & 3) || address>UINT32_MAX-3) return {};
+    const auto it=words.find(address); return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  for (uint32_t axis=0; axis<2; ++axis) {
+    number(gaze+axis*4,axis == 0 ? .5f : -.5f);
+    number(table+60+axis*4,0); number(table+68+axis*4,1); number(table+76+axis*4,.5f);
+  }
+  for (uint32_t n=0; n<4; ++n) number(visual+3444+n*4,0);
+  for (uint32_t i=0; i<3; ++i) {
+    const uint64_t record=table+i*152;
+    words[record+4]=i+1; words[record+8]=0; words[record+20]=i<2 ? 2 : 1;
+    words[record+24]=0; number(record+28,9); number(record+32,8);
+  }
+  auto publication=eye_source::ReadEyeControl(visual,gaze,read);
+  Require(publication && publication->material.count == 2 && publication->binding.count == 3 &&
+      publication->output[0] == std::array<float,2>{.25f,.25f} &&
+      publication->output[1] == std::array<float,2>{.75f,.25f},
+      "first record's limits drive both eyes; third record is not an eye output");
+  NativeInstanceRegistry registry;
+  instance_source::Binding binding{registry.Create(4),4,{}};
+  const auto resident=registry.Stats().bytes;
+  auto publish=[&] {
+    binding.eye=publication->binding;
+    return registry.PublishEye(binding.instance,4,publication->material);
+  };
+  auto copy=[&] {
+    for (uint32_t i=0; i<publication->material.count; ++i)
+      for (uint32_t axis=0; axis<2; ++axis) number(table+i*152+28+axis*4,publication->output[i][axis]);
+  };
+  Require(publish() && !instance_source::ReadEye(registry,binding,visual,4,read),
+      "producer cannot expose UVs before the actual caller copy");
+  copy();
+  Require(!instance_source::ReadEye(registry,binding,visual,4,read), "invalidated output never resurrects from matching bytes");
+  Require(publish(), "republish after incomplete caller");
+  const auto owned=instance_source::ReadEye(registry,binding,visual,4,read);
+  Require(owned && registry.Stats().bytes == resident, "eye snapshots reuse fixed entry budget without heap residency");
+  auto input_read=[&](uint64_t address) {
+    for (uint32_t i=0; i<2; ++i)
+      Require(address != table+i*152+28 && address != table+i*152+32, "native consumer must not reimport exported eye UV");
+    return read(address);
+  };
+  auto capture=[](uint32_t image) { return MaterialImageSelection<uint32_t>{MaterialImageAction::Bind,image}; };
+  const auto inputs=ReadMaterialTextureInputs<uint32_t>(visual,input_read,capture,&*owned);
+  Require(inputs && inputs->overrides.size() == 3 && inputs->overrides[0].native_eye &&
+      inputs->overrides[1].native_eye && !inputs->overrides[2].native_eye, "only producer-owned slots bypass UV imports");
+  std::array<MaterialImageAssignment,4> assignments{{{MaterialImageSource::Table,0,1},
+      {MaterialImageSource::Table,1,2},{MaterialImageSource::Table,0,3},{MaterialImageSource::Table,1,4}}};
+  std::array<NativeMaterialRange,4> ranges{};
+  for (size_t i=0; i<ranges.size(); ++i) ranges[i].texture_assignment_end=i+1;
+  std::vector<MaterialTextureValues<uint32_t>> composed;
+  Require(ComposeMaterialTextures(std::span<const MaterialImageAssignment>(assignments),
+      std::span<const NativeMaterialRange>(ranges),*inputs,capture,composed) &&
+      composed[0].uv[0] == .25f && composed[0].native_eye_uv_mask == 1 &&
+      composed[1].uv == std::array<float,4>{.25f,.25f,.75f,.25f} && composed[1].native_eye_uv_mask == 3 &&
+      composed[2].uv[0] == 9 && composed[2].native_eye_uv_mask == 2 && composed[3].native_eye_uv_mask == 0,
+      "actual material ordering selects, preserves, replaces and resets owned eye provenance by channel");
+  number(table+28,.125f);
+  Require(!instance_source::ReadEye(registry,binding,visual,4,read) &&
+      ReadMaterialTextureInputs<uint32_t>(visual,read,capture)->overrides[0].uv->at(0) == .125f,
+      "unknown late writer invalidates native eye publication and explicit legacy route reads current value");
+  copy(); Require(!instance_source::ReadEye(registry,binding,visual,4,read), "late write cannot resurrect an older gaze");
+  for (uint32_t offset : {4u,8u,20u}) {
+    Require(publish(), "republish binding"); const auto saved=words[table+offset]; words[table+offset]=0;
+    if (saved == 0) words[table+offset]=1;
+    Require(!instance_source::ReadEye(registry,binding,visual,4,read), "selector/channel/enable rebind invalidates native values");
+    words[table+offset]=saved;
+  }
+  Require(publish(), "republish before table replacement"); words[visual+3560]=table+152;
+  Require(!instance_source::ReadEye(registry,binding,visual,4,read), "table replacement invalidates even at same instance");
+  words[visual+3560]=table; Require(publish(), "republish before count replacement"); words[visual+3564]=2;
+  Require(!instance_source::ReadEye(registry,binding,visual,4,read), "table count change invalidates publication");
+  words[visual+3564]=1;
+  const auto one=eye_source::ReadEyeControl(visual,gaze,read);
+  Require(one && one->material.count == 1 && one->output[1][0] == .75f, "one record still computes four scratch floats");
+  for (uint32_t count : {0u,~0u,257u}) {
+    words[visual+3564]=count;
+    Require(!eye_source::ReadEyeControl(visual,gaze,read), "empty/signed negative/oversized table refuses native ownership");
+  }
+  words[visual+3564]=2; words[table+76]=0x7fc00000;
+  Require(!eye_source::ReadEyeControl(visual,gaze,read), "nonfinite authored limits refused");
+  number(table+76,.5f); words.erase(gaze+4);
+  Require(!eye_source::ReadEyeControl(visual,gaze,read) &&
+      !eye_source::ReadEyeControl(UINT32_MAX-100,gaze,read), "missing input and visual overflow refuse safely");
+  Require(publish() && !registry.ReadEye(binding.instance,5), "wrong model generation cannot borrow eye material");
+  auto bad=publication->material; bad.count=3;
+  Require(!registry.PublishEye(binding.instance,4,bad) && !registry.ReadEye(binding.instance,4),
+      "refused replacement clears old owned values");
+  Require(publish(), "republish before retirement");
+  registry.Retire(binding.instance);
+  const auto replacement=registry.Create(5);
+  Require(replacement != binding.instance && !registry.ReadEye(binding.instance,4) && !registry.ReadEye(replacement,5),
+      "reload cannot inherit retired eye state");
+  words.clear(); publication.reset();
+  Require(owned->entries[0].uv[0] == .25f && inputs->overrides[1].uv->at(0) == .75f,
+      "immutable material snapshots survive source destruction and instance reload");
+  registry.Retire(replacement); Require(registry.Stats().bytes == 0, "all fixed eye residency retires with instance");
 }
 void TestSourceHandoff() {
   using namespace instance_source;
@@ -394,6 +516,7 @@ void TestSkeleton() {
 }
 }
 void TestNativeInstances() {
+  TestEyeMaterialOwnership();
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();

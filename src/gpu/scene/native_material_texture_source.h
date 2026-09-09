@@ -6,6 +6,7 @@
 #pragma once
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_material_data.h"
+#include "gpu/scene/native_eye_material.h"
 #include <bit>
 #include <cmath>
 
@@ -50,8 +51,9 @@ std::optional<NativeMaterialObjectInputs> ReadMaterialObjectInputs(uint32_t visu
 // an owned lease, a known no-op, or explicitly unavailable, never a source key.
 template <class Image, class Read, class Capture>
 std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
-    uint32_t visual, Read read, Capture capture) {
+    uint32_t visual, Read read, Capture capture, const NativeEyeMaterial *eye = nullptr) {
   if (!visual || (visual & 3) || visual > UINT32_MAX - 3751) return {};
+  if (eye && !eye->Valid()) return {};
   const uint64_t object = visual;
   const auto mode = read(object + 3000), special_route = read(object + 3128);
   if (!mode || !special_route || *mode == 11 || *special_route) return {};
@@ -89,7 +91,11 @@ std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
         entry.selector = *selector; entry.channel = *channel;
         if (*uv_on) {
           std::array<float, 2> offset;
-          if (!floats(record + 28, offset)) return {};
+          if (eye && i < eye->count) {
+            const auto &owned=eye->entries[i];
+            if (!owned.enabled || owned.selector != *selector || owned.channel != *channel) return {};
+            offset=owned.uv; entry.native_eye=true;
+          } else if (!floats(record + 28, offset)) return {};
           entry.uv = offset;
         }
         if (*image_on) {

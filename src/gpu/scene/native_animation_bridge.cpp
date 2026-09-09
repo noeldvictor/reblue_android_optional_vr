@@ -8,6 +8,8 @@
 #include "gpu/scene/native_animation_placement.h"
 #include "gpu/scene/native_animation_selection_source.h"
 #include "gpu/scene/native_effect_animation_source.h"
+#include "gpu/scene/native_eye_material_source.h"
+#include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
@@ -37,6 +39,7 @@ REX_EXTERN(__imp__sub_8217C580);
 REX_EXTERN(__imp__bdVisualObjectAnimSlotUpdate);
 REX_EXTERN(__imp__bdAnimationUpdate);
 REX_EXTERN(__imp__sub_822D3CB0);
+REX_EXTERN(__imp__sub_822BA028);
 REX_EXTERN(__imp__sub_8218FC98);
 REX_EXTERN(__imp__sub_8227EF60);
 REX_EXTERN(__imp__sub_8228A4E8);
@@ -88,6 +91,7 @@ struct Store {
   uint64_t placement_refused=0, placement_roots=0, placement_changed=0;
   uint64_t slot_selections=0, slot_selection_checks=0, slot_restarts=0, slot_ready=0, slot_absent=0, slot_selection_refused=0;
   uint64_t effects=0, effect_checks=0, effect_uv=0, effect_translated=0, effect_rotated=0, effect_transitions=0;
+  uint64_t eyes=0, eye_checks=0, eye_refused=0, eye_off_center=0;
   std::array<EffectObservation,size_t(EffectAdmission::Count)> effect_observations{};
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
@@ -143,6 +147,9 @@ void Report(Store &store) {
   if (store.effects)
     BD_INFO("[native-animation-effects] frame {} completed {} checked {} uv {} translated {} rotated {} transitions {}; native channels feed material UV; timeline/catalog and outgoing material adapters remain",
         frame,store.effects,store.effect_checks,store.effect_uv,store.effect_translated,store.effect_rotated,store.effect_transitions);
+  if (store.eyes || store.eye_refused)
+    BD_INFO("[native-eye-control] frame {} completed {} checked {} refused {} off-center {}; native gaze to instance/material owner; caller scratch export remains",
+        frame,store.eyes,store.eye_checks,store.eye_refused,store.eye_off_center);
   for (size_t n=0; n<store.effect_observations.size(); ++n) {
     const auto &seen=store.effect_observations[n];
     if (seen.calls)
@@ -1089,6 +1096,37 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   ctx.fpscr.disableFlushMode();
   return true;
 }
+bool EyeMaterial(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  const uint32_t visual=ctx.r3.u32, output=ctx.r5.u32;
+  auto refuse=[&] { auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.eye_refused; return false; };
+  const auto identity=FindNativeVisualIdentity(visual);
+  const auto graph=Word(uint64_t(visual)+2620);
+  const auto model=graph ? FindLoadedNativeModel(*graph) : nullptr;
+  if (!identity || !model || model->Generation() != identity.model_generation ||
+      (output & 3) || !Range(output,16)) return refuse();
+  const auto publication=eye_source::ReadEyeControl(visual,ctx.r4.u32,Word);
+  if (!publication) return refuse();
+  const bool verify=REXCVAR_GET(bd_native_materials_verify);
+  ctx.fpscr.disableFlushMode();
+  if (verify) {
+    __imp__sub_822BA028(ctx,base); // once, before publishing any native output
+    for (uint32_t eye=0; eye<2; ++eye) for (uint32_t axis=0; axis<2; ++axis)
+      if (bd::mem::load<uint32_t>(output+eye*8+axis*4) != std::bit_cast<uint32_t>(publication->output[eye][axis]))
+        throw std::runtime_error("Native eye material source comparison failed");
+  }
+  if (!PublishNativeEyeMaterial(visual,identity,publication->binding.table,publication->binding.count,publication->material))
+    throw std::runtime_error("Native eye material owner publication refused");
+  // All three callers copy min(signed table count,2) records after this returns.
+  // Preserve r6/r7; do not take a caller-specific count or expose its scratch as input.
+  for (uint32_t eye=0; eye<2; ++eye) for (uint32_t axis=0; axis<2; ++axis)
+    bd::mem::store<float>(output+eye*8+axis*4,publication->output[eye][axis]);
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++store.eyes; store.eye_checks+=verify;
+  store.eye_off_center+=bd::mem::load<float>(ctx.r4.u32) != 0 || bd::mem::load<float>(ctx.r4.u32+4) != 0;
+  Report(store);
+  return true;
+}
 } // namespace
 } // namespace bd::gpu::scene::animation_bridge
 
@@ -1175,6 +1213,10 @@ REX_HOOK_RAW(bdVisualObjectSetAnimation) {
 REX_HOOK_RAW(sub_822D3CB0) {
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
   if (!bd::gpu::scene::animation_bridge::LateLayers(ctx,base)) __imp__sub_822D3CB0(ctx,base);
+}
+REX_HOOK_RAW(sub_822BA028) {
+  bd::gpu::scene::InvalidateNativeEyeMaterial(ctx.r3.u32);
+  if (!bd::gpu::scene::animation_bridge::EyeMaterial(ctx,base)) __imp__sub_822BA028(ctx,base);
 }
 REX_HOOK_RAW(sub_8218FC98) {
   using namespace bd::gpu::scene::animation_bridge;

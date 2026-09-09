@@ -42,6 +42,27 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
             self.assertNotIn(forbidden, self.selection_source)
         self.assertIn("TestNativeSlotSelection()", self.animation_test)
 
+    def test_eye_producer_connects_instance_owner_and_material_consumer(self):
+        root = Path(__file__).resolve().parents[1]
+        material = (root / "src/gpu/scene/native_material_texture_bridge.cpp").read_text(encoding="utf-8")
+        importer = (root / "src/gpu/scene/native_material_texture_source.h").read_text(encoding="utf-8")
+        eye = self.animation_bridge.split("bool EyeMaterial(", 1)[1].split("} // namespace", 1)[0]
+        hook = self.animation_bridge.split("REX_HOOK_RAW(sub_822BA028)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("InvalidateNativeEyeMaterial"), hook.index("EyeMaterial(ctx,base)"))
+        self.assertEqual(eye.count("__imp__sub_822BA028"), 1)
+        self.assertLess(eye.index("throw std::runtime_error"), eye.index("PublishNativeEyeMaterial"))
+        self.assertIn("model->Generation() != identity.model_generation", eye)
+        self.assertNotIn("ctx.r6", eye)
+        self.assertNotIn("ctx.r7", eye)
+        self.assertIn("std::optional<NativeEyeMaterial> eye;", self.core)
+        self.assertIn("eye_source::Matches", self.source)
+        self.assertIn("registry.InvalidateEye", self.source)
+        self.assertIn("ReadNativeEyeMaterial(*visual,model ? model->Generation() : 0)", material)
+        self.assertIn("Capture, eye ? &*eye : nullptr", material)
+        self.assertIn("offset=owned.uv; entry.native_eye=true;", importer)
+        for forbidden in ("unordered_map", "PPCContext", "be_f32"):
+            self.assertNotIn(forbidden, (root / "src/gpu/scene/native_eye_material.h").read_text(encoding="utf-8"))
+
     def test_animation_registration_is_load_scoped_and_sampler_never_reads_source_keys(self):
         for name in ("sub_8217BD70", "sub_8217C5E8"):
             hook = self.animation_bridge.split(f"REX_HOOK_RAW({name})", 1)[1].split("REX_HOOK_RAW", 1)[0]
