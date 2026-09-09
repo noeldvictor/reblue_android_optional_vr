@@ -38,6 +38,7 @@ template <class Image> struct MaterialTextureOverride {
   MaterialImageSelection<Image> image;
   bool native_eye = false;
   bool native_animated = false;
+  bool native_image = false;
 };
 template <class Image> struct MaterialTextureInputs {
   std::array<float, 4> initial_uv{}, reset_uv{};
@@ -52,6 +53,7 @@ template <class Image> struct MaterialTextureInputs {
 template <class Image> struct MaterialTextureValues {
   std::array<Image, 16> images{};
   uint16_t image_mask = 0;
+  uint16_t native_image_mask = 0;
   std::array<float, 4> uv{}, secondary_uv{};
   bool owns_uv = false;
   uint8_t native_eye_uv_mask = 0; // provenance of the offsets actually selected
@@ -93,6 +95,7 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
       const auto step = assignments[cursor++];
       if (step.channel >= 16) return false;
       MaterialImageSelection<Image> selected;
+      bool selected_native=false;
       if (step.source == MaterialImageSource::NormalTable) {
         if (step.channel != 4) return false;
         // Normal commands bypass visual/animation overrides. Phase1 maps every
@@ -119,7 +122,7 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
               uv_match = true;
               break; // even this record's image is skipped
             }
-            if (entry.replaces_image) { selected = entry.image; early_image = true; }
+            if (entry.replaces_image) { selected = entry.image; selected_native=entry.native_image; early_image = true; }
           }
           if (step.channel < 2 && !uv_match && uv_overridden[step.channel]) {
             for (size_t c = 0; c < 2; ++c) state.uv[step.channel * 2 + c] = inputs.reset_uv[step.channel * 2 + c];
@@ -160,9 +163,11 @@ bool ComposeMaterialTextures(std::span<const MaterialImageAssignment> assignment
       if (selected.action == MaterialImageAction::Bind) {
         state.images[step.channel] = selected.image;
         state.image_mask |= bit;
+        state.native_image_mask=(state.native_image_mask & ~bit) | (selected_native ? bit : 0);
       } else if (selected.action != MaterialImageAction::Keep) {
         state.images[step.channel] = {};
         state.image_mask &= ~bit;
+        state.native_image_mask &= ~bit;
       }
     }
     values.push_back(state);

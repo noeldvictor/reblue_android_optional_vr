@@ -1490,6 +1490,7 @@ void TestNativeEffectConsumption() {
   scalar(0x8208EA64,.017453292f);
   for (uint32_t n=0; n<4; ++n) {
     const auto record=records+n*152;
+    word(record,0);
     word(record+4,n+1); word(record+8,0); word(record+12,2); word(record+16,n == 2);
     word(record+20,n != 3); word(record+24,0); word(record+120,n == 1 || n == 2 ? 0x01000000 : 0x000000FF);
     scalar(record+28,2); scalar(record+32,3); scalar(record+36,4); scalar(record+40,-2);

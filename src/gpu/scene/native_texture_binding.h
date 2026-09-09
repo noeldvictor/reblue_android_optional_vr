@@ -6,19 +6,12 @@
  */
 #pragma once
 #include "gpu/scene/native_texture_gpu.h"
+#include "gpu/scene/native_texture_binding_data.h"
 
 namespace bd::gpu::scene {
 // Companions are explicit native assets, not borrowed views of a guest object.
 // They preserve the current shader ABI's volume slice and atlas/cube inputs
 // until materials and shaders have explicit dimensional texture semantics.
-struct NativeTextureBinding {
-  NativeTextureGpuHandle primary;
-  NativeTextureGpuHandle slice_2d;
-  NativeTextureGpuHandle cube;
-
-  bool operator==(const NativeTextureBinding &) const = default;
-};
-
 struct NativeTextureIndices {
   uint32_t image_2d;
   uint32_t image_3d;

@@ -13,10 +13,13 @@ struct NativeMaterialUVProgram {
     uint32_t selector=0, channel=0, joint=0;
     NativeEffectUVMode mode=NativeEffectUVMode::Scroll;
     bool enabled=false;
+    bool image_enabled=false;
+    int32_t image_animation=0;
     std::array<float,2> rate{}, translation_divisor{1,1}, rotation_degrees{90,90};
     bool Same(const Slot &other) const {
       return selector == other.selector && channel == other.channel && joint == other.joint &&
-          mode == other.mode && enabled == other.enabled &&
+          mode == other.mode && enabled == other.enabled && image_enabled == other.image_enabled &&
+          image_animation == other.image_animation &&
           std::memcmp(rate.data(),other.rate.data(),sizeof(rate)) == 0 &&
           std::memcmp(translation_divisor.data(),other.translation_divisor.data(),sizeof(translation_divisor)) == 0 &&
           std::memcmp(rotation_degrees.data(),other.rotation_degrees.data(),sizeof(rotation_degrees)) == 0;

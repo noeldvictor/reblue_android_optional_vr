@@ -11,6 +11,7 @@ namespace bd::gpu::scene {
 struct NodeTag;
 struct NativeNodeLightBinding;
 struct NativeLightSourceBinding;
+namespace material_image_source { struct Binding; }
 // Source identity lookup only at compatibility/producer boundaries. Native
 // deferred entries and their consumer never resolve an instance back to a VA.
 NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual);
@@ -19,6 +20,10 @@ bool PublishNativeMaterialUVs(uint32_t visual, NativeVisualIdentity identity,
 void InvalidateNativeMaterialUVs(uint32_t visual);
 std::shared_ptr<const NativeMaterialUVs> ReadNativeMaterialUVs(uint32_t visual, uint64_t generation);
 std::shared_ptr<const NativeMaterialUVProgram> ReadNativeMaterialUVProgram(uint32_t visual, uint64_t generation);
+bool PublishNativeMaterialImages(uint32_t visual, NativeVisualIdentity identity,
+    const material_image_source::Binding &binding, const NativeMaterialImages &images);
+void InvalidateNativeMaterialImages(uint32_t visual);
+std::shared_ptr<const NativeMaterialImages> ReadNativeMaterialImages(uint32_t visual, uint64_t generation);
 // Late handoff after authored scene preparation and known later writers.
 // Uses the existing bounded instance index; no source address survives in output.
 bool CollectNativeVisualInputs(std::span<const NativeVisualIdentity> requested,

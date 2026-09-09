@@ -25,6 +25,36 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.effects = (root / "src/gpu/scene/native_effect_animation.h").read_text(encoding="utf-8")
         cls.effect_source = (root / "src/gpu/scene/native_effect_animation_source.h").read_text(encoding="utf-8")
 
+    def test_material_image_transaction_connects_native_leases_before_consumption(self):
+        root = Path(__file__).resolve().parents[1]
+        material = (root / "src/gpu/scene/native_material_texture_bridge.cpp").read_text(encoding="utf-8")
+        image_source = (root / "src/gpu/scene/native_material_image_source.h").read_text(encoding="utf-8")
+        images = (root / "src/gpu/scene/native_material_images.h").read_text(encoding="utf-8")
+        fixture = (root / "tools/native_material_test/instances.cpp").read_text(encoding="utf-8")
+        producer = material.split("bool UpdateNativeMaterialImages(", 1)[1].split("NativeObjectTextureScope::", 1)[0]
+        self.assertIn("REX_EXTERN(__imp__sub_821444E0);", material)
+        self.assertEqual(producer.count("__imp__sub_821444E0"), 1)
+        self.assertIn("model->Generation() != identity.model_generation", producer)
+        self.assertLess(producer.index("disableFlushMode()"), producer.index("material_image_source::Prepare"))
+        self.assertLess(producer.index("material_image_source::Prepare"), producer.index("__imp__sub_821444E0"))
+        self.assertLess(producer.index("throw std::runtime_error"), producer.index("update->Publish"))
+        self.assertLess(producer.index("update->Publish"), producer.index("PublishNativeMaterialImages"))
+        self.assertNotIn("return false", producer.split("update->Publish", 1)[1])
+        self.assertIn("ReadNativeMaterialImages(*visual", material)
+        self.assertIn("animated.get(),images.get()", material)
+        self.assertIn("native_image_mask", material)
+        self.assertIn("registry.InvalidateMaterialImages(binding.instance)", self.source)
+        self.assertIn("kEntryBytes = 2048", self.core)
+        self.assertIn("sizeof(instance_source::Binding)+512 <= NativeInstanceRegistry::kEntryBytes", self.bridge)
+        for forbidden in ("PPCContext", "bd::mem", "REX_", "unordered_map", "uint32_t table", "source_read"):
+            self.assertNotIn(forbidden, images)
+        for guard in ("262144", "visited >= 4096", "writes.size() >= 768", "*callback", "*capacity-*begin < 4"):
+            self.assertIn(guard, image_source)
+        for case in ("TestMaterialImageOwnership", "native material recaptured source texture",
+                     "material reimported image pointer or descriptor", "pinned replacement charged",
+                     "procedural selected key refuses", "no active key preserves cached selection"):
+            self.assertIn(case, fixture)
+
     def test_ready_slot_selection_reuses_owned_clips_and_preserves_pending_original(self):
         selection = self.animation_bridge.split("bool SelectAnimation(", 1)[1].split("std::optional<Placement>", 1)[0]
         hook = self.animation_bridge.split("REX_HOOK_RAW(bdVisualObjectSetAnimation)", 1)[1].split("REX_HOOK_RAW", 1)[0]

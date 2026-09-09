@@ -7,8 +7,10 @@
 #include "gpu/scene/native_material_textures.h"
 #include "gpu/scene/native_material_data.h"
 #include "gpu/scene/native_material_uv.h"
+#include "gpu/scene/native_material_images.h"
 #include <bit>
 #include <cmath>
+#include <type_traits>
 
 namespace bd::gpu::scene {
 struct NativeMaterialShadowInputs {
@@ -51,9 +53,11 @@ std::optional<NativeMaterialObjectInputs> ReadMaterialObjectInputs(uint32_t visu
 // an owned lease, a known no-op, or explicitly unavailable, never a source key.
 template <class Image, class Read, class Capture>
 std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
-    uint32_t visual, Read read, Capture capture, const NativeMaterialUVs *animated = nullptr) {
+    uint32_t visual, Read read, Capture capture, const NativeMaterialUVs *animated = nullptr,
+    const NativeMaterialImages *images = nullptr) {
   if (!visual || (visual & 3) || visual > UINT32_MAX - 3751) return {};
   if (animated && !animated->Valid()) return {};
+  if (images && !images->Valid()) return {};
   const uint64_t object = visual;
   const auto mode = read(object + 3000), special_route = read(object + 3128);
   if (!mode || !special_route || *mode == 11 || *special_route) return {};
@@ -80,13 +84,17 @@ std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
       const auto count = read(object + 3564);
       if (!count || *count > 256) return {};
       if (animated && animated->count != *count) return {};
+      if (images && images->entries.size() != *count) return {};
       result.overrides.reserve(*count);
       for (uint32_t i = 0; i < *count; ++i) {
         const uint64_t record = uint64_t(*records) + i * 152;
-        const auto uv_on = read(record + 20), image_on = read(record + 24);
+        const auto *owned_image=images ? &images->entries[i] : nullptr;
+        const auto uv_on = read(record + 20);
+        const auto image_on = owned_image ? std::optional(uint32_t(owned_image->enabled)) : read(record + 24);
         if (!uv_on || !image_on) return {};
         if (!*uv_on && !*image_on) continue;
-        const auto selector = read(record + 4), channel = read(record + 8);
+        const auto selector = owned_image ? std::optional(owned_image->selector) : read(record + 4);
+        const auto channel = owned_image ? std::optional(owned_image->channel) : read(record + 8);
         if (!selector || !channel) return {};
         MaterialTextureOverride<Image> entry;
         entry.selector = *selector; entry.channel = *channel;
@@ -100,10 +108,17 @@ std::optional<MaterialTextureInputs<Image>> ReadMaterialTextureInputs(
           entry.uv = offset;
         }
         if (*image_on) {
-          const auto image = read(record + 84);
-          if (!image) return {};
-          entry.replaces_image = *image != 0;
-          if (*image) entry.image = capture(*image);
+          if (owned_image) {
+            if constexpr (std::is_same_v<Image,NativeTextureBinding>) {
+              entry.replaces_image=owned_image->replaces_image; entry.image=owned_image->image;
+              entry.native_image=true;
+            } else return {};
+          } else {
+            const auto image = read(record + 84);
+            if (!image) return {};
+            entry.replaces_image = *image != 0;
+            if (*image) entry.image = capture(*image);
+          }
         }
         result.overrides.push_back(std::move(entry));
       }

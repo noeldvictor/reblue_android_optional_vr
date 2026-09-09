@@ -275,6 +275,155 @@ void TestMaterialUVProgramOwnership() {
       "native descriptors survive source/instance destruction with pinned residency charged");
   pinned.reset(); Require(registry.Stats().bytes == 0, "last descriptor lease releases accounted storage");
 }
+void TestMaterialImageOwnership() {
+  Require(NativeImageWindowActive({2,3,5,0,false},2) == true &&
+      NativeImageWindowActive({2,3,5,0,false},5) == true &&
+      NativeImageWindowActive({2,3,5,0,false},6) == false, "inclusive image window endpoints");
+  Require(NativeImageWindowActive({2,0,5,0,false},999) == true &&
+      NativeImageWindowActive({2,0,5,0,false},1) == false, "zero-duration hold starts at authored time");
+  Require(NativeImageWindowActive({2,3,5,2,true},8) == true &&
+      NativeImageWindowActive({2,3,5,2,true},11) == false &&
+      NativeImageWindowActive({-2,3,0,2,true},4) == true, "integer repeat and negative-start loop");
+  Require(!NativeImageWindowActive({0,.25f,-1,1,true},5) &&
+      !NativeImageWindowActive({NAN,1,1,0,false},1), "trapping period and nonfinite windows refuse");
+  std::unordered_map<uint64_t,uint32_t> words;
+  const uint32_t visual=10000, table=20000, catalog=30000, owner=31000, windows=32000, cache=33000;
+  for (uint32_t n=0; n<3752; n+=4) words[visual+n]=0;
+  for (uint32_t n=0; n<4*152; n+=4) words[table+n]=0;
+  words[visual+3560]=table; words[visual+3564]=4; words[visual+2264]=catalog;
+  words[visual+2212]=7; words[visual+2216]=8; words[visual+2224]=std::bit_cast<uint32_t>(4.75f);
+  words[catalog+4]=0; words[catalog+8]=7; words[catalog+12]=0; words[catalog+16]=owner;
+  words[owner+316]=6; words[owner+80]=windows; words[owner+84]=windows+8;
+  words[owner+324]=cache; words[owner+328]=cache+4; words[owner+332]=cache+4; words[cache]=34000;
+  words[windows]=34000; words[windows+4]=34400; words[0x82055230]=0;
+  words[0x8208EA64]=std::bit_cast<uint32_t>(.017453292f);
+  for (uint32_t n=0; n<2; ++n) {
+    const uint32_t window=34000+n*400, texture=36000+n*100, holder=37000+n*100;
+    words[window+60]=std::bit_cast<uint32_t>(float(n));
+    words[window+64]=std::bit_cast<uint32_t>(5.0f);
+    words[window+68]=std::bit_cast<uint32_t>(5.0f);
+    words[window+124]=0; words[window+128]=0; words[window+212]=0;
+    words[window+260]=texture; words[texture+4]=holder; words[holder+24]=41000+n*1000;
+  }
+  words[table+4]=3; words[table+24]=1; words[table+84]=43000;
+  words[table+152]=uint32_t(-1); words[table+152+4]=9; words[table+152+24]=1; words[table+152+84]=43000;
+  words[table+3*152+4]=3; words[table+3*152+24]=1; words[table+3*152+84]=43000;
+  auto read=[&](uint64_t address)->std::optional<uint32_t> {
+    const auto it=words.find(address); return it == words.end() ? std::nullopt : std::optional(it->second);
+  };
+  // Opaque GPU leases: CPU tests compare/pin identities, never pretend to render.
+  auto token_a=std::make_shared<int>(1), token_b=std::make_shared<int>(2), token_c=std::make_shared<int>(3);
+  NativeTextureBinding a{std::shared_ptr<const NativeTextureGpu>(token_a,reinterpret_cast<const NativeTextureGpu *>(token_a.get()))};
+  NativeTextureBinding b{std::shared_ptr<const NativeTextureGpu>(token_b,reinterpret_cast<const NativeTextureGpu *>(token_b.get()))};
+  NativeTextureBinding c{std::shared_ptr<const NativeTextureGpu>(token_c,reinterpret_cast<const NativeTextureGpu *>(token_c.get()))};
+  size_t captures=0;
+  auto capture=[&](uint32_t image) {
+    ++captures;
+    if (image == 41000) return MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind,a};
+    if (image == 42000) return MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind,b};
+    if (image == 43000) return MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Bind,c};
+    return MaterialImageSelection<NativeTextureBinding>{};
+  };
+  auto bound=material_uv_source::ReadProgram(visual,read);
+  Require(bound.has_value(), "bind image enable/animation slot alongside UV descriptors");
+  auto producer_read=[&](uint64_t address) {
+    if (address >= table && address < table+4*152 && (address-table)%152 != 84)
+      throw std::runtime_error("image producer reimported bind-owned descriptors");
+    return read(address);
+  };
+  auto update=material_image_source::Prepare(visual,bound->program,producer_read,capture);
+  Require(update && update->selected == 2 && update->held == 0 && captures == 3 && words[cache] == 34000 &&
+      words[table+84] == 43000, "complete immutable image transaction before source mutation");
+  Require(update->images.entries[0].image.image == b && update->images.entries[1].image.image == c &&
+      update->images.entries[3].image.image == b, "last active window wins, repeated catalog sees staged scratch");
+  auto write=[&](uint32_t address,uint32_t value) { words[address]=value; };
+  update->Publish(write);
+  Require(words[cache] == 34400 && words[table+84] == 42000 && update->Matches(read) &&
+      material_image_source::Matches(visual,update->binding,update->images,read), "exact source cache/table comparison");
+  NativeInstanceRegistry registry;
+  const auto id=registry.Create(11);
+  instance_source::Binding association{id,11,{}}; association.material_images=update->binding;
+  Require(registry.PublishMaterialImages(id,11,update->images), "image publication into existing instance registry");
+  auto lease=instance_source::ReadMaterialImages(registry,association,visual,11,read);
+  const auto bytes=registry.Stats().bytes;
+  Require(lease && registry.PublishMaterialImages(id,11,update->images) &&
+      registry.ReadMaterialImages(id,11) == lease && registry.Stats().bytes == bytes, "identical immutable image lease reuse");
+  constexpr uint32_t defaults=(uint32_t(-32035)<<16)-25620;
+  for (uint32_t n=0; n<4; ++n) words[defaults+n*4]=0;
+  auto material_read=[&](uint64_t address) {
+    if (address >= table && address < table+4*152 && (address-table)%152 != 20)
+      throw std::runtime_error("material reimported image pointer or descriptor");
+    return read(address);
+  };
+  auto forbidden_capture=[](uint32_t)->MaterialImageSelection<NativeTextureBinding> {
+    throw std::runtime_error("native material recaptured source texture");
+  };
+  auto inputs=ReadMaterialTextureInputs<NativeTextureBinding>(visual,material_read,forbidden_capture,nullptr,lease.get());
+  Require(inputs.has_value(), "real material importer consumes owned image leases without source-image reads");
+  std::array<MaterialImageAssignment,3> commands{{{MaterialImageSource::Table,0,3},
+      {MaterialImageSource::Table,1,9},{MaterialImageSource::Table,0,99}}};
+  struct Range { uint32_t texture_assignment_end; };
+  std::array<Range,3> ranges{{{1},{2},{3}}};
+  auto lookup=[](uint32_t) { return MaterialImageSelection<NativeTextureBinding>{MaterialImageAction::Keep}; };
+  std::vector<MaterialTextureValues<NativeTextureBinding>> values;
+  Require(ComposeMaterialTextures<NativeTextureBinding,Range>(commands,ranges,*inputs,lookup,values) &&
+      values[0].images[0] == b && values[1].images[1] == c && values[2].images[0] == b &&
+      values[2].native_image_mask == 3, "actual composition retains native images across Keep commands");
+  inputs->overrides[0].image={}; inputs->overrides[2].image={};
+  Require(ComposeMaterialTextures<NativeTextureBinding,Range>(commands,ranges,*inputs,lookup,values) &&
+      !(values[0].image_mask&1) && !(values[0].native_image_mask&1), "unknown nonnull replacement invalidates ownership");
+  words[visual+2224]=std::bit_cast<uint32_t>(100.0f);
+  const auto hold=material_image_source::Prepare(visual,bound->program,producer_read,capture);
+  Require(hold && hold->selected == 0 && hold->held == 2 && hold->images.entries[0].image.image == b,
+      "no active key preserves cached selection");
+  words[owner+316]=5;
+  const auto not_ready=material_image_source::Prepare(visual,bound->program,producer_read,capture);
+  Require(not_ready && not_ready->selected == 0 && not_ready->held == 0 &&
+      not_ready->images.entries[0].image.image == b, "not-ready clears scratch, preserves outgoing material image");
+  not_ready->Publish(write); Require(words[owner+328] == cache, "not-ready cache clear exported");
+  words[owner+316]=6; words[visual+2224]=std::bit_cast<uint32_t>(4.75f);
+  const auto before=words; captures=0;
+  words[34400+212]=1;
+  Require(!material_image_source::Prepare(visual,bound->program,producer_read,capture) && captures == 0,
+      "procedural selected key refuses before mutation/capture");
+  words=before; words[owner+332]=cache;
+  Require(!material_image_source::Prepare(visual,bound->program,producer_read,capture) && captures == 0,
+      "required source scratch allocation retains original whole call");
+  words=before; words[catalog+8]=99; words[catalog+4]=catalog;
+  Require(!material_image_source::Prepare(visual,bound->program,producer_read,capture), "cyclic catalog bounded");
+  words=before; words[owner+84]=windows+4097*4;
+  Require(!material_image_source::Prepare(visual,bound->program,producer_read,capture), "oversized window catalog refuses");
+  words=before; words[0x82055230]=std::bit_cast<uint32_t>(1.0f);
+  Require(!material_image_source::Prepare(visual,bound->program,producer_read,capture), "changed comparison constant refuses");
+  words=before;
+  for (uint32_t field : {4u,8u,24u,84u}) {
+    association.material_images=update->binding; registry.PublishMaterialImages(id,11,update->images);
+    words[table+field]^=1;
+    Require(!instance_source::ReadMaterialImages(registry,association,visual,11,read), "late image descriptor/source invalidates");
+    words[table+field]^=1;
+    Require(!instance_source::ReadMaterialImages(registry,association,visual,11,read), "old image publication cannot resurrect");
+  }
+  registry.PublishMaterialImages(id,11,update->images); association.material_images=update->binding;
+  Require(!instance_source::ReadMaterialImages(registry,association,visual,12,read) &&
+      !registry.ReadMaterialImages(id,11), "wrong generation invalidates source association");
+  auto bad=update->images; bad.entries[0].image={MaterialImageAction::Bind};
+  Require(!registry.PublishMaterialImages(id,11,bad), "bind without a lease is invalid");
+  bad=update->images; bad.entries.resize(257);
+  Require(!registry.PublishMaterialImages(id,11,bad), "image slots bounded");
+  NativeInstanceRegistry tight(bytes);
+  const auto tight_id=tight.Create(11);
+  Require(tight.PublishMaterialImages(tight_id,11,update->images), "exact combined instance/image budget");
+  auto pinned=tight.ReadMaterialImages(tight_id,11);
+  auto changed=update->images; changed.entries[0].image.image=a;
+  Require(!tight.PublishMaterialImages(tight_id,11,changed) && !tight.ReadMaterialImages(tight_id,11) &&
+      tight.Stats().bytes == bytes, "pinned replacement charged; budget refusal clears visibility");
+  pinned.reset(); Require(tight.PublishMaterialImages(tight_id,11,changed), "released image budget reused");
+  tight.Retire(tight_id); Require(tight.Stats().bytes == 0, "image retirement releases charged ownership");
+  words.clear(); registry.Retire(id);
+  const auto reloaded=registry.Create(12);
+  Require(!registry.ReadMaterialImages(reloaded,12) && lease->entries[0].image.image == b &&
+      lease->entries[1].image.image == c, "reload has no inherited images; pinned native leases outlive source");
+}
 void TestSourceHandoff() {
   using namespace instance_source;
   constexpr uint32_t visual = 0x10000, container = visual + 2632;
@@ -652,6 +801,7 @@ void TestNativeInstances() {
   TestEyeMaterialOwnership();
   TestMaterialUVBudgets();
   TestMaterialUVProgramOwnership();
+  TestMaterialImageOwnership();
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();

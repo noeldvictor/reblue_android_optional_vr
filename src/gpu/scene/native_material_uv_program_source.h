@@ -14,6 +14,9 @@ std::optional<NativeMaterialUVProgram::Slot> ReadSlot(uint64_t record, Read read
   const auto selector=read(record+4), channel=read(record+8), enabled=read(record+20), driver=read(record+120);
   if (!selector || !channel || !enabled || !driver) return {};
   result.selector=*selector; result.channel=*channel; result.enabled=*enabled != 0;
+  const auto image_enabled=read(record+24), image_animation=read(record);
+  if (!image_enabled || !image_animation) return {};
+  result.image_enabled=*image_enabled != 0; result.image_animation=int32_t(*image_animation);
   if (*driver>>24) {
     const auto joint=read(record+12);
     if (!joint) return {};

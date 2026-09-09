@@ -9,6 +9,7 @@
 #include "gpu/scene/native_model_materials.h"
 #include "gpu/scene/native_material_uv.h"
 #include "gpu/scene/native_material_uv_program.h"
+#include "gpu/scene/native_material_images.h"
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -40,7 +41,7 @@ public:
   static constexpr size_t kMaxTransforms = 4096, kMaxInstances = 4096;
   static constexpr size_t kMaxBytes = 16u << 20;
   // Includes conservative bookkeeping for the bridge's separately bounded index.
-  static constexpr size_t kEntryBytes = 512;
+  static constexpr size_t kEntryBytes = 2048; // includes fixed image-source comparison bindings
   explicit NativeInstanceRegistry(size_t max_bytes = kMaxBytes,
                                   size_t max_instances = kMaxInstances)
       : max_bytes_(max_bytes), max_instances_(max_instances) {}
@@ -217,7 +218,7 @@ public:
     if (it == entries_.end() || it->second.model_generation != generation) return false;
     auto &entry=it->second;
     if (program.Valid() && entry.material_program && entry.material_program->Same(program)) return true;
-    entry.material_program.reset(); entry.material_uv.reset();
+    entry.material_program.reset(); entry.material_uv.reset(); entry.material_images.reset();
     if (!program.Valid() || !Fits(sizeof(ProgramOwner)+128+program.slots.size()*sizeof(NativeMaterialUVProgram::Slot))) return false;
     auto owner=std::make_shared<ProgramOwner>(); owner->program=program;
     const size_t bytes=sizeof(ProgramOwner)+128+owner->program.slots.capacity()*sizeof(NativeMaterialUVProgram::Slot);
@@ -234,8 +235,32 @@ public:
   void InvalidateMaterialUVProgram(NativeInstanceId id) {
     std::lock_guard lock(mutex_);
     if (const auto it=entries_.find(id); it != entries_.end()) {
-      it->second.material_program.reset(); it->second.material_uv.reset();
+      it->second.material_program.reset(); it->second.material_uv.reset(); it->second.material_images.reset();
     }
+  }
+  bool PublishMaterialImages(NativeInstanceId id, uint64_t generation, const NativeMaterialImages &images) {
+    std::lock_guard lock(mutex_);
+    const auto it=entries_.find(id);
+    if (it == entries_.end() || it->second.model_generation != generation) return false;
+    auto &slot=it->second.material_images;
+    if (images.Valid() && slot && slot->Same(images)) return true;
+    slot.reset();
+    if (!images.Valid() || !Fits(sizeof(ImageOwner)+128+images.entries.size()*sizeof(NativeMaterialImages::Entry))) return false;
+    auto owner=std::make_shared<ImageOwner>(); owner->images=images;
+    const size_t bytes=sizeof(ImageOwner)+128+owner->images.entries.capacity()*sizeof(NativeMaterialImages::Entry);
+    if (!Fits(bytes)) return false;
+    owner->bytes=bytes; owner->accounting=accounting_; accounting_->bytes.fetch_add(bytes);
+    slot=std::shared_ptr<const NativeMaterialImages>(owner,&owner->images);
+    return true;
+  }
+  std::shared_ptr<const NativeMaterialImages> ReadMaterialImages(NativeInstanceId id, uint64_t generation) const {
+    std::lock_guard lock(mutex_);
+    const auto it=entries_.find(id);
+    return it != entries_.end() && it->second.model_generation == generation ? it->second.material_images : nullptr;
+  }
+  void InvalidateMaterialImages(NativeInstanceId id) {
+    std::lock_guard lock(mutex_);
+    if (const auto it=entries_.find(id); it != entries_.end()) it->second.material_images.reset();
   }
   NativeInstanceStats Stats() const {
     std::lock_guard lock(mutex_);
@@ -245,6 +270,12 @@ public:
   }
 private:
   struct Accounting { std::atomic<size_t> bytes{0}; };
+  struct ImageOwner {
+    NativeMaterialImages images;
+    std::shared_ptr<Accounting> accounting;
+    size_t bytes=0;
+    ~ImageOwner() { if (accounting) accounting->bytes.fetch_sub(bytes); }
+  };
   struct ProgramOwner {
     NativeMaterialUVProgram program;
     std::shared_ptr<Accounting> accounting;
@@ -275,6 +306,7 @@ private:
     } render;
     std::shared_ptr<const NativeMaterialUVs> material_uv;
     std::shared_ptr<const NativeMaterialUVProgram> material_program;
+    std::shared_ptr<const NativeMaterialImages> material_images;
   };
   static_assert(sizeof(Entry) <= kEntryBytes);
   std::shared_ptr<const NativeInstancePose> OwnPose(NativeInstanceId id, const Entry &entry,

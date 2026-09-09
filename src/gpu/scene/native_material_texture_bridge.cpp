@@ -6,6 +6,7 @@
 #include "gpu/scene/native_material_texture_bridge.h"
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_material_texture_source.h"
+#include "gpu/scene/native_material_image_source.h"
 #include "gpu/scene/native_toon_source.h"
 #include "gpu/scene/native_material_alpha_source.h"
 #include "gpu/scene/native_alpha_bridge.h"
@@ -35,11 +36,16 @@
 #include <unordered_map>
 #include <cstring>
 #include <rex/cvar.h>
+#include <rex/hook.h>
+#include <rex/ppc/context.h>
+#include <stdexcept>
 
 REXCVAR_DEFINE_BOOL(bd_native_material_textures, true, kCvarGroup,
     "Object-published native material images and UV offsets for primitive submission.");
 REXCVAR_DEFINE_BOOL(bd_native_primitive_policies, true, kCvarGroup,
     "Load-owned primitive winding and live compound draw-participation policy.");
+REXCVAR_DECLARE(bool, bd_native_materials_verify);
+REX_EXTERN(__imp__sub_821444E0);
 namespace bd::gpu::scene {
 struct NativeObjectTextureState {
   uint32_t context = 0, visual = 0, graph = 0, table_offset = 0;
@@ -88,6 +94,8 @@ struct Stats {
   uint64_t draws = 0, images = 0, uv = 0;
   uint64_t eye_scopes=0, eye_values=0, eye_replay_reads=0, eye_packets=0;
   uint64_t animated_scopes=0, animated_values=0, animated_packets=0;
+  uint64_t image_updates=0, image_checks=0, image_refused=0, image_selected=0, image_held=0, image_publications=0;
+  uint64_t owned_image_scopes=0, owned_image_values=0, owned_image_packets=0;
   size_t peak_bytes = 0;
 };
 thread_local Stats stats;
@@ -132,6 +140,38 @@ std::optional<NativeRigidCutoutInputs> CaptureCutoutPass() {
 }
 }
 
+bool UpdateNativeMaterialImages(PPCContext &ctx, uint8_t *base) {
+  if (!REXCVAR_GET(bd_native_material_textures)) return false;
+  const uint32_t visual=ctx.r3.u32;
+  const auto identity=FindNativeVisualIdentity(visual);
+  const auto graph=Word(uint64_t(visual)+2620);
+  const auto model=graph ? FindLoadedNativeModel(*graph) : nullptr;
+  if (!model || model->Generation() != identity.model_generation) return false;
+  const auto program=ReadNativeMaterialUVProgram(visual,identity.model_generation);
+  if (!program) return false;
+  ctx.fpscr.disableFlushMode();
+  std::optional<material_image_source::Update> update;
+  try { update=material_image_source::Prepare(visual,*program,Word,Capture); }
+  catch (const std::exception &) { ++stats.image_refused; return false; }
+  if (!update) { ++stats.image_refused; return false; }
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    __imp__sub_821444E0(ctx,base);
+    ++stats.image_checks;
+    if (!update->Matches(Word) || !material_image_source::Matches(visual,update->binding,update->images,Word))
+      throw std::runtime_error("Native animated material image comparison failed");
+  }
+  // Preserve outgoing scratch/table side effects while other original callers
+  // still consume them. Native materials pin leases, never these source keys.
+  update->Publish([](uint32_t address,uint32_t value) { bd::mem::store<uint32_t>(address,value); });
+  bool published=false;
+  try { published=PublishNativeMaterialImages(visual,identity,update->binding,update->images); }
+  catch (const std::exception &) {}
+  if (!published) { InvalidateNativeMaterialImages(visual); ++stats.image_refused; }
+  else ++stats.image_publications;
+  ++stats.image_updates; stats.image_selected+=update->selected; stats.image_held+=update->held;
+  return true; // never replay original side effects after completed publication
+}
+
 NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     std::shared_ptr<const NativeInstancePose> pose, uint32_t stack) : previous_(current) {
   current = nullptr;
@@ -148,7 +188,8 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     if (*phase == 1 && (!NativeRigidShadowEnabled() || *render_view != 1)) return;
     const auto model=FindLoadedNativeModel(*graph);
     const auto animated=ReadNativeMaterialUVs(*visual,model ? model->Generation() : 0);
-    auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture, animated.get());
+    const auto images=ReadNativeMaterialImages(*visual,model ? model->Generation() : 0);
+    auto inputs = ReadMaterialTextureInputs<NativeTextureBinding>(*visual, Word, Capture, animated.get(),images.get());
     static uint32_t water_scope_examples = 0;
     if (*render_view == 3 && IsDeferredWaterResource(*visual,Word) && water_scope_examples < 3) {
       ++water_scope_examples;
@@ -206,6 +247,8 @@ NativeObjectTextureScope::NativeObjectTextureScope(uint32_t context,
     ++stats.scopes;
     stats.eye_scopes+=animated && animated->HasEyes() && !current->inputs.skip_overrides;
     stats.animated_scopes+=animated && !animated->entries.empty() && !current->inputs.skip_overrides;
+    if (images && !current->inputs.skip_overrides)
+      for (const auto &entry : images->entries) if (entry.replaces_image) { ++stats.owned_image_scopes; break; }
   } catch (const std::exception &error) {
     ++stats.refused;
     if (stats.refused <= 3) BD_WARN("[native-material-textures] publication refused: {}", error.what());
@@ -363,6 +406,7 @@ NativeObjectTextureState::Mesh *PrepareMaterialMesh(const NativeModelMaterialPro
         scope->inputs, lookup, mesh.values, 4096, scope->shadow_phase)) { ++stats.refused; return nullptr; }
     for (const auto &value : mesh.values) stats.eye_values+=value.native_eye_uv_mask != 0;
     for (const auto &value : mesh.values) stats.animated_values+=value.native_animated_uv_mask != 0;
+    for (const auto &value : mesh.values) stats.owned_image_values+=value.native_image_mask != 0;
     if (scope->policy_inputs) {
       auto classify = [&](const PrimitivePolicyStep &step) {
         bool early_image = false;
@@ -517,6 +561,7 @@ std::optional<NativeObjectPrimitiveInputs> FindNativeObjectPrimitive(
   object_stats.packets += result.has_value();
   stats.eye_packets+=result.has_value() && mesh->values[primitive].native_eye_uv_mask != 0;
   stats.animated_packets+=result.has_value() && mesh->values[primitive].native_animated_uv_mask != 0;
+  stats.owned_image_packets+=result.has_value() && mesh->values[primitive].native_image_mask != 0;
   return result;
 }
 
@@ -660,6 +705,9 @@ void NativeMaterialTextureNoteDraw(uint32_t image_mask, bool uv) {
   ++stats.draws; stats.images += std::popcount(image_mask); stats.uv += uv;
 }
 void NativeMaterialTextureReport() {
+  BD_INFO("[native-material-image-owner] frame {} updates {} checked {} refused {} selected {} held {} publications {}; scopes {} composed {} packets {}; native leases, catalog/cache exports and procedural fallback remain",
+      FrameStatFrameCount(),stats.image_updates,stats.image_checks,stats.image_refused,stats.image_selected,stats.image_held,
+      stats.image_publications,stats.owned_image_scopes,stats.owned_image_values,stats.owned_image_packets);
   BD_INFO("[native-material-uv-consumer] frame {} scopes {} composed {} packets {}; shared animated UV owner, no UV reimport as material input",
       FrameStatFrameCount(),stats.animated_scopes,stats.animated_values,stats.animated_packets);
   BD_INFO("[native-eye-material] frame {} scopes {} composed {} replay-reads {} packets {}; owned eye UV selected by native material recipes, not a draw/pixel count",
@@ -808,3 +856,10 @@ bool StageNativeWaterForObject(const NativeInstancePose &pose, uint32_t node) {
   return true;
 }
 } // namespace bd::gpu::scene
+
+REX_HOOK_RAW(sub_821444E0) {
+  if (!bd::gpu::scene::UpdateNativeMaterialImages(ctx,base)) {
+    bd::gpu::scene::InvalidateNativeMaterialImages(ctx.r3.u32);
+    __imp__sub_821444E0(ctx,base);
+  }
+}

@@ -46,6 +46,7 @@ REX_EXTERN(__imp__sub_8213F5E8);
 namespace bd::gpu::scene {
 namespace {
 static_assert(kVisualBoneContainer == instance_source::kPaletteContainer);
+static_assert(sizeof(instance_source::Binding)+512 <= NativeInstanceRegistry::kEntryBytes);
 enum class SkeletonMissing : size_t {
   Scope, Publication, UpdateLane, SourceMatch, ChildStop, Model, Topology, Palette,
   Channels, Root, Evaluation, Count
@@ -241,7 +242,7 @@ void BeginMaterialBinding(uint32_t visual) {
   auto &store=Instances(); std::lock_guard lock(store.mutex);
   if (const auto it=store.sources.find(visual); it != store.sources.end()) {
     store.instances.InvalidateMaterialUVProgram(it->second.instance);
-    it->second.material_program={}; it->second.material_uv={};
+    it->second.material_program={}; it->second.material_uv={}; it->second.material_images={};
   }
 }
 void BindMaterialProgram(uint32_t visual) {
@@ -309,6 +310,31 @@ bool PublishNativeMaterialUVs(uint32_t visual, NativeVisualIdentity identity,
   if (!store.instances.PublishMaterialUVs(identity.instance,identity.model_generation,material)) return false;
   it->second.material_uv={table,material.count}; ++store.material_uv_published;
   return true;
+}
+bool PublishNativeMaterialImages(uint32_t visual, NativeVisualIdentity identity,
+    const material_image_source::Binding &binding, const NativeMaterialImages &images) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end() || it->second.instance != identity.instance ||
+      it->second.model_generation != identity.model_generation) return false;
+  it->second.material_images={};
+  if (!store.instances.PublishMaterialImages(identity.instance,identity.model_generation,images)) return false;
+  it->second.material_images=binding; return true;
+}
+void InvalidateNativeMaterialImages(uint32_t visual) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  if (const auto it=store.sources.find(visual); it != store.sources.end()) {
+    store.instances.InvalidateMaterialImages(it->second.instance); it->second.material_images={};
+  }
+}
+std::shared_ptr<const NativeMaterialImages> ReadNativeMaterialImages(uint32_t visual, uint64_t generation) {
+  if (!REXCVAR_GET(bd_native_instances) || !REXCVAR_GET(bd_native_animation) || !REXCVAR_GET(bd_native_skeleton)) {
+    InvalidateNativeMaterialImages(visual); return {};
+  }
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end() || !it->second.material_images.table) return {};
+  return instance_source::ReadMaterialImages(store.instances,it->second,visual,generation,Word);
 }
 void InvalidateNativeMaterialUVs(uint32_t visual) {
   auto &store=Instances(); std::lock_guard lock(store.mutex);
