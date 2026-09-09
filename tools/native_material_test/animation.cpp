@@ -1,5 +1,6 @@
 #include "gpu/scene/native_animation_source.h"
 #include "gpu/scene/native_animation_controller_source.h"
+#include "gpu/scene/native_animation_placement.h"
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include <iostream>
@@ -1188,6 +1189,103 @@ void TestNativeControllerConsumption() {
             "untracked late write is still rejected with bounded causal provenance");
   }
 }
+void TestAttachmentPlacement() {
+  ClipSource source; source.words.clear();
+  constexpr uint32_t visual=0x10000, parent=0x20000;
+  auto read=[&](uint64_t address) { return source.Read(address); };
+  source.Word(visual+15240,0);
+  auto input=animation_source::ReadAttachmentInput(visual,NAN,7,read);
+  Require(input && !input->enabled,"disabled attachment never requires parent, clock or world storage");
+  source.Word(visual+15240,1); source.Word(visual+15228,0);
+  input=animation_source::ReadAttachmentInput(visual,NAN,7,read);
+  Require(input && input->enabled && !input->attached,"unattached update retains tail without placement inputs");
+  source.Word(visual+15228,1); source.Word(visual+15188,parent);
+  source.Word(instance_source::kUpdateThread,7);
+  source.Word(parent+2628,0x30000); source.Word(parent+5640,0);
+  for (size_t c=0; c<4; ++c) source.Word(parent+3012+c*4,std::bit_cast<uint32_t>(float(c)/4));
+  auto parent_world=JointIdentity(); parent_world[12]=31; parent_world[13]=-7;
+  for (size_t c=0; c<16; ++c) {
+    source.Word(parent+2396+c*4,std::bit_cast<uint32_t>(parent_world[c]));
+    source.Word(parent+2460+c*4,std::bit_cast<uint32_t>(c == 12 ? 99.0f : parent_world[c]));
+  }
+  for (uint32_t animation : {0u,1u,10u,11u,UINT32_MAX}) {
+    source.Word(parent+1880,animation);
+    if (animation>=1 && animation<=10) source.Word(parent+4*(animation+1387),500+animation);
+    input=animation_source::ReadAttachmentInput(visual,12.5f,7,read);
+    Require(input && !input->sampled && input->parent_graph == 0x30000 && input->world == visual+2388 &&
+            input->parent_world == parent_world && input->ticks == 12.5f &&
+            input->animation == (animation>=1 && animation<=10 ? 500+animation : animation),
+            "copy placement reads the distinct parent view, exact world and unsigned 1..10 remap");
+  }
+  input=animation_source::ReadAttachmentInput(visual,9,8,read);
+  Require(input && input->world == visual+2452 && input->parent_world[12] == 99,
+          "copy placement selects both thread buffers with their actual container offsets");
+  source.Word(parent+5640,1); source.Word(parent+1928,0);
+  for (size_t c=0; c<3; ++c) {
+    source.Word(parent+5592+c*4,std::bit_cast<uint32_t>(float(c+3)));
+    source.Word(parent+5604+c*4,std::bit_cast<uint32_t>(float(c)/7));
+    source.Word(visual+15216+c*4,std::bit_cast<uint32_t>(float(c+1)));
+  }
+  input=animation_source::ReadAttachmentInput(visual,9,7,read);
+  Require(input && input->sampled && input->entry == 0 && input->animation == 12 && input->position[2] == 5,
+          "sampled placement with absent entry does not read clocks or weight");
+  source.Word(parent+1928,0x40000);
+  Require(!animation_source::ReadAttachmentInput(visual,9,7,read),"selected entry requires actual source clocks");
+  source.Word(parent+1904,std::bit_cast<uint32_t>(13.5f)); source.Word(parent+1892,std::bit_cast<uint32_t>(.25f));
+  input=animation_source::ReadAttachmentInput(visual,9,7,read);
+  Require(input && input->parent_ticks == 13.5f && input->weight == .25f,"selected attachment retains tick units and weight");
+  source.Word(parent+5608,std::bit_cast<uint32_t>(NAN));
+  Require(!animation_source::ReadAttachmentInput(visual,9,7,read) &&
+          !animation_source::ReadAttachmentInput(UINT32_MAX-8,9,7,read),"invalid placement input refuses transactionally");
+  source.words.clear();
+  Require(input && input->angles[1] == 1.0f/7,"owned input survives source destruction");
+
+  auto rotate=[](JointVector value, const JointVector &angles) {
+    for (size_t axis=0; axis<3; ++axis) {
+      const size_t a=(axis+1)%3,b=(axis+2)%3;
+      const float x=value[a],y=value[b],s=std::sin(angles[axis]),c=std::cos(angles[axis]);
+      value[a]=x*c-y*s; value[b]=x*s+y*c;
+    }
+    return value;
+  };
+  auto cross=[](const JointVector &a,const JointVector &b) {
+    return JointVector{a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]};
+  };
+  for (int step=0; step<24; ++step) {
+    NativeJointChannels root; root.rotation={.12f,-.23f,.34f,.78f}; root.translation={2,-3,5};
+    // Inactive fields are still read by placement, unlike hierarchy evaluation.
+    const JointVector angles{step*.017f,-step*.033f,step*.057f},scale{2,-3,.5f},position{11,-13,17};
+    const auto matrix=ComposeNativeAttachmentPlacement(root,position,angles,scale);
+    Require(matrix.has_value(),"noncommuting attachment rotations and signed nonuniform scale");
+    const JointVector point{7,-4,2};
+    auto oriented=rotate({point[0]*scale[0],point[1]*scale[1],point[2]*scale[2]},angles);
+    const JointVector q{root.rotation[0],root.rotation[1],root.rotation[2]};
+    const auto once=cross(q,oriented),twice=cross(q,once),translated=rotate(root.translation,angles);
+    for (size_t c=0; c<3; ++c) {
+      const float expected=oriented[c]+2*root.rotation[3]*once[c]+2*twice[c]+position[c]+translated[c];
+      const float actual=point[0]*(*matrix)[c]+point[1]*(*matrix)[4+c]+point[2]*(*matrix)[8+c]+(*matrix)[12+c];
+      Require(Near(actual,expected,2e-5f),"placement matches independent vector rotations, not swapped operands or scaled root motion");
+    }
+    auto changed=*matrix; changed[12]=std::nextafter(changed[12],INFINITY);
+    Require(SameNativePlacementRoot(*matrix,*matrix) && !SameNativePlacementRoot(*matrix,changed),
+            "even one-ulp late placement writes reject native root reuse");
+    std::array<NativeSkeletonJoint,1> joints{}; joints[0].pose_index=0;
+    std::array<NativeJointChannels,1> channels{};
+    std::vector<RenderMatrix> pose;
+    Require(EvaluateNativeSkeleton(joints,channels,*matrix,pose),"native attachment root directly drives existing skeleton");
+    NativeInstanceRegistry registry; const auto instance=registry.Create(77);
+    Require(registry.Publish(instance,0,pose) && !registry.Transfer(instance,0,1,3) &&
+            registry.Transfer(instance,0,1,pose.size()),"placed skeleton uses exact palette count for immutable render instance");
+    auto retained=registry.Read(instance,1); registry.Retire(instance);
+    Require(retained && retained->transforms == pose,"native placed pose survives instance retirement");
+  }
+  auto empty=animation_source::ControllerLayer(1);
+  auto matrix=ComposeNativeAttachmentPlacement(empty.channels[0],{3,4,5},{},{1,1,1});
+  Require(matrix && (*matrix)[0] == 1 && (*matrix)[12] == 3 && (*matrix)[15] == 1,
+          "absent root/clip retains zero quaternion identity and parent position");
+  Require(!ComposeNativeAttachmentPlacement(empty.channels[0],{},{NAN,0,0},{1,1,1}) &&
+          !ComposeNativeAttachmentPlacement(empty.channels[0],{},{},{INFINITY,1,1}),"nonfinite placement never publishes");
+}
 } // namespace
 void TestAnimationClips() {
   TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
@@ -1198,6 +1296,7 @@ void TestAnimationClips() {
   TestIndexedAnimationAssets();
   TestSelectedTrackAndRootMotion();
   TestJointSelectionHandoff();
+  TestAttachmentPlacement();
   TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

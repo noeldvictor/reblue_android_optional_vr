@@ -163,6 +163,31 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("REX_HOOK_RAW(sub_82284BE0)", self.animation_bridge)
         self.assertIn("TestLayerMixing()", self.animation_test)
 
+    def test_attachment_owns_placement_before_controller_and_skeleton_consumers(self):
+        prepare = self.animation_bridge.split("std::optional<Placement> PreparePlacement", 1)[1].split("struct PlacementScope;", 1)[0]
+        for forbidden in ("bdSceneGraphFindNodeByName(", "sub_8227EF60(", "sub_8228A4E8(", "ChannelRecord", ".Encode(", "ctx.r1"):
+            self.assertNotIn(forbidden, prepare)
+        self.assertIn("SampleRootMotion(*asset", prepare)
+        self.assertIn("ComposeNativeAttachmentPlacement(layer.channels[0]", prepare)
+        complete = self.animation_bridge.split("void CompletePlacementBeforeUpdate", 1)[1].split("void AttachmentTail", 1)[0]
+        self.assertLess(complete.index("throw std::runtime_error"), complete.index("WritePlacementRoot(placement)"))
+        hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("CompletePlacementBeforeUpdate"), hook.index("VisualScope"))
+        tail = self.animation_bridge.split("void AttachmentTail", 1)[1].split("bool AttachmentUpdate", 1)[0]
+        calls = ["bdAnimationUpdate(ctx,base)", "AnimeData_method_1A60(ctx,base)", "sub_822D3CB0(ctx,base)",
+                 "bdVisualObjectInitBones(ctx,base)", "AnimeData_helper_928(ctx,base)"]
+        self.assertEqual([tail.index(call) for call in calls], sorted(tail.index(call) for call in calls))
+        for call in calls:
+            self.assertEqual(tail.count(call), 1)
+        self.assertIn("REX_HOOK_RAW(AnimeData_method_4638)", self.animation_bridge)
+        root = self.animation_bridge.split("std::optional<RenderMatrix> TakeNativeAnimationPlacementRoot", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertIn("placement.model->Generation() == generation", root)
+        self.assertIn("SameNativePlacementRoot(placement.root,boundary)", root)
+        self.assertIn("scope->consumed=true", root)
+        bones = self.bridge.split("bool EvaluateOwnedBones", 1)[1].split("void PublishEvaluatedPose", 1)[0]
+        self.assertLess(bones.index("TakeNativeAnimationPlacementRoot"), bones.index("EvaluateNativeSkeleton"))
+        self.assertIn("TestAttachmentPlacement()", self.animation_test)
+
     def test_named_sampling_uses_owned_model_names_and_bounded_source_filter(self):
         sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("bool Mix(", 1)[0]
         self.assertIn("std::array<NativeJointName,30> excluded_names", sampler)

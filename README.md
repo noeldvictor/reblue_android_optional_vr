@@ -187,19 +187,30 @@ The outgoing root record and original cutscene placement remain. No speedup,
 motion-pixel or full desktop/VR qualification is claimed.
 [Behavior tests, exact live scope and remaining root gate](research/20260908_2052_selected-animation-verification.md).
 
-**Single-joint consumers (host183/run987; opt-in):** load-owned joint bindings now
+**Single-joint consumers (host184/run988; opt-in):** load-owned joint bindings now
 replace the original ID-tree lookup and connect placement/attachment callers to
 native model, clip and rest-channel owners. Admitted samples bypass the guest
-packed-key/weighted-helper chain. The opening-event diagnostic records **732
-matching lookups and 291 matching samples, zero lookup/sample refusals**; controller
-and late-layer checks also match. C++ fixtures, 417 source/scenario checks and the
+packed-key/weighted-helper chain. The diagnostic records **1100 matching lookups
+and 659 matching samples, including nine fractional-weight samples, with zero
+lookup/sample refusals**; controller and late-layer checks also match through
+post-event field contexts. C++ fixtures, 418 source/scenario checks and the
 host build pass. Controller exclusions now use owned joints/names, but this run
-observed none. Fractional weights and excluded-joint inputs have CPU coverage,
-not live qualification. Caller placement, pointer/channel exports and source slot
-selection remain adapters; individual caller coverage, the separate cutscene-root
+observed none; excluded-joint inputs remain CPU-only. Pointer/channel exports,
+source slot selection and other caller placement remain adapters; individual
+caller coverage, the separate cutscene-root
 gate, motion pixels, reloads and both eyes remain pending.
 [Load-owned selection, live comparison and storage](research/20260908_2138_native-joint-selection.md).
 [Single-joint connection, verification and remaining interfaces](research/20260908_2113_native-single-joint-animation.md).
+
+**Attachment placement (implemented; live gate pending):** a whole update callback
+now composes owned parent/root/scale inputs and connects its transform to native
+skeleton evaluation, without guest joint lookup or a packed root scratch record.
+Copy-parent and sampled-root behavior pass C++ fixtures; the host build passes.
+Run988 did **not** observe an attached placement within 60 seconds, so neither
+mode nor this new skeleton handoff is live-qualified. The next run needs the
+authored attachment trigger, not another identical boot. World-buffer exports,
+animation catalog selection and late effects remain explicit adapters.
+[Placement contract, coverage failure and retained evidence](research/20260908_2208_native-attachment-placement.md).
 
 ### How much is left?
 

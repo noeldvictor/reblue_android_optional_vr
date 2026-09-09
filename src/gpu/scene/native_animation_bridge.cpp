@@ -5,6 +5,7 @@
  */
 #include "gpu/scene/native_animation_source.h"
 #include "gpu/scene/native_animation_controller_source.h"
+#include "gpu/scene/native_animation_placement.h"
 #include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
@@ -18,6 +19,7 @@
 #include <rex/cvar.h>
 #include <rex/hook.h>
 #include <rex/ppc/context.h>
+#include <rex/system/xthread.h>
 
 REXCVAR_DEFINE_BOOL(bd_native_animation, false, kCvarGroup,
     "Load-owned indexed/named animation sampling for ordinary native skeletons; pending desktop qualification.");
@@ -40,6 +42,14 @@ REX_EXTERN(__imp__sub_8228A3E8);
 REX_EXTERN(__imp__sub_82284BE0);
 REX_EXTERN(bdVisualObjectCollisionTestNearby);
 REX_EXTERN(bdEffectUpdate);
+REX_EXTERN(__imp__AnimeData_method_4638);
+REX_EXTERN(__imp__bdVisualObjectSetAnimation);
+REX_EXTERN(bdVisualObjectSetAnimation);
+REX_EXTERN(bdAnimationUpdate);
+REX_EXTERN(AnimeData_method_1A60);
+REX_EXTERN(sub_822D3CB0);
+REX_EXTERN(bdVisualObjectInitBones);
+REX_EXTERN(AnimeData_helper_928);
 
 namespace bd::gpu::scene::animation_bridge {
 namespace {
@@ -60,6 +70,8 @@ struct Store {
   uint64_t root_requests=0, root_checks=0, root_tracks=0, root_absent=0, root_refused=0;
   uint64_t joint_requests=0, joint_checks=0, joint_samples=0, joint_weighted=0, joint_refused=0;
   uint64_t joint_lookups=0, joint_lookup_checks=0, joint_lookup_found=0, joint_lookup_refused=0, owned_exclusions=0;
+  uint64_t placements=0, placement_checks=0, placement_copy=0, placement_sampled=0, placement_tracks=0;
+  uint64_t placement_refused=0, placement_roots=0, placement_changed=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -104,6 +116,10 @@ void Report(Store &store) {
   if (store.joint_lookups || store.joint_lookup_refused || store.owned_exclusions)
     BD_INFO("[native-animation-selection] frame {} completed {} checked {} found {} refused {}; owned exclusions {}; load-owned joints; outgoing pointers remain",
         frame,store.joint_lookups,store.joint_lookup_checks,store.joint_lookup_found,store.joint_lookup_refused,store.owned_exclusions);
+  if (store.placements || store.placement_refused)
+    BD_INFO("[native-animation-placement] frame {} completed {} checked {} copy {} sampled {} tracks {} refused {}; skeleton roots {} changed {}; owned attachment placement; world/late-effect adapters remain",
+        frame,store.placements,store.placement_checks,store.placement_copy,store.placement_sampled,store.placement_tracks,
+        store.placement_refused,store.placement_roots,store.placement_changed);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -383,6 +399,160 @@ std::optional<float> Scalar(uint64_t address) {
   if (!value) return {};
   const float scalar=std::bit_cast<float>(*value);
   return std::isfinite(scalar) ? std::optional(scalar) : std::nullopt;
+}
+
+struct Placement {
+  animation_source::AttachmentInput input;
+  NativeModelRenderHandle model;
+  RenderMatrix root{};
+  uint32_t visual=0, graph=0, clear_translation=0;
+  std::optional<uint32_t> compression;
+  uint32_t exclusions=0, depth=0;
+  bool track=false;
+};
+std::optional<Placement> PreparePlacement(uint32_t visual, float ticks) {
+  if (!rex::system::XThread::GetCurrentThread()) return {};
+  auto input=animation_source::ReadAttachmentInput(visual,ticks,rex::system::XThread::GetCurrentThreadId(),Word);
+  if (!input) return {};
+  Placement result; result.input=*input; result.visual=visual;
+  if (!input->enabled || !input->attached) return result;
+  const auto graph=Word(uint64_t(visual)+2620);
+  result.model=graph ? FindLoadedNativeModel(*graph) : nullptr;
+  const auto parent=FindLoadedNativeModel(input->parent_graph);
+  const auto name=skeleton_source::ReadJointName(0x820702D0,Word);
+  if (!result.model || result.model->Skeleton().empty() || !parent || parent->Skeleton().empty() || !name.Valid() ||
+      !std::ranges::all_of(parent->Skeleton(),[](const auto &joint) { return joint.animation_name.Valid(); }) ||
+      !Range(input->world,64) || !Range(uint64_t(visual)+3004,16) || !Range(uint64_t(visual)+1896,4) ||
+      Word(0x82055230) != 0u) return {};
+  result.graph=*graph;
+  const auto named=std::ranges::find_if(parent->Skeleton(),[&](const auto &joint) { return joint.animation_name.View() == name.View(); });
+  if (!input->sampled) {
+    result.root=input->parent_world;
+    if (named != parent->Skeleton().end()) {
+      const auto channels=Word(uint64_t(visual)+2628);
+      if (!channels || !*channels || named->pose_index >= result.model->Skeleton().size()) return {};
+      const uint64_t destination=uint64_t(*channels)+named->pose_index*48+8;
+      if ((destination&3) || !Range(destination,12)) return {};
+      result.clear_translation=uint32_t(destination);
+    }
+  } else {
+    // Missing authored root uses pose zero; missing entry leaves all sampled
+    // fields zero. No joint pointer or outgoing 48-byte scratch is produced.
+    auto layer=animation_source::ControllerLayer(1);
+    const auto *joint=named != parent->Skeleton().end() ? &*named : parent->FindJoint(0);
+    if (input->entry && joint) {
+      const auto source=Word(uint64_t(input->entry)+12);
+      if (!source || parent->AnimationTargets().size() != parent->Skeleton().size()) return {};
+      PrepareClip(*source);
+      std::shared_ptr<const NativeAnimationAsset> asset;
+      { auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(*source); }
+      const auto compression=Word(kSamplerState), exclusions=Word(kSamplerState+4), depth=Word(kSamplerState+24), euler=Word(0x827A7EE4);
+      if (!asset || !compression || (asset->Indexed() && *compression) || !exclusions || !depth ||
+          !euler || ((*euler>>8)&255) || Word(0x820551AC) != std::bit_cast<uint32_t>(1.0f)) return {};
+      const auto key=parent->AnimationTargets()[joint->pose_index];
+      auto sampled=animation_source::SampleRootMotion(*asset,key,*joint,float(double(input->parent_ticks)/30.0),std::move(layer),input->weight);
+      if (!sampled) return {};
+      layer=std::move(*sampled);
+      const bool applied=input->weight >= kNativeAnimationWeightEpsilon;
+      result.compression=!asset->Indexed() && applied ? 0u : *compression;
+      result.exclusions=*exclusions; result.depth=*depth;
+      result.track=applied && asset->FindTrack(key,asset->Indexed() ? 0u : joint->pose_index);
+    }
+    const auto root=ComposeNativeAttachmentPlacement(layer.channels[0],input->position,input->angles,input->scale);
+    if (!root) return {};
+    result.root=*root;
+  }
+  return result;
+}
+
+struct PlacementScope;
+thread_local PlacementScope *active_placement=nullptr;
+struct PlacementScope {
+  Placement &placement;
+  PlacementScope *previous=active_placement;
+  bool previous_reference=controller_reference;
+  bool verify=REXCVAR_GET(bd_native_materials_verify), ready=false, selected=false, consumed=false;
+  explicit PlacementScope(Placement &value) : placement(value) {
+    active_placement=this;
+    if (verify) controller_reference=true; // Only the original placement prefix.
+  }
+  ~PlacementScope() { active_placement=previous; controller_reference=previous_reference; }
+};
+void WritePlacementRoot(const Placement &placement) {
+  auto *out=bd::mem::at<be_f32>(placement.input.world);
+  for (size_t c=0; c<16; ++c) out[c]=placement.root[c];
+}
+void CompletePlacementBeforeUpdate(uint32_t visual) {
+  auto *scope=active_placement;
+  if (!scope || scope->ready || scope->placement.visual != visual) return;
+  const auto &placement=scope->placement;
+  if (scope->verify) {
+    bool same=scope->selected;
+    size_t first_component=16;
+    for (size_t c=0; c<16; ++c) {
+      const auto expected=Scalar(uint64_t(placement.input.world)+c*4);
+      const bool equal=expected && std::abs(placement.root[c]-*expected) <= 1e-4f*std::max(1.0f,std::abs(*expected));
+      if (!equal && first_component == 16) first_component=c;
+      same &= equal;
+    }
+    same &= Word(uint64_t(visual)+1896) == std::bit_cast<uint32_t>(placement.input.ticks);
+    for (size_t c=0; c<4; ++c) same &= Word(uint64_t(visual)+3004+c*4) == placement.input.appearance[c];
+    if (placement.clear_translation)
+      for (size_t c=0; c<3; ++c) same &= Word(uint64_t(placement.clear_translation)+c*4) == 0u;
+    if (placement.compression)
+      same &= Word(kSamplerState) == placement.compression && Word(kSamplerState+4) == placement.exclusions && Word(kSamplerState+24) == placement.depth;
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.placement_checks;
+    if (!same) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-placement-drift] visual {:08X} sampled {} component {} native {} original {}; no publication/fallback",
+          visual,placement.input.sampled,first_component,first_component < 16 ? placement.root[first_component] : 0,
+          first_component < 16 ? Scalar(uint64_t(placement.input.world)+first_component*4).value_or(NAN) : 0);
+      throw std::runtime_error("Native attachment placement comparison failed");
+    }
+  }
+  // Publish before the controller/late/bone consumers, never after an original
+  // callback has already evaluated the pose. Its selection/effects run once.
+  WritePlacementRoot(placement);
+  scope->ready=true; controller_reference=scope->previous_reference;
+}
+void AttachmentTail(PPCContext &ctx, uint8_t *base, uint32_t visual) {
+  ctx.r3.u64=visual; ctx.r4.u64=0; ctx.r5.u64=0; bdAnimationUpdate(ctx,base);
+  ctx.r3.u64=visual+15336; ctx.r4.u64=0; AnimeData_method_1A60(ctx,base);
+  ctx.r3.u64=visual; sub_822D3CB0(ctx,base);
+  ctx.r3.u64=visual; bdVisualObjectInitBones(ctx,base);
+  ctx.r3.u64=visual+5532; AnimeData_helper_928(ctx,base);
+  ctx.fpscr.disableFlushMode();
+}
+bool AttachmentUpdate(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  ctx.fpscr.disableFlushMode();
+  auto placement=PreparePlacement(ctx.r3.u32,float(ctx.f1.f64));
+  if (!placement) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (++store.placement_refused <= 4) BD_INFO("[native-animation-placement-refused] visual {:08X}; original whole attachment update retained",ctx.r3.u32);
+    return false;
+  }
+  if (!placement->input.enabled) return true;
+  if (!placement->input.attached) { AttachmentTail(ctx,base,placement->visual); return true; }
+  PlacementScope scope(*placement);
+  if (scope.verify) {
+    __imp__AnimeData_method_4638(ctx,base);
+  } else {
+    WritePlacementRoot(*placement);
+    if (placement->compression) bd::mem::store<uint32_t>(kSamplerState,*placement->compression);
+    ctx.r3.u64=placement->visual; ctx.r4.u64=0; ctx.r5.u64=placement->input.animation;
+    ctx.r7.u64=1; ctx.r8.u64=0; ctx.f1.f64=0; bdVisualObjectSetAnimation(ctx,base);
+    if (placement->clear_translation)
+      for (size_t c=0; c<3; ++c) bd::mem::store<uint32_t>(placement->clear_translation+uint32_t(c)*4,0);
+    bd::mem::store<float>(placement->visual+1896,placement->input.ticks);
+    for (size_t c=0; c<4; ++c) bd::mem::store<uint32_t>(placement->visual+3004+uint32_t(c)*4,placement->input.appearance[c]);
+    AttachmentTail(ctx,base,placement->visual);
+  }
+  if (!scope.ready) throw std::runtime_error("Native attachment update missed its pre-consumer comparison boundary");
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++store.placements; store.placement_copy+=!placement->input.sampled;
+  store.placement_sampled+=placement->input.sampled; store.placement_tracks+=placement->track; Report(store);
+  return true;
 }
 std::optional<std::vector<uint32_t>> PointerVector(uint64_t begin_address, uint64_t end_address, size_t maximum) {
   const auto begin=Word(begin_address), end=Word(end_address);
@@ -838,6 +1008,20 @@ std::optional<std::vector<NativeJointChannels>> TakeNativeAnimationChannels(
 }
 void RetireNativeAnimationChannels(uint32_t visual) {
   animation_bridge::completed_controller.Retire(visual);
+  if (auto *scope=animation_bridge::active_placement; scope && scope->placement.visual == visual) scope->consumed=true;
+}
+std::optional<RenderMatrix> TakeNativeAnimationPlacementRoot(
+    uint32_t visual, uint32_t graph, uint64_t generation, const RenderMatrix &boundary) {
+  using namespace animation_bridge;
+  auto *scope=active_placement;
+  if (!Enabled() || !scope || !scope->ready || scope->consumed || scope->placement.visual != visual) return {};
+  scope->consumed=true;
+  const auto &placement=scope->placement;
+  const bool same=placement.graph == graph && placement.model->Generation() == generation &&
+      SameNativePlacementRoot(placement.root,boundary);
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++(same ? store.placement_roots : store.placement_changed);
+  return same ? std::optional(placement.root) : std::nullopt;
 }
 }
 
@@ -873,8 +1057,23 @@ REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
   __imp__bdVisualObjectAnimSlotUpdate(ctx,base);
 }
 REX_HOOK_RAW(bdAnimationUpdate) {
+  bd::gpu::scene::animation_bridge::CompletePlacementBeforeUpdate(ctx.r3.u32);
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
   if (!bd::gpu::scene::animation_bridge::Controller(ctx,base)) __imp__bdAnimationUpdate(ctx,base);
+}
+REX_HOOK_RAW(AnimeData_method_4638) {
+  if (!bd::gpu::scene::animation_bridge::AttachmentUpdate(ctx,base)) __imp__AnimeData_method_4638(ctx,base);
+}
+REX_HOOK_RAW(bdVisualObjectSetAnimation) {
+  using namespace bd::gpu::scene::animation_bridge;
+  if (auto *scope=active_placement; scope && scope->verify && !scope->ready) {
+    const auto &placement=scope->placement;
+    if (scope->selected || ctx.r3.u32 != placement.visual || ctx.r4.u32 != 0 || ctx.r5.u32 != placement.input.animation ||
+        ctx.r7.u32 != 1 || ctx.r8.u32 != 0 || ctx.f1.f64 != 0)
+      throw std::runtime_error("Native attachment animation-selection comparison failed");
+    scope->selected=true;
+  }
+  __imp__bdVisualObjectSetAnimation(ctx,base);
 }
 REX_HOOK_RAW(sub_822D3CB0) {
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);

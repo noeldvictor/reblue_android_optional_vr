@@ -137,9 +137,11 @@ bool EvaluateOwnedBones(PPCContext &ctx, uint8_t *base) {
   auto channels = TakeNativeAnimationChannels(scope->visual,publication->graph,model->Generation(),ctx.r5.u32);
   if (!channels) channels=skeleton_source::ReadChannels(ctx.r5.u32, publication->count, Word);
   if (!channels) return unavailable(SkeletonMissing::Channels);
-  const auto root = skeleton_source::ReadRoot(
+  auto root = skeleton_source::ReadRoot(
       {ctx.r6.u64,ctx.r7.u64,ctx.r8.u64,ctx.r9.u64,ctx.r10.u64},ctx.r1.u32,Word);
   if (!root) return unavailable(SkeletonMissing::Root);
+  if (auto placement=TakeNativeAnimationPlacementRoot(scope->visual,publication->graph,model->Generation(),*root))
+    root=std::move(placement);
   std::vector<RenderMatrix> pose;
   if (!EvaluateNativeSkeleton(model->Skeleton(),*channels,*root,pose)) return unavailable(SkeletonMissing::Evaluation);
   if (REXCVAR_GET(bd_native_materials_verify)) {

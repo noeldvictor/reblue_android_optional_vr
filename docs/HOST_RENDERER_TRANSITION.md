@@ -933,6 +933,32 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    remain. Remove those at their native consumers; no new reverse-node framework
    or unchanged boots for absent authored exclusions/root/subtree content.
    [Connected selection, exact evidence and remaining adapters](../research/20260908_2138_native-joint-selection.md).
+   **Attachment placement (host184/run988; implemented, NOT live-qualified):**
+   AnimeData_method_4638 now owns both copy-parent and sampled-root placement,
+   reusing native model/clip/channel/matrix owners and feeding a scoped root into
+   skeleton evaluation. Admitted production removes its name/ID tree walks,
+   packed48B root scratch and matrix helper chain. Animation selection and the
+   controller/late/effect/bone tail execute once in source order. Verification
+   runs the original prefix once and compares BEFORE native consumers, not after
+   the completed original callback; generation/late-write root guards remain.
+   Material68/CPU65,418 guards and host184 pass; no guest objects/shaders.
+   CPU64 caught a fixture count3 for a one-joint transfer; corrected fixture
+   explicitly rejects3 before transferring the exact count. Production unchanged.
+   Run988 times out60s with no positive attached-placement observation: the new
+   gate DOES NOT PASS. Both placement modes and actual scoped root consumption
+   remain CPU/source-only. No unchanged retry. Source caller sub_822B8DF0 selects
+   +6284 and requires child+15236; AnimeData_method_EBA8 has a separate condition.
+   Both also need child+15240/+15228 for attached work. Recover authored setup
+   or a targeted representative scenario before another placement probe.
+   Existing routes reverify1100 matching/found lookups and659 matching single
+   samples,9 fractional-weight,refused0;109082 matching controllers,13817
+   handoffs,changed0; late6 matching/reused/handoffs. Post-event contexts and
+   skeleton14409 matching; no new motion/reload/pixels/both-eye qualification.
+   988 is retained losslessly as retained-placement988.zip and replaces987's
+   sampler/import regression text;985's separate missing-root failure stays.
+   World/channel/palette exports, source selection, special/late effects, other
+   caller placement and persistent cooking remain. Defaults unchanged.
+   [Attachment implementation, source contracts and exact limits](../research/20260908_2208_native-attachment-placement.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

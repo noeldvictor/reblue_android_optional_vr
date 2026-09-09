@@ -6877,3 +6877,78 @@ hostobjects/buildmetadata/source/Git/system activity. Calculated diagnostics
 1613824B drive-wide free increase since first63437365248B, not all cleanup.
 README/queue and the new report distinguish live lookup/sampling from pending
 owned exclusions, root/content, motion/pixels and full desktop/VR acceptance.
+
+### 2026-09-08 attachment placement after49d785a
+
+Continue the SAME cumulative ledger: first scoped free63435210752B, no matching
+game/build/test producers via Get-Process (CIM denied, not used as proof).
+Fixture10682023B/43files,EXE49315840B/PDB113446912B,buildlogs422379B/212files.
+Floor62509998080B, owner3GiB exception,100MiBdiagnostics/75MiBruntime stop,
+10MiBbuildlogs,13images10434657B and historical no-new-raw gate unchanged.
+Plan material67/CPU64/host184 in existing j4 trees,300s and64/8/192MiB maximum
+free-drop; expected fixture<16MiB, host<192MiB peak. No shader/guest build,
+image/raw/perf/cache/dump producer. Keep66/63/183 receipts until replacements
+pass;987 and protected985ZIP remain. Runtime requires fresh aggregate accounting
+and a placement-specific observation, not another unchanged root-coverage boot.
+
+Material67/PID37792 build0; CPU64/PID28624 fails because the new one-joint
+fixture requested transfer count3. Production strict count check is correct.
+Fixture now explicitly rejects3 and transfers pose.size(); no threshold changed.
+Material68/PID26572 build0,CPU65/PID20676 PASS0.11s/CTest0.13s.418 Python
+guards/scenario tests PASS0.225s. Host184/PID33632/session21669 terminal0:
+new header triggers CMake glob recheck, codegen0writes; only host/version users,
+no guest objects/shaders. EXE49336832B/PDB113524736B, EXE SHA256
+255A033A8906F8C91C6CCAD6585A1E9E57C1C597145CBFFC972A64A08755DA41.
+Fixture1371648B SHA25672E39D6EFBC961A2F49D1437754FC8876668A14CAE8478F08E9A9011EC018A61,
+tree10731178B/43files. All matching producer processes0.
+
+After passing replacements, removed10 exact ordinary superseded66/67,63/64,
+183 receipt files,8087B logical; free63433416704->63433433088,
+16384B observed reclaim. Resolved CPU64 setup error retained above and now
+covered by an explicit negative assertion. Receipts reproducible; no game data,
+profiles, active trees or protected runtime failures removed. No prior credit.
+Current diagnostics78119237B/buildlogs420498B/212files; full400KiB runtime
+overlap leaves114363B below unchanged75MiB stop. Profile SHA2562F1BC38D...
+unchanged. New AttachmentPlacementProbe requires positive matching sampled
+placements/tracks and native skeleton roots, changed0, plus unchanged controller/
+late gates. Copy-mode coverage reported separately. Run988 planned60s/400KiB/
+192MiB free-drop, no images/raw/perf/cache/dumps, exact profile restoration.
+
+Run988/PID34620/session90601 terminal22:07:06, operator exit1 for missing
+requested placement observation, NOT PASS. No positive placement/refusal line;
+cannot distinguish unreached callback from disabled/unattached. Both modes and
+actual native root consumption remain CPU/source-only. No unchanged retry.
+Existing frame2311:109082 matching controllers,18132 unclassified refusals,
+13827samples,23mixes,13252interior,14613advancing,13817handoffs,changed0; late6
+matching/samples/reuses/handoffs. Single659 matching/sampled,9 fractional-weight,
+refused0; lookup1100 matching/found,refused0,owned exclusions0. Skeleton2268=
+14409 matching evaluations/publications,wrong0/unavailable0; context2285 is
+FieldActive bg41_01,event0. Canonical122->121/93432B import reverified.
+No motion/reload/pixels/both-eye/Quest claim. Profile116B restored SHA256
+2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0;
+matching producers0, timestamp inventory0new capture/perf/cache/dump files.
+
+988log269258B SHA25681FD1C911F4C9C186D7D18C3B648EDDCA82DD4A8A329212A981C4F19B88C4E65
+retained losslessly in retained-placement988.zip45113B, SHA256
+ED7655643F3BCE40B912AB2876E7ABE3B9610719248F9EB09968DD3B0E9CA851.
+Sole member's full decompressed hash/size verified before plaintext removal.
+First archive command lacked System.IO.Compression assembly and failed before
+creating output; explicit assembly load succeeded, no duplicate producer/file.
+Compression free63530446848->63530397696 consumes49152B; overlap<1MiB.
+After terminal/hash checks removed exact redundant988plaintext and superseded
+987log119516B (hashBD44625A...);988 covers its lookup/sampler/import purposes.
+2files388774B logical,free63530397696->63530790912,393216B observed reclaim.
+988 remains fully recoverable from ZIP;987text is superseded, findings/hash in
+prior report, not recoverable from Git.985ZIP/975/979/980/971/962/964/968 and
+other unresolved evidence unchanged. Total this turn12files396861B logical
+removed;409600B observed deletion minus49152B archive allocation=360448B net
+cleanup352KiB. No earlier savings credited again.
+
+Partial attributed retained growth71687B: fixture+49155B,EXE/PDB+98816B,
+buildlogs-1881B,988ZIP replacing987text-74403B. This excludes host objects,
+buildmetadata/source/Git and external activity. Calculated diagnostics78044834B,
+buildlogs420498B/212files; next full400KiB would leave188766B below75MiB,
+requiring fresh remeasurement. Pre-doc free63530790912B,95580160B drive-wide
+free increase vs first63435210752B; most is NOT attributable cleanup. No next
+producer queued. README/queue/new source-contract report preserve the failed
+authored-placement gate and point to caller conditions before a new probe.

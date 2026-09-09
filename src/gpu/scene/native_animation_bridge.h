@@ -13,4 +13,8 @@ namespace bd::gpu::scene {
 std::optional<std::vector<NativeJointChannels>> TakeNativeAnimationChannels(
     uint32_t visual, uint32_t graph, uint64_t generation, uint32_t source);
 void RetireNativeAnimationChannels(uint32_t visual);
+// Scoped attachment producer -> actual bone evaluation. The by-value source
+// root remains a strict late-writer guard, not the native input on admission.
+std::optional<RenderMatrix> TakeNativeAnimationPlacementRoot(
+    uint32_t visual, uint32_t graph, uint64_t generation, const RenderMatrix &boundary);
 }
