@@ -145,11 +145,11 @@ samples, but failed its requested 256-mix gate; no subtree/filter calls were
 observed. Advancing/interior-key motion, full field/reload, skin pixels and both
 eyes remain unqualified. Host175 does not inherit live qualification from174.
 
-**Native controllers and late layers (host179/run984; opt-in):** admitted controllers now own
+**Native controllers and late layers (host180/run985; opt-in):** admitted controllers now own
 slot-clock advancement, ordered layers and native TRS working values. They no
 longer exchange per-layer guest scratch buffers. Completed values feed the
 existing native skeleton evaluator through a one-shot, model-generation check.
-The latest live diagnostic records **108,986 matching controller transactions**, including
+The longer run985 diagnostic records **108,986 matching controller transactions**, including
 empty plans, with 13,815 samples, 23 mixes, 14,601 advancing slot clocks and 13,805
 native channel handoffs. The six previously rejected handoffs are now connected:
 all six post-controller updates match, reuse native channels and pass their
@@ -186,6 +186,17 @@ coverage; actual root/cutscene integration still needs a different observation.
 The outgoing root record and original cutscene placement remain. No speedup,
 motion-pixel or full desktop/VR qualification is claimed.
 [Behavior tests, exact live scope and remaining root gate](research/20260908_2052_selected-animation-verification.md).
+
+**Single-joint consumers (host182/run986; opt-in):** checked joint selection now
+connects placement/attachment callers to the existing native model, clip and
+rest-channel owners. Admitted samples bypass the guest packed-key/weighted-helper
+chain; the original graph lookup, caller placement and outgoing channel record
+remain adapters. The opening-event diagnostic records **289 matching samples,
+zero refusals**, with matching controller and late-layer checks. C++ fixtures,
+416 source/scenario checks and the host build pass. Fractional weights have CPU
+coverage but were not observed live; individual caller coverage, the separate
+cutscene-root gate, motion pixels, reloads and both eyes remain pending.
+[Single-joint connection, verification and remaining interfaces](research/20260908_2113_native-single-joint-animation.md).
 
 ### How much is left?
 

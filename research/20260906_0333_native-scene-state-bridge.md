@@ -6713,3 +6713,77 @@ producer must remeasure/reconcile rather than assume it fits. Same100MiB ceiling
 62509998080B cumulative floor,13images10434657B and historical raw gate unchanged.
 README/queue distinguish CPU/build/live controller evidence from unqualified
 root/cutscene integration. Full goal remains active, desktop/VR gate incomplete.
+
+### 2026-09-08 one-joint consumer connection after042c75e
+
+Previous goal turn was progress: selected-track CPU/host/live controller evidence
+changed authoritative qualification; root985 coverage stayed missing. Clean
+synchronized main at entry, no producer live. Read guest-source/devloop skills,
+full disk policy and hook TOML. Reused prior contracts; complete8227EF60 lookup
+and8228A4E8 dispatcher now inspected. All four non8218FC98 one-joint callers
+resolve a model/index immediately before sampling (100:11924,63:11507,
+65:20217,88:7016). New bounded one-shot lookup provenance connects them to
+generation-checked load-owned joint/rest data and existing selected clip residency.
+Original lookup/caller placement remains; no new address map/model lease cache.
+Weighted one-joint math reuses SampleRootMotion, including <=0/epsilon no-ops,
+upper weight clamp, indexed descriptor0 and owned rest blending. Exact dormant
+word comparison distinguishes unsampled/TR-only fields from active finite values.
+No model-name uniqueness guard was relaxed: direct cursor semantics still make
+duplicate model names distinct from duplicate asset descriptors.
+
+First measured free63445581824B after source/tests, fixture10574334B/43files,
+hostEXE49301504B/PDB113389568B;420377B/212build logs.416 Python guards PASS0.220s.
+No budget reset: floor62509998080B,100MiB diagnostics,75MiB runtime stop.
+Plan material65/CPU62 thenhost181 using inspected existing j4 wrapper:
+64MiB/8MiB/192MiB maximum free-drop,300s,10MiB aggregate build logs. Expected
+fixture overlap<16MiB/host<192MiB, no guest rebuild or new shader/image/raw/perf/
+cache/dump producer.64/61/180 receipts retire only after replacements pass;
+985 missing-root evidence remains protected. Live one-joint observation is a
+different changed-code route, not a relabelled8218FC98 pass or unchanged retry;
+require fresh positive joint comparison and full budget overlap before launch.
+
+Material65/PID33868 build0;CPU62/PID33524 PASS0.12s/CTest0.13s. Host181/PID36312/
+session2382 build0; final182/PID29180 build0 adds sampled-vs-no-op provenance.
+No guest objects/shaders;182 rebuilds only bridge+link,codegen0writes. Final
+hostEXE49311232B/PDB113426432B, SHA256BC0D87BCC2E0742916DB91F5F553F6E45A33C453B38FCF39F41C75F648600F00.
+FixtureEXE1329664B SHA25667F0C7E4C11F15A6504A0443E5F5AFD8A1B71DC2C4D051781229BF1BB1D91492;
+tree10588180B/43files. All producers terminal before next launch.
+
+Passing65/62/182 replaces64/61/180/181 receipts. Eight exact ordinary logfiles,
+7219B logical, removed after inspection;free63444844544->63444856832,12288B
+observed reclaimed (12KiB). Reproducible build/test text, not in Git. No runtime
+evidence, active tree, game data, profile or unresolved failure removed.
+Fresh operator accounting78220262B diagnostics,418610B/212buildlogs. Full400KiB
+overlap=78629862B leaves13338B under unchanged75MiB stop. Free63444856832B;
+original profile hash2F1BC38D... confirmed. Native single-joint observation
+requires positive completed==checked AND positive sampled counts in addition
+to unchanged controller/late criteria. It excludes the distinct RootAnimationProbe
+so cannot restamp985's missing8218FC98 evidence. Same60s/400KiB/192MiB limits,
+zero raw/image/perf/cache/dump allowance and guaranteed exact profile restore.
+
+Run986/PID34464/session14460 terminal21:12:21, explicit observation-complete
+stop (operator exit1, not a crash). Jointframe1144 has289 completed/checked/
+sampled,weighted0,refused0. Controller30364 matching,5012 admission refusals,
+3984samples,8mixes,3827interior-CLIP,4000advancing clocks,3979handoffs,changed0;
+late6 matching updates/samples/reuses/handoffs,refused0. Skeleton1119 has3706
+matching evaluations/publications,wrong0/unavailable0. Context1120 isFieldActive
+bg41_01,event1: opening-event coverage, not post-event/reload/motion/both eyes.
+No caller attribution or fractional-weight observation; no new8218FC98 root
+evidence. Retain985 for its separate missing-root gate and longer post-event
+controller baseline. Canonical122->121track/93432B import again,prepare-refused0.
+
+986text120282B SHA25662CF629B8D43403A712B87B8E1D0F64B3A9FFDF7BE302551B5F77058437C9B90.
+Profile2F1BC38D... independently restored; no producer remains, no new raw,
+capture/perf/cache/dump files in the scoped timestamp inventory. Final416 Python
+guards/scenario tests PASS0.227s. No further producer queued.
+Post-run free63444729856B,851968B drive-wide use since first63445581824B.
+Partial attributed retained growth178953B: fixture+13846B,EXE/PDB+46592B,
+buildlogs-1767B,new distinct986log+120282B. Excludes objects/buildmetadata/source/
+Git/system activity. Current cleanup credit remains12288B observed,7219B logical.
+Buildlogs418610B/212files; calculated diagnostics78340544B. Next full400KiB
+runtime overlap78750144B exceeds unchanged75MiB stop by106944B: reconcile eligible
+superseded artifacts before another run; do not raise the cap or delete protected
+985 just to fit. Source work can continue; full goal is not marked blocked.
+Pre-documentation/commit recheck free63443554304B,2027520B additional drive-wide
+use since first measurement; unrelated drive activity is not attributed cleanup.
+README/queue and the new single-joint report record this connected checkpoint.

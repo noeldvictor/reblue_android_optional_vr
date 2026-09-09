@@ -901,6 +901,21 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    canonical import and replaces984 controller/late runtime text; retain985 for
    the unresolved root-coverage gate. No motion-pixel/reload/both-eye claim.
    [Selected sampling verification and pending root connection](../research/20260908_2052_selected-animation-verification.md).
+   **Single-joint connection (host182/run986):** the four other8228A4E8 caller
+   sites share a checked8227EF60 selection handoff to generation-owned joints,
+   rest channels and selected native clips. One-shot provenance retains no model
+   lease/address map; original graph lookup, placement and48B export remain.
+   Material65/CPU62 and416 guards pass, including weight clamps/no-ops, owned-rest
+   blending, generation reuse and exact dormant bytes. Host182 builds without
+   guest objects/shaders. Run986 has289 completed/checked/sampled,weighted0,
+   refused0;30364 matching controllers,3979 handoffs,changed0 and6 matching late
+   updates. This is opening-event coverage, not attribution to all four callers,
+   fractional-weight live qualification or a replacement for985's missing whole
+   cutscene-root gate. Authored root-request conditions need targeted observation;
+   reaching an opening event alone is insufficient. No new pixels or speed claim.
+   Next connect placement/source selection to owned consumers and retire the
+   lookup/export adapters, preserving strict comparisons and unresolved evidence.
+   [Single-joint contracts and scoped live evidence](../research/20260908_2113_native-single-joint-animation.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

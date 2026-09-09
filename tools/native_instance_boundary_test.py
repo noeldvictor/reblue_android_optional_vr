@@ -100,6 +100,20 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertLess(hook.index("PrepareClip(*source)"), hook.index("RootMotion(ctx,base)"))
         self.assertIn("asset.Indexed() ? 0u : joint.pose_index", self.controller_source)
 
+    def test_single_joint_calls_consume_generation_checked_selection_without_source_keys(self):
+        lookup = self.animation_bridge.split("REX_HOOK_RAW(sub_8227EF60)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(lookup.index("selected_joint.Clear()"), lookup.index("__imp__sub_8227EF60"))
+        self.assertLess(lookup.index("__imp__sub_8227EF60"), lookup.index("PublishSelectedJoint("))
+        sample = self.animation_bridge.split("bool SingleJoint(", 1)[1].split("bool LateLayers(", 1)[0]
+        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "SourceNode(", "bdSceneGraphFindNodeByName"):
+            self.assertNotIn(forbidden, sample)
+        self.assertIn("selected_joint.Take(ctx.r4.u32,LoadedNativeModelGeneration)", sample)
+        self.assertIn("model->Generation() != selection->generation", sample)
+        self.assertLess(sample.index("SampleRootMotion("), sample.index("__imp__sub_8228A4E8"))
+        self.assertLess(sample.index("throw std::runtime_error"), sample.index("auto *output="))
+        self.assertIn("SameSampledChannelWord", sample)
+        self.assertIn("TestJointSelectionHandoff()", self.animation_test)
+
     def test_weighted_subtrees_share_visual_scope_and_preserve_controller_side_effects(self):
         hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
         self.assertLess(hook.index("VisualScope"), hook.index("__imp__bdAnimationUpdate(ctx,base)"))

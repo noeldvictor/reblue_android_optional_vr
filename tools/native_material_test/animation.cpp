@@ -852,6 +852,10 @@ void TestSelectedTrackAndRootMotion() {
   std::array<NativeSkeletonJoint,3> skeleton;
   skeleton[0].pose_index=2; skeleton[1].pose_index=0; skeleton[1].parent=0;
   skeleton[2].pose_index=1; skeleton[2].parent=0;
+  for (auto &joint : skeleton) {
+    joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+    joint.blend_rest.translation={10,20,30}; joint.blend_rest.scale={2,3,4};
+  }
   for (bool cubic : {false,true}) {
     auto source=cubic ? CubicSource() : ClipSource();
     auto asset=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);});
@@ -871,6 +875,21 @@ void TestSelectedTrackAndRootMotion() {
             animation_source::ControllerLayer::Decode(input));
         Require(root && root->Encode()[0] == expected[index],
                 "selected root matches all whole-layer words through clamped endpoints, interior samples and dormant payloads");
+      }
+    }
+    for (float weight : {-1.0f,0.0f,0x1p-24f,.125f,.5f,1.0f,2.0f}) {
+      auto weighted_input=initial;
+      for (auto &record : weighted_input) record[0]=256|64;
+      auto expected=weighted_input;
+      if (weight >= kNativeAnimationWeightEpsilon)
+        Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,std::min(weight,1.0f),2,false,expected),
+                "weighted reference uses owned authored rest channels");
+      for (const auto &joint : skeleton) {
+        const std::array<animation_source::ChannelRecord,1> input{weighted_input[joint.pose_index]};
+        auto selected=animation_source::SampleRootMotion(*asset,names[joint.pose_index],joint,.25f,
+            animation_source::ControllerLayer::Decode(input),weight);
+        Require(selected && selected->Encode()[0] == expected[joint.pose_index],
+                "single-joint weights clamp above one, preserve nonpositive/epsilon no-ops, and blend missing channels against owned rest");
       }
     }
     const std::array<animation_source::ChannelRecord,1> input{initial[2]};
@@ -925,6 +944,33 @@ void TestSelectedTrackAndRootMotion() {
   const std::array missing_names{3u,4u};
   Require(!layer.Apply(*selective,missing_names,siblings,NAN,1,0,true,{},false) && layer.Encode() == before,
           "missing named tracks cannot bypass nonfinite clock refusal");
+}
+void TestJointSelectionHandoff() {
+  animation_source::JointSelectionHandoff handoff;
+  uint64_t current_generation=7; unsigned lookups=0;
+  auto generation=[&](uint32_t graph) { ++lookups; return graph == 1 ? current_generation : 0; };
+  handoff.Publish({1,0x1000,2,7});
+  const auto selected=handoff.Take(0x1000,generation);
+  Require(selected && selected->pose == 2 && selected->graph == 1 && lookups == 1 && !handoff.Take(0x1000,generation),
+          "lookup passes one model-local joint to exactly one sampler without retaining model/asset leases");
+  handoff.Publish({1,0x1000,2,7});
+  Require(!handoff.Take(0x2000,generation) && !handoff.Take(0x1000,generation) && lookups == 1,
+          "wrong-node consumption invalidates stale association before any model lookup");
+  handoff.Publish({1,0x1000,2,7}); current_generation=8;
+  Require(!handoff.Take(0x1000,generation),"model source-address reuse cannot borrow prior owned joint selection");
+  handoff.Publish({1,0x1000,2,8}); handoff.Publish({1,0,2,8});
+  Require(!handoff.Take(0x1000,generation),"failed/null lookup replaces prior pending selection");
+  handoff.Publish({1,0x1000,2,8}); handoff.Clear();
+  Require(!handoff.Take(0x1000,generation),"comparison suppression clears unrelated lookup provenance");
+  handoff.Publish({1,0x1000,kMaxNativeJoints,8});
+  Require(!handoff.Take(0x1000,generation),"joint identity bounds reject before publication");
+  constexpr uint32_t payload=0x7fc01234;
+  Require(animation_source::SameSampledChannelWord(payload,payload,9,7,3) &&
+          !animation_source::SameSampledChannelWord(payload,payload^1,9,7,3) &&
+          !animation_source::SameSampledChannelWord(payload,payload,9,7,7) &&
+          animation_source::SameSampledChannelWord(payload,payload,2,7,0) &&
+          !animation_source::SameSampledChannelWord(payload,payload^1,0,7,0),
+          "unsampled TR-only/no-op payloads require exact bits; sampled active nonfinite values and flag drift still fail");
 }
 void TestNativeControllerPlan() {
   Require(animation_source::ControllerSourceExtentFits(512,6,false) &&
@@ -1151,6 +1197,7 @@ void TestAnimationClips() {
   TestFirstMatchAnimationDescriptors();
   TestIndexedAnimationAssets();
   TestSelectedTrackAndRootMotion();
+  TestJointSelectionHandoff();
   TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

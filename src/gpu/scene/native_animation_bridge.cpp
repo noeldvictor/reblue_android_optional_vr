@@ -33,6 +33,8 @@ REX_EXTERN(__imp__bdVisualObjectAnimSlotUpdate);
 REX_EXTERN(__imp__bdAnimationUpdate);
 REX_EXTERN(__imp__sub_822D3CB0);
 REX_EXTERN(__imp__sub_8218FC98);
+REX_EXTERN(__imp__sub_8227EF60);
+REX_EXTERN(__imp__sub_8228A4E8);
 REX_EXTERN(__imp__sub_82289888);
 REX_EXTERN(__imp__sub_8228A3E8);
 REX_EXTERN(__imp__sub_82284BE0);
@@ -56,6 +58,7 @@ struct Store {
   uint64_t late_controllers=0, late_checks=0, late_samples=0, late_reused=0, late_handoffs=0;
   uint64_t slot_publications=0, slot_reused=0, late_refused=0;
   uint64_t root_requests=0, root_checks=0, root_tracks=0, root_absent=0, root_refused=0;
+  uint64_t joint_requests=0, joint_checks=0, joint_samples=0, joint_weighted=0, joint_refused=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -94,6 +97,9 @@ void Report(Store &store) {
   if (store.root_requests || store.root_absent || store.root_refused)
     BD_INFO("[native-animation-root] frame {} completed {} checked {} tracks {} absent {} refused {}; owned model selection and single-track sampling; outgoing root-motion adapter remains",
         frame,store.root_requests,store.root_checks,store.root_tracks,store.root_absent,store.root_refused);
+  if (store.joint_requests || store.joint_refused)
+    BD_INFO("[native-animation-joint] frame {} completed {} checked {} sampled {} weighted {} refused {}; generation-checked selection and owned single-track channels; placement adapter remains",
+        frame,store.joint_requests,store.joint_checks,store.joint_samples,store.joint_weighted,store.joint_refused);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -134,6 +140,7 @@ struct ReferenceScope {
 // Bounded one-shot handoff, not a process-wide source-address cache. Another
 // controller or a skeleton handoff consumes/replaces it on the same update lane.
 thread_local animation_source::ControllerHandoff completed_controller;
+thread_local animation_source::JointSelectionHandoff selected_joint;
 auto TakeCompletedLayer(uint32_t visual, uint32_t graph, uint64_t generation, uint32_t source) {
   bool changed=false;
   animation_source::ControllerHandoff::Difference difference;
@@ -438,6 +445,7 @@ bool RootMotion(PPCContext &ctx, uint8_t *base) {
       animation_source::ControllerLayer::Decode(previous));
   if (!result) return refuse("selected track");
   const auto records=result->Encode();
+  const uint32_t compared_channels=asset->FindTrack(key,asset->Indexed() ? 0u : joint->pose_index) ? asset->ChannelMask() : 0u;
   if (REXCVAR_GET(bd_native_materials_verify)) {
     ReferenceScope reference;
     __imp__sub_8218FC98(ctx,base);
@@ -446,10 +454,7 @@ bool RootMotion(PPCContext &ctx, uint8_t *base) {
     size_t first_word=0;
     for (size_t w=0; w<12; ++w) {
       const uint32_t expected=input[w], actual=records[0][w];
-      const bool active=(w>=2 && w<5 && (records[0][0]&1)) || (w>=5 && w<9 && (records[0][0]&2)) ||
-          (w>=9 && (records[0][0]&4));
-      const float a=std::bit_cast<float>(actual), b=std::bit_cast<float>(expected);
-      const bool equal=active ? std::isfinite(a) && std::isfinite(b) && std::abs(a-b) <= 1e-4f*std::max(1.0f,std::abs(b)) : actual == expected;
+      const bool equal=animation_source::SameSampledChannelWord(expected,actual,w,records[0][0],compared_channels);
       if (same && !equal) first_word=w; same &= equal;
     }
     auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.root_checks;
@@ -465,6 +470,71 @@ bool RootMotion(PPCContext &ctx, uint8_t *base) {
   ctx.r3.u32=1;
   auto &store=Clips(); std::lock_guard lock(store.mutex);
   ++store.root_requests; store.root_tracks+=asset->FindTrack(key,asset->Indexed() ? 0u : joint->pose_index) != nullptr; Report(store);
+  return true;
+}
+void PublishSelectedJoint(uint32_t graph, uint32_t pose, uint32_t node) {
+  if (!Enabled() || controller_reference || !node) return;
+  const auto model=FindLoadedNativeModel(graph);
+  if (!model || model->AnimationTargets().size() != model->Skeleton().size() ||
+      pose >= model->AnimationTargets().size() || Word(node) != pose ||
+      Word(uint64_t(node)+4) != model->AnimationTargets()[pose]) return;
+  selected_joint.Publish({graph,node,pose,model->Generation()});
+}
+bool SingleJoint(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) { selected_joint.Clear(); return false; }
+  auto refuse=[&](const char *reason) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (++store.joint_refused <= 4) BD_INFO("[native-animation-joint-refused] {}; original single-joint sample retained",reason);
+    return false;
+  };
+  const auto selection=selected_joint.Take(ctx.r4.u32,LoadedNativeModelGeneration);
+  const auto model=selection ? FindLoadedNativeModel(selection->graph) : nullptr;
+  if (!model || model->Generation() != selection->generation) return refuse("selected model generation");
+  const auto joint=std::ranges::find(model->Skeleton(),selection->pose,&NativeSkeletonJoint::pose_index);
+  if (joint == model->Skeleton().end() || selection->pose >= model->AnimationTargets().size()) return refuse("owned joint");
+  std::shared_ptr<const NativeAnimationAsset> asset;
+  { auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(ctx.r5.u32); }
+  const float weight=float(ctx.f2.f64), seconds=float(ctx.f1.f64/30.0);
+  if (!asset || !std::isfinite(weight) || !std::isfinite(seconds)) return refuse("selected asset/clock");
+  const auto compression=Word(kSamplerState), exclusions=Word(kSamplerState+4), depth=Word(kSamplerState+24), euler=Word(0x827A7EE4);
+  if (!compression || (asset->Indexed() && *compression) || !exclusions || !depth || !euler || ((*euler>>8)&255) ||
+      Word(0x820551AC) != std::bit_cast<uint32_t>(1.0f) || Word(0x82055230) != 0u) return refuse("sampler state");
+  const uint32_t destination=ctx.r3.u32;
+  if ((destination&3) || !Range(destination,48)) return refuse("single output");
+  std::array<animation_source::ChannelRecord,1> previous;
+  const auto *input=bd::mem::at<const be_u32>(destination);
+  for (size_t w=0; w<12; ++w) previous[0][w]=input[w];
+  ctx.fpscr.disableFlushMode();
+  auto result=animation_source::SampleRootMotion(*asset,model->AnimationTargets()[selection->pose],*joint,seconds,
+      animation_source::ControllerLayer::Decode(previous),weight);
+  if (!result) return refuse("owned channel blend");
+  const auto records=result->Encode();
+  const bool applied=weight >= kNativeAnimationWeightEpsilon;
+  const uint32_t compared_channels=applied && asset->FindTrack(model->AnimationTargets()[selection->pose],asset->Indexed() ? 0u : joint->pose_index) ? asset->ChannelMask() : 0u;
+  const uint32_t final_compression=!asset->Indexed() && applied ? 0u : *compression;
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    ReferenceScope reference;
+    __imp__sub_8228A4E8(ctx,base);
+    bool same=Word(kSamplerState) == final_compression && Word(kSamplerState+4) == *exclusions && Word(kSamplerState+24) == *depth;
+    size_t first_word=0;
+    for (size_t w=0; w<12; ++w) {
+      const uint32_t expected=input[w], actual=records[0][w];
+      const bool equal=animation_source::SameSampledChannelWord(expected,actual,w,records[0][0],compared_channels);
+      if (same && !equal) first_word=w; same &= equal;
+    }
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.joint_checks;
+    if (!same) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-joint-drift] model {} joint {} word {}; no fallback",model->Generation(),selection->pose,first_word);
+      throw std::runtime_error("Native single-joint comparison failed");
+    }
+  }
+  auto *output=bd::mem::at<be_u32>(destination);
+  for (size_t w=0; w<12; ++w) output[w]=records[0][w];
+  bd::mem::store<uint32_t>(kSamplerState,final_compression);
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++store.joint_requests; store.joint_samples+=compared_channels != 0;
+  store.joint_weighted+=compared_channels && weight < 1; Report(store);
   return true;
 }
 bool LateLayers(PPCContext &ctx, uint8_t *base) {
@@ -809,6 +879,18 @@ REX_HOOK_RAW(sub_8218FC98) {
     if (source) PrepareClip(*source);
   }
   if (!RootMotion(ctx,base)) __imp__sub_8218FC98(ctx,base);
+}
+REX_HOOK_RAW(sub_8227EF60) {
+  using namespace bd::gpu::scene::animation_bridge;
+  const uint32_t graph=ctx.r3.u32, pose=ctx.r4.u32;
+  selected_joint.Clear();
+  __imp__sub_8227EF60(ctx,base);
+  PublishSelectedJoint(graph,pose,ctx.r3.u32);
+}
+REX_HOOK_RAW(sub_8228A4E8) {
+  using namespace bd::gpu::scene::animation_bridge;
+  if (Enabled() && !controller_reference) PrepareClip(ctx.r5.u32);
+  if (!SingleJoint(ctx,base)) __imp__sub_8228A4E8(ctx,base);
 }
 REX_HOOK_RAW(sub_82289888) {
   if (!bd::gpu::scene::animation_bridge::Sample(ctx,base,false)) __imp__sub_82289888(ctx,base);

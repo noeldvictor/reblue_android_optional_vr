@@ -98,8 +98,10 @@ struct ControllerLayer {
 // whole-body sample. Dense source dispatch uses its FIRST descriptor even when
 // the selected model node has another pose identity; named clips use that name.
 inline std::optional<ControllerLayer> SampleRootMotion(const NativeAnimationAsset &asset,
-    uint32_t name, const NativeSkeletonJoint &joint, float seconds, ControllerLayer previous) {
-  if (!previous.Valid() || previous.channels.size() != 1 || !std::isfinite(seconds)) return {};
+    uint32_t name, const NativeSkeletonJoint &joint, float seconds, ControllerLayer previous, float weight=1) {
+  if (!previous.Valid() || previous.channels.size() != 1 || !std::isfinite(seconds) || !std::isfinite(weight)) return {};
+  if (weight <= 0 || weight < kNativeAnimationWeightEpsilon) return previous;
+  weight=std::min(weight,1.0f);
   const auto track_index=asset.Indexed() ? 0u : joint.pose_index;
   const auto *track=asset.FindTrack(name,track_index);
   if (!asset.Indexed()) previous.boundary[0].name=name;
@@ -107,10 +109,39 @@ inline std::optional<ControllerLayer> SampleRootMotion(const NativeAnimationAsse
   NativeJointChannels sampled;
   auto &channel=previous.channels[0]; auto &header=previous.boundary[0];
   if (!asset.SampleTarget(name,track_index,seconds,sampled) ||
-      !BlendNativeChannels(channel,sampled,joint.blend_rest,1,channel,asset.ChannelMask())) return {};
+      !BlendNativeChannels(channel,sampled,joint.blend_rest,weight,channel,asset.ChannelMask())) return {};
   header.flags=(header.flags&~7u) | (channel.translated ? 1u : 0u) | (channel.rotated ? 2u : 0u) | (channel.scaled ? 4u : 0u);
   if (track->Animated()) header.flags|=128;
   return previous;
+}
+
+// One lookup -> one sampler, on the same update lane. Only boundary identities
+// live here: no retained model/asset lease and no process-wide node-address map.
+// Any intervening lookup, mismatched node, or retired/reused model invalidates it.
+class JointSelectionHandoff {
+public:
+  struct Selection { uint32_t graph, node, pose; uint64_t generation; };
+  void Publish(Selection value) {
+    pending_.reset();
+    if (value.graph && value.node && value.generation && value.pose < kMaxNativeJoints) pending_=value;
+  }
+  template<class Generation>
+  std::optional<Selection> Take(uint32_t node, Generation &&generation) {
+    auto value=pending_; pending_.reset();
+    if (!value || value->node != node || generation(value->graph) != value->generation) return {};
+    return value;
+  }
+  void Clear() { pending_.reset(); }
+private:
+  std::optional<Selection> pending_;
+};
+
+inline bool SameSampledChannelWord(uint32_t expected, uint32_t actual, size_t word, uint32_t flags, uint32_t channel_mask) {
+  const bool active=(word>=2 && word<5 && (flags&channel_mask&1)) ||
+      (word>=5 && word<9 && (flags&channel_mask&2)) || (word>=9 && word<12 && (flags&channel_mask&4));
+  if (!active) return expected == actual;
+  const float a=std::bit_cast<float>(actual), b=std::bit_cast<float>(expected);
+  return std::isfinite(a) && std::isfinite(b) && std::abs(a-b) <= 1e-4f*std::max(1.0f,std::abs(b));
 }
 
 struct ControllerExecution {
