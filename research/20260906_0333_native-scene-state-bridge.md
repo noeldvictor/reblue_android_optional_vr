@@ -6475,3 +6475,94 @@ full overlap rather than reuse this derived value. Timestamp inventory finds no
 new raw/perf/cache/dump/image files; owner profile independently restored.
 README/active queue updated once for this bundle. Explicit local source/test/docs
 commit only; external push still denied with no new upload approval supplied.
+
+### 2026-09-08 native controller/channel ownership afterb3d1f7b
+
+User-requested push succeeded: all16 pending commits uploaded to the configured
+origin/main throughb3d1f7b; clean synchronized main before implementation.
+Continuation progress: native clock/layer plan and native TRS working buffers
+replace admitted controller scratch traffic; one-shot generation-checked values
+connect to the existing skeleton evaluator. The outgoing48-byte boundary still
+must compare unchanged to detect unconverted late writers; that read is NOT
+claimed removed. Complete original-controller comparison runs side effects once,
+never replays a partly published native transaction. Unsupported plans refuse
+before changes. No new guest hooks/codegen inputs or shader edits.
+
+First measured free63454601216B (after source work), pre-build63453863936B;
+no active renderer/compiler/build/test process. Previous recorded ending free
+63470657536B was higher; this inter-turn drive change is not attributed to the
+new source files or called cleanup. Scoped current build logs remain421138B/214,
+no producer has run this turn. Same cumulative floor62509998080B, no reset.
+Plan material59/CPU57 thenhost176, existing j4 wrapper: fixture64MiB,
+CPU8MiB,host192MiB maximum free-drop;300s,10MiB cumulative build logs.
+Expected fixture<16MiB overlap/host<192MiB; retain small text receipts and
+replace only superseded passing fixture/build logs after new checks succeed.
+No new raw/image/perf/cache producer. Live controller qualification remains
+pending until a distinct bounded observation and complete diagnostic overlap
+fit the unchanged75MiB runtime stop/100MiB diagnostic ceiling.
+
+Material59/CPU57 pass,412 artifact-free guards pass. Host176 build0, no guest
+objects/shaders; EXE49273856B hash10E455F95DCF08C9F305F45B13C4F515A80FE54212890557E80CDE6BBEFEEC86,
+PDB113270784B. Tail audit confirms effect reads channel data while collision
+records are separate; signed fractional UV wrap needs vector-denormal semantics.
+After grouped tail/observation fixes, material60/PID32648 build0,CPU58/PID27428
+PASS0.12s/CTest0.13s; host177/PID35888 build0, private bridge+link/codegen0writes.
+All jobs terminal. Host177 EXE49275904B/PDB113266688B, SHA256
+4C11FC7D3BA6B601EDEA8A60522B7ABADD7073AB554DDBFE5AFA0DC1FD41D3EF.
+Fixture60 EXE1263104B, SHA2566208293D4C0349278199BB8683AC87A91A064C8C45656D6C1830541A6A689A6B;
+tree10407859B/43files.60/58 replaces59/57 and58/56;177 replaces175/176 host receipts.
+Keep174/982's latest live import evidence and all unresolved failures.
+
+Next capture-free changed-controller observation reuses the opening sequence's
+previously observed layer compositions: >=1000 full controller comparisons,
+positive native mixes, >=256 interior-CLIP sample times, >=256 actual advancing
+slot clocks and >=256 validated native skeleton handoffs. Not interior-key,
+authored-subtree or scene/reload/pixel qualification. Existing ignored operator
+adds an exclusive ControllerAnimationProbe; prior thresholds remain unchanged.
+60s/400KiB log/192MiB maximum free-drop, full75MiB preflight overlap, no new
+raw/image/perf/cache/dumps, exact owner-profile restore. New observation changes
+whether complete controllers can replace standalone sampler dispatch in live
+objects, not whether previously absent subtree content eventually appears.
+
+Run983/PID25056/session81327 terminal19:50:13,exit1 explicit diagnostic-observed
+stop; original profile byte-exact hash independently verified. At frame1162:
+30460 matching controller transactions (including empty plans),3996 sampled,
+8 mixes,3839 interior-CLIP samples,4012 advancing slot clocks,3985 handoffs,
+6 changed/unreadable handoff refusals,5028 model/controller admission refusals.
+No drift; standalone6sampled/checked,wrong0; skeleton1122 has3524 matching
+evaluations/publications. Frame1137 isFieldActive,event1, not full field/reload
+qualification. No authored subtree, normal-mode tail pixels or game-stereo claim.
+Canonicalization reverified122->121tracks,93432B current charge,prepare-refused0;
+that replaces982's importer provenance. Keep979/980 and975/971/962 failures.
+Run983 text133297B SHA25664868E4469A9D62DF9E8642CC72405F9F227EDED4765FEEBE4B14F48D50C7D22.
+
+Final source extent review adds source-only multi-layer512-joint overlap refusal;
+native/sequential4096 capacity remains. Material61/PID32820 andCPU59/PID25736
+PASS0.12s/CTest0.13s,412 guards PASS0.231s; host178/PID32484 build0, one private
+bridge+link/codegen0writes, no guest objects/shaders. No further run;178 does NOT
+inherit177/983's exact binary qualification. Current hashes, source contracts
+and remaining interfaces in20260908_1951_native-animation-controller.md.
+Current material tree10409344B/43files,EXE1263104B. HostEXE49275904B/PDB113266688B.
+All producers terminal, owner profile restored, no queued build/runtime.
+
+Completed cleanup, each exact literal target inspected and no recursive deletion:
+58/56 plus59/57 and175/176 text:12files7736B,free63452467200->63452483584,
+16384B observed reclaim. After983 reverified import,982/174 text:3files151885B,
+free63455219712->63455375360,155648B observed reclaim. After61/59 passes,
+60/58 text:4files2163B,free63454162944->63454167040,4096B observed reclaim.
+Total19 superseded agent text files161784B logical/176128B observed reclaimed
+(172KiB); no earlier cleanup credited. Logs are removed, not recoverable from
+Git; tests/builds reproducible,982 source/hash history retained. No game data,
+profiles, assets, raw/image evidence or unresolved failure logs removed.
+
+Final pre-commit free63454167040B (59.10GiB), net434176B drive-wide use since
+the first63454601216B measurement AFTER source work (not a measured full-turn
+start). A later3.18MiB drive-wide free-space gain preceded cleanup and is not
+claimed as reclamation. Attributed partial retained growth445236B: fixturetree
++161495B,hostEXE/PDB+301568B,buildlogs-1767B,runtimelog-16060B. Other hostobjects,
+buildmetadata,source/Git and system activity are outside that subtotal.
+Fresh full operator accounting78087241B diagnostics;419371B/214build logs.
+No new raw/perf/cache/dump/image output;13window images still10434657B.
+Existing capture gate,75MiB runtime stop/100MiB diagnostic ceiling and cumulative
+floor62509998080B remain. README/active queue updated once for this bundle;
+only explicit source/tests/docs to commit/push, no binaries or diagnostic files.

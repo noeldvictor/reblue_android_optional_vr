@@ -850,15 +850,35 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    passes without guest objects/shaders; no indexed live content observed.
    Indexed pure application supports duplicate names, but the model importer
    still withholds ambiguous name tables, so that runtime admission remains open.
-   Next connect native controller channels through slot clocks/completed handoff
-   to retire outgoing scratch, without making absent dense content a permanent
-   blocker on that active path. Choose an actual authored layer/subtree transition before
-   another live probe, with advancing source-clock/interior-key observations;
-   no unchanged boot or reduced threshold. Indexed loader/content qualification,
+   **Native controller connection (host177/run983, opt-in):** native slot-clock
+   plans, TRS working layers and completed channel handoff replace admitted
+   controller scratch/memcpy/sampler dispatch. Preserve single clock subtraction,
+   adjacent-slot mixing, double-advanced overlays and signed UV phase. Collision/
+   effects run once; strict verification executes the complete original once.
+   Final material61/CPU59,412 guards andhost178 pass; no guest objects/shaders.
+   Host178 adds a source multi-layer overlap guard, not a smaller native joint
+   limit; last live evidence is177, not a restamp of the178 binary.
+   Run983:30460 matching controller transactions (includes empty plans),3996
+   samples,8 mixes,3839 interior-CLIP times,4012 advancing slot clocks,3985 native
+   skeleton handoffs. Six changed/unreadable boundary refusals and5028 model/
+   controller admission refusals require classification. Frame1137 context is
+   FieldActive,event1, not independent interactive/reload qualification.
+   The one-shot generation guard still checks outgoing48B data for late writes;
+   no claim that those reads, source slot selection or all exports are gone.
+   Native working values reach the existing skeleton/instance/render owners;
+   temporary flag/name sidecars stay confined to the outgoing adapter.
+   Run983 also positively re-verifies first-match import:122->121tracks,
+   prepare-refused0. Its current asset layout charges93432B, not174's93424B.
+   Superseded174/982 text retired; source/hash findings and979/980 failures remain.
+   Next migrate remaining channel writers/source selection, remove validation/
+   exports when their last consumer retires, and select actual authored subtree/
+   indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
+   reduced threshold. Indexed loader/content qualification,
    inherited dense compression/nonzero Euler modes, late writers/special bones,
    persistent cooking, outgoing48-byte channels/palettes and full desktop/both-eye
    gates remain. Preserve975's reload and971/962's pixel failures; defaults
    unchanged, no Quest work.
+   [Controller transaction, handoff, source contracts and live evidence](../research/20260908_1951_native-animation-controller.md).
    [Indexed connection, source boundaries and exact verification](../research/20260908_1916_native-indexed-animation.md).
    [Named/importer source contracts and checkpoint](../research/20260906_0333_native-scene-state-bridge.md#2026-09-08-named-animation-inputs-and-importer-contracts-after52a9510).
    [Weighted/layer contracts and scoped verification](../research/20260908_1824_native-animation-layers.md).

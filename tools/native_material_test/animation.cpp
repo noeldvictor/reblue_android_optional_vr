@@ -1,4 +1,5 @@
 #include "gpu/scene/native_animation_source.h"
+#include "gpu/scene/native_animation_controller_source.h"
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include <iostream>
@@ -771,6 +772,9 @@ void TestIndexedAnimationAssets() {
       Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,float(step)/128,1,2,false,actual,{},true) &&
               animation_source::ApplyKeyedLayer(*named,names,skeleton,float(step)/128,1,2,false,expected,{},true) &&
               actual == expected,"indexed and named source-free imports reach identical whole channels through reordered native joints");
+      animation_source::ControllerLayer working(3);
+      Require(working.Apply(*asset,names,skeleton,float(step)/128,1,2,false,{},true) && working.Encode() == actual,
+              "native controller working channels match the indexed outgoing ABI without intermediate packing");
     }
     std::vector<animation_source::ChannelRecord> records(3);
     for (size_t n=0; n<3; ++n) {
@@ -779,6 +783,7 @@ void TestIndexedAnimationAssets() {
       if (type == 1) for (unsigned word=9; word<12; ++word) record[word]=std::bit_cast<uint32_t>(4.0f);
     }
     const auto before=records;
+    auto working=animation_source::ControllerLayer::Decode(before);
     const std::array<std::string_view,31> invalid_exclusions{};
     const NativeAnimationFilter ignored{"an overlong ignored indexed filter",invalid_exclusions,false};
     Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,.5f,0,true,records,ignored) &&
@@ -792,6 +797,8 @@ void TestIndexedAnimationAssets() {
       Require(std::bit_cast<float>(records[0][9]) == 3 && std::bit_cast<float>(records[1][9]) == 3,
               "indexed missing scale blends against owned authored rest scale");
     }
+    Require(working.Apply(*asset,names,skeleton,.25f,.5f,0,true,ignored,false) && working.Encode() == records,
+            "working layers preserve ignored TR-only NaN scale payloads, activation, filters and headers");
     records=before;
     Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,.25f,1,2,false,records) &&
             records[0][1] == before[0][1] && !(records[1][0]&1) && (records[2][0]&128),
@@ -827,6 +834,158 @@ void TestIndexedAnimationAssets() {
             "published indexed poses outlive source, asset and instance retirement");
   }
 }
+
+NativeJointName ControllerName(std::string_view text) {
+  NativeJointName name{{},uint8_t(text.size())};
+  std::ranges::copy(text,name.bytes.begin()); return name;
+}
+void TestNativeControllerPlan() {
+  Require(animation_source::ControllerSourceExtentFits(512,6,false) &&
+          !animation_source::ControllerSourceExtentFits(513,2,false) &&
+          animation_source::ControllerSourceExtentFits(4096,2,true) &&
+          animation_source::ControllerSourceExtentFits(4096,1,false) &&
+          !animation_source::ControllerSourceExtentFits(4097,1,false),
+          "source multi-layer overlap is refused without imposing console stride limits on native sequential plans");
+  const auto offsets=AdvanceNativeAnimationOffsets({1.75f,-1.75f,2,0},{.5f,-.5f,0,std::numeric_limits<float>::denorm_min()});
+  Require(offsets[0] == .25f && offsets[1] == -.25f && std::bit_cast<uint32_t>(offsets[2]) == 0x80000000u &&
+          std::bit_cast<uint32_t>(offsets[3]) == 0x80000000u,"native UV phase preserves signed fractional wrap and vector denormal flush");
+  NativeAnimationControllerInput input; input.active=3; input.delta_ticks=1;
+  for (auto &slot : input.slots) {
+    slot.present=true; slot.loop=true; slot.weight=.5f; slot.target_weight=1; slot.weight_rate=.125f;
+    slot.time_ticks=29; slot.time_rate=2; slot.duration_ticks=30; slot.contribution=1;
+  }
+  input.slots[0].contribution=2; input.slots[1].contribution=3; input.slots[2].contribution=5;
+  auto plan=PlanNativeAnimationController(input);
+  Require(plan && plan->count == 7 && plan->slots[0].loops == 1 && plan->slots[0].time_ticks == 1 &&
+          plan->slots[0].weight == .625f,"native plan owns all active clocks and complete three-layer composition");
+  Require(plan->steps[4].kind == NativeAnimationStep::Kind::Mix && plan->steps[4].weight == .6f &&
+          plan->steps[4].left == 0 && plan->steps[5].weight == .625f && plan->steps[5].left == kNativeAnimationCombined &&
+          plan->steps[6].weight == .625f,"three-layer order retains adjacent-slot denominator and final base weight");
+  input.slots[0].loops=UINT32_MAX; input.slots[0].time_ticks=100;
+  plan=PlanNativeAnimationController(input);
+  Require(plan && plan->slots[0].loops == 0 && plan->slots[0].time_ticks == 72 && plan->steps[0].seconds == 1,
+          "clock wraps unsigned loop count once, retains overshoot state, clamps only whole sampling");
+  input.slots[0].loop=false; input.slots[0].weight=-2; input.slots[0].weight_rate=-.25f;
+  plan=PlanNativeAnimationController(input);
+  Require(plan && plan->slots[0].time_ticks == 30 && plan->slots[0].weight == -2.25f,
+          "nonlooping clocks clamp upper duration; negative weight ramps are not clamped to zero");
+  auto broken=input; broken.slots[1].present=false;
+  Require(!PlanNativeAnimationController(broken),"positive absent layer refuses stale scratch before any publication");
+  broken=input; broken.active=0;
+  Require(!PlanNativeAnimationController(broken),"empty multi-layer plan must not invent stale combined scratch");
+  broken=input; broken.active=7;
+  Require(!PlanNativeAnimationController(broken),"physical slot bounds are checked");
+  broken=input; broken.delta_ticks=std::numeric_limits<float>::infinity();
+  Require(!PlanNativeAnimationController(broken),"nonfinite clocks refuse transactionally");
+  input.active=2; input.sequential=true; input.overlay_count=3;
+  input.overlays[1]=ControllerName("arm"); input.overlays[2]=ControllerName("root");
+  input.slots[0].weight=.5f; input.slots[0].weight_rate=0;
+  plan=PlanNativeAnimationController(input);
+  Require(plan && plan->count == 4 && plan->slots[1].time_ticks == 3 && plan->slots[1].weight == .75f &&
+          plan->slots[2].time_ticks == 1 && plan->steps[2].subtree && plan->steps[2].root.View() == "arm",
+          "active overlay advances twice in original order; separate overlay advances once with owned name");
+  input.active=1; input.overlay_count=0; input.slots[0].time_ticks=0; input.slots[0].time_rate=-2;
+  plan=PlanNativeAnimationController(input);
+  Require(plan && plan->slots[0].time_ticks == -2 && plan->steps[0].seconds == 0,
+          "negative authored clock survives while slot sampling independently clamps to zero");
+  input.slots[0].time_ticks=30; input.slots[0].time_rate=0; input.slots[0].loop=true; input.slots[0].loops=4;
+  plan=PlanNativeAnimationController(input);
+  Require(plan && plan->slots[0].loops == 4,"exact duration does not increment loop counter");
+  input.slots[0].weight=-1; input.replace_slots=true;
+  plan=PlanNativeAnimationController(input);
+  Require(plan && plan->count == 1 && plan->steps[0].reset && plan->steps[0].weight == 1,
+          "replacement mode samples even a negative-weight slot");
+}
+void TestNativeControllerConsumption() {
+  ClipSource source;
+  auto imported=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){ return source.Read(address); });
+  Require(imported.has_value(),"controller imports through production asset boundary");
+  auto asset=std::make_shared<const NativeAnimationAsset>(std::move(*imported));
+  source.words.clear();
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u};
+  std::array<NativeSkeletonJoint,3> skeleton;
+  skeleton[0].pose_index=2; skeleton[0].animation_name=ControllerName("root");
+  skeleton[1].pose_index=0; skeleton[1].parent=0; skeleton[1].animation_name=ControllerName("arm");
+  skeleton[2].pose_index=1; skeleton[2].parent=0; skeleton[2].animation_name=ControllerName("hand");
+  for (auto &joint : skeleton) {
+    joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+    joint.blend_rest.translation={10,0,0};
+  }
+  std::array<std::shared_ptr<const NativeAnimationAsset>,6> assets; assets.fill(asset);
+  NativeAnimationControllerInput input; input.active=3; input.delta_ticks=.5f;
+  for (size_t n=0; n<6; ++n) {
+    auto &slot=input.slots[n]; slot.present=true; slot.weight=.5f; slot.target_weight=1;
+    slot.time_ticks=float(n)*3; slot.time_rate=1; slot.duration_ticks=30; slot.contribution=float(n+1);
+  }
+  for (unsigned frame=0; frame<65; ++frame) {
+    input.slots[0].time_ticks=float(frame)/4;
+    const auto plan=PlanNativeAnimationController(input);
+    Require(plan.has_value(),"advancing native controller plan");
+    std::vector<animation_source::ChannelRecord> initial(3);
+    for (auto &record : initial) { record[0]=128|64; record[1]=0xFEED; record[5]=0x7fc01234; }
+    const auto result=animation_source::ExecuteController(*plan,assets,names,skeleton,
+        animation_source::ControllerLayer::Decode(initial),0,{});
+    Require(result && result->sampled == 3 && result->mixed == 3 && result->interior == 3,
+            "owned controller executes all sampled/mixed interior layers");
+    std::array<std::vector<animation_source::ChannelRecord>,8> reference;
+    reference[7]=initial; for (auto &record : reference[7]) record[0]&=~128u;
+    // Independent, previously live-checked ABI operations validate the new
+    // working representation. Plan ordering has separate literal checks above.
+    for (size_t n=0; n<plan->count; ++n) {
+      const auto &step=plan->steps[n]; auto &destination=reference[step.destination];
+      if (step.kind == NativeAnimationStep::Kind::Copy) destination=reference[step.left];
+      else if (step.kind == NativeAnimationStep::Kind::Mix) {
+        Require(animation_source::MixChannelRecords(reference[step.left],reference[step.right],step.weight,
+            step.destination == 6 && step.left == 6,false,destination),"reference layer composition");
+      } else {
+        if (step.reset) destination.resize(3);
+        Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,step.seconds,step.weight,2,false,destination,{{},{},true},step.reset),
+                "reference whole clip application");
+      }
+    }
+    Require(result->output.Encode() == reference[7],"native working layers equal every outgoing channel word across advancing frames");
+    std::vector<RenderMatrix> pose;
+    Require(EvaluateNativeSkeleton(skeleton,result->output.channels,JointIdentity(),pose),
+            "completed controller values feed native hierarchy directly, without channel record decoding");
+    NativeInstanceRegistry instances; const auto instance=instances.Create(91);
+    Require(instances.Publish(instance,0,pose) && instances.Transfer(instance,0,1,3),"controller pose enters existing instance/render owners");
+    auto retained=instances.Read(instance,1); instances.Retire(instance);
+    Require(retained && retained->transforms == pose,"controller-derived poses outlive retirement");
+  }
+  input.active=1; input.overlay_count=2; input.overlays[1]=ControllerName("arm");
+  const auto plan=PlanNativeAnimationController(input);
+  const std::array excluded{ControllerName("arm")};
+  auto result=animation_source::ExecuteController(*plan,assets,names,skeleton,animation_source::ControllerLayer(3),0,excluded);
+  Require(result && result->subtree == 1 && result->exclusions == 0 && result->output.channels[0].translated,
+          "whole-body exclusions followed by named forced-subtree overlay use the same native values");
+  auto missing=assets; missing[1].reset();
+  Require(!animation_source::ExecuteController(*plan,missing,names,skeleton,animation_source::ControllerLayer(3),0,excluded),
+          "missing overlay asset refuses whole transaction, not a partially published base pose");
+  auto bad_plan=*plan; bad_plan.steps[1].seconds=-1;
+  Require(!animation_source::ExecuteController(bad_plan,assets,names,skeleton,animation_source::ControllerLayer(3),0,excluded),
+          "direct overlay does not silently clamp out-of-range clock");
+  const auto records=result->output.Encode();
+  animation_source::ControllerHandoff handoff;
+  auto publish=[&] { return handoff.Publish({1,2,0x8000,3,result->output.channels,records}); };
+  unsigned reads=0;
+  auto read=[&](uint64_t address)->std::optional<uint32_t> {
+    ++reads;
+    if (address < 0x8000 || address >= 0x8090 || (address&3)) return {};
+    return records[(address-0x8000)/48][((address-0x8000)%48)/4];
+  };
+  bool changed=false;
+  Require(publish() && !handoff.Take(1,2,4,0x8000,read,changed) && reads == 0,
+          "generation reuse rejects stale handoff before source reads");
+  Require(publish() && handoff.Take(1,2,3,0x8000,read,changed).has_value() && reads == 36 &&
+          !handoff.Take(1,2,3,0x8000,read,changed),"completed native channel handoff is validated and consumed exactly once");
+  Require(publish() && !handoff.Take(1,2,3,0x8000,[&](uint64_t address) {
+    auto word=read(address); if (address == 0x8008) *word^=1; return word;
+  },changed) && changed,"late channel writes reject rather than silently reuse stale native state");
+  Require(publish(),"publish before retirement"); handoff.Retire(1);
+  Require(!handoff.Take(1,2,3,0x8000,read,changed),"visual retirement invalidates pending native channels");
+  Require(publish() && !handoff.Publish({1,2,UINT32_MAX-3,3,result->output.channels,records}) &&
+          !handoff.Take(1,2,3,0x8000,read,changed),"overflowing failed replacement clears stale pending ownership");
+}
 } // namespace
 void TestAnimationClips() {
   TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
@@ -835,5 +994,6 @@ void TestAnimationClips() {
   TestConstantTimesAndScaleTail(); TestNamedAnimationSelection();
   TestFirstMatchAnimationDescriptors();
   TestIndexedAnimationAssets();
+  TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

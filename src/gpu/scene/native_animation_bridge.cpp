@@ -4,6 +4,8 @@
  * @license BSD 3-Clause, see LICENSE
  */
 #include "gpu/scene/native_animation_source.h"
+#include "gpu/scene/native_animation_controller_source.h"
+#include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_model_materials.h"
@@ -32,6 +34,8 @@ REX_EXTERN(__imp__bdAnimationUpdate);
 REX_EXTERN(__imp__sub_82289888);
 REX_EXTERN(__imp__sub_8228A3E8);
 REX_EXTERN(__imp__sub_82284BE0);
+REX_EXTERN(bdVisualObjectCollisionTestNearby);
+REX_EXTERN(bdEffectUpdate);
 
 namespace bd::gpu::scene::animation_bridge {
 namespace {
@@ -44,6 +48,9 @@ struct Store {
   uint64_t loaded = 0, load_refused = 0, sampled = 0, whole = 0, preserved = 0, checks = 0, wrong = 0;
   uint64_t cubic = 0, registered = 0, prepare_refused = 0, weighted = 0, subtree = 0;
   uint64_t mixed = 0, mix_checks = 0, filtered = 0, canonicalized = 0, indexed = 0;
+  uint64_t controllers=0, controller_checks=0, controller_refused=0, controller_samples=0, controller_mixes=0;
+  uint64_t controller_interior=0, controller_subtree=0, channel_handoffs=0, channel_changed=0;
+  uint64_t controller_advancing=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -71,6 +78,10 @@ void Report(Store &store) {
       store.sampled,store.whole,store.preserved,unavailable,store.checks,store.wrong,store.cubic,
       store.registered,store.assets.Size(),store.prepare_refused,store.weighted,store.subtree,store.mixed,store.mix_checks,store.filtered,store.indexed);
   store.frame = frame;
+  if (store.controllers || store.controller_refused)
+    BD_INFO("[native-animation-controller] frame {} completed {} checked {} refused {}; samples {} mixes {} subtree {} interior {}; handoffs {} changed {}; advancing {}; native clocks/layers, one outgoing boundary; late-writer validation remains",
+        frame,store.controllers,store.controller_checks,store.controller_refused,store.controller_samples,store.controller_mixes,
+        store.controller_subtree,store.controller_interior,store.channel_handoffs,store.channel_changed,store.controller_advancing);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -101,6 +112,10 @@ void Import(uint32_t source) {
   }
 }
 thread_local uint32_t slot_graph = 0;
+thread_local bool controller_reference=false;
+// Bounded one-shot handoff, not a process-wide source-address cache. Another
+// controller or a skeleton handoff consumes/replaces it on the same update lane.
+thread_local animation_source::ControllerHandoff completed_controller;
 void PrepareSlot(uint32_t visual, uint32_t slot) {
   const auto source = animation_source::SelectedSlotSource(visual,slot,Word);
   if (!source || !*source) return;
@@ -142,7 +157,7 @@ struct SlotScope {
   ~SlotScope() { slot_graph=previous; }
 };
 bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
-  if (!Enabled()) return false;
+  if (!Enabled() || controller_reference) return false;
   const float weight=preserve ? float(ctx.f2.f64) : 1.0f;
   if (!std::isfinite(weight)) return Unavailable(Missing::Weight);
   // The original dispatcher returns before touching nodes, channels or globals.
@@ -257,7 +272,7 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   return true;
 }
 bool Mix(PPCContext &ctx, uint8_t *base) {
-  if (!Enabled()) return false;
+  if (!Enabled() || controller_reference) return false;
   if (ctx.r4.s32 <= 0) return true;
   const auto model=FindLoadedNativeModel(slot_graph);
   const uint32_t count=ctx.r4.u32, destination=ctx.r3.u32, left=ctx.r5.u32, right=ctx.r6.u32;
@@ -302,8 +317,221 @@ bool Mix(PPCContext &ctx, uint8_t *base) {
   auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.mixed; Report(store);
   return true;
 }
+
+std::optional<float> Scalar(uint64_t address) {
+  const auto value=Word(address);
+  if (!value) return {};
+  const float scalar=std::bit_cast<float>(*value);
+  return std::isfinite(scalar) ? std::optional(scalar) : std::nullopt;
+}
+std::optional<std::vector<uint32_t>> PointerVector(uint64_t begin_address, uint64_t end_address, size_t maximum) {
+  const auto begin=Word(begin_address), end=Word(end_address);
+  if (!begin || !end) return {};
+  if (!*begin) return std::vector<uint32_t>{};
+  if (*end < *begin || ((*end-*begin)&3) || (*end-*begin)/4 > maximum) return {};
+  std::vector<uint32_t> values;
+  for (uint64_t address=*begin; address<*end; address+=4) {
+    const auto value=Word(address); if (!value) return {}; values.push_back(*value);
+  }
+  return values;
+}
+std::optional<uint32_t> SourceNode(uint32_t graph, uint32_t pose, size_t count) {
+  const auto first=Word(uint64_t(graph)+16); if (!first || !*first) return {};
+  std::vector<uint32_t> pending{*first}; std::unordered_set<uint32_t> seen;
+  while (!pending.empty()) {
+    const uint32_t node=pending.back(); pending.pop_back();
+    if (!seen.insert(node).second || seen.size() > count) return {};
+    const auto index=Word(node), child=Word(uint64_t(node)+56), sibling=Word(uint64_t(node)+60);
+    if (!index || !child || !sibling) return {};
+    if (*index == pose) return node;
+    if (*sibling) pending.push_back(*sibling);
+    if (*child) pending.push_back(*child);
+  }
+  return {};
+}
+bool Controller(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  ctx.fpscr.disableFlushMode(); // Same scalar mode as the original prologue/exit.
+  completed_controller.Clear();
+  auto refuse=[&](const char *reason) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (++store.controller_refused <= 6) BD_INFO("[native-animation-controller-refused] {}; original complete controller retained",reason);
+    return false;
+  };
+  const uint32_t visual=ctx.r3.u32;
+  const auto model=FindLoadedNativeModel(slot_graph);
+  const auto count=Word(uint64_t(visual)+1868), output=Word(uint64_t(visual)+2628), active=Word(uint64_t(visual)+2208);
+  const auto delta=Scalar(0x82DDA880);
+  const auto mode=Word(0x82DEBEEC), stamp=Word(0x82DC99C4), initialized=Word(0x82E18660);
+  const auto compression=Word(kSamplerState), exclusion_count=Word(kSamplerState+4), euler=Word(0x827A7EE4);
+  if (!model || model->AnimationTargets().empty() || !count || *count != model->Skeleton().size() ||
+      !output || (*output&3) || !Range(*output,uint64_t(*count)*48) || !active || *active > kNativeAnimationSlots ||
+      !delta || !mode || !stamp || !initialized || !compression || !exclusion_count || *exclusion_count > 30 ||
+      !euler || ((*euler>>8)&255) || !Range(kSamplerState,28) || !Range(uint64_t(visual)+1872,6*56) ||
+      !Range(uint64_t(visual)+3476,4) || Word(0x820551AC) != std::bit_cast<uint32_t>(1.0f) || Word(0x82055230) != 0u)
+    return refuse("model/controller boundary");
+  NativeAnimationControllerInput input; input.active=*active; input.delta_ticks=*delta;
+  input.sequential=ctx.r4.u32 == 1; input.replace_slots=*mode != 0;
+  if (!animation_source::ControllerSourceExtentFits(*count,*active,input.sequential)) return refuse("overlapping source layer extents");
+  std::array<std::shared_ptr<const NativeAnimationAsset>,kNativeAnimationSlots> assets;
+  std::array<uint8_t,16> included_bytes;
+  for (size_t n=0; n<16; ++n) included_bytes[n]=bd::mem::load<uint8_t>(kSamplerState+8+uint32_t(n));
+  for (uint32_t n=0; n<kNativeAnimationSlots; ++n) {
+    auto &slot=input.slots[n]; const uint64_t address=uint64_t(visual)+n*56;
+    const auto entry=Word(address+1920);
+    const auto contribution=Scalar(address+1924);
+    if (!entry) return refuse("slot entry");
+    slot.present=*entry != 0;
+    // Contributions of absent slots still participate in the multi-layer loop.
+    if (*active != 1 && !input.sequential && n < *active) {
+      if (!contribution) return refuse("layer contribution"); slot.contribution=*contribution;
+    }
+    if (!slot.present) continue;
+    const auto source=Word(uint64_t(*entry)+12), loop=Word(address+1876), loops=Word(address+1880);
+    const auto weight=Scalar(address+1884), target=Scalar(address+1888), rate=Scalar(address+1892),
+        time=Scalar(address+1896), speed=Scalar(address+1900);
+    const auto duration=source ? animation_source::Half(uint64_t(*source)+4,Word) : std::nullopt;
+    if (!source || !*source || !loop || !loops || !weight || !target || !rate || !time || !speed || !duration)
+      return refuse("slot clock");
+    slot.loop=*loop != 0; slot.loops=*loops; slot.weight=*weight; slot.target_weight=*target; slot.weight_rate=*rate;
+    slot.time_ticks=*time; slot.time_rate=*speed; slot.duration_ticks=float(*duration);
+    slot.included=skeleton_source::ReadJointName(address+1904,Word);
+    if (!slot.included.Valid()) return refuse("slot name");
+    if (n < *active) for (size_t b=0; b<=slot.included.length; ++b) included_bytes[b]=uint8_t(slot.included.bytes[b]);
+    { auto &store=Clips(); std::lock_guard lock(store.mutex); assets[n]=store.assets.Find(*source); }
+  }
+  included_bytes[0]=0;
+  std::vector<uint32_t> exclusions;
+  if (ctx.r5.u32) {
+    const auto overlays=PointerVector(uint64_t(ctx.r5.u32)+4,uint64_t(ctx.r5.u32)+8,kNativeAnimationSlots);
+    if (!overlays) return refuse("overlay names");
+    input.overlay_count=uint32_t(overlays->size());
+    for (uint32_t n=1; n<input.overlay_count; ++n) {
+      if (!(*overlays)[n]) return refuse("null overlay name");
+      input.overlays[n]=skeleton_source::ReadJointName((*overlays)[n],Word);
+      if (!input.overlays[n].Valid()) return refuse("overlay name extent");
+      exclusions.push_back((*overlays)[n]);
+    }
+  }
+  const auto excluded_nodes=PointerVector(uint64_t(visual)+4616,uint64_t(visual)+4620,30);
+  if (!excluded_nodes || exclusions.size()+excluded_nodes->size() > 30) return refuse("excluded nodes");
+  for (uint32_t pose : *excluded_nodes) {
+    const auto node=SourceNode(slot_graph,pose,*count);
+    if (!node) return refuse("unresolved excluded node");
+    exclusions.push_back(*node+64);
+  }
+  const bool write_exclusions=!exclusions.empty();
+  if (!write_exclusions) for (uint32_t n=0; n<*exclusion_count; ++n) {
+    const auto pointer=Word(0x82DBEC70+uint64_t(n)*4);
+    if (!pointer) return refuse("inherited exclusions"); exclusions.push_back(*pointer);
+  }
+  std::vector<NativeJointName> excluded_names;
+  for (uint32_t pointer : exclusions) {
+    auto name=pointer ? skeleton_source::ReadJointName(pointer,Word) : NativeJointName{};
+    if (pointer && !name.Valid()) return refuse("excluded name"); excluded_names.push_back(name);
+  }
+  const auto plan=PlanNativeAnimationController(input);
+  if (!plan) return refuse("incomplete native layer plan");
+  std::vector<animation_source::ChannelRecord> before(*count);
+  const auto *source_channels=bd::mem::at<const be_u32>(*output);
+  for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) before[n][w]=source_channels[n*12+w];
+  auto result=animation_source::ExecuteController(*plan,assets,model->AnimationTargets(),model->Skeleton(),
+      animation_source::ControllerLayer::Decode(before),*compression,excluded_names);
+  if (!result) return refuse("native layer execution");
+  const auto records=result->output.Encode();
+  if (records.size() != *count || (write_exclusions && !Range(0x82DBEC70,exclusions.size()*4))) return refuse("outgoing boundary");
+  const bool verify=REXCVAR_GET(bd_native_materials_verify);
+  if (verify) {
+    struct ReferenceScope {
+      bool previous=controller_reference;
+      ReferenceScope() { controller_reference=true; }
+      ~ReferenceScope() { controller_reference=previous; }
+    } reference;
+    // Full original executes side effects exactly once, with original channels.
+    // Native slot/channel transactions have not modified source state yet.
+    __imp__bdAnimationUpdate(ctx,base);
+    bool same=Word(uint64_t(visual)+3476) == *stamp && Word(0x82E18660) == (*initialized|1u) &&
+        Word(kSamplerState) == result->compression && Word(kSamplerState+4) == result->exclusions && Word(kSamplerState+24) == 0u;
+    for (uint32_t n=0; n<kNativeAnimationSlots; ++n) if (plan->advanced[n]) {
+      const uint64_t address=uint64_t(visual)+n*56; const auto &slot=plan->slots[n];
+      same &= Word(address+1880) == slot.loops && Word(address+1884) == std::bit_cast<uint32_t>(slot.weight) &&
+          Word(address+1896) == std::bit_cast<uint32_t>(slot.time_ticks);
+    }
+    for (size_t n=0; n<16; ++n) same &= bd::mem::load<uint8_t>(kSamplerState+8+uint32_t(n)) == included_bytes[n];
+    if (write_exclusions) for (size_t n=0; n<exclusions.size(); ++n) same &= Word(0x82DBEC70+n*4) == exclusions[n];
+    size_t first_joint=0, first_word=0; bool channel_same=true;
+    for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) {
+      const uint32_t expected=source_channels[n*12+w], actual=records[n][w];
+      const bool active_value=(w>=2 && w<5 && (records[n][0]&1)) ||
+          (w>=5 && w<9 && (records[n][0]&2)) || (w>=9 && (records[n][0]&4));
+      const float a=std::bit_cast<float>(actual), b=std::bit_cast<float>(expected);
+      const bool equal=active_value ? std::isfinite(a) && std::isfinite(b) && std::abs(a-b) <= 1e-4f*std::max(1.0f,std::abs(b)) : actual == expected;
+      if (channel_same && !equal) { first_joint=n; first_word=w; } channel_same &= equal;
+    }
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.controller_checks;
+    if (!same || !channel_same) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-controller-drift] model {} state {} channels {} joint {} word {}; no fallback or second side-effect update",
+          model->Generation(),same,channel_same,first_joint,first_word);
+      throw std::runtime_error("Native animation controller comparison failed");
+    }
+  }
+  for (uint32_t n=0; n<kNativeAnimationSlots; ++n) if (plan->advanced[n]) {
+    const uint32_t address=visual+n*56; const auto &slot=plan->slots[n];
+    bd::mem::store<uint32_t>(address+1880,slot.loops); bd::mem::store<float>(address+1884,slot.weight);
+    bd::mem::store<float>(address+1896,slot.time_ticks);
+  }
+  bd::mem::store<uint32_t>(visual+3476,*stamp); bd::mem::store<uint32_t>(0x82E18660,*initialized|1u);
+  bd::mem::store<uint32_t>(kSamplerState,result->compression); bd::mem::store<uint32_t>(kSamplerState+4,result->exclusions);
+  bd::mem::store<uint32_t>(kSamplerState+24,0);
+  for (size_t n=0; n<16; ++n) bd::mem::store<uint8_t>(kSamplerState+8+uint32_t(n),included_bytes[n]);
+  if (write_exclusions) for (size_t n=0; n<exclusions.size(); ++n) bd::mem::store<uint32_t>(0x82DBEC70+uint32_t(n)*4,exclusions[n]);
+  auto *destination=bd::mem::at<be_u32>(*output);
+  for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) destination[n*12+w]=records[n][w];
+  if (!completed_controller.Publish({visual,slot_graph,*output,model->Generation(),std::move(result->output.channels),records}))
+    throw std::runtime_error("Native animation completed channel publication refused");
+  if (!verify) {
+    // Authored gameplay/effect side effects remain outside the native layer plan.
+    if (bd::mem::load<uint32_t>(visual+3532) && bd::mem::load<uint32_t>(visual+3000) == 3) {
+      ctx.r3.u32=visual; bdVisualObjectCollisionTestNearby(ctx,base);
+    }
+    if (bd::mem::load<uint32_t>(visual+3560)) { ctx.r3.u32=visual; bdEffectUpdate(ctx,base); }
+    if (bd::mem::load<uint32_t>(visual+3440)) {
+      ctx.fpscr.disableFlushMode();
+      std::array<float,4> offsets, rates;
+      for (uint32_t n=0; n<4; ++n) {
+        offsets[n]=bd::mem::load<float>(visual+3444+n*4); rates[n]=bd::mem::load<float>(visual+3460+n*4);
+      }
+      const auto advanced=AdvanceNativeAnimationOffsets(offsets,rates);
+      for (uint32_t n=0; n<4; ++n) bd::mem::store<float>(visual+3444+n*4,advanced[n]);
+    }
+  }
+  auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.controllers;
+  for (size_t n=0; n<kNativeAnimationSlots; ++n)
+    store.controller_advancing+=plan->advanced[n] && plan->slots[n].time_ticks != input.slots[n].time_ticks;
+  store.controller_samples+=result->sampled; store.controller_mixes+=result->mixed;
+  store.controller_subtree+=result->subtree; store.controller_interior+=result->interior; Report(store);
+  ctx.fpscr.disableFlushMode();
+  return true;
+}
 } // namespace
 } // namespace bd::gpu::scene::animation_bridge
+
+namespace bd::gpu::scene {
+std::optional<std::vector<NativeJointChannels>> TakeNativeAnimationChannels(
+    uint32_t visual, uint32_t graph, uint64_t generation, uint32_t source) {
+  using namespace animation_bridge;
+  if (!Enabled()) { completed_controller.Clear(); return {}; }
+  bool changed=false;
+  auto channels=completed_controller.Take(visual,graph,generation,source,Word,changed);
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  store.channel_handoffs+=channels.has_value(); store.channel_changed+=changed;
+  return channels;
+}
+void RetireNativeAnimationChannels(uint32_t visual) {
+  animation_bridge::completed_controller.Retire(visual);
+}
+}
 
 REX_HOOK_RAW(sub_8217BD70) {
   const uint32_t owner = ctx.r3.u32;
@@ -338,8 +566,7 @@ REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
 }
 REX_HOOK_RAW(bdAnimationUpdate) {
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
-  // Preserve authored slot clocks, layer ordering, collision and effect updates.
-  __imp__bdAnimationUpdate(ctx,base);
+  if (!bd::gpu::scene::animation_bridge::Controller(ctx,base)) __imp__bdAnimationUpdate(ctx,base);
 }
 REX_HOOK_RAW(sub_82289888) {
   if (!bd::gpu::scene::animation_bridge::Sample(ctx,base,false)) __imp__sub_82289888(ctx,base);

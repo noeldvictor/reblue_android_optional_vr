@@ -145,12 +145,27 @@ samples, but failed its requested 256-mix gate; no subtree/filter calls were
 observed. Advancing/interior-key motion, full field/reload, skin pixels and both
 eyes remain unqualified. Host175 does not inherit live qualification from174.
 
-Next: own slot/controller channels and clocks through the completed-pose handoff,
-retiring outgoing scratch. Dense loader/content coverage, special/late bone
-writers, duplicate model-name admission, inherited dense compression/Euler modes,
-persistent cooking and source-backed catalog/palette adapters remain. Defaults
-are unchanged; prior reload and pixel failures stay open. New live probes need
-actual authored layer/subtree/indexed content, not an unchanged boot.
+**Native controllers (host177/run983; opt-in):** admitted controllers now own
+slot-clock advancement, ordered layers and native TRS working values. They no
+longer exchange per-layer guest scratch buffers. Completed values feed the
+existing native skeleton evaluator through a one-shot, model-generation check.
+The live diagnostic records **30,460 matching controller transactions**, including
+empty plans, with 3,996 samples, 8 mixes, 4,012 advancing slot clocks and 3,985
+native channel handoffs. Six handoffs rejected a changed/unreadable boundary;
+5,028 controller calls retained the original at model/controller admission.
+Those refusals still need classification. CPU tests, 412 source/scenario checks
+and the host build pass, without guest objects or shaders rebuilding.
+Final host178 adds a CPU-tested source-overlap guard; run983 used host177.
+
+The run reached the opening event, not the full field/reload gate. Strict
+comparison executes the original once; this is not a speedup measurement.
+Gameplay/effect updates still run once. Outgoing channel bytes and their
+late-writer validation reads remain, along with source slot selection, special
+bones, dense content/modes, persistent cooking and catalog/palette adapters.
+Next: migrate the remaining channel writers and source selection so that
+validation/export can retire; qualify real authored subtree and motion content.
+Defaults and the full desktop/both-eye gate are unchanged; no Quest work.
+[Controller ownership, live comparison and remaining boundaries](research/20260908_1951_native-animation-controller.md).
 [Indexed animation connection, importer verification and remaining gates](research/20260908_1916_native-indexed-animation.md).
 [Weighted/layer connection, scoped evidence and remaining gates](research/20260908_1824_native-animation-layers.md).
 [Selected-motion residency, runtime evidence and next work](research/20260908_1745_selected-motion-residency.md).

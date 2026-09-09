@@ -6,6 +6,7 @@
 #include "gpu/scene/native_instance_bridge.h"
 #include "gpu/scene/native_instance_source.h"
 #include "gpu/scene/native_skeleton_source.h"
+#include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_scene_lights_source.h"
 #include "gpu/scene/native_material.h"
 #include "gpu/scene/native_rigid_route.h"
@@ -133,7 +134,8 @@ bool EvaluateOwnedBones(PPCContext &ctx, uint8_t *base) {
   joints = model->Skeleton().size();
   if (!joints || joints != count) return unavailable(SkeletonMissing::Topology);
   if (!Range(publication->palette, uint64_t(count)*sizeof(RenderMatrix))) return unavailable(SkeletonMissing::Palette);
-  const auto channels = skeleton_source::ReadChannels(ctx.r5.u32, publication->count, Word);
+  auto channels = TakeNativeAnimationChannels(scope->visual,publication->graph,model->Generation(),ctx.r5.u32);
+  if (!channels) channels=skeleton_source::ReadChannels(ctx.r5.u32, publication->count, Word);
   if (!channels) return unavailable(SkeletonMissing::Channels);
   const auto root = skeleton_source::ReadRoot(
       {ctx.r6.u64,ctx.r7.u64,ctx.r8.u64,ctx.r9.u64,ctx.r10.u64},ctx.r1.u32,Word);
@@ -179,6 +181,7 @@ void PublishEvaluatedPose(const SkeletonEvaluationScope &scope) {
   ++store.skeleton_published;
 }
 void Retire(uint32_t visual) {
+  RetireNativeAnimationChannels(visual);
   auto &store = Instances();
   std::lock_guard lock(store.mutex);
   if (const auto it = store.sources.find(visual); it != store.sources.end()) {

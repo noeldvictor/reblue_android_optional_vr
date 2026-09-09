@@ -19,6 +19,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.animation_test = (root / "tools/native_material_test/animation.cpp").read_text(encoding="utf-8")
         cls.animation_bridge = (root / "src/gpu/scene/native_animation_bridge.cpp").read_text(encoding="utf-8")
         cls.animation_asset = (root / "src/gpu/scene/native_animation_asset.h").read_text(encoding="utf-8")
+        cls.controller = (root / "src/gpu/scene/native_animation_controller.h").read_text(encoding="utf-8")
+        cls.controller_source = (root / "src/gpu/scene/native_animation_controller_source.h").read_text(encoding="utf-8")
 
     def test_animation_registration_is_load_scoped_and_sampler_never_reads_source_keys(self):
         for name in ("sub_8217BD70", "sub_8217C5E8"):
@@ -27,12 +29,38 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
             self.assertLess(hook.index("LoadScope"), hook.index(f"__imp__{name}"))
         hook = self.animation_bridge.split("REX_HOOK_RAW(sub_82288680)", 1)[1].split("REX_HOOK_RAW", 1)[0]
         self.assertLess(hook.index("__imp__sub_82288680"), hook.index("Import(source)"))
-        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("} // namespace", 1)[0]
+        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("bool Mix(", 1)[0]
         for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "emplace", "Publish(", "loading_owner"):
             self.assertNotIn(forbidden, sampler)
         self.assertIn("asset=store.assets.Find(ctx.r5.u32)", sampler)
         self.assertIn("ApplyKeyedLayer(*asset,model->AnimationTargets()", sampler)
         self.assertLess(sampler.index("throw std::runtime_error"), sampler.index("auto *output"))
+
+    def test_controller_owns_plan_and_layers_before_any_source_publication(self):
+        controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
+        for forbidden in ("PPCContext", "REX_", "bd::mem", "ReadWord", "ChannelRecord", "24576", "0x82DF4660"):
+            self.assertNotIn(forbidden, self.controller)
+        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "24576", "0x82DF4660"):
+            self.assertNotIn(forbidden, controller)
+        self.assertLess(controller.index("PlanNativeAnimationController(input)"), controller.index("ExecuteController("))
+        self.assertIn("ControllerSourceExtentFits(*count,*active,input.sequential)", controller)
+        self.assertLess(controller.index("ExecuteController("), controller.index("__imp__bdAnimationUpdate(ctx,base)"))
+        self.assertLess(controller.index("throw std::runtime_error"), controller.index("auto *destination="))
+        tail = controller.split("if (!verify) {", 1)[1]
+        self.assertEqual(tail.count("bdVisualObjectCollisionTestNearby(ctx,base)"), 1)
+        self.assertEqual(tail.count("bdEffectUpdate(ctx,base)"), 1)
+        self.assertIn("controller_reference=true", controller)
+        self.assertIn("TestNativeControllerPlan()", self.animation_test)
+        self.assertIn("TestNativeControllerConsumption()", self.animation_test)
+
+    def test_completed_controller_channels_reach_skeleton_with_late_writer_guard(self):
+        producer = self.bridge.split("bool EvaluateOwnedBones(", 1)[1].split("void PublishEvaluatedPose", 1)[0]
+        self.assertLess(producer.index("TakeNativeAnimationChannels("), producer.index("skeleton_source::ReadChannels"))
+        self.assertIn("model->Generation(),ctx.r5.u32", producer)
+        self.assertIn("RetireNativeAnimationChannels(visual)", self.bridge)
+        self.assertIn("pending->generation != generation", self.controller_source)
+        self.assertIn("changed=true; return {};", self.controller_source)
+        self.assertIn("pending_.reset(); changed=false", self.controller_source)
 
     def test_selected_slots_prepare_owned_curves_before_sampling_with_bounded_refusals(self):
         registration = self.animation_bridge.split("void Import(", 1)[1].split("thread_local uint32_t slot_graph", 1)[0]
