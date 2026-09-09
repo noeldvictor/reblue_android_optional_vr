@@ -1405,6 +1405,40 @@ void TestAttachmentPlacement() {
   Require(!ComposeNativeAttachmentPlacement(empty.channels[0],{},{NAN,0,0},{1,1,1}) &&
           !ComposeNativeAttachmentPlacement(empty.channels[0],{},{},{INFINITY,1,1}),"nonfinite placement never publishes");
 }
+void TestNativeEffectObservation() {
+  using animation_source::ObserveEffectDrivers;
+  ClipSource source; source.words.clear();
+  constexpr uint32_t visual=0x10000, records=0x12000;
+  auto word=[&](uint64_t address,uint32_t value) { source.Word(address,value); };
+  auto read=[&](uint64_t address) { return source.Read(address); };
+  Require(!ObserveEffectDrivers(visual,read),"unreadable effect table is unknown, never absent content");
+  word(visual+3560,0);
+  Require(ObserveEffectDrivers(visual,read)->uv == 0,"null effect table needs no dormant fields");
+  word(visual+3560,records); word(visual+3564,3); word(visual+2628,0x16000);
+  for (uint32_t n=0; n<3; ++n) {
+    word(records+n*152+20,1); word(records+n*152+120,n ? 0x61000000 : 0x000000FF);
+    word(records+n*152+12,n); word(records+n*152+16,n == 2);
+  }
+  const auto before=source.words;
+  auto seen=ObserveEffectDrivers(visual,read);
+  Require(seen && seen->uv == 3 && seen->named == 2 && seen->translated == 1 && seen->rotated == 1 &&
+          !seen->unresolved && !seen->no_channels && source.words == before,
+          "census sees both authored drivers without packed-channel, curve, clock reads or source writes");
+  word(records+152+12,UINT32_MAX); word(visual+2628,0);
+  seen=ObserveEffectDrivers(visual,read);
+  Require(seen && seen->named == 2 && seen->unresolved == 1 && seen->no_channels == 2 &&
+          !seen->translated && !seen->rotated,"unbound name and unavailable channels remain distinct observations");
+  source.words.erase(records+2*152+120);
+  Require(!ObserveEffectDrivers(visual,read),"partial census cannot masquerade as complete zero-driver coverage");
+  word(records+2*152+20,0);
+  Require(ObserveEffectDrivers(visual,read)->named == 1,"disabled UV does not inspect dormant joint name");
+  word(visual+3564,257);
+  Require(!ObserveEffectDrivers(visual,read),"census shares the 256-record boundary, never unbounded traversal");
+  word(visual+3564,UINT32_MAX);
+  Require(ObserveEffectDrivers(visual,read)->uv == 0,"signed negative counts do not inspect records");
+  word(visual+3564,2); word(visual+3560,UINT32_MAX-3);
+  Require(!ObserveEffectDrivers(visual,read),"overflowing record extent is unknown");
+}
 void TestNativeEffectConsumption() {
   using animation_source::PrepareEffectUpdate;
   using animation_source::ReadReadyEffect;
@@ -1522,6 +1556,9 @@ void TestNativeEffectConsumption() {
     Require(!ReadReadyEffect(visual+2248,20,read) && !PrepareEffectUpdate(visual,1,1,{},read) && source.words == unchanged,
             "pending first cue refuses without side effects or selecting a later duplicate");
   }
+  word(entry+32+8,20);
+  Require(!ReadReadyEffect(visual+2248,20,read),"ready duplicate cannot replace the first pending effect entry");
+  word(entry+32+8,21);
   for (uint32_t state : {0u,5u,UINT32_MAX}) {
     word(object+316,state);
     Require(ReadReadyEffect(visual+2248,20,read) == 0u,"terminal nonready effect is known absent, not a poll or duplicate sweep");
@@ -1572,6 +1609,7 @@ void TestAnimationClips() {
   TestJointSelectionHandoff();
   TestAttachmentPlacement();
   TestNativeSlotSelection();
+  TestNativeEffectObservation();
   TestNativeEffectConsumption();
   TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";

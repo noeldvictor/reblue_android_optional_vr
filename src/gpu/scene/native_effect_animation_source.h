@@ -8,6 +8,44 @@
 #include <bit>
 
 namespace bd::gpu::scene::animation_source {
+// Verification-only census BEFORE controller admission. A missing read is not
+// evidence of absent authored content. No payload sampling, writes or residency.
+struct EffectDrivers {
+  uint32_t uv=0, named=0, translated=0, rotated=0, unresolved=0, no_channels=0;
+};
+template<class Read>
+std::optional<EffectDrivers> ObserveEffectDrivers(uint32_t visual, Read &&read) {
+  if (!visual || (visual&3) || uint64_t(visual)+3568 > uint64_t(UINT32_MAX)+1) return {};
+  const auto records=read(uint64_t(visual)+3560);
+  if (!records) return {};
+  EffectDrivers result;
+  if (!*records) return result;
+  const auto count=read(uint64_t(visual)+3564);
+  if (!count) return {};
+  if (int32_t(*count) <= 0) return result;
+  if (*count > 256 || (*records&3) || uint64_t(*records)+uint64_t(*count)*152 > uint64_t(UINT32_MAX)+1) return {};
+  for (uint32_t n=0; n<*count; ++n) {
+    const uint64_t record=uint64_t(*records)+n*152;
+    const auto enabled=read(record+20);
+    if (!enabled) return {};
+    if (!*enabled) continue;
+    ++result.uv;
+    const auto name=read(record+120); // first byte of the authored joint NAME
+    if (!name) return {};
+    if (!(*name>>24)) continue;
+    ++result.named;
+    const auto source=read(uint64_t(visual)+2628), joint=read(record+12);
+    if (!source || !joint) return {};
+    if (int32_t(*joint) < 0) ++result.unresolved;
+    if (!*source) ++result.no_channels;
+    if (!*source || int32_t(*joint) < 0) continue;
+    const auto rotation=read(record+16);
+    if (!rotation) return {};
+    ++(*rotation ? result.rotated : result.translated);
+  }
+  return result;
+}
+
 // AnimeData's effect catalog is separate from the skeletal clip catalog.
 // Poll states 1..4 can load/allocate/change dependencies. Refuse before polling;
 // the complete original controller must execute once, never a partial replay.

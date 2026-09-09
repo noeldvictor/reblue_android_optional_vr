@@ -58,6 +58,18 @@ namespace {
 constexpr uint32_t kSamplerState = 0x82DC99E0;
 enum class Missing : size_t { Model, Asset, Restrictions, Output, Sampling, Weight, Subtree, Count };
 constexpr std::array missing_names{"model", "asset", "restrictions", "output", "sampling", "weight", "subtree"};
+enum class EffectAdmission : size_t { Admitted, Boundary, Slots, Exclusions, Plan, Layers, Effects, Output, Count };
+constexpr std::array effect_admission_names{"admitted", "boundary", "slots", "exclusions", "plan", "layers", "effects", "output"};
+static_assert(effect_admission_names.size() == size_t(EffectAdmission::Count));
+struct EffectObservation {
+  uint64_t calls=0, unknown=0, uv=0, named=0, translated=0, rotated=0, unresolved=0, no_channels=0;
+  void Add(const std::optional<animation_source::EffectDrivers> &drivers) {
+    ++calls;
+    if (!drivers) { ++unknown; return; }
+    uv+=drivers->uv; named+=drivers->named; translated+=drivers->translated; rotated+=drivers->rotated;
+    unresolved+=drivers->unresolved; no_channels+=drivers->no_channels;
+  }
+};
 struct Store {
   std::mutex mutex;
   NativeAnimationResidency assets;
@@ -76,6 +88,7 @@ struct Store {
   uint64_t placement_refused=0, placement_roots=0, placement_changed=0;
   uint64_t slot_selections=0, slot_selection_checks=0, slot_restarts=0, slot_ready=0, slot_absent=0, slot_selection_refused=0;
   uint64_t effects=0, effect_checks=0, effect_uv=0, effect_translated=0, effect_rotated=0, effect_transitions=0;
+  std::array<EffectObservation,size_t(EffectAdmission::Count)> effect_observations{};
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -130,6 +143,12 @@ void Report(Store &store) {
   if (store.effects)
     BD_INFO("[native-animation-effects] frame {} completed {} checked {} uv {} translated {} rotated {} transitions {}; native channels feed material UV; timeline/catalog and outgoing material adapters remain",
         frame,store.effects,store.effect_checks,store.effect_uv,store.effect_translated,store.effect_rotated,store.effect_transitions);
+  for (size_t n=0; n<store.effect_observations.size(); ++n) {
+    const auto &seen=store.effect_observations[n];
+    if (seen.calls)
+      BD_INFO("[native-effect-inputs] frame {} stage {} calls {} unknown {} uv {} named {} translation {} rotation {} unresolved {} no-channels {}; pre-admission observations, not native execution or unique assets",
+          frame,effect_admission_names[n],seen.calls,seen.unknown,seen.uv,seen.named,seen.translated,seen.rotated,seen.unresolved,seen.no_channels);
+  }
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -887,12 +906,16 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   if (!Enabled() || controller_reference) return false;
   ctx.fpscr.disableFlushMode(); // Same scalar mode as the original prologue/exit.
   completed_controller.Clear();
+  const uint32_t visual=ctx.r3.u32;
+  const bool observe=REXCVAR_GET(bd_native_materials_verify);
+  const auto drivers=observe ? animation_source::ObserveEffectDrivers(visual,Word) : std::nullopt;
+  EffectAdmission stage=EffectAdmission::Boundary;
   auto refuse=[&](const char *reason) {
     auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (observe) store.effect_observations[size_t(stage)].Add(drivers);
     if (++store.controller_refused <= 6) BD_INFO("[native-animation-controller-refused] {}; original complete controller retained",reason);
     return false;
   };
-  const uint32_t visual=ctx.r3.u32;
   const auto model=FindLoadedNativeModel(slot_graph);
   const auto count=Word(uint64_t(visual)+1868), output=Word(uint64_t(visual)+2628), active=Word(uint64_t(visual)+2208);
   const auto delta=Scalar(0x82DDA880);
@@ -910,6 +933,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   std::array<std::shared_ptr<const NativeAnimationAsset>,kNativeAnimationSlots> assets;
   std::array<uint8_t,16> included_bytes;
   for (size_t n=0; n<16; ++n) included_bytes[n]=bd::mem::load<uint8_t>(kSamplerState+8+uint32_t(n));
+  stage=EffectAdmission::Slots;
   for (uint32_t n=0; n<kNativeAnimationSlots; ++n) {
     auto &slot=input.slots[n]; const uint64_t address=uint64_t(visual)+n*56;
     const auto entry=Word(address+1920);
@@ -935,6 +959,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     { auto &store=Clips(); std::lock_guard lock(store.mutex); assets[n]=store.assets.Find(*source); }
   }
   included_bytes[0]=0;
+  stage=EffectAdmission::Exclusions;
   std::vector<uint32_t> exclusions;
   std::vector<NativeJointName> excluded_names;
   if (ctx.r5.u32) {
@@ -966,20 +991,24 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     auto name=*pointer ? skeleton_source::ReadJointName(*pointer,Word) : NativeJointName{};
     if (*pointer && !name.Valid()) return refuse("excluded name"); excluded_names.push_back(name);
   }
+  stage=EffectAdmission::Plan;
   const auto plan=PlanNativeAnimationController(input);
   if (!plan) return refuse("incomplete native layer plan");
   std::vector<animation_source::ChannelRecord> before(*count);
   const auto *source_channels=bd::mem::at<const be_u32>(*output);
   for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) before[n][w]=source_channels[n*12+w];
+  stage=EffectAdmission::Layers;
   auto result=animation_source::ExecuteController(*plan,assets,model->AnimationTargets(),model->Skeleton(),
       animation_source::ControllerLayer::Decode(before),*compression,excluded_names);
   if (!result) return refuse("native layer execution");
   // Consume owned channels before their one-shot skeleton handoff. Entire effect
   // plan is admitted before the original or any source publication; pending cue
   // loads preserve the complete original controller once, including side effects.
+  stage=EffectAdmission::Effects;
   const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word);
   if (!effects) return refuse("effect timeline/UV boundary");
   const auto records=result->output.Encode();
+  stage=EffectAdmission::Output;
   if (records.size() != *count || (write_exclusions && !Range(0x82DBEC70,exclusions.size()*4))) return refuse("outgoing boundary");
   const bool verify=REXCVAR_GET(bd_native_materials_verify);
   if (verify) {
@@ -1048,6 +1077,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     }
   }
   auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.controllers;
+  if (observe) store.effect_observations[size_t(EffectAdmission::Admitted)].Add(drivers);
   store.effects+=effects->called; store.effect_uv+=effects->uv.size();
   store.effect_translated+=effects->translated; store.effect_rotated+=effects->rotated;
   store.effect_transitions+=effects->transitioned;

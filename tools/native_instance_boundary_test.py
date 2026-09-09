@@ -92,6 +92,17 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("ReadMaterialTextureInputs<int>", self.animation_test)
         self.assertIn("ComposeMaterialTextures<int>", self.animation_test)
 
+    def test_effect_census_precedes_admission_without_changing_execution(self):
+        controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
+        self.assertLess(controller.index("ObserveEffectDrivers("), controller.index("return refuse("))
+        self.assertIn("observe ? animation_source::ObserveEffectDrivers", controller)
+        self.assertIn("effect_observations[size_t(stage)].Add(drivers)", controller)
+        self.assertIn("effect_observations[size_t(EffectAdmission::Admitted)].Add(drivers)", controller)
+        self.assertIn("TestNativeEffectObservation()", self.animation_test)
+        census = self.effect_source.split("ObserveEffectDrivers(", 1)[1].split("// AnimeData", 1)[0]
+        for forbidden in ("Publish", "ReadChannels", "read(record+28)", "read(record+36)", "REX_", "emplace"):
+            self.assertNotIn(forbidden, census)
+
     def test_completed_controller_channels_reach_skeleton_with_late_writer_guard(self):
         producer = self.bridge.split("bool EvaluateOwnedBones(", 1)[1].split("void PublishEvaluatedPose", 1)[0]
         self.assertLess(producer.index("TakeNativeAnimationChannels("), producer.index("skeleton_source::ReadChannels"))
