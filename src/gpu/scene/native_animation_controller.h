@@ -138,4 +138,25 @@ inline std::optional<NativeAnimationControllerPlan> PlanNativeAnimationControlle
   }
   return plan;
 }
+// Authored post-controller layers advance once per update, independently of the
+// main delta. Their selection gates are boundary inputs, not console field IDs.
+inline std::optional<NativeAnimationControllerPlan> PlanNativeAnimationLateLayers(
+    const std::array<NativeAnimationSlot,kNativeAnimationSlots> &slots,
+    const std::array<bool,kNativeAnimationSlots> &enabled, bool replace,
+    NativeJointName included) {
+  if (!included.Valid()) return {};
+  NativeAnimationControllerPlan plan; plan.slots=slots;
+  for (uint8_t n : {4,5,3}) {
+    auto &slot=plan.slots[n];
+    if (!enabled[n] || !slot.present) continue;
+    if (!AdvanceNativeAnimationSlot(slot,1)) return {};
+    plan.advanced[n]=true;
+    if (!replace && slot.weight <= 0) continue;
+    auto &step=plan.steps[plan.count++]; step.slot=n;
+    step.reset=replace; step.included=included;
+    step.seconds=float(double(std::clamp(slot.time_ticks,0.0f,slot.duration_ticks))/30.0);
+    step.weight=replace ? 1 : std::min(slot.weight,1.0f);
+  }
+  return plan;
+}
 } // namespace bd::gpu::scene

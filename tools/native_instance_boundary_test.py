@@ -30,10 +30,10 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         hook = self.animation_bridge.split("REX_HOOK_RAW(sub_82288680)", 1)[1].split("REX_HOOK_RAW", 1)[0]
         self.assertLess(hook.index("__imp__sub_82288680"), hook.index("Import(source)"))
         sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("bool Mix(", 1)[0]
-        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "emplace", "Publish(", "loading_owner"):
+        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "emplace", "assets.Publish(", "loading_owner"):
             self.assertNotIn(forbidden, sampler)
         self.assertIn("asset=store.assets.Find(ctx.r5.u32)", sampler)
-        self.assertIn("ApplyKeyedLayer(*asset,model->AnimationTargets()", sampler)
+        self.assertIn("layer.Apply(*asset,model->AnimationTargets()", sampler)
         self.assertLess(sampler.index("throw std::runtime_error"), sampler.index("auto *output"))
 
     def test_controller_owns_plan_and_layers_before_any_source_publication(self):
@@ -49,7 +49,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         tail = controller.split("if (!verify) {", 1)[1]
         self.assertEqual(tail.count("bdVisualObjectCollisionTestNearby(ctx,base)"), 1)
         self.assertEqual(tail.count("bdEffectUpdate(ctx,base)"), 1)
-        self.assertIn("controller_reference=true", controller)
+        self.assertIn("ReferenceScope reference", controller)
+        self.assertIn("ReferenceScope() { controller_reference=true; }", self.animation_bridge)
         self.assertIn("TestNativeControllerPlan()", self.animation_test)
         self.assertIn("TestNativeControllerConsumption()", self.animation_test)
 
@@ -59,7 +60,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("model->Generation(),ctx.r5.u32", producer)
         self.assertIn("RetireNativeAnimationChannels(visual)", self.bridge)
         self.assertIn("pending->generation != generation", self.controller_source)
-        self.assertIn("changed=true; return {};", self.controller_source)
+        self.assertIn("if (actual != pending->boundary[n][w])", self.controller_source)
+        self.assertIn("changed=true;", self.controller_source)
         self.assertIn("pending_.reset(); changed=false", self.controller_source)
 
     def test_selected_slots_prepare_owned_curves_before_sampling_with_bounded_refusals(self):
@@ -79,12 +81,27 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
         self.assertLess(hook.index("VisualScope"), hook.index("__imp__bdAnimationUpdate(ctx,base)"))
         sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("} // namespace", 1)[0]
-        self.assertIn("ApplyKeyedLayer(*asset,model->AnimationTargets()", sampler)
+        self.assertIn("layer.Apply(*asset,model->AnimationTargets()", sampler)
         self.assertIn("model->AnimationTargets()[*index] != *hash", sampler)
         self.assertIn("kNativeAnimationWeightEpsilon) return true", sampler)
         self.assertIn("!euler_mode", sampler)
         self.assertIn("TestWeightedLayerConsumption()", self.animation_test)
         self.assertIn("TestOwnedBlendRest()", self.animation_test)
+
+    def test_late_writers_reuse_and_republish_native_channels_before_bones(self):
+        late = self.animation_bridge.split("bool LateLayers(", 1)[1].split("bool Controller(", 1)[0]
+        for forbidden in ("ReadKeyedAsset", "ReadKeyedClip", "bdVisualObjectAnimSlotUpdate(ctx", "24576"):
+            self.assertNotIn(forbidden, late)
+        self.assertIn("*selection == 504", late)
+        self.assertLess(late.index("TakeCompletedLayer("), late.index("ExecuteController("))
+        self.assertLess(late.index("ExecuteController("), late.index("__imp__sub_822D3CB0(ctx,base)"))
+        self.assertLess(late.index("throw std::runtime_error"), late.index("auto *destination="))
+        self.assertIn("std::move(layer),*compression,exclusions,false", late)
+        self.assertIn("records,true}", late)
+        self.assertIn("REX_HOOK_RAW(sub_822D3CB0)", self.animation_bridge)
+        sampler = self.animation_bridge.split("bool Sample(", 1)[1].split("bool Mix(", 1)[0]
+        self.assertLess(sampler.index("TakeCompletedLayer("), sampler.index("layer.Apply("))
+        self.assertIn("completed_controller.Publish({slot_visual,graph,destination", sampler)
 
     def test_layer_mix_checks_complete_output_before_replacing_original_records(self):
         mix = self.animation_bridge.split("bool Mix(", 1)[1].split("} // namespace", 1)[0]

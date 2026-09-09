@@ -860,8 +860,9 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    limit; last live evidence is177, not a restamp of the178 binary.
    Run983:30460 matching controller transactions (includes empty plans),3996
    samples,8 mixes,3839 interior-CLIP times,4012 advancing slot clocks,3985 native
-   skeleton handoffs. Six changed/unreadable boundary refusals and5028 model/
-   controller admission refusals require classification. Frame1137 context is
+   skeleton handoffs. Six changed/unreadable boundary refusals occurred (resolved
+   by the late connection below);5028 model/controller admission refusals still
+   require classification. Frame1137 context is
    FieldActive,event1, not independent interactive/reload qualification.
    The one-shot generation guard still checks outgoing48B data for late writes;
    no claim that those reads, source slot selection or all exports are gone.
@@ -870,6 +871,18 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    Run983 also positively re-verifies first-match import:122->121tracks,
    prepare-refused0. Its current asset layout charges93432B, not174's93424B.
    Superseded174/982 text retired; source/hash findings and979/980 failures remain.
+   **Late layer connection (host179/run984):** post-controller slots4/5/3 now
+   advance/apply through the same native plan/working-channel owner and republish
+   before skeleton evaluation. Preserve unit-step clocks, slot5 selection504
+   exclusion and dirty flags. Six late transactions match the original, all six
+   reuse native channels and reach skeleton evaluation. Main controller counts
+   match983; handoffs3991,changed0, resolving its six observed late refusals.
+   Standalone sampler working values/publication also use that owner, but the
+   separate attachment route has no new live coverage. Material62/CPU60 and413
+   guards pass; host179 builds without guest objects/shaders. Frame1085 is the
+   opening event, not interactive/reload/pixel qualification. Untracked writes
+   still compare every boundary word; first difference now has bounded provenance.
+   Run984 re-verifies canonicalization and supersedes177/983 runtime/build text.
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
@@ -878,6 +891,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    persistent cooking, outgoing48-byte channels/palettes and full desktop/both-eye
    gates remain. Preserve975's reload and971/962's pixel failures; defaults
    unchanged, no Quest work.
+   [Late layer contracts, causal regression and connected live handoffs](../research/20260908_2021_native-late-animation.md).
    [Controller transaction, handoff, source contracts and live evidence](../research/20260908_1951_native-animation-controller.md).
    [Indexed connection, source boundaries and exact verification](../research/20260908_1916_native-indexed-animation.md).
    [Named/importer source contracts and checkpoint](../research/20260906_0333_native-scene-state-bridge.md#2026-09-08-named-animation-inputs-and-importer-contracts-after52a9510).

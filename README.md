@@ -145,17 +145,21 @@ samples, but failed its requested 256-mix gate; no subtree/filter calls were
 observed. Advancing/interior-key motion, full field/reload, skin pixels and both
 eyes remain unqualified. Host175 does not inherit live qualification from174.
 
-**Native controllers (host177/run983; opt-in):** admitted controllers now own
+**Native controllers and late layers (host179/run984; opt-in):** admitted controllers now own
 slot-clock advancement, ordered layers and native TRS working values. They no
 longer exchange per-layer guest scratch buffers. Completed values feed the
 existing native skeleton evaluator through a one-shot, model-generation check.
 The live diagnostic records **30,460 matching controller transactions**, including
-empty plans, with 3,996 samples, 8 mixes, 4,012 advancing slot clocks and 3,985
-native channel handoffs. Six handoffs rejected a changed/unreadable boundary;
+empty plans, with 3,996 samples, 8 mixes, 4,012 advancing slot clocks and 3,991
+native channel handoffs. The six previously rejected handoffs are now connected:
+all six post-controller updates match, reuse native channels and pass their
+completed values to the native skeleton, with **zero changed-channel refusals**.
+The late phase owns its fixed-step clocks and ordered layers instead of calling
+the guest slot/sampler chain. Standalone slot sampling also uses the same owner,
+but that separate attachment route was not exercised in this run.
 5,028 controller calls retained the original at model/controller admission.
-Those refusals still need classification. CPU tests, 412 source/scenario checks
+Those admission refusals still need classification. CPU tests, 413 source/scenario checks
 and the host build pass, without guest objects or shaders rebuilding.
-Final host178 adds a CPU-tested source-overlap guard; run983 used host177.
 
 The run reached the opening event, not the full field/reload gate. Strict
 comparison executes the original once; this is not a speedup measurement.
@@ -165,6 +169,7 @@ bones, dense content/modes, persistent cooking and catalog/palette adapters.
 Next: migrate the remaining channel writers and source selection so that
 validation/export can retire; qualify real authored subtree and motion content.
 Defaults and the full desktop/both-eye gate are unchanged; no Quest work.
+[Late-layer connection, causal regression and live handoffs](research/20260908_2021_native-late-animation.md).
 [Controller ownership, live comparison and remaining boundaries](research/20260908_1951_native-animation-controller.md).
 [Indexed animation connection, importer verification and remaining gates](research/20260908_1916_native-indexed-animation.md).
 [Weighted/layer connection, scoped evidence and remaining gates](research/20260908_1824_native-animation-layers.md).

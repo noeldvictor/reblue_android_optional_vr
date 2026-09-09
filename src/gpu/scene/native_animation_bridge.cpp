@@ -31,6 +31,7 @@ REX_EXTERN(__imp__sub_8217BD00);
 REX_EXTERN(__imp__sub_8217C580);
 REX_EXTERN(__imp__bdVisualObjectAnimSlotUpdate);
 REX_EXTERN(__imp__bdAnimationUpdate);
+REX_EXTERN(__imp__sub_822D3CB0);
 REX_EXTERN(__imp__sub_82289888);
 REX_EXTERN(__imp__sub_8228A3E8);
 REX_EXTERN(__imp__sub_82284BE0);
@@ -51,6 +52,8 @@ struct Store {
   uint64_t controllers=0, controller_checks=0, controller_refused=0, controller_samples=0, controller_mixes=0;
   uint64_t controller_interior=0, controller_subtree=0, channel_handoffs=0, channel_changed=0;
   uint64_t controller_advancing=0;
+  uint64_t late_controllers=0, late_checks=0, late_samples=0, late_reused=0, late_handoffs=0;
+  uint64_t slot_publications=0, slot_reused=0, late_refused=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -82,6 +85,10 @@ void Report(Store &store) {
     BD_INFO("[native-animation-controller] frame {} completed {} checked {} refused {}; samples {} mixes {} subtree {} interior {}; handoffs {} changed {}; advancing {}; native clocks/layers, one outgoing boundary; late-writer validation remains",
         frame,store.controllers,store.controller_checks,store.controller_refused,store.controller_samples,store.controller_mixes,
         store.controller_subtree,store.controller_interior,store.channel_handoffs,store.channel_changed,store.controller_advancing);
+  if (store.late_controllers || store.late_refused || store.slot_publications)
+    BD_INFO("[native-animation-late] frame {} completed {} checked {} refused {}; samples {} reused {} handoffs {}; slot-published {} slot-reused {}; native layers continue to skeleton; untracked-write guard retained",
+        frame,store.late_controllers,store.late_checks,store.late_refused,store.late_samples,
+        store.late_reused,store.late_handoffs,store.slot_publications,store.slot_reused);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -112,10 +119,29 @@ void Import(uint32_t source) {
   }
 }
 thread_local uint32_t slot_graph = 0;
+thread_local uint32_t slot_visual = 0;
 thread_local bool controller_reference=false;
+struct ReferenceScope {
+  bool previous=controller_reference;
+  ReferenceScope() { controller_reference=true; }
+  ~ReferenceScope() { controller_reference=previous; }
+};
 // Bounded one-shot handoff, not a process-wide source-address cache. Another
 // controller or a skeleton handoff consumes/replaces it on the same update lane.
 thread_local animation_source::ControllerHandoff completed_controller;
+auto TakeCompletedLayer(uint32_t visual, uint32_t graph, uint64_t generation, uint32_t source) {
+  bool changed=false;
+  animation_source::ControllerHandoff::Difference difference;
+  auto result=completed_controller.TakeLayer(visual,graph,generation,source,Word,changed,&difference);
+  if (changed) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (++store.channel_changed <= 6)
+      BD_INFO("[native-animation-channel-changed] visual {:08X} graph {:08X} model {} joint {} word {} expected {:08X} actual {:08X} readable {}; checked import retained",
+          visual,graph,generation,difference.joint,difference.word,difference.expected,
+          difference.actual.value_or(0),difference.actual.has_value());
+  }
+  return result;
+}
 void PrepareSlot(uint32_t visual, uint32_t slot) {
   const auto source = animation_source::SelectedSlotSource(visual,slot,Word);
   if (!source || !*source) return;
@@ -148,13 +174,14 @@ struct VisualScope {
   ~VisualScope() { slot_graph = previous; }
 };
 struct SlotScope {
-  uint32_t previous;
-  explicit SlotScope(uint32_t visual, uint32_t slot) : previous(slot_graph) {
+  uint32_t previous, previous_visual;
+  explicit SlotScope(uint32_t visual, uint32_t slot) : previous(slot_graph), previous_visual(slot_visual) {
+    slot_visual=visual;
     slot_graph = Enabled() ? Word(uint64_t(visual)+2620).value_or(0) : 0;
     if (!slot_graph || !FindLoadedNativeModel(slot_graph)) { slot_graph=0; return; }
     PrepareSlot(visual,slot);
   }
-  ~SlotScope() { slot_graph=previous; }
+  ~SlotScope() { slot_graph=previous; slot_visual=previous_visual; }
 };
 bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   if (!Enabled() || controller_reference) return false;
@@ -215,15 +242,25 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
   const uint32_t destination = ctx.r3.u32;
   const auto count = model->AnimationTargets().size();
   if ((destination & 3) || !Range(destination,count*48)) return Unavailable(Missing::Output);
-  std::vector<animation_source::ChannelRecord> records(count);
+  animation_source::ControllerLayer layer(count);
+  const bool visual_output=slot_visual && Word(uint64_t(slot_visual)+2628) == destination &&
+      Word(uint64_t(slot_visual)+1868) == count;
+  bool reused=false;
   if (preserve) {
-    const auto *input = bd::mem::at<const be_u32>(destination);
-    for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) records[n][word] = input[n*12+word];
+    auto previous=visual_output ? TakeCompletedLayer(slot_visual,graph,model->Generation(),destination) : std::nullopt;
+    if (previous) { layer=std::move(previous->layer); reused=true; }
+    else {
+      std::vector<animation_source::ChannelRecord> records(count);
+      const auto *input = bd::mem::at<const be_u32>(destination);
+      for (size_t n=0; n<count; ++n) for (size_t word=0; word<12; ++word) records[n][word] = input[n*12+word];
+      layer=animation_source::ControllerLayer::Decode(records);
+    }
   }
-  const bool applied=animation_source::ApplyKeyedLayer(*asset,model->AnimationTargets(),
-      model->Skeleton(),seconds,weight,root_pose,single_subtree,records,filter,!preserve);
+  const bool applied=layer.Apply(*asset,model->AnimationTargets(),
+      model->Skeleton(),seconds,weight,root_pose,single_subtree,filter,!preserve);
   if (!applied)
     return Unavailable(Missing::Sampling);
+  const auto records=layer.Encode();
   const auto selected=SelectNativeAnimationNodes(model->Skeleton(),root_pose,single_subtree,filter);
   bool used_cubic=false;
   for (size_t n=0; n<model->Skeleton().size(); ++n) {
@@ -265,7 +302,11 @@ bool Sample(PPCContext &ctx, uint8_t *base, bool preserve) {
     bd::mem::store<uint32_t>(kSamplerState,0);
     if (preserve) bd::mem::store<uint32_t>(kSamplerState+4,0);
   }
+  if (visual_output && !completed_controller.Publish({slot_visual,graph,destination,model->Generation(),
+          std::move(layer.channels),records,true}))
+    throw std::runtime_error("Native standalone animation publication refused");
   auto &store=Clips(); std::lock_guard lock(store.mutex);
+  store.slot_publications+=visual_output; store.slot_reused+=reused;
   ++store.sampled; ++(preserve ? store.preserved : store.whole); store.cubic += used_cubic;
   store.weighted += preserve && weight != 1; store.subtree += partial_subtree;
   store.filtered += !filter.included.empty() || !filter.excluded.empty(); store.indexed += indexed; Report(store);
@@ -348,6 +389,120 @@ std::optional<uint32_t> SourceNode(uint32_t graph, uint32_t pose, size_t count) 
     if (*child) pending.push_back(*child);
   }
   return {};
+}
+bool LateLayers(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  auto refuse=[&](const char *reason) {
+    auto &store=Clips(); std::lock_guard lock(store.mutex);
+    if (++store.late_refused <= 4) BD_INFO("[native-animation-late-refused] {}; original late transaction retained",reason);
+    return false;
+  };
+  const uint32_t visual=ctx.r3.u32;
+  const auto model=FindLoadedNativeModel(slot_graph);
+  const auto count=Word(uint64_t(visual)+1868), output=Word(uint64_t(visual)+2628);
+  if (!model || model->AnimationTargets().empty() || !count || *count != model->Skeleton().size() ||
+      !output || (*output&3) || !Range(*output,uint64_t(*count)*48)) return refuse("model/output");
+  std::array<NativeAnimationSlot,kNativeAnimationSlots> slots;
+  std::array<bool,kNativeAnimationSlots> enabled{};
+  std::array<std::shared_ptr<const NativeAnimationAsset>,kNativeAnimationSlots> assets;
+  // sub_822D3CB0: authored order 4,5,3; slot5's selection504 is excluded.
+  for (const auto [n,gate] : {std::pair{4u,5452u},std::pair{5u,5456u},std::pair{3u,5528u}}) {
+    const auto active=Word(uint64_t(visual)+gate);
+    if (!active) return refuse("selection gate");
+    if (!*active) continue;
+    const uint64_t address=uint64_t(visual)+n*56;
+    if (n == 5) {
+      const auto selection=Word(address+1872);
+      if (!selection) return refuse("late selection");
+      if (*selection == 504) continue;
+    }
+    const auto entry=Word(address+1920);
+    if (!entry) return refuse("late entry");
+    if (!*entry) continue;
+    const auto source=Word(uint64_t(*entry)+12), loop=Word(address+1876), loops=Word(address+1880);
+    const auto weight=Scalar(address+1884), target=Scalar(address+1888), rate=Scalar(address+1892),
+        time=Scalar(address+1896), speed=Scalar(address+1900);
+    const auto duration=source ? animation_source::Half(uint64_t(*source)+4,Word) : std::nullopt;
+    if (!source || !*source || !loop || !loops || !weight || !target || !rate || !time || !speed || !duration)
+      return refuse("late clock");
+    auto &slot=slots[n]; enabled[n]=slot.present=true;
+    slot.loop=*loop != 0; slot.loops=*loops; slot.weight=*weight; slot.target_weight=*target;
+    slot.weight_rate=*rate; slot.time_ticks=*time; slot.time_rate=*speed; slot.duration_ticks=float(*duration);
+    { auto &store=Clips(); std::lock_guard lock(store.mutex); assets[n]=store.assets.Find(*source); }
+  }
+  if (std::ranges::none_of(enabled,[](bool value) { return value; })) return true;
+  const auto mode=Word(0x82DEBEEC), compression=Word(kSamplerState), exclusion=Word(kSamplerState+4),
+      depth=Word(kSamplerState+24), euler=Word(0x827A7EE4);
+  const auto included=skeleton_source::ReadJointName(kSamplerState+8,Word);
+  if (!mode || !compression || !exclusion || *exclusion > 30 || !depth || *depth || !euler || ((*euler>>8)&255) ||
+      !included.Valid() || Word(0x820551AC) != std::bit_cast<uint32_t>(1.0f) || Word(0x82055230) != 0u)
+    return refuse("sampler state");
+  std::vector<NativeJointName> exclusions;
+  for (uint32_t n=0; n<*exclusion; ++n) {
+    const auto pointer=Word(0x82DBEC70+uint64_t(n)*4);
+    if (!pointer) return refuse("exclusion table");
+    const auto name=*pointer ? skeleton_source::ReadJointName(*pointer,Word) : NativeJointName{};
+    if (*pointer && !name.Valid()) return refuse("exclusion name");
+    exclusions.push_back(name);
+  }
+  ctx.fpscr.disableFlushMode();
+  const auto plan=PlanNativeAnimationLateLayers(slots,enabled,*mode != 0,included);
+  if (!plan) return refuse("late plan");
+  auto previous=TakeCompletedLayer(visual,slot_graph,model->Generation(),*output);
+  const bool reused=previous.has_value();
+  animation_source::ControllerLayer layer;
+  if (previous) layer=std::move(previous->layer);
+  else {
+    std::vector<animation_source::ChannelRecord> records(*count);
+    const auto *input=bd::mem::at<const be_u32>(*output);
+    for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) records[n][w]=input[n*12+w];
+    layer=animation_source::ControllerLayer::Decode(records);
+  }
+  auto result=animation_source::ExecuteController(*plan,assets,model->AnimationTargets(),model->Skeleton(),
+      std::move(layer),*compression,exclusions,false);
+  if (!result) return refuse("late layers");
+  const auto records=result->output.Encode();
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    ReferenceScope reference;
+    __imp__sub_822D3CB0(ctx,base);
+    bool same=Word(kSamplerState) == result->compression && Word(kSamplerState+4) == result->exclusions &&
+        Word(kSamplerState+24) == *depth && skeleton_source::ReadJointName(kSamplerState+8,Word).View() == included.View();
+    for (uint32_t n=0; n<kNativeAnimationSlots; ++n) if (plan->advanced[n]) {
+      const uint64_t address=uint64_t(visual)+n*56; const auto &slot=plan->slots[n];
+      same &= Word(address+1880) == slot.loops && Word(address+1884) == std::bit_cast<uint32_t>(slot.weight) &&
+          Word(address+1896) == std::bit_cast<uint32_t>(slot.time_ticks);
+    }
+    const auto *original=bd::mem::at<const be_u32>(*output);
+    size_t first_joint=0, first_word=0; bool channel_same=true;
+    for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) {
+      const uint32_t expected=original[n*12+w], actual=records[n][w];
+      const bool active=(w>=2 && w<5 && (records[n][0]&1)) || (w>=5 && w<9 && (records[n][0]&2)) ||
+          (w>=9 && (records[n][0]&4));
+      const float a=std::bit_cast<float>(actual), b=std::bit_cast<float>(expected);
+      const bool equal=active ? std::isfinite(a) && std::isfinite(b) && std::abs(a-b) <= 1e-4f*std::max(1.0f,std::abs(b)) : actual == expected;
+      if (channel_same && !equal) { first_joint=n; first_word=w; } channel_same &= equal;
+    }
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.late_checks;
+    if (!same || !channel_same) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-late-drift] model {} state {} channels {} joint {} word {}; no fallback",
+          model->Generation(),same,channel_same,first_joint,first_word);
+      throw std::runtime_error("Native late animation comparison failed");
+    }
+  }
+  for (uint32_t n=0; n<kNativeAnimationSlots; ++n) if (plan->advanced[n]) {
+    const uint32_t address=visual+n*56; const auto &slot=plan->slots[n];
+    bd::mem::store<uint32_t>(address+1880,slot.loops); bd::mem::store<float>(address+1884,slot.weight);
+    bd::mem::store<float>(address+1896,slot.time_ticks);
+  }
+  bd::mem::store<uint32_t>(kSamplerState,result->compression); bd::mem::store<uint32_t>(kSamplerState+4,result->exclusions);
+  auto *destination=bd::mem::at<be_u32>(*output);
+  for (size_t n=0; n<*count; ++n) for (size_t w=0; w<12; ++w) destination[n*12+w]=records[n][w];
+  if (!completed_controller.Publish({visual,slot_graph,*output,model->Generation(),std::move(result->output.channels),records,true}))
+    throw std::runtime_error("Native late animation publication refused");
+  auto &store=Clips(); std::lock_guard lock(store.mutex);
+  ++store.late_controllers; store.late_samples+=result->sampled; store.late_reused+=reused; Report(store);
+  return true;
 }
 bool Controller(PPCContext &ctx, uint8_t *base) {
   if (!Enabled() || controller_reference) return false;
@@ -442,11 +597,7 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   if (records.size() != *count || (write_exclusions && !Range(0x82DBEC70,exclusions.size()*4))) return refuse("outgoing boundary");
   const bool verify=REXCVAR_GET(bd_native_materials_verify);
   if (verify) {
-    struct ReferenceScope {
-      bool previous=controller_reference;
-      ReferenceScope() { controller_reference=true; }
-      ~ReferenceScope() { controller_reference=previous; }
-    } reference;
+    ReferenceScope reference;
     // Full original executes side effects exactly once, with original channels.
     // Native slot/channel transactions have not modified source state yet.
     __imp__bdAnimationUpdate(ctx,base);
@@ -522,11 +673,11 @@ std::optional<std::vector<NativeJointChannels>> TakeNativeAnimationChannels(
     uint32_t visual, uint32_t graph, uint64_t generation, uint32_t source) {
   using namespace animation_bridge;
   if (!Enabled()) { completed_controller.Clear(); return {}; }
-  bool changed=false;
-  auto channels=completed_controller.Take(visual,graph,generation,source,Word,changed);
+  auto channels=TakeCompletedLayer(visual,graph,generation,source);
   auto &store=Clips(); std::lock_guard lock(store.mutex);
-  store.channel_handoffs+=channels.has_value(); store.channel_changed+=changed;
-  return channels;
+  store.channel_handoffs+=channels.has_value(); store.late_handoffs+=channels && channels->late;
+  if (!channels) return {};
+  return std::move(channels->layer.channels);
 }
 void RetireNativeAnimationChannels(uint32_t visual) {
   animation_bridge::completed_controller.Retire(visual);
@@ -567,6 +718,10 @@ REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
 REX_HOOK_RAW(bdAnimationUpdate) {
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
   if (!bd::gpu::scene::animation_bridge::Controller(ctx,base)) __imp__bdAnimationUpdate(ctx,base);
+}
+REX_HOOK_RAW(sub_822D3CB0) {
+  bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
+  if (!bd::gpu::scene::animation_bridge::LateLayers(ctx,base)) __imp__sub_822D3CB0(ctx,base);
 }
 REX_HOOK_RAW(sub_82289888) {
   if (!bd::gpu::scene::animation_bridge::Sample(ctx,base,false)) __imp__sub_82289888(ctx,base);

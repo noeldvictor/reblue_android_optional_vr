@@ -6566,3 +6566,69 @@ No new raw/perf/cache/dump/image output;13window images still10434657B.
 Existing capture gate,75MiB runtime stop/100MiB diagnostic ceiling and cumulative
 floor62509998080B remain. README/active queue updated once for this bundle;
 only explicit source/tests/docs to commit/push, no binaries or diagnostic files.
+
+### 2026-09-08 late native animation continuation after827d36a
+
+Main re-read canonical instructions, guest-source/devloop skills and full disk
+policy. Clean synchronized main at entry, no active producer. Source establishes
+post-controller order: AnimeData_method_4638 ->bdAnimationUpdate ->late slots
+sub_822D3CB0 ->InitBones. Late slots4/5/3 use unit-step clocks; slot5 selection504
+is skipped. The standalone SlotUpdate also has a separate attachment caller.
+New bundle reuses native clip/controller channels through these late consumers
+and republishes before native skeleton evaluation. Untracked writes still fail
+the unchanged word comparison; their first differing word now has bounded
+provenance. Correlation between983's six samples/six changes is not yet proof.
+
+First measured free63449755648B, pre-build63450009600B (253952B drive-wide gain,
+not cleanup). Same cumulative floor62509998080B and100MiB diagnostic ceiling;
+75MiB runtime stop/10MiB build logs unchanged. Existing logs419371B/214files,
+material tree10409344B/43files, hostEXE49275904B/PDB113266688B. No budget reset.
+413 artifact-free guards/scenario tests pass0.239s. Plan material62/CPU60 then
+host179 with inspected existing j4 wrapper:64MiB/8MiB/192MiB free-drop caps,
+300s timeout. Expected fixture overlap<16MiB and host<192MiB. Keep current
+passing61/59 and178 until replacements pass, plus177/983 live evidence and all
+unresolved failures. No new raw/image/perf/cache/dump producer. A later runtime
+must reserve full400KiB overlap and establish positive late-native consumption,
+not just repeat the prior controller count or replace missing broader gates.
+
+Material62/PID37152 build0; CPU60/PID33600 PASS0.12s/CTest0.13s. Host179/
+PID22264/session13205 terminal0: private animation bridge plus version consumers,
+codegen0writes, no guest objects/shaders. HostEXE49293824B/PDB113348608B;
+fixtureEXE1285632B. End build free63449174016B. Reused inspected runtime operator
+adds LateAnimationProbe only as an extra condition on the unchanged controller
+observation: positive matching late transactions, positive samples, reused native
+layers and downstream late skeleton handoffs. No subtree/indexed/motion/pixel
+claim.60s,400KiB text,192MiB free-drop; reserve full75MiB overlap before profile
+mutation, zero raw/image/perf/cache/dump allowance, guaranteed exact restoration.
+Current passing179/62/60 supersedes178/61/59 build/test text;177/983 still retained
+until the new run re-verifies its controller and import contracts.
+
+Run984/PID32680/session49310 terminal20:21:19, exit1 observation-complete stop.
+Main30460matching transactions,3996samples,8mixes,4012advancing clocks; late6
+completed/checked,6samples,6native reuses and6native skeleton handoffs. Total
+handoffs3991,changed0 versus983's3985/6, with identical main controller counts.
+This source/causal-regression/live bundle resolves the six observed late writes;
+5028model/controller refusals still unclassified. Standalone attachment sampling
+not reached. Skeletonframe1084 has3706matching evaluations/publications; context
+1085 is opening event, not interactive/reload/motion/both-eye qualification.
+Run984 also re-verifies canonicalization122->121/93432B,prepare-refused0. Exact
+hashes/contracts in20260908_2021_native-late-animation.md. Profile independently
+matches original2F1BC38D...; no new raw/perf/cache/dump/image files by scoped
+timestamp inventory. No producer remains live, no next build/run queued.
+
+Completed cleanup:178/61/59 logs6files2924B logical, free63448608768->63448616960,
+8192B reclaimed; after984 replaces prior live coverage,177/983 logs3files134058B
+logical,free63451828224->63451967488,139264B reclaimed. Total9superseded agent
+text files136982B logical/147456B observed (144KiB) reclaimed this turn only.
+Deleted text is not in Git; builds/tests reproducible,983source/hash/results
+remain historical in its controller report. No protected failure/game data,
+asset/profile/build tree/image/raw deletion. Preserve975/979/980/971/962 evidence.
+
+Pre-commit free63451967488B (59.09GiB),2211840B drive-wide GAIN since first
+63449755648B. Most of that gain preceded cleanup and is NOT attributed to it.
+Partial attributed retained growth147266B: fixturetree+60722B,hostEXE/PDB+99840B,
+buildlogs+1006B,runtime984replacing983-14302B. Host objects/build metadata,
+source/Git and unrelated activity are outside this subtotal. Final diagnostics
+78073945B;420377B/212buildlogs. Same75MiB stop/100MiB ceiling/floor62509998080B,
+13window images10434657B unchanged. README/active queue updated for this bundle;
+commit/push explicit source/tests/docs only. Full goal remains active/incomplete.

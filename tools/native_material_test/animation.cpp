@@ -895,6 +895,23 @@ void TestNativeControllerPlan() {
   plan=PlanNativeAnimationController(input);
   Require(plan && plan->count == 1 && plan->steps[0].reset && plan->steps[0].weight == 1,
           "replacement mode samples even a negative-weight slot");
+  std::array<bool,6> late_enabled{}; late_enabled[3]=late_enabled[4]=late_enabled[5]=true;
+  auto late=PlanNativeAnimationLateLayers(input.slots,late_enabled,false,ControllerName("arm"));
+  Require(late && late->count == 3 && late->steps[0].slot == 4 && late->steps[1].slot == 5 && late->steps[2].slot == 3 &&
+          late->slots[4].time_ticks == 1 && late->slots[4].weight == .625f && late->steps[0].included.View() == "arm",
+          "late layers advance with unit step in authored 4,5,3 order, inheriting global inclusion");
+  late_enabled[5]=false;
+  input.slots[3].present=false; input.slots[4].weight=-2; input.slots[4].time_ticks=-4;
+  late=PlanNativeAnimationLateLayers(input.slots,late_enabled,false,ControllerName(""));
+  Require(late && late->count == 0 && late->advanced[4] && !late->advanced[5] && !late->advanced[3] &&
+          late->slots[4].time_ticks == -2 && late->slots[4].weight == -1.875f,
+          "disabled/absent late slots do not advance; negative-weight slot advances but does not sample");
+  late=PlanNativeAnimationLateLayers(input.slots,late_enabled,true,ControllerName(""));
+  Require(late && late->count == 1 && late->steps[0].reset && late->steps[0].seconds == 0 && late->steps[0].weight == 1,
+          "late replacement samples nonpositive weight with ordinary clip-domain clamp");
+  input.slots[4].time_rate=std::numeric_limits<float>::infinity();
+  Require(!PlanNativeAnimationLateLayers(input.slots,late_enabled,false,ControllerName("")),
+          "nonfinite late clock refuses before any earlier slot can publish");
 }
 void TestNativeControllerConsumption() {
   ClipSource source;
@@ -985,6 +1002,58 @@ void TestNativeControllerConsumption() {
   Require(!handoff.Take(1,2,3,0x8000,read,changed),"visual retirement invalidates pending native channels");
   Require(publish() && !handoff.Publish({1,2,UINT32_MAX-3,3,result->output.channels,records}) &&
           !handoff.Take(1,2,3,0x8000,read,changed),"overflowing failed replacement clears stale pending ownership");
+
+  // Reproduce the former ownership gap: a post-controller writer changes valid
+  // channels, then bones must consume the UPDATED native owner, not stale base.
+  std::array<bool,6> enabled{}; enabled[3]=enabled[4]=enabled[5]=true;
+  for (unsigned frame=0; frame<65; ++frame) {
+    auto outgoing=records;
+    outgoing[1][0]|=128; // No matching animated track: late work must retain dirtiness.
+    auto base_layer=animation_source::ControllerLayer::Decode(outgoing);
+    auto boundary_read=[&](uint64_t address)->std::optional<uint32_t> {
+      if (address < 0x8000 || address >= 0x8090 || (address&3)) return {};
+      return outgoing[(address-0x8000)/48][((address-0x8000)%48)/4];
+    };
+    Require(handoff.Publish({1,2,0x8000,3,base_layer.channels,outgoing}),"publish controller before authored late layers");
+    auto continued=handoff.TakeLayer(1,2,3,0x8000,boundary_read,changed);
+    Require(continued && !continued->late && continued->layer.Encode() == outgoing,
+            "validated handoff retains native payloads and dormant boundary values without decoding payloads");
+    auto late_slots=input.slots;
+    for (uint8_t n : {4,5,3}) {
+      late_slots[n].time_ticks=float(frame)/4; late_slots[n].time_rate=.25f;
+      late_slots[n].weight=float(n)/8; late_slots[n].weight_rate=.03125f;
+    }
+    const auto late_plan=PlanNativeAnimationLateLayers(late_slots,enabled,false,ControllerName(""));
+    Require(late_plan.has_value(),"advancing late layer plan");
+    const auto late_result=animation_source::ExecuteController(*late_plan,assets,names,skeleton,
+        std::move(continued->layer),0,{},false);
+    Require(late_result && late_result->sampled == 3,"three late consumers use one native working layer");
+    auto reference=outgoing;
+    for (uint8_t n : {4,5,3}) {
+      const float seconds=float(double(float(double(late_slots[n].time_ticks)+double(late_slots[n].time_rate)))/30.0);
+      const float weight=float(double(late_slots[n].weight)+double(late_slots[n].weight_rate));
+      Require(animation_source::ApplyKeyedLayer(*asset,names,skeleton,seconds,weight,2,false,reference,{},false),
+              "independent legacy layer reference in authored late order");
+    }
+    outgoing=late_result->output.Encode();
+    Require(outgoing == reference && (outgoing[1][0]&128),"late layers match old ABI and preserve dirty flags on untouched joints");
+    Require(handoff.Publish({1,2,0x8000,3,late_result->output.channels,outgoing,true}),"late writer republishes completed native owner");
+    auto bones=handoff.TakeLayer(1,2,3,0x8000,boundary_read,changed);
+    std::vector<RenderMatrix> pose;
+    Require(bones && bones->late && !changed && EvaluateNativeSkeleton(skeleton,bones->layer.channels,JointIdentity(),pose),
+            "late native channels reach existing skeleton evaluation without stale-base rejection");
+    NativeInstanceRegistry instances; const auto instance=instances.Create(91);
+    Require(instances.Publish(instance,0,pose) && instances.Transfer(instance,0,1,3),"late pose feeds existing immutable render instance");
+    auto retained=instances.Read(instance,1); instances.Retire(instance);
+    Require(retained && retained->transforms == pose,"completed late pose survives source/instance retirement");
+    Require(!handoff.TakeLayer(1,2,3,0x8000,boundary_read,changed),"late pose handoff remains exactly once");
+    Require(handoff.Publish({1,2,0x8000,3,late_result->output.channels,outgoing,true}),"publish before untracked writer");
+    outgoing[0][2]^=1;
+    animation_source::ControllerHandoff::Difference difference;
+    Require(!handoff.TakeLayer(1,2,3,0x8000,boundary_read,changed,&difference) && changed &&
+            difference.joint == 0 && difference.word == 2 && difference.actual == outgoing[0][2],
+            "untracked late write is still rejected with bounded causal provenance");
+  }
 }
 } // namespace
 void TestAnimationClips() {

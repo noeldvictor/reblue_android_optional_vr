@@ -102,12 +102,13 @@ inline std::optional<ControllerExecution> ExecuteController(
     const NativeAnimationControllerPlan &plan,
     const std::array<std::shared_ptr<const NativeAnimationAsset>,kNativeAnimationSlots> &assets,
     std::span<const uint32_t> names, std::span<const NativeSkeletonJoint> skeleton,
-    ControllerLayer previous, uint32_t compression, std::span<const NativeJointName> exclusions) {
+    ControllerLayer previous, uint32_t compression, std::span<const NativeJointName> exclusions,
+    bool begin_update=true) {
   if (!previous.Valid() || names.size() != previous.channels.size() || !ValidNativeSkeleton(skeleton) ||
       skeleton.size() != names.size() || exclusions.size() > 30 || plan.count > plan.steps.size()) return {};
   std::array<ControllerLayer,8> layers;
   layers[kNativeAnimationOutput]=std::move(previous);
-  for (auto &header : layers[kNativeAnimationOutput].boundary) header.flags&=~128u;
+  if (begin_update) for (auto &header : layers[kNativeAnimationOutput].boundary) header.flags&=~128u;
   std::array<std::string_view,30> excluded_views;
   size_t excluded_count=0;
   for (size_t n=0; n<exclusions.size(); ++n) {
@@ -164,7 +165,10 @@ class ControllerHandoff {
     uint64_t generation=0;
     std::vector<NativeJointChannels> channels;
     std::vector<ChannelRecord> boundary;
+    bool late=false;
   };
+  struct Validated { ControllerLayer layer; bool late=false; };
+  struct Difference { size_t joint=0, word=0; uint32_t expected=0; std::optional<uint32_t> actual; };
   bool Publish(Pending pending) {
     pending_.reset();
     if (!pending.visual || !pending.graph || !pending.source || !pending.generation || pending.channels.empty() ||
@@ -173,14 +177,29 @@ class ControllerHandoff {
     pending_=std::move(pending); return true;
   }
   template<class ReadWord>
-  std::optional<std::vector<NativeJointChannels>> Take(uint32_t visual, uint32_t graph, uint64_t generation,
-      uint32_t source, ReadWord &&read, bool &changed) {
+  std::optional<Validated> TakeLayer(uint32_t visual, uint32_t graph, uint64_t generation,
+      uint32_t source, ReadWord &&read, bool &changed, Difference *difference=nullptr) {
     auto pending=std::move(pending_); pending_.reset(); changed=false;
     if (!pending || pending->visual != visual || pending->graph != graph || pending->generation != generation || pending->source != source) return {};
     for (size_t n=0; n<pending->boundary.size(); ++n) for (size_t w=0; w<12; ++w) {
-      if (read(uint64_t(source)+n*48+w*4) != pending->boundary[n][w]) { changed=true; return {}; }
+      const auto actual=read(uint64_t(source)+n*48+w*4);
+      if (actual != pending->boundary[n][w]) {
+        changed=true;
+        if (difference) *difference={n,w,pending->boundary[n][w],actual};
+        return {};
+      }
     }
-    return std::move(pending->channels);
+    Validated result; result.late=pending->late;
+    result.layer.channels=std::move(pending->channels);
+    for (const auto &record : pending->boundary) result.layer.boundary.push_back({record[0],record[1]});
+    return result;
+  }
+  template<class ReadWord>
+  std::optional<std::vector<NativeJointChannels>> Take(uint32_t visual, uint32_t graph, uint64_t generation,
+      uint32_t source, ReadWord &&read, bool &changed) {
+    auto result=TakeLayer(visual,graph,generation,source,read,changed);
+    if (!result) return {};
+    return std::move(result->layer.channels);
   }
   void Retire(uint32_t visual) { if (pending_ && pending_->visual == visual) pending_.reset(); }
   void Clear() { pending_.reset(); }
