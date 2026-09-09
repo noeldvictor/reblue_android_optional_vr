@@ -244,21 +244,22 @@ bundle to authored gaze instead of another unchanged opening-scene probe.
 Joint-driver, transition and pixel gates remain unqualified.
 [Source/content evidence and next connected boundary](research/20260908_2331_effect-input-coverage.md).
 
-**Shared animated materials (2026-09-09; opt-in):** controller and eye UV updates
-now share one immutable, generation-checked instance publication. Actual native
-material packets consume it, and subsequent controller ticks reuse its UV
-offsets. Eye updates preserve other animated slots; pinned snapshots, late-write
-invalidation and allocation backpressure share the existing 16 MiB instance budget.
-Host190 records **1,918 native scroll-input reuses**, zero publication refusals,
-959 matching eye updates (225 off-center), and 13,200 additional material packets
-between fresh post-event field samples. CPU tests exercise the complete
-controller/eye/next-tick/material chain without UV re-import, all three UV motion
-modes, lifetime and tight budgets; 423 guards and the host build pass.
-Live non-eye slot preservation, joint-driven UVs and cue transitions remain
-unexercised. Authored bindings/rates, remaining image/UV writers and checked
-outgoing scratch/table adapters still need migration. No motion-pixel,
-reload/stereo, whole-frame or speedup qualification is claimed.
-[Shared ownership, exact verification and remaining dependencies](research/20260909_0037_native-material-uv-ownership.md).
+**Bind-owned animated materials (2026-09-09; opt-in):** authored UV rates,
+divisors, gaze limits and resolved material/joint bindings are now published once
+at binding into the existing instance owner. Controller and eye evaluation use
+these immutable descriptors; their shared UV outputs feed subsequent ticks and
+actual native material packets. All leases share the existing 16 MiB budget.
+Host192 records **1,920 effect-slot and 957 eye evaluations using native
+descriptors**, zero descriptor changes/refusals, 1,914 native scroll-input reuses,
+and 13,200 additional material packets between fresh post-event field samples.
+CPU tests forbid descriptor/UV re-import inside evaluation and cover three UV
+modes, late writes, generation/reload lifetime and tight budgets. The 424 guards,
+C++ fixture and host build pass.
+Original load-time name resolution and per-update late-write validation still
+read guest data; other image/UV writers and outgoing scratch/table adapters remain.
+Live joint-driven UVs, cue transitions and preserved non-eye slots are unexercised.
+No motion-pixel, reload/stereo, whole-frame or speedup qualification is claimed.
+[Binding ownership, verification and remaining dependencies](research/20260909_0104_native-material-uv-programs.md).
 
 ### How much is left?
 

@@ -240,6 +240,16 @@ void TestMaterialUVProgramOwnership() {
   words[visual+3560]=table; Require(publish(), "republish before unit change"); words[0x8208EA64]^=1;
   Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read), "unit conversion late write cannot change native evaluation silently");
   words[0x8208EA64]^=1;
+  Require(publish() && !registry.ReadMaterialUVProgram(binding.instance,12) &&
+      !instance_source::ReadMaterialUVProgram(registry,binding,visual,12,read) &&
+      !registry.ReadMaterialUVProgram(binding.instance,11), "wrong generation invalidates descriptor visibility without borrowing another model");
+  Require(publish(), "republish before count change"); words[visual+3564]=1;
+  Require(!instance_source::ReadMaterialUVProgram(registry,binding,visual,11,read), "descriptor table count changes invalidate the whole binding");
+  words[visual+3564]=2;
+  const auto unit=words[0x8208EA64]; words.erase(0x8208EA64);
+  Require(!material_uv_source::ReadProgram(visual,read) &&
+      !material_uv_source::ReadProgram(UINT32_MAX-100,read), "missing unit and overflowing visual refuse complete descriptor import");
+  words[0x8208EA64]=unit;
   auto dormant=publication->program; dormant.slots[1].rate[0]=NAN;
   Require(dormant.Valid(), "dormant nonfinite scroll payload remains admissible for a channel driver");
   auto bad=publication->program; bad.slots.resize(257); Require(!bad.Valid(), "program slot capacity is bounded");
@@ -256,7 +266,11 @@ void TestMaterialUVProgramOwnership() {
       "pinned descriptor replacement refuses without stale visibility");
   held.reset(); Require(tight.PublishMaterialUVProgram(id,11,changed), "released descriptor overlap permits republish");
   tight.Retire(id); Require(tight.Stats().bytes == 0, "tight descriptor budget returns to zero");
-  registry.Retire(binding.instance); words.clear();
+  registry.Retire(binding.instance);
+  const auto reloaded=registry.Create(12);
+  Require(reloaded != binding.instance && !registry.ReadMaterialUVProgram(binding.instance,11) &&
+      !registry.ReadMaterialUVProgram(reloaded,12), "replacement model generation cannot inherit retired descriptors");
+  registry.Retire(reloaded); words.clear();
   Require(pinned->slots[0].rate[0] == .25f && registry.Stats().bytes == bytes,
       "native descriptors survive source/instance destruction with pinned residency charged");
   pinned.reset(); Require(registry.Stats().bytes == 0, "last descriptor lease releases accounted storage");

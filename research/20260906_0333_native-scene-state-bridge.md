@@ -7346,3 +7346,45 @@ source validation remain explicit. Next existing supervisor run requests
 MaterialProgramProbe plus all prior animated-UV/eye/controller/late observations,
 60s/400KiB/192MiB,no capture/perf/cook,exact116Bprofile restoration. Pre-run
 profile hash unchanged; never label host190's evidence as the new binary.
+
+Source/test f6e254e committed/pushed before the changed-code runtime. Eight
+superseded76/73/190/191 receipts13487Blogical removed after passing192;
+free63555710976->63555735552B,24576Breclaimed. Failed191's missing declaration is
+resolved and documented, not an unqualified runtime/pixel failure to preserve.
+Runtime preflight78146305Bdiagnostics,409600Blogreserve,noimages,free63554990080B,
+floor63353663488B. Host192/PID30080/session13730,01:03:47..01:04:41, requested
+MaterialProgramProbe reached WITH previousUV/eye/controller/late gates. Intentional
+diagnostic-stop exit1, not crash/CTest pass.5binding publications,1878reads,
+changed0/refused0;1920effect-slot/957eye descriptor evaluations;1914owned scroll
+inputs,231off-center eye controls. Fresh idle contexts1638->1938 material packets
+27808->41008. Missing joint-driver/cue/non-eye-preservation live coverage remains0.
+All14settings applied,exact116Bprofile restored; no new raw/window/perf/cache/dump.
+Original name resolution and per-update descriptor comparison remain source
+adapters; no full-frame, motion-pixel, reload/stereo or Quest acceptance claimed.
+
+Full254910Blog hash20E47B916951C82DBB0BCD0BC4E01B7EF52675CDA02138C29034F9EC9657C3F7
+retained losslessly in material-program192ZIP51869B,hash88080D12C4BA4DF855E2BA77B18BB1272E66D345B608464E5D0053A69DC2C3FF.
+Full member/name/length/hash verified; archiveallocationfree63553740800->
+63553687552B,53248B. Plaintext plus supersededanimated-uv190ZIP306426Blogical
+removed:free63553470464->63553781760B,311296Breclaimed. Current log recoverable
+from newZIP; old190log no longer retained, historical report preserved. Keep
+effect187/placement988/root985 and earlier unresolved pixel/reload evidence.
+
+Final explicit descriptor wrong-generation/reload/count/missing-input regressions
+change tests only. Material78/PID4232 build0;CPU75/PID31084 PASS0.12s/CTest0.14s,
+same64/8MiB/300s/cumulative caps. Fixture1580032B,tree11399067B/43files;
+fixture SHA256039F960E4808088AEE7F40046A2EB9C1798BD943746B434E7875D572FD6565E9.
+Four77/74receipts2331Blogical removed after replacement;free63556743168->
+63556747264B,4096Breclaimed. No host rebuild/run restamp for test-only additions.
+
+Total14files322244Blogical deleted;339968Bmeasured deletions minus53248Barchive
+allocation=286720B net280KiB cleanup, no old savings credited. Partial retained
+growth275790B (fixture+153694,EXE/PDB+125440,ZIPreplacement+353,buildlogs-3697),
+excluding hostobjects/metadata/source/Git and unrelated drive activity. Post-cleanup
+free63556747264B (~59.2GiB),drive-wide5251072Blower thanfirst63561998336B;
+only measured deletion/allocation is task cleanup. Diagnostics78146490B,
+buildlogs419974B/212files; next400KiB overlap87110B below75MiB, fresh preflight
+mandatory.13windowimages10434657B unchanged, no new raw/budget exception.
+All producers terminal, none queued. Retain final78/75/192 and material-program192.
+README/queue and research/20260909_0104_native-material-uv-programs.md record the
+connected outcome, remaining writers/validation and unchanged full desktop goal.

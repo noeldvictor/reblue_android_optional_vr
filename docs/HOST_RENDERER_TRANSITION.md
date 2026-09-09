@@ -1006,29 +1006,32 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    rendering dependency removed. Full log retained losslessly in effect187ZIP,
    replacing186's explained missing-driver/scroll/selection/controller purpose.
    [Source/content provenance, exact evidence and next boundary](../research/20260908_2331_effect-input-coverage.md).
-   **Shared animated material connection (sourcedd6a2dc,host190/PID38184):**
-   controller -> shared immutable NativeMaterialUVs in the existing instance
-   registry -> eye patch -> subsequent controller -> native material packets.
-   Replaces the fixed eye-only owner; sparse model-local slots, full table count,
-   stable instance/generation and pinned allocation accounting under16MiB.
-   Complete controller/eye/next-tick/composer CPU chain forbids exported UV inputs;
-   tests cover three UV modes, preserved non-eye slots, source destruction,
-   reload, late writes/rebinding, signed zero and tight-budget backpressure.
-   Material76/CPU73/423guards/host190 PASS. Live:1918owned scroll inputs,
-   1922publications/refused0;959exact eyes,225off-center; idle1662->1962 scopes
-   632->932,packets27808->41008 (+13200),owner changed0. Skin emission/fence
-   retirement advances separately. Requested observation reached; no full
-   desktop, motion-pixel, reload/both-eye or speedup qualification.
-   Live preserved non-eye slots, translation/rotation drivers and cue transitions
-   remain0; their CPU coverage is not a substitute. Outgoing table/scratch checks
-   and authored/source bindings remain explicit adapters, not a host-only frame.
-   Next: publish authored UV configuration and resolved material/joint identities
-   at binding/rebinding into existing owners; migrate other UV/image writers,
-   including viewer overrides, before retiring final source UV inputs/exports.
-   Reuse completed parser/binder/effect/eye contracts, not a helper queue or new
-   cache/renderer. No unchanged opening UVCON probe or threshold reduction.
-   Lossless animated-uv190ZIP replaces eye188's verification purpose; retain
-   effect187/placement988/root985 and prior pixel/reload failures. Defaults unchanged.
+   **Bind-owned animated materials (sourcef6e254e,host192/PID30080):** binding
+   publishes immutable native rates/divisors, gaze limits and resolved material/
+   joint identities into the existing generation-owned instance registry. Both
+   controller and eye evaluation consume descriptors, then shared UV values feed
+   subsequent updates and actual native material packets. No second source index.
+   Descriptor and UV leases share16MiB accounting, including pinned retirement;
+   rebind/late descriptor changes invalidate both kinds of stale visibility.
+   Material78/CPU75/424guards/host192 PASS. Connected CPU chain forbids descriptor
+   and UV imports inside evaluation; includes all three motion modes, preserved
+   non-eye slots, late writes, model-generation/reload and tight-budget refusal.
+   Live:5binding publications/1878reads,changed0/refused0;1920effect-slot and957eye
+   descriptor evaluations,231off-center eyes;1914owned scroll inputs. Idle
+   contexts1638->1938 scopes632->932,packets27808->41008 (+13200). Original
+   eye/controller/late regression gates unchanged. Skin fence counters separate.
+   Live joint-driven UVs, queued transitions and preserved non-eye slots remain0;
+   no motion-pixel/reload/both-eye/full-frame or speedup qualification.
+   Original binding/name resolution remains a load-time adapter. Descriptor
+   late-write validation still re-decodes source words for comparison; native
+   evaluation no longer imports them as input, but not all table reads are gone.
+   Next migrate remaining UV/image writers (including viewer overrides) and their
+   publications, then retire final configuration/UV validation and outgoing
+   scratch/table exports as their last consumers leave. Reuse existing owners and
+   complete parser/binder/effect/eye contracts; no unchanged UVCON opening probe.
+   Lossless material-program192ZIP replaces animated-uv190's purpose. Preserve
+   effect187/placement988/root985 and earlier pixel/reload failures; defaults unchanged.
+   [Bind-owned descriptors, CPU/live evidence and next boundary](../research/20260909_0104_native-material-uv-programs.md).
    [Shared owner, connected verification and remaining interfaces](../research/20260909_0037_native-material-uv-ownership.md).
    [Eye contracts, native consumer evidence and remaining interfaces](../research/20260909_0000_native-eye-materials.md).
    Next migrate remaining channel writers/source selection, remove validation/
