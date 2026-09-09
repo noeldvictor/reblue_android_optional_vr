@@ -63,6 +63,7 @@ REX_EXTERN(__imp__AnimeData_PollLoadState);
 REX_EXTERN(__imp__sub_821502F0);
 REX_EXTERN(__imp__sub_8218BB10);
 REX_EXTERN(__imp__sub_8218B4D8);
+REX_EXTERN(__imp__AnimeData_method_1338);
 
 namespace bd::gpu::scene::animation_bridge {
 namespace {
@@ -1072,8 +1073,9 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   const auto material_program=ReadNativeMaterialUVProgram(visual,model->Generation());
   const auto previous_uv=ReadNativeMaterialUVs(visual,model->Generation());
   const auto catalog=FindNativeImageCatalog(visual,identity.instance,identity.model_generation,Word);
+  const auto material_animation=catalog ? ReadNativeMaterialAnimation(visual,identity.model_generation,*catalog) : std::nullopt;
   const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),
-      result->output.channels,Word,previous_uv.get(),material_program.get(),catalog.get());
+      result->output.channels,Word,previous_uv.get(),material_program.get(),catalog.get(),material_animation ? &*material_animation : nullptr);
   if (!effects) return refuse("effect timeline/UV boundary");
   const auto records=result->output.Encode();
   stage=EffectAdmission::Output;
@@ -1133,6 +1135,8 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     }
   }
   effects->Publish([](uint64_t address,uint32_t value) { bd::mem::store<uint32_t>(uint32_t(address),value); });
+  if (effects->called && !PublishNativeMaterialAnimation(visual,identity,*catalog,effects->animation))
+    InvalidateNativeMaterialAnimation(visual); // never replay after completed exports
   const bool material_requested=effects->material.Valid();
   const bool material_owned=material_requested && identity.model_generation == model->Generation() &&
       PublishNativeMaterialUVs(visual,identity,effects->table,effects->material);
@@ -1273,12 +1277,16 @@ REX_HOOK_RAW(sub_8218BB10) {
   using namespace bd::gpu::scene;
   const uint32_t container=ctx.r3.u32;
   const uint32_t visual=container >= 2248 ? container-2248 : 0;
+  InvalidateNativeMaterialAnimation(visual);
   RetireNativeImageCatalog(visual);
   __imp__sub_8218BB10(ctx,base); // parser and viewer append; never hold native locks
   // During parsing identity may not exist yet; final material binding owns that
   // import. Viewer replacement reuses only an already established instance.
   const auto identity=FindNativeVisualIdentity(visual);
-  try { BindNativeImageCatalog(visual,identity.instance,identity.model_generation); }
+  try {
+    BindNativeImageCatalog(visual,identity.instance,identity.model_generation);
+    RefreshNativeMaterialAnimation(visual);
+  }
   catch (const std::exception &error) {
     RetireNativeImageCatalog(visual);
     BD_WARN("[native-image-catalog-bind] {}",error.what());
@@ -1286,8 +1294,15 @@ REX_HOOK_RAW(sub_8218BB10) {
 }
 REX_HOOK_RAW(sub_8218B4D8) {
   const uint32_t container=ctx.r3.u32;
+  bd::gpu::scene::InvalidateNativeMaterialAnimation(container >= 2248 ? container-2248 : 0);
   bd::gpu::scene::RetireNativeImageCatalog(container >= 2248 ? container-2248 : 0);
   __imp__sub_8218B4D8(ctx,base); // retire before unlink/destruction of image entries
+}
+REX_HOOK_RAW(AnimeData_method_1338) {
+  const uint32_t visual=ctx.r3.u32;
+  bd::gpu::scene::InvalidateNativeMaterialAnimation(visual);
+  __imp__AnimeData_method_1338(ctx,base); // polls/restarts once; complete writer before import
+  bd::gpu::scene::RefreshNativeMaterialAnimation(visual);
 }
 REX_HOOK_RAW(bdD2AnimLoadFile) {
   const uint32_t owner=ctx.r3.u32;
@@ -1342,11 +1357,13 @@ REX_HOOK_RAW(bdVisualObjectAnimSlotUpdate) {
   __imp__bdVisualObjectAnimSlotUpdate(ctx,base);
 }
 REX_HOOK_RAW(bdAnimationUpdate) {
+  const uint32_t material_visual=ctx.r3.u32;
   bd::gpu::scene::animation_bridge::CompletePlacementBeforeUpdate(ctx.r3.u32);
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
   if (!bd::gpu::scene::animation_bridge::Controller(ctx,base)) {
     bd::gpu::scene::InvalidateNativeMaterialUVs(ctx.r3.u32);
     __imp__bdAnimationUpdate(ctx,base);
+    bd::gpu::scene::RefreshNativeMaterialAnimation(material_visual);
   }
 }
 REX_HOOK_RAW(AnimeData_method_4638) {

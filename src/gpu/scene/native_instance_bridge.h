@@ -11,7 +11,13 @@ namespace bd::gpu::scene {
 struct NodeTag;
 struct NativeNodeLightBinding;
 struct NativeLightSourceBinding;
-namespace material_image_source { struct Binding; }
+namespace material_image_source { struct Binding; struct LoadedCatalog; }
+void RefreshNativeMaterialAnimation(uint32_t visual);
+void InvalidateNativeMaterialAnimation(uint32_t visual);
+std::optional<NativeMaterialAnimation> ReadNativeMaterialAnimation(uint32_t visual, uint64_t generation,
+    const material_image_source::LoadedCatalog &catalog);
+bool PublishNativeMaterialAnimation(uint32_t visual, NativeVisualIdentity identity,
+    const material_image_source::LoadedCatalog &catalog, const NativeMaterialAnimation &state);
 // Source identity lookup only at compatibility/producer boundaries. Native
 // deferred entries and their consumer never resolve an instance back to a VA.
 NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual);

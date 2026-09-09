@@ -8,6 +8,7 @@
 #include "gpu/scene/native_material_uv_program.h"
 #include "gpu/scene/native_image_animation_source.h"
 #include "gpu/scene/native_image_catalog_source.h"
+#include "gpu/scene/native_material_animation.h"
 
 namespace bd::gpu::scene {
 namespace material_image_source {
@@ -49,9 +50,10 @@ bool Matches(uint32_t visual, const Binding &binding, const NativeMaterialImages
 }
 template<class Read, class Capture, class Find>
 std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &program, Read source_read,
-    Capture capture, Find find, const LoadedCatalog &catalog, Trace *trace=nullptr) {
+    Capture capture, Find find, const LoadedCatalog &catalog, const NativeMaterialAnimation &animation, Trace *trace=nullptr) {
   auto refuse=[&](Refusal reason)->std::optional<Update> { if (trace) trace->reason=reason; return {}; };
   if (!program.Valid() || !visual || (visual&3) || visual > UINT32_MAX-3567) return {};
+  if (!animation.Valid() || animation.catalog.get() != &catalog.catalog) return {};
   Update result;
   // A transaction-wide cap includes the remaining outgoing adapter. Refuse before
   // any guest mutation, allocation callback or publication on malformed cycles.
@@ -84,9 +86,8 @@ std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &pr
     if (!image) return {};
     if (slot.image_animation >= 0) {
       if (!catalog.catalog.entries.empty()) {
-        const auto id=read(uint64_t(visual)+2212+(slot.image_animation ? 4 : 0));
-        if (!id) return {};
-        const auto ordinal=catalog.catalog.Image(*id,slot.image_animation);
+        const auto id=animation.ids[slot.image_animation ? 1 : 0];
+        const auto ordinal=catalog.catalog.Image(id,slot.image_animation);
         const uint32_t owner=ordinal == UINT32_MAX ? 0 : catalog.exports[ordinal].owner;
         if (owner) {
           if (trace) trace->owner=owner;
@@ -97,9 +98,7 @@ std::optional<Update> Prepare(uint32_t visual, const NativeMaterialUVProgram &pr
           if (*state == 6) {
             asset=find(owner);
             if (!asset) return refuse(Refusal::Asset);
-            const auto time_word=read(uint64_t(visual)+2224);
-            if (!time_word) return refuse(Refusal::Time);
-            const float time=std::bit_cast<float>(*time_word);
+            const float time=animation.time;
             if (!std::isfinite(time) || double(time) < double(INT32_MIN) || double(time) > double(INT32_MAX))
               return refuse(Refusal::Time);
             const auto selection=asset->animation.Select(int32_t(time));

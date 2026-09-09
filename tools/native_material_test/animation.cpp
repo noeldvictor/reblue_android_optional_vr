@@ -1487,6 +1487,7 @@ void TestNativeEffectConsumption() {
   word(visual+3560,records); word(visual+3564,4); word(visual+2628,0x16000);
   word(visual+2212,1); word(visual+2232,entry); scalar(visual+2224,9); scalar(visual+2228,1);
   word(entry+16,object); scalar(object+312,10.9f); word(object+316,6);
+  word(visual+2260,1); word(visual+2264,entry); word(entry+4,0); word(entry+8,1); word(entry+12,0);
   scalar(0x8208EA64,.017453292f);
   for (uint32_t n=0; n<4; ++n) {
     const auto record=records+n*152;
@@ -1508,7 +1509,16 @@ void TestNativeEffectConsumption() {
   Require(registry.PublishMaterialUVProgram(binding.instance,9,authored->program), "binding publishes immutable descriptors");
   const auto program=instance_source::ReadMaterialUVProgram(registry,binding,visual,9,read);
   Require(bool(program), "evaluators acquire generation-checked binding descriptors");
+  auto catalog_import=material_image_source::ReadCatalog(visual,binding.instance,9,65536,read);
+  Require(catalog_import.has_value(), "controller catalog binding");
+  const auto bound_catalog=std::make_shared<const material_image_source::LoadedCatalog>(std::move(*catalog_import));
+  const auto state_import=material_animation_source::ReadState(visual,bound_catalog,read);
+  Require(state_import && registry.PublishMaterialAnimation(binding.instance,9,state_import->state), "publish initial native material timeline");
+  binding.material_animation=state_import->boundary;
+  const auto initial_animation=instance_source::ReadMaterialAnimation(registry,binding,visual,9,*bound_catalog,read);
+  Require(initial_animation && initial_animation->cues[0] == 0, "native cue ordinal replaces selected source entry");
   const auto evaluation_read=[&](uint64_t address) {
+    Require(address < visual+2212 || address > visual+2244, "native effect evaluation must not read exported timeline");
     Require(address != 0x8208EA64, "native evaluation uses its owned unit conversion");
     for (uint32_t n=0; n<4; ++n) for (uint32_t offset : {4u,8u,12u,16u,20u,36u,40u,44u,48u,52u,56u,60u,64u,68u,72u,76u,80u,120u})
       Require(address != records+n*152+offset, "controller and eye evaluation must not import authored descriptors");
@@ -1516,7 +1526,7 @@ void TestNativeEffectConsumption() {
   };
   // Bound reader never provides packed channels at 0x16000: all values must be
   // consumed directly from the controller, without stealing skeleton's handoff.
-  auto update=PrepareEffectUpdate(visual,.5f,1,channels,evaluation_read,nullptr,program.get());
+  auto update=PrepareEffectUpdate(visual,.5f,1,channels,evaluation_read,nullptr,program.get(),bound_catalog.get(),&*initial_animation);
   Require(update && update->uv.size() == 3 && update->translated == 1 && update->rotated == 1 &&
           update->owned_descriptors == 3 && !update->transitioned && update->timeline[3] == std::bit_cast<uint32_t>(9.5f),
           "complete effect transaction admits clock plus scroll/translation/rotation drivers");
@@ -1531,6 +1541,12 @@ void TestNativeEffectConsumption() {
   scalar(records+28,5);
   Require(!update->Matches(read),"effect verification catches live UV divergence");
   update->Publish(word);
+
+  Require(registry.PublishMaterialAnimation(binding.instance,9,update->animation), "native controller republishes its owned clock");
+  binding.material_animation=update->timeline;
+  const auto next_animation=instance_source::ReadMaterialAnimation(registry,binding,visual,9,*bound_catalog,read);
+  Require(next_animation && next_animation->time == 9.5f && initial_animation->time == 9,
+      "completed clock feeds next update without mutating preceding snapshot");
 
   // Publish into the production instance owner, then forbid exported UV reads
   // inside the actual material importer. Only the late-write guard reads them.
@@ -1591,7 +1607,7 @@ void TestNativeEffectConsumption() {
     Require(address != records+28 && address != records+32, "next controller must not reimport exported scroll offsets");
     return evaluation_read(address);
   };
-  const auto next=PrepareEffectUpdate(visual,.5f,1,channels,no_scroll_import,after_eye.get(),program.get());
+  const auto next=PrepareEffectUpdate(visual,.5f,1,channels,no_scroll_import,after_eye.get(),program.get(),bound_catalog.get(),&*next_animation);
   Require(next && next->owned_offsets == 1 && next->material.entries[0].uv == std::array<float,2>{2.25f,-.75f} &&
       !next->material.HasEyes(), "next controller advances late eye offsets as native input and updates writer provenance");
   next->Publish(word);
@@ -1619,15 +1635,25 @@ void TestNativeEffectConsumption() {
   word(visual+2264,entry); word(entry+8,20); word(entry+4,entry+32);
   word(entry+32+8,21); word(entry+32+16,object+512); word(object+512+316,6); word(entry+32+4,0);
   word(visual+2260,2); word(entry+12,1); word(entry+32+12,0);
-  auto catalog=material_image_source::ReadCatalog(visual,1,9,65536,read);
-  Require(catalog.has_value(), "cue catalog bound once before controller transition");
+  auto bind_catalog=[&] {
+    auto value=material_image_source::ReadCatalog(visual,1,9,65536,read);
+    return value ? std::make_shared<const material_image_source::LoadedCatalog>(std::move(*value)) : nullptr;
+  };
+  auto catalog=bind_catalog();
+  Require(bool(catalog), "cue catalog bound once before controller transition");
   auto cue_read=[&](uint64_t address) {
+    Require(address < visual+2212 || address > visual+2244, "queued effect evaluator must not import source timeline");
     Require(address != visual+2260 && address != visual+2264 &&
         !(address >= entry && address < entry+64 && (address-entry)%32 != 16),
         "effect selection must not walk source catalog or read authored IDs/kinds");
     return read(address); // active duration still uses its outgoing entry+16 adapter
   };
-  auto prepare_cue=[&] { return PrepareEffectUpdate(visual,1,1,{},cue_read,nullptr,nullptr,&*catalog); };
+  // Distinct producer states for the cases below; native consecutive updates
+  // above reuse registry values, never this fixture-only importer.
+  auto prepare_cue=[&] {
+    const auto state=material_animation_source::ReadState(visual,catalog,read);
+    return state ? PrepareEffectUpdate(visual,1,1,{},cue_read,nullptr,nullptr,catalog.get(),&state->state) : std::nullopt;
+  };
   auto transition=prepare_cue();
   Require(transition && transition->transitioned && transition->timeline[0] == 20 && transition->timeline[1] == 21 &&
           transition->timeline[2] == 0xFEED && transition->timeline[3] == 0 &&
@@ -1646,11 +1672,11 @@ void TestNativeEffectConsumption() {
   }
   word(entry+32+8,20);
   Require(!catalog->Matches(1,9,read), "late cue edit invalidates catalog association");
-  catalog=material_image_source::ReadCatalog(visual,1,9,65536,read);
+  catalog=bind_catalog();
   Require(catalog && !ReadReadyEffect(*catalog,20,cue_read),"ready duplicate cannot replace the first pending effect entry");
   word(entry+32+8,21);
-  catalog=material_image_source::ReadCatalog(visual,1,9,65536,read);
-  Require(catalog.has_value(), "explicit rebind restores authored catalog");
+  catalog=bind_catalog();
+  Require(bool(catalog), "explicit rebind restores authored catalog");
   for (uint32_t state : {0u,5u,UINT32_MAX}) {
     word(object+316,state);
     Require(ReadReadyEffect(*catalog,20,cue_read) == 0u,"terminal nonready effect is known absent, not a poll or duplicate sweep");
@@ -1666,11 +1692,11 @@ void TestNativeEffectConsumption() {
   Require(!catalog->Matches(1,9,read) && !material_image_source::ReadCatalog(visual,1,9,65536,read),
       "cyclic effect catalogs invalidate and refuse at bind, not per-frame traversal");
   word(visual+2212,0); word(visual+3564,257);
-  Require(!PrepareEffectUpdate(visual,1,1,{},read),"material record count shares the existing 256-record owner bound");
+  Require(!prepare_cue(),"material record count shares the existing 256-record owner bound");
   word(visual+3564,UINT32_MAX);
-  Require(PrepareEffectUpdate(visual,1,1,{},read).has_value(),"signed negative record count is an authored no-op");
+  Require(prepare_cue().has_value(),"signed negative record count is an authored no-op");
   word(visual+3564,1); word(visual+3560,visual+16); word(visual+2628,0);
-  Require(!PrepareEffectUpdate(visual,1,1,{},read),"aliased visual/table storage cannot invalidate transactional preflight");
+  Require(!prepare_cue(),"aliased visual/table storage cannot invalidate transactional preflight");
   word(visual+3560,0); source.words.erase(visual+2212);
   Require(PrepareEffectUpdate(visual,NAN,NAN,{},read).has_value(),"null controller effect table does not inspect dormant timeline");
 

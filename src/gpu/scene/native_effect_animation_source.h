@@ -8,6 +8,7 @@
 #include "gpu/scene/native_material_uv.h"
 #include "gpu/scene/native_material_uv_program.h"
 #include "gpu/scene/native_image_catalog_source.h"
+#include "gpu/scene/native_material_animation_source.h"
 #include <bit>
 
 namespace bd::gpu::scene::animation_source {
@@ -85,6 +86,7 @@ struct EffectUpdate {
   struct UV { uint32_t destination=0; std::array<float,2> value{}; };
   uint32_t visual=0;
   std::array<uint32_t,9> timeline{}; // outgoing-only IDs/entries; not a native owner
+  NativeMaterialAnimation animation;
   bool called=false, clock_written=false, transitioned=false;
   uint32_t translated=0, rotated=0;
   uint32_t table=0, owned_offsets=0, owned_descriptors=0;
@@ -115,41 +117,41 @@ struct EffectUpdate {
 template<class Read>
 std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, double duration_scale,
     std::span<const NativeJointChannels> channels, Read &&read, const NativeMaterialUVs *previous=nullptr,
-    const NativeMaterialUVProgram *program=nullptr, const material_image_source::LoadedCatalog *catalog=nullptr) {
+    const NativeMaterialUVProgram *program=nullptr, const material_image_source::LoadedCatalog *catalog=nullptr,
+    const NativeMaterialAnimation *animation=nullptr) {
   if (!visual || (visual&3) || uint64_t(visual)+3752 > uint64_t(UINT32_MAX)+1) return {};
   const auto records=read(uint64_t(visual)+3560);
   if (!records) return {};
   EffectUpdate result; result.visual=visual;
   if (!*records) return result; // controller does not call bdEffectUpdate at all
+  if (!catalog || !animation || !animation->Valid() || animation->catalog.get() != &catalog->catalog) return {};
   result.called=true;
-  for (size_t n=0; n<result.timeline.size(); ++n) {
-    const auto word=read(uint64_t(visual)+2212+n*4);
-    if (!word) return {};
-    result.timeline[n]=*word;
-  }
-  auto &timeline=result.timeline;
-  const NativeEffectClock clock{std::bit_cast<float>(timeline[3]),std::bit_cast<float>(timeline[4]),
-      timeline[0] != 0,timeline[2] != 0,timeline[7] != 0};
+  auto &state=result.animation; state=*animation;
+  const NativeEffectClock clock{state.time,state.speed,state.ids[0] != 0,state.loop_bits != 0,state.queued[0] != 0};
   std::optional<double> duration;
   if (clock.NeedsDuration()) {
-    const auto a=ReadEffectDuration(timeline[5],duration_scale,read), b=ReadEffectDuration(timeline[6],duration_scale,read);
+    const auto entry=[&](size_t n) { return state.cues[n] == UINT32_MAX ? 0 : catalog->exports[state.cues[n]].node; };
+    const auto a=ReadEffectDuration(entry(0),duration_scale,read), b=ReadEffectDuration(entry(1),duration_scale,read);
     if (!a || !b) return {};
     duration=*a > *b ? *a : *b;
   }
   const auto step=AdvanceNativeEffectClock(clock,delta,duration);
   if (!step) return {};
   result.clock_written=clock.active;
-  if (clock.active) timeline[3]=std::bit_cast<uint32_t>(step->time);
+  if (clock.active) state.time=step->time;
   if (step->transition) {
-    if (!catalog) return {};
-    const auto a=ReadReadyEffect(*catalog,timeline[7],read), b=ReadReadyEffect(*catalog,timeline[8],read);
+    const auto a=ReadReadyEffect(*catalog,state.queued[0],read), b=ReadReadyEffect(*catalog,state.queued[1],read);
     if (!a || !b) return {};
-    if (*a != timeline[5] || *b != timeline[6]) {
+    const std::array cues{*a ? catalog->catalog.Cue(state.queued[0]) : UINT32_MAX,
+        *b ? catalog->catalog.Cue(state.queued[1]) : UINT32_MAX};
+    if (cues != state.cues) {
       result.transitioned=true;
-      timeline[0]=timeline[7]; timeline[1]=timeline[8]; timeline[3]=0; timeline[4]=std::bit_cast<uint32_t>(1.0f);
-      timeline[5]=*a; timeline[6]=*b; timeline[7]=0; timeline[8]=0;
+      state.ids=state.queued; state.cues=cues; state.time=0; state.speed=1; state.queued={};
     }
   }
+  const auto boundary=material_animation_source::Export(state,*catalog);
+  if (!boundary) return {};
+  result.timeline=*boundary;
   const auto count=read(uint64_t(visual)+3564);
   if (!count) return {};
   if (int32_t(*count) <= 0) return result;

@@ -8,6 +8,7 @@
 #include "gpu/scene/native_material_uv_source.h"
 #include "gpu/scene/native_material_uv_program_source.h"
 #include "gpu/scene/native_material_image_source.h"
+#include "gpu/scene/native_material_animation_source.h"
 #include <optional>
 
 namespace bd::gpu::scene::instance_source {
@@ -24,7 +25,17 @@ struct Binding {
   material_uv_source::Binding material_uv;
   material_uv_source::Binding material_program;
   material_image_source::Binding material_images;
+  material_animation_source::Boundary material_animation{};
 };
+template<class Read>
+std::optional<NativeMaterialAnimation> ReadMaterialAnimation(NativeInstanceRegistry &registry, Binding &binding,
+    uint32_t visual, uint64_t generation, const material_image_source::LoadedCatalog &catalog, Read read) {
+  auto state=registry.ReadMaterialAnimation(binding.instance,generation);
+  if (generation == binding.model_generation && state && state->catalog.get() == &catalog.catalog &&
+      material_animation_source::Matches(visual,binding.material_animation,read)) return state;
+  registry.InvalidateMaterialAnimation(binding.instance); binding.material_animation={};
+  return {};
+}
 template<class Read>
 std::shared_ptr<const NativeMaterialUVProgram> ReadMaterialUVProgram(NativeInstanceRegistry &registry, Binding &binding,
     uint32_t visual, uint64_t generation, Read read) {

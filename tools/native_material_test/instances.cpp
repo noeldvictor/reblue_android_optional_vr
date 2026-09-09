@@ -276,6 +276,64 @@ void TestMaterialUVProgramOwnership() {
       "native descriptors survive source/instance destruction with pinned residency charged");
   pinned.reset(); Require(registry.Stats().bytes == 0, "last descriptor lease releases accounted storage");
 }
+void TestMaterialAnimationOwnership() {
+  constexpr uint32_t visual=10000, node=20000, owner=30000;
+  NativeInstanceRegistry registry(NativeInstanceRegistry::kEntryBytes);
+  const auto id=registry.Create(19);
+  instance_source::Binding binding{id,19,{}};
+  std::unordered_map<uint64_t,uint32_t> words;
+  for (uint32_t n=0; n<9; ++n) words[visual+2212+n*4]=0;
+  words[visual+2212]=7; words[visual+2216]=8; words[visual+2220]=0xFEED;
+  words[visual+2224]=std::bit_cast<uint32_t>(3.5f); words[visual+2228]=std::bit_cast<uint32_t>(-2.0f);
+  words[visual+2232]=node; words[visual+2240]=9;
+  words[visual+2260]=1; words[visual+2264]=node;
+  words[node+4]=0; words[node+8]=7; words[node+12]=0; words[node+16]=owner;
+  auto read=[&](uint64_t address)->std::optional<uint32_t> {
+    const auto found=words.find(address); return found == words.end() ? std::nullopt : std::optional(found->second);
+  };
+  auto value=material_image_source::ReadCatalog(visual,id,19,65536,read);
+  Require(value.has_value(), "material timeline binds its existing native catalog");
+  const auto bytes=value->RetainedBytes()+NativeAnimationResidency::kEntryBytes;
+  NativeAnimationResidency assets(bytes);
+  Require(assets.Publish(visual,visual,std::move(*value)), "timeline catalog uses shared asset accounting");
+  auto catalog=assets.Find<material_image_source::LoadedCatalog>(visual);
+  auto publication=material_animation_source::ReadState(visual,catalog,read);
+  Require(publication && publication->state.cues[0] == 0 && publication->state.cues[1] == UINT32_MAX &&
+      publication->state.queued[0] == 9 && publication->state.loop_bits == 0xFEED &&
+      material_animation_source::Export(publication->state,*catalog) == publication->boundary,
+      "native timeline preserves authored IDs, bits, clocks and explicit cue ordinals");
+  auto publish=[&] {
+    Require(registry.PublishMaterialAnimation(id,19,publication->state), "publish timeline in existing fixed entry budget");
+    binding.material_animation=publication->boundary;
+  };
+  publish();
+  for (uint32_t n=0; n<9; ++n) {
+    words[visual+2212+n*4]^=1;
+    Require(!instance_source::ReadMaterialAnimation(registry,binding,visual,19,*catalog,read), "each late timeline word invalidates native state");
+    words[visual+2212+n*4]^=1;
+    Require(!instance_source::ReadMaterialAnimation(registry,binding,visual,19,*catalog,read), "restoring timeline bytes cannot resurrect publication");
+    publish();
+  }
+  auto snapshot=instance_source::ReadMaterialAnimation(registry,binding,visual,19,*catalog,read);
+  Require(snapshot && !registry.ReadMaterialAnimation(id,20) && registry.Stats().bytes == NativeInstanceRegistry::kEntryBytes,
+      "timeline reads pin catalog, copy state and enforce model generation without per-frame allocation");
+  auto changed=*snapshot; changed.time=4;
+  Require(registry.PublishMaterialAnimation(id,19,changed) && snapshot->time == 3.5f,
+      "timeline publication cannot mutate an earlier native snapshot");
+  changed.cues[0]=1;
+  Require(!registry.PublishMaterialAnimation(id,19,changed) && !registry.ReadMaterialAnimation(id,19), "invalid cue index clears prior timeline");
+  words[visual+2232]=node+32;
+  Require(!material_animation_source::ReadState(visual,catalog,read), "foreign or retired selected entry cannot become an invented ordinal");
+  words[visual+2232]=node;
+  auto rebound=material_image_source::ReadCatalog(visual,id,19,65536,read);
+  Require(rebound.has_value(), "replacement catalog binding");
+  publish();
+  Require(!instance_source::ReadMaterialAnimation(registry,binding,visual,19,*rebound,read), "replaced catalog identity invalidates selected ordinals");
+  changed={}; publication.reset(); catalog.reset(); assets.Retire(visual); registry.Retire(id); words.clear();
+  Require(snapshot->ids[0] == 7 && snapshot->time == 3.5f && snapshot->catalog->Cue(7) == 0 && assets.Bytes() == bytes,
+      "native material clock and catalog survive complete source and instance retirement");
+  snapshot.reset(); Require(assets.Bytes() == 0 && registry.Stats().bytes == 0, "last timeline lease releases catalog charge");
+}
 void TestNativeImageCatalog() {
   using Asset=material_image_source::LoadedCatalog;
   constexpr uint32_t visual=10000, first=20000, owner=30000;
@@ -390,6 +448,8 @@ void TestMaterialImageOwnership() {
   auto bound=material_uv_source::ReadProgram(visual,read);
   Require(bound.has_value(), "bind image enable/animation slot alongside UV descriptors");
   auto producer_read=[&](uint64_t address) {
+    if (address >= visual+2212 && address <= visual+2244)
+      throw std::runtime_error("image evaluation reimported native timeline");
     if (address == visual+2260 || address == visual+2264 || (address >= catalog && address < catalog+20))
       throw std::runtime_error("image selection walked source catalog");
     if (address >= table && address < table+4*152 && (address-table)%152 != 84)
@@ -416,10 +476,13 @@ void TestMaterialImageOwnership() {
   Require(ready && !residency.Find(owner) && residency.Bytes() == loaded_bytes,
       "typed image asset cannot be mistaken for motion; exact payload and guard accounting");
   captures=0;
-  const auto owned_catalog=material_image_source::ReadCatalog(visual,1,11,65536,read);
-  Require(owned_catalog.has_value(), "catalog imported at binding before image selection");
+  auto catalog_import=material_image_source::ReadCatalog(visual,1,11,65536,read);
+  Require(catalog_import.has_value(), "catalog imported at binding before image selection");
+  const auto owned_catalog=std::make_shared<const material_image_source::LoadedCatalog>(std::move(*catalog_import));
+  const auto owned_animation=material_animation_source::ReadState(visual,owned_catalog,read);
+  Require(owned_animation.has_value(), "selected IDs and clock imported only at completed producer");
   auto update=material_image_source::Prepare(visual,bound->program,producer_read,capture,
-      [&](uint32_t address) { return address == owner ? ready : nullptr; },*owned_catalog);
+      [&](uint32_t address) { return address == owner ? ready : nullptr; },*owned_catalog,owned_animation->state);
   Require(update && update->selected == 2 && update->held == 0 && update->owned_keys == 2 && captures == 1 && words[cache] == 34000 &&
       words[table+84] == 43000, "complete immutable image transaction before source mutation");
   Require(update->images.entries[0].image.image == b && update->images.entries[1].image.image == c &&
@@ -431,11 +494,14 @@ void TestMaterialImageOwnership() {
   auto prepare=[&](uint32_t visual_address,const NativeMaterialUVProgram &program,auto reader,auto image_capture) {
     auto catalog_value=material_image_source::ReadCatalog(visual_address,1,11,65536,read);
     if (!catalog_value) return std::optional<material_image_source::Update>{};
+    auto catalog_owner=std::make_shared<const material_image_source::LoadedCatalog>(std::move(*catalog_value));
+    const auto animation=material_animation_source::ReadState(visual_address,catalog_owner,read);
+    if (!animation) return std::optional<material_image_source::Update>{};
     auto value=material_image_source::ReadAnimation(owner,NativeAnimationResidency::kMaxBytes,read,image_capture);
     auto asset=value ? std::make_shared<const Asset>(std::move(*value)) : nullptr;
     captures=0;
     return material_image_source::Prepare(visual_address,program,reader,image_capture,
-        [&](uint32_t address)->std::shared_ptr<const Asset> { return address == owner ? asset : nullptr; },*catalog_value,&trace);
+        [&](uint32_t address)->std::shared_ptr<const Asset> { return address == owner ? asset : nullptr; },*catalog_owner,animation->state,&trace);
   };
   auto write=[&](uint32_t address,uint32_t value) { words[address]=value; };
   update->Publish(write);
@@ -948,7 +1014,7 @@ void TestNativeInstances() {
   TestEyeMaterialOwnership();
   TestMaterialUVBudgets();
   TestMaterialUVProgramOwnership();
-  TestNativeImageCatalog(); TestMaterialImageOwnership();
+  TestMaterialAnimationOwnership(); TestNativeImageCatalog(); TestMaterialImageOwnership();
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();

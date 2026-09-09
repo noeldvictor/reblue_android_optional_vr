@@ -7549,3 +7549,33 @@ source/Git and global activity. Free63534784512B (~59.17GiB),3964928Blower than
 first measured63538749440B. Diagnostics78148084B/buildlogs420690B/212files;
 next400KiB overlap leaves85516Bbelow75MiB, fresh preflight required.13window
 images10434657B unchanged. Same cumulative budget, no new raw allowance.
+
+### 2026-09-09 native material selection and clock afterbf31b73
+
+Previous turn was verified catalog-to-packet progress. New bundle moves authored
+IDs, selected cue ordinals, queued IDs and clocks into the existing instance
+registry, consumed by effect/controller and material-image evaluators. Binding,
+completed cue requests and completed original fallback publish at explicit writer
+boundaries; native controllers publish next state directly. Exact late-write
+guard, active-duration reads and outgoing timeline/scratch exports remain.
+428 Python source/scenario guards PASS0.229s. First measured free63536373760B;
+increase since prior final drive measurement is unrelated, not cleanup credit.
+No jobs live. Existing fixture11892269B/43files,buildlogs420690B/212files. Reuse
+material83/CPU80/host196 with300s/64/8/192MiB caps; fixture peak<16MiB, host<192MiB.
+Same62509998080B cumulative floor/3GiB exception and diagnostic/raw limits, no
+reset. Shared instance header legitimately affects several host objects; no
+guest/shader changes, full rebuild, recook, raw/window capture or device work.
+Keep82/79/195 receipts and catalog195ZIP until their purposes are replaced.
+
+Material83/PID28800/session48482 build0;CPU80/PID36412 PASS0.12s/CTest0.13s.
+Fixture1726976B/tree11973062B (+80793B). Host196/PID32336/session34875 build0,
+link26/29; review caught avoidable registry work with native animation disabled.
+Added early setting gate; host197/PID27036 build0,one bridge object+link3/4.
+Both codegen0writes/no guest objects/shaders. EXE49474048B/PDB114651136B (+99840B),
+SHA2560130832366A55A4D49C57CC5B2E125E950AC713107F1B9D3A50A9AF8F351D54F.
+Bannerbf31b73dirty; source checkpoint will not restamp it. Free after196:
+63535009792B;197preflight63509450752B/end63509123072B; current63508766720B.
+Scoped inspection of host root/CMakeFiles since03:04 found only the expected
+single2.60MB bridge object, EXE/PDB and small Ninja/dependency metadata; it does
+not attribute the intervening25.56MB drive-wide drop to this task. Cumulative
+floor unchanged, sufficient guarded reserve; live acceptance still pending.

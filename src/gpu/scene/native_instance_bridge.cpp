@@ -62,6 +62,7 @@ struct Store {
   uint64_t handoffs = 0, handoff_missing = 0;
   uint64_t material_uv_published=0, material_uv_reads=0, material_uv_changed=0;
   uint64_t material_program_published=0, material_program_reads=0, material_program_changed=0, material_program_refused=0;
+  uint64_t material_animation_published=0, material_animation_imports=0, material_animation_reads=0, material_animation_changed=0;
   uint64_t skeleton_updates = 0, skeleton_published = 0, skeleton_unavailable = 0, skeleton_checks = 0, skeleton_wrong = 0;
   std::array<uint64_t, size_t(SkeletonMissing::Count)> skeleton_missing{};
   uint32_t miss_examples = 0;
@@ -100,6 +101,9 @@ void Report(Store &store) {
     BD_INFO("[native-skeleton] frame {} evaluated {} update poses {} unavailable {}; checked {} wrong {}; ordinary skinned hierarchy, curve/late-writer/copy adapters remain",
         frame, store.skeleton_updates, store.skeleton_published, store.skeleton_unavailable, store.skeleton_checks, store.skeleton_wrong);
   store.frame = frame;
+  if (store.material_animation_published)
+    BD_INFO("[native-material-animation] frame {} published {} imports {} reads {} changed {}; instance-owned selection/clock, exact late-write guard remains",
+        frame,store.material_animation_published,store.material_animation_imports,store.material_animation_reads,store.material_animation_changed);
   if (store.material_uv_published)
     BD_INFO("[native-material-uv-owner] frame {} published {} reads {} changed {}; shared controller/eye ownership; outgoing late-write guard remains",
         frame,store.material_uv_published,store.material_uv_reads,store.material_uv_changed);
@@ -244,6 +248,8 @@ void BeginMaterialBinding(uint32_t visual) {
   RetireNativeImageCatalog(visual);
   auto &store=Instances(); std::lock_guard lock(store.mutex);
   if (const auto it=store.sources.find(visual); it != store.sources.end()) {
+    store.instances.InvalidateMaterialAnimation(it->second.instance);
+    it->second.material_animation={};
     store.instances.InvalidateMaterialUVProgram(it->second.instance);
     it->second.material_program={}; it->second.material_uv={}; it->second.material_images={};
   }
@@ -253,7 +259,7 @@ void BindMaterialProgram(uint32_t visual) {
   const auto graph=Word(uint64_t(visual)+2620);
   const auto model=graph ? FindLoadedNativeModel(*graph) : nullptr;
   const auto publication=material_uv_source::ReadProgram(visual,Word);
-  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  auto &store=Instances(); std::unique_lock lock(store.mutex);
   bool valid=model && publication;
   if (valid) for (const auto &slot : publication->program.slots)
     if (slot.mode != NativeEffectUVMode::Scroll && !model->FindJoint(slot.joint)) { valid=false; break; }
@@ -266,6 +272,8 @@ void BindMaterialProgram(uint32_t visual) {
   // the instance registry while holding the animation store lock.
   BindNativeImageCatalog(visual,binding->instance,binding->model_generation);
   ++store.material_program_published; Report(store);
+  lock.unlock();
+  RefreshNativeMaterialAnimation(visual);
 }
 void Handoff(uint32_t container) {
   if (container < kVisualBoneContainer) return;
@@ -305,6 +313,51 @@ NativeVisualIdentity FindNativeVisualIdentity(uint32_t visual) {
   const auto it = store.sources.find(visual);
   return it == store.sources.end() ? NativeVisualIdentity{} :
       NativeVisualIdentity{it->second.instance, it->second.model_generation};
+}
+void InvalidateNativeMaterialAnimation(uint32_t visual) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  if (const auto it=store.sources.find(visual); it != store.sources.end()) {
+    store.instances.InvalidateMaterialAnimation(it->second.instance); it->second.material_animation={};
+  }
+}
+bool PublishNativeMaterialAnimation(uint32_t visual, NativeVisualIdentity identity,
+    const material_image_source::LoadedCatalog &catalog, const NativeMaterialAnimation &state) {
+  const auto boundary=material_animation_source::Export(state,catalog);
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end() || it->second.instance != identity.instance ||
+      it->second.model_generation != identity.model_generation || catalog.instance != identity.instance ||
+      catalog.generation != identity.model_generation) return false;
+  if (!boundary || !store.instances.PublishMaterialAnimation(identity.instance,identity.model_generation,state)) {
+    store.instances.InvalidateMaterialAnimation(identity.instance); it->second.material_animation={}; return false;
+  }
+  it->second.material_animation=*boundary;
+  ++store.material_animation_published;
+  return true;
+}
+void RefreshNativeMaterialAnimation(uint32_t visual) {
+  if (!REXCVAR_GET(bd_native_animation) || !REXCVAR_GET(bd_native_skeleton) || !REXCVAR_GET(bd_native_instances)) return;
+  // Authoritative completed writers only. Read-side mismatch never imports or
+  // revives state; original fallback may publish after all its side effects.
+  try {
+    const auto identity=FindNativeVisualIdentity(visual);
+    if (!identity.instance) return;
+    const auto catalog=FindNativeImageCatalog(visual,identity.instance,identity.model_generation,Word);
+    const auto publication=material_animation_source::ReadState(visual,catalog,Word);
+    if (!publication || !PublishNativeMaterialAnimation(visual,identity,*catalog,publication->state))
+      InvalidateNativeMaterialAnimation(visual);
+    else { auto &store=Instances(); std::lock_guard lock(store.mutex); ++store.material_animation_imports; }
+  } catch (const std::exception &) { InvalidateNativeMaterialAnimation(visual); }
+}
+std::optional<NativeMaterialAnimation> ReadNativeMaterialAnimation(uint32_t visual, uint64_t generation,
+    const material_image_source::LoadedCatalog &catalog) {
+  auto &store=Instances(); std::lock_guard lock(store.mutex);
+  const auto it=store.sources.find(visual);
+  if (it == store.sources.end()) return {};
+  const bool published=store.instances.ReadMaterialAnimation(it->second.instance,generation).has_value();
+  auto state=instance_source::ReadMaterialAnimation(store.instances,it->second,visual,generation,catalog,Word);
+  store.material_animation_reads+=state.has_value(); store.material_animation_changed+=published && !state;
+  return state;
 }
 bool PublishNativeMaterialUVs(uint32_t visual, NativeVisualIdentity identity,
     uint32_t table, const NativeMaterialUVs &material) {

@@ -67,13 +67,13 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertIn("*count > 4096", source)
         self.assertIn("if (node) return {}", source)
         self.assertIn("generation != model_generation", source)
-        self.assertIn("catalog.catalog.Image(*id,slot.image_animation)", material)
+        self.assertIn("catalog.catalog.Image(id,slot.image_animation)", material)
         self.assertIn("catalog.catalog.Cue(id)", self.effect_source)
         self.assertNotIn("visual)+2264", material)
         ready = self.effect_source.split("ReadReadyEffect(", 1)[1].split("ReadEffectDuration(", 1)[0]
         self.assertNotIn("+16", ready)
         self.assertIn("FindNativeImageCatalog(visual,identity.instance,identity.model_generation,source_read)", runtime)
-        self.assertIn("material_program.get(),catalog.get()", self.animation_bridge)
+        self.assertIn("material_program.get(),catalog.get(),material_animation", self.animation_bridge)
         lookup = self.animation_bridge.split("FindNativeImageCatalog(\n", 1)[1].split("FindNativeImageAnimation(", 1)[0]
         self.assertNotIn("ReadCatalog(", lookup)
         self.assertIn("catalog->Matches(instance,generation,read)", lookup)
@@ -86,6 +86,36 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
                      "every catalog late word", "pinned catalog imposes shared rebind backpressure",
                      "catalog selection survives complete source", "catalog cycle refuses at binding"):
             self.assertIn(case, fixture)
+
+    def test_material_timeline_has_two_native_consumers_and_completed_writers(self):
+        root = Path(__file__).resolve().parents[1]
+        native = (root / "src/gpu/scene/native_material_animation.h").read_text(encoding="utf-8")
+        source = (root / "src/gpu/scene/native_material_animation_source.h").read_text(encoding="utf-8")
+        image = (root / "src/gpu/scene/native_material_image_source.h").read_text(encoding="utf-8")
+        runtime = (root / "src/gpu/scene/native_material_texture_bridge.cpp").read_text(encoding="utf-8")
+        fixture = (root / "tools/native_material_test/instances.cpp").read_text(encoding="utf-8")
+        for forbidden in ("PPCContext", "source_read", "uint32_t visual", "uint32_t node", "bd::mem", "unordered_map"):
+            self.assertNotIn(forbidden, native)
+        self.assertIn("std::optional<NativeMaterialAnimation> material_animation", self.core)
+        self.assertIn("material_animation_source::Matches", self.source)
+        self.assertIn("state->catalog.get() == &catalog.catalog", self.source)
+        evaluator = self.effect_source.split("PrepareEffectUpdate(", 1)[1]
+        self.assertNotIn("read(uint64_t(visual)+2212", evaluator)
+        self.assertIn("const NativeEffectClock clock{state.time,state.speed", evaluator)
+        self.assertIn("material_animation_source::Export(state,*catalog)", evaluator)
+        self.assertNotIn("visual)+2212", image)
+        self.assertNotIn("visual)+2224", image)
+        self.assertIn("const float time=animation.time", image)
+        self.assertIn("ReadNativeMaterialAnimation(visual,identity.model_generation,*catalog)", runtime)
+        self.assertIn("PublishNativeMaterialAnimation(visual,identity,*catalog,effects->animation)", self.animation_bridge)
+        hook = self.animation_bridge.split("REX_HOOK_RAW(AnimeData_method_1338)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("InvalidateNativeMaterialAnimation"), hook.index("__imp__AnimeData_method_1338"))
+        self.assertLess(hook.index("__imp__AnimeData_method_1338"), hook.index("RefreshNativeMaterialAnimation"))
+        self.assertIn("if (state.cues[n] == UINT32_MAX) return {}", source)
+        for case in ("each late timeline word", "restoring timeline bytes cannot resurrect", "invalid cue index clears",
+                     "native material clock and catalog survive complete source", "image evaluation reimported native timeline"):
+            self.assertIn(case, fixture)
+        self.assertIn("completed clock feeds next update without mutating preceding snapshot", self.animation_test)
 
     def test_ready_image_assets_feed_materials_through_existing_typed_residency(self):
         root = Path(__file__).resolve().parents[1]
@@ -243,7 +273,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
 
     def test_effects_consume_owned_channels_before_skeleton_and_material_publication(self):
         controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
-        self.assertIn("result->output.channels,Word,previous_uv.get(),material_program.get(),catalog.get())", controller)
+        self.assertIn("result->output.channels,Word,previous_uv.get(),material_program.get(),catalog.get(),material_animation", controller)
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("__imp__bdAnimationUpdate"))
         self.assertLess(controller.index("effects->Matches(Word)"), controller.index("auto *destination="))
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("completed_controller.Publish("))

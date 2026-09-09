@@ -10,6 +10,7 @@
 #include "gpu/scene/native_material_uv.h"
 #include "gpu/scene/native_material_uv_program.h"
 #include "gpu/scene/native_material_images.h"
+#include "gpu/scene/native_material_animation.h"
 #include <atomic>
 #include <cstdint>
 #include <cstring>
@@ -268,6 +269,24 @@ public:
     result.indexed = entries_.size(); result.bytes = accounting_->bytes.load();
     return result;
   }
+  bool PublishMaterialAnimation(NativeInstanceId id, uint64_t generation, const NativeMaterialAnimation &state) {
+    std::lock_guard lock(mutex_);
+    const auto it=entries_.find(id);
+    if (it == entries_.end() || it->second.model_generation != generation) return false;
+    it->second.material_animation.reset();
+    if (!state.Valid()) return false;
+    it->second.material_animation=state; // fixed-size value, covered by existing entry charge
+    return true;
+  }
+  std::optional<NativeMaterialAnimation> ReadMaterialAnimation(NativeInstanceId id, uint64_t generation) const {
+    std::lock_guard lock(mutex_);
+    const auto it=entries_.find(id);
+    return it != entries_.end() && it->second.model_generation == generation ? it->second.material_animation : std::nullopt;
+  }
+  void InvalidateMaterialAnimation(NativeInstanceId id) {
+    std::lock_guard lock(mutex_);
+    if (const auto it=entries_.find(id); it != entries_.end()) it->second.material_animation.reset();
+  }
 private:
   struct Accounting { std::atomic<size_t> bytes{0}; };
   struct ImageOwner {
@@ -307,6 +326,7 @@ private:
     std::shared_ptr<const NativeMaterialUVs> material_uv;
     std::shared_ptr<const NativeMaterialUVProgram> material_program;
     std::shared_ptr<const NativeMaterialImages> material_images;
+    std::optional<NativeMaterialAnimation> material_animation;
   };
   static_assert(sizeof(Entry) <= kEntryBytes);
   std::shared_ptr<const NativeInstancePose> OwnPose(NativeInstanceId id, const Entry &entry,
