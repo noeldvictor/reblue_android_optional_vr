@@ -1,0 +1,167 @@
+/**
+ * @brief Transactional effect boundary; no packed-channel reader or retained cache.
+ * @copyright Copyright (c) 2026 reblue contributors
+ * @license BSD 3-Clause, see LICENSE
+ */
+#pragma once
+#include "gpu/scene/native_effect_animation.h"
+#include <bit>
+
+namespace bd::gpu::scene::animation_source {
+// AnimeData's effect catalog is separate from the skeletal clip catalog.
+// Poll states 1..4 can load/allocate/change dependencies. Refuse before polling;
+// the complete original controller must execute once, never a partial replay.
+template<class Read>
+std::optional<uint32_t> ReadReadyEffect(uint32_t catalog, uint32_t id, Read &&read) {
+  if (!catalog || (catalog&3)) return {};
+  auto node=read(uint64_t(catalog)+16);
+  for (size_t visited=0; node && *node && visited<4096; ++visited) {
+    if (*node&3) return {};
+    const auto name=read(uint64_t(*node)+8);
+    if (!name) return {};
+    if (*name == id) {
+      const auto object=read(uint64_t(*node)+16);
+      if (!object || !*object || (*object&3)) return {};
+      const auto state=read(uint64_t(*object)+316);
+      if (!state || (*state >= 1 && *state <= 4)) return {};
+      return int32_t(*state) >= 6 ? *node : 0u; // first terminal match wins, even absent
+    }
+    node=read(uint64_t(*node)+4);
+  }
+  return node && !*node ? std::optional(0u) : std::nullopt;
+}
+template<class Read>
+std::optional<double> ReadEffectDuration(uint32_t entry, double scale, Read &&read) {
+  if (!std::isfinite(scale)) return {};
+  double duration=0;
+  if (entry) {
+    if (entry&3) return {};
+    const auto object=read(uint64_t(entry)+16);
+    if (!object || !*object || (*object&3)) return {};
+    const auto word=read(uint64_t(*object)+312);
+    if (!word) return {};
+    const double value=std::bit_cast<float>(*word);
+    // Preserve fctiwz then integer->float, including the INT_MIN NaN result.
+    const int32_t ticks=std::isnan(value) || value <= double(INT32_MIN) ? INT32_MIN :
+        value >= double(INT32_MAX) ? INT32_MAX : int32_t(value);
+    duration=float(ticks);
+  }
+  // Existing bdDrawDistanceScaleHook scales both candidates BEFORE max. Despite
+  // its historical name this caller compares an AnimeData clock, not distance.
+  return scale == 1 ? duration : duration*scale;
+}
+struct EffectUpdate {
+  struct UV { uint32_t destination=0; std::array<float,2> value{}; };
+  uint32_t visual=0;
+  std::array<uint32_t,9> timeline{}; // outgoing-only IDs/entries; not a native owner
+  bool called=false, clock_written=false, transitioned=false;
+  uint32_t translated=0, rotated=0;
+  std::vector<UV> uv;
+  template<class Write> void Publish(Write &&write) const {
+    if (transitioned) for (size_t n=0; n<timeline.size(); ++n) write(uint64_t(visual)+2212+n*4,timeline[n]);
+    else if (clock_written) write(uint64_t(visual)+2224,timeline[3]);
+    for (const auto &entry : uv) for (size_t n=0; n<2; ++n)
+      write(uint64_t(entry.destination)+n*4,std::bit_cast<uint32_t>(entry.value[n]));
+  }
+  template<class Read> bool Matches(Read &&read) const {
+    if (!called) return true;
+    for (size_t n=0; n<timeline.size(); ++n)
+      if (read(uint64_t(visual)+2212+n*4) != timeline[n]) return false;
+    for (const auto &entry : uv) for (size_t n=0; n<2; ++n) {
+      const auto word=read(uint64_t(entry.destination)+n*4);
+      if (!word) return false;
+      const float expected=std::bit_cast<float>(*word), actual=entry.value[n];
+      if (!std::isfinite(expected) || std::abs(actual-expected) > 1e-4f*std::max(1.0f,std::abs(expected))) return false;
+    }
+    return true;
+  }
+};
+
+template<class Read>
+std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, double duration_scale,
+    std::span<const NativeJointChannels> channels, Read &&read) {
+  if (!visual || (visual&3) || uint64_t(visual)+3752 > uint64_t(UINT32_MAX)+1) return {};
+  const auto records=read(uint64_t(visual)+3560);
+  if (!records) return {};
+  EffectUpdate result; result.visual=visual;
+  if (!*records) return result; // controller does not call bdEffectUpdate at all
+  result.called=true;
+  for (size_t n=0; n<result.timeline.size(); ++n) {
+    const auto word=read(uint64_t(visual)+2212+n*4);
+    if (!word) return {};
+    result.timeline[n]=*word;
+  }
+  auto &timeline=result.timeline;
+  const NativeEffectClock clock{std::bit_cast<float>(timeline[3]),std::bit_cast<float>(timeline[4]),
+      timeline[0] != 0,timeline[2] != 0,timeline[7] != 0};
+  std::optional<double> duration;
+  if (clock.NeedsDuration()) {
+    const auto a=ReadEffectDuration(timeline[5],duration_scale,read), b=ReadEffectDuration(timeline[6],duration_scale,read);
+    if (!a || !b) return {};
+    duration=*a > *b ? *a : *b;
+  }
+  const auto step=AdvanceNativeEffectClock(clock,delta,duration);
+  if (!step) return {};
+  result.clock_written=clock.active;
+  if (clock.active) timeline[3]=std::bit_cast<uint32_t>(step->time);
+  if (step->transition) {
+    const auto a=ReadReadyEffect(visual+2248,timeline[7],read), b=ReadReadyEffect(visual+2248,timeline[8],read);
+    if (!a || !b) return {};
+    if (*a != timeline[5] || *b != timeline[6]) {
+      result.transitioned=true;
+      timeline[0]=timeline[7]; timeline[1]=timeline[8]; timeline[3]=0; timeline[4]=std::bit_cast<uint32_t>(1.0f);
+      timeline[5]=*a; timeline[6]=*b; timeline[7]=0; timeline[8]=0;
+    }
+  }
+  const auto count=read(uint64_t(visual)+3564);
+  if (!count) return {};
+  if (int32_t(*count) <= 0) return result;
+  if (*count > 256 || (*records&3) || uint64_t(*records)+uint64_t(*count)*152 > uint64_t(UINT32_MAX)+1) return {};
+  const auto overlaps=[](uint64_t a,uint64_t bytes,uint64_t b,uint64_t extent) { return a < b+extent && b < a+bytes; };
+  const auto source=read(uint64_t(visual)+2628);
+  if (!source || channels.size() > kMaxNativeJoints ||
+      overlaps(*records,uint64_t(*count)*152,visual,3752) ||
+      (*source && overlaps(*records,uint64_t(*count)*152,*source,channels.size()*48))) return {};
+  for (uint32_t n=0; n<*count; ++n) {
+    const uint64_t record=uint64_t(*records)+n*152;
+    const auto enabled=read(record+20);
+    if (!enabled) return {};
+    if (!*enabled) continue;
+    NativeEffectUVMotion motion;
+    const auto driver=read(record+120);
+    if (!driver) return {};
+    if ((*driver>>24) && *source) {
+      const auto joint=read(record+12);
+      if (!joint) return {};
+      if (int32_t(*joint) >= 0) {
+        const auto rotation=read(record+16);
+        if (!rotation) return {};
+        motion.joint=*joint;
+        motion.mode=*rotation ? NativeEffectUVMode::Rotation : NativeEffectUVMode::Translation;
+      }
+    }
+    for (size_t axis=0; axis<2; ++axis) {
+      if (motion.mode == NativeEffectUVMode::Scroll) {
+        const auto offset=read(record+28+axis*4), rate=read(record+36+axis*4);
+        if (!offset || !rate) return {};
+        motion.offset[axis]=std::bit_cast<float>(*offset); motion.rate[axis]=std::bit_cast<float>(*rate);
+      } else {
+        const auto divisor=read(record+(motion.mode == NativeEffectUVMode::Rotation ? 52 : 44)+axis*4);
+        if (!divisor || !read(record+28+axis*4)) return {}; // validate outgoing destination too
+        motion.divisor[axis]=std::bit_cast<float>(*divisor);
+        if (motion.mode == NativeEffectUVMode::Rotation) {
+          const auto factor=read(0x8208EA64);
+          if (!factor) return {};
+          motion.divisor[axis]=float(double(motion.divisor[axis])*double(std::bit_cast<float>(*factor)));
+        }
+      }
+    }
+    const auto uv=EvaluateNativeEffectUV(motion,delta,channels);
+    if (!uv) return {};
+    result.translated+=motion.mode == NativeEffectUVMode::Translation;
+    result.rotated+=motion.mode == NativeEffectUVMode::Rotation;
+    result.uv.push_back({uint32_t(record+28),*uv});
+  }
+  return result;
+}
+} // namespace bd::gpu::scene::animation_source

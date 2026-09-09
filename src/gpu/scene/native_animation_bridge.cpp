@@ -7,6 +7,7 @@
 #include "gpu/scene/native_animation_controller_source.h"
 #include "gpu/scene/native_animation_placement.h"
 #include "gpu/scene/native_animation_selection_source.h"
+#include "gpu/scene/native_effect_animation_source.h"
 #include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
@@ -27,6 +28,7 @@ REXCVAR_DEFINE_BOOL(bd_native_animation, false, kCvarGroup,
 REXCVAR_DECLARE(bool, bd_native_instances);
 REXCVAR_DECLARE(bool, bd_native_skeleton);
 REXCVAR_DECLARE(bool, bd_native_materials_verify);
+REXCVAR_DECLARE(double, bd_effect_distance);
 REX_EXTERN(__imp__sub_8217BD70);
 REX_EXTERN(__imp__sub_8217C5E8);
 REX_EXTERN(__imp__sub_82288680);
@@ -42,7 +44,6 @@ REX_EXTERN(__imp__sub_82289888);
 REX_EXTERN(__imp__sub_8228A3E8);
 REX_EXTERN(__imp__sub_82284BE0);
 REX_EXTERN(bdVisualObjectCollisionTestNearby);
-REX_EXTERN(bdEffectUpdate);
 REX_EXTERN(__imp__AnimeData_method_4638);
 REX_EXTERN(__imp__bdVisualObjectSetAnimation);
 REX_EXTERN(bdVisualObjectSetAnimation);
@@ -74,6 +75,7 @@ struct Store {
   uint64_t placements=0, placement_checks=0, placement_copy=0, placement_sampled=0, placement_tracks=0;
   uint64_t placement_refused=0, placement_roots=0, placement_changed=0;
   uint64_t slot_selections=0, slot_selection_checks=0, slot_restarts=0, slot_ready=0, slot_absent=0, slot_selection_refused=0;
+  uint64_t effects=0, effect_checks=0, effect_uv=0, effect_translated=0, effect_rotated=0, effect_transitions=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -125,6 +127,9 @@ void Report(Store &store) {
   if (store.slot_selections || store.slot_selection_refused)
     BD_INFO("[native-animation-slot-select] frame {} completed {} checked {} restarted {} ready {} absent {} refused {}; native slot selection feeds controllers; pending poll/catalog boundary remains",
         frame,store.slot_selections,store.slot_selection_checks,store.slot_restarts,store.slot_ready,store.slot_absent,store.slot_selection_refused);
+  if (store.effects)
+    BD_INFO("[native-animation-effects] frame {} completed {} checked {} uv {} translated {} rotated {} transitions {}; native channels feed material UV; timeline/catalog and outgoing material adapters remain",
+        frame,store.effects,store.effect_checks,store.effect_uv,store.effect_translated,store.effect_rotated,store.effect_transitions);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -969,6 +974,11 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   auto result=animation_source::ExecuteController(*plan,assets,model->AnimationTargets(),model->Skeleton(),
       animation_source::ControllerLayer::Decode(before),*compression,excluded_names);
   if (!result) return refuse("native layer execution");
+  // Consume owned channels before their one-shot skeleton handoff. Entire effect
+  // plan is admitted before the original or any source publication; pending cue
+  // loads preserve the complete original controller once, including side effects.
+  const auto effects=animation_source::PrepareEffectUpdate(visual,*delta,REXCVAR_GET(bd_effect_distance),result->output.channels,Word);
+  if (!effects) return refuse("effect timeline/UV boundary");
   const auto records=result->output.Encode();
   if (records.size() != *count || (write_exclusions && !Range(0x82DBEC70,exclusions.size()*4))) return refuse("outgoing boundary");
   const bool verify=REXCVAR_GET(bd_native_materials_verify);
@@ -996,10 +1006,12 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
       if (channel_same && !equal) { first_joint=n; first_word=w; } channel_same &= equal;
     }
     auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.controller_checks;
-    if (!same || !channel_same) {
+    const bool effects_same=effects->Matches(Word);
+    store.effect_checks+=effects->called;
+    if (!same || !channel_same || !effects_same) {
       ++store.wrong;
-      BD_ERROR("[native-animation-controller-drift] model {} state {} channels {} joint {} word {}; no fallback or second side-effect update",
-          model->Generation(),same,channel_same,first_joint,first_word);
+      BD_ERROR("[native-animation-controller-drift] model {} state {} channels {} joint {} word {} effects {}; no fallback or second side-effect update",
+          model->Generation(),same,channel_same,first_joint,first_word,effects_same);
       throw std::runtime_error("Native animation controller comparison failed");
     }
   }
@@ -1018,11 +1030,13 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
   if (!completed_controller.Publish({visual,slot_graph,*output,model->Generation(),std::move(result->output.channels),records}))
     throw std::runtime_error("Native animation completed channel publication refused");
   if (!verify) {
-    // Authored gameplay/effect side effects remain outside the native layer plan.
+    // Authored gameplay collision runs once, before native effect publication.
     if (bd::mem::load<uint32_t>(visual+3532) && bd::mem::load<uint32_t>(visual+3000) == 3) {
       ctx.r3.u32=visual; bdVisualObjectCollisionTestNearby(ctx,base);
     }
-    if (bd::mem::load<uint32_t>(visual+3560)) { ctx.r3.u32=visual; bdEffectUpdate(ctx,base); }
+  }
+  effects->Publish([](uint64_t address,uint32_t value) { bd::mem::store<uint32_t>(uint32_t(address),value); });
+  if (!verify) {
     if (bd::mem::load<uint32_t>(visual+3440)) {
       ctx.fpscr.disableFlushMode();
       std::array<float,4> offsets, rates;
@@ -1034,6 +1048,9 @@ bool Controller(PPCContext &ctx, uint8_t *base) {
     }
   }
   auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.controllers;
+  store.effects+=effects->called; store.effect_uv+=effects->uv.size();
+  store.effect_translated+=effects->translated; store.effect_rotated+=effects->rotated;
+  store.effect_transitions+=effects->transitioned;
   store.owned_exclusions+=excluded_nodes->size();
   for (size_t n=0; n<kNativeAnimationSlots; ++n)
     store.controller_advancing+=plan->advanced[n] && plan->slots[n].time_ticks != input.slots[n].time_ticks;

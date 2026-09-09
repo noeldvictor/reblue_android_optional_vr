@@ -22,6 +22,8 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.controller = (root / "src/gpu/scene/native_animation_controller.h").read_text(encoding="utf-8")
         cls.controller_source = (root / "src/gpu/scene/native_animation_controller_source.h").read_text(encoding="utf-8")
         cls.selection_source = (root / "src/gpu/scene/native_animation_selection_source.h").read_text(encoding="utf-8")
+        cls.effects = (root / "src/gpu/scene/native_effect_animation.h").read_text(encoding="utf-8")
+        cls.effect_source = (root / "src/gpu/scene/native_effect_animation_source.h").read_text(encoding="utf-8")
 
     def test_ready_slot_selection_reuses_owned_clips_and_preserves_pending_original(self):
         selection = self.animation_bridge.split("bool SelectAnimation(", 1)[1].split("std::optional<Placement>", 1)[0]
@@ -66,11 +68,29 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         self.assertLess(controller.index("throw std::runtime_error"), controller.index("auto *destination="))
         tail = controller.split("if (!verify) {", 1)[1]
         self.assertEqual(tail.count("bdVisualObjectCollisionTestNearby(ctx,base)"), 1)
-        self.assertEqual(tail.count("bdEffectUpdate(ctx,base)"), 1)
+        self.assertNotIn("bdEffectUpdate(ctx,base)", controller)
+        self.assertEqual(tail.count("effects->Publish("), 1)
         self.assertIn("ReferenceScope reference", controller)
         self.assertIn("ReferenceScope() { controller_reference=true; }", self.animation_bridge)
         self.assertIn("TestNativeControllerPlan()", self.animation_test)
         self.assertIn("TestNativeControllerConsumption()", self.animation_test)
+
+    def test_effects_consume_owned_channels_before_skeleton_and_material_publication(self):
+        controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
+        self.assertIn("result->output.channels,Word)", controller)
+        self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("__imp__bdAnimationUpdate"))
+        self.assertLess(controller.index("effects->Matches(Word)"), controller.index("auto *destination="))
+        self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("completed_controller.Publish("))
+        self.assertLess(controller.index("bdVisualObjectCollisionTestNearby(ctx,base)"), controller.index("effects->Publish("))
+        self.assertLess(controller.index("effects->Publish("), controller.index("AdvanceNativeAnimationOffsets("))
+        for forbidden in ("PPCContext", "ReadWord", "ChannelRecord", "bd::mem", "0x82", "uint32_t visual"):
+            self.assertNotIn(forbidden, self.effects)
+        for forbidden in ("PPCContext", "__imp__", "ChannelRecord", "unordered_map", "ReadChannels(", "source+", "*source+"):
+            self.assertNotIn(forbidden, self.effect_source)
+        self.assertIn("*state >= 1 && *state <= 4", self.effect_source)
+        self.assertIn("TestNativeEffectConsumption()", self.animation_test)
+        self.assertIn("ReadMaterialTextureInputs<int>", self.animation_test)
+        self.assertIn("ComposeMaterialTextures<int>", self.animation_test)
 
     def test_completed_controller_channels_reach_skeleton_with_late_writer_guard(self):
         producer = self.bridge.split("bool EvaluateOwnedBones(", 1)[1].split("void PublishEvaluatedPose", 1)[0]

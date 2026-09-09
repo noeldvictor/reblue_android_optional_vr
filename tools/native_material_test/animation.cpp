@@ -2,6 +2,8 @@
 #include "gpu/scene/native_animation_controller_source.h"
 #include "gpu/scene/native_animation_placement.h"
 #include "gpu/scene/native_animation_selection_source.h"
+#include "gpu/scene/native_effect_animation_source.h"
+#include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include <iostream>
@@ -1403,6 +1405,161 @@ void TestAttachmentPlacement() {
   Require(!ComposeNativeAttachmentPlacement(empty.channels[0],{},{NAN,0,0},{1,1,1}) &&
           !ComposeNativeAttachmentPlacement(empty.channels[0],{},{},{INFINITY,1,1}),"nonfinite placement never publishes");
 }
+void TestNativeEffectConsumption() {
+  using animation_source::PrepareEffectUpdate;
+  using animation_source::ReadReadyEffect;
+  using animation_source::ReadEffectDuration;
+  auto advance=[](float time,float speed,bool loop,bool queued,float delta,std::optional<double> duration) {
+    return AdvanceNativeEffectClock({time,speed,true,loop,queued},delta,duration);
+  };
+  Require(advance(35,1,true,false,1,10)->time == 26 && advance(35,1,false,false,1,10)->time == 10,
+          "effect timeline uses one subtraction or clamp, not modulo");
+  Require(advance(9,1,true,true,1,10)->transition == false && advance(10,1,true,true,1,10)->transition,
+          "queued cue transition is strict greater-than, not endpoint equality");
+  Require(advance(0,-1,false,true,1,{})->transition && !advance(1,-1,false,true,1,{})->transition &&
+          !advance(10,0,false,true,1,{})->transition && advance(0,-1,true,false,1,10)->time == 0,
+          "reverse queued crossing and zero-rate queue never need duration; nonqueued negative clamps");
+  Require(!advance(0,NAN,true,false,1,10) && !advance(0,1,true,false,1,{}) &&
+          AdvanceNativeEffectClock({NAN,NAN,false,true,true},NAN,{}).has_value(),
+          "active invalid clocks refuse but inactive clock payloads stay dormant");
+
+  ClipSource source;
+  auto imported=animation_source::ReadKeyedAsset(0x1000,128*1024,[&](uint64_t address){return source.Read(address);});
+  Require(imported.has_value(),"effect consumer reuses production clip import");
+  auto asset=std::make_shared<const NativeAnimationAsset>(std::move(*imported)); source.words.clear();
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u};
+  std::array<NativeSkeletonJoint,3> skeleton;
+  skeleton[0].pose_index=2; skeleton[1].pose_index=0; skeleton[1].parent=0;
+  skeleton[2].pose_index=1; skeleton[2].parent=0;
+  for (auto &joint : skeleton) joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+  std::array<std::shared_ptr<const NativeAnimationAsset>,6> assets; assets.fill(asset);
+  NativeAnimationControllerInput input; input.active=1; input.delta_ticks=.5f;
+  auto &slot=input.slots[0]; slot.present=true; slot.weight=slot.target_weight=slot.contribution=1;
+  slot.time_ticks=7; slot.time_rate=1; slot.duration_ticks=30;
+  const auto plan=PlanNativeAnimationController(input);
+  Require(plan.has_value(),"effect producer owns the controller clock");
+  auto controller=animation_source::ExecuteController(*plan,assets,names,skeleton,animation_source::ControllerLayer(3),0,{});
+  Require(controller && controller->sampled == 1 && controller->output.channels[2].translation[0] == 2,
+          "effect producer is the real native controller, not a packed-channel fixture mirror");
+  auto &channels=controller->output.channels;
+  channels[2].translated=channels[2].rotated=false; // dormant payload still drives UVs
+  constexpr uint32_t visual=0x10000, records=0x12000, entry=0x14000, object=0x15000;
+  auto word=[&](uint64_t address,uint32_t value) { source.Word(address,value); };
+  auto scalar=[&](uint64_t address,float value) { word(address,std::bit_cast<uint32_t>(value)); };
+  auto read=[&](uint64_t address) { return source.Read(address); };
+  for (uint32_t offset=0; offset<3752; offset+=4) word(visual+offset,0);
+  for (uint32_t offset=0; offset<152*4; offset+=4) word(records+offset,0xAABBCCDD);
+  word(visual+3560,records); word(visual+3564,4); word(visual+2628,0x16000);
+  word(visual+2212,1); word(visual+2232,entry); scalar(visual+2224,9); scalar(visual+2228,1);
+  word(entry+16,object); scalar(object+312,10.9f); word(object+316,6);
+  scalar(0x8208EA64,.017453292f);
+  for (uint32_t n=0; n<4; ++n) {
+    const auto record=records+n*152;
+    word(record+4,n+1); word(record+8,0); word(record+12,2); word(record+16,n == 2);
+    word(record+20,n != 3); word(record+24,0); word(record+120,n == 1 || n == 2 ? 0x01000000 : 0x000000FF);
+    scalar(record+28,2); scalar(record+32,3); scalar(record+36,4); scalar(record+40,-2);
+    scalar(record+44,4); scalar(record+48,-2); scalar(record+52,90); scalar(record+56,45);
+  }
+  // Bound reader never provides packed channels at 0x16000: all values must be
+  // consumed directly from the controller, without stealing skeleton's handoff.
+  auto update=PrepareEffectUpdate(visual,.5f,1,channels,read);
+  Require(update && update->uv.size() == 3 && update->translated == 1 && update->rotated == 1 &&
+          !update->transitioned && update->timeline[3] == std::bit_cast<uint32_t>(9.5f),
+          "complete effect transaction admits clock plus scroll/translation/rotation drivers");
+  Require(update->uv[0].value == std::array<float,2>{4,2} && update->uv[1].value == std::array<float,2>{.5f,0} &&
+          Near(update->uv[2].value[0],.5f) && Near(update->uv[2].value[1],0),
+          "UV drivers replace scrolling with dormant native translation or authored yaw/pitch");
+  const auto before=source.words; std::vector<uint64_t> writes;
+  update->Publish([&](uint64_t address,uint32_t value) { writes.push_back(address); word(address,value); });
+  Require(writes.size() == 7 && update->Matches(read),"one clock and six UV words publish once and match");
+  for (const auto &[address,value] : before)
+    if (std::ranges::find(writes,address) == writes.end()) Require(source.Read(address) == value,"every untouched table/visual word survives exactly");
+  scalar(records+28,5);
+  Require(!update->Matches(read),"effect verification catches live UV divergence");
+  update->Publish(word);
+
+  // Feed the actual existing object-material importer/composer, then destroy all
+  // source and animation data. Copied material values remain usable by rendering.
+  word(visual+3000,3); word(visual+3440,1);
+  for (uint32_t n=0; n<4; ++n) scalar(visual+3444+n*4,0);
+  const auto material=ReadMaterialTextureInputs<int>(visual,read,[](uint32_t) { return MaterialImageSelection<int>{}; });
+  Require(material && material->overrides.size() == 3,"native UV publication reaches the existing immutable material-input owner");
+  struct Range { size_t texture_assignment_end; };
+  const std::array assignments{MaterialImageAssignment{MaterialImageSource::Table,0,1},
+      MaterialImageAssignment{MaterialImageSource::Table,0,2},MaterialImageAssignment{MaterialImageSource::Table,1,3}};
+  const std::array ranges{Range{1},Range{2},Range{3}};
+  std::vector<MaterialTextureValues<int>> values;
+  Require(ComposeMaterialTextures<int>(assignments,std::span<const Range>(ranges),*material,
+      [](uint32_t selector) { return MaterialImageSelection<int>{MaterialImageAction::Bind,int(selector)+10}; },values),
+      "existing renderer material composition consumes animated selectors and channel pairs");
+  Require(values.size() == 3 && values[0].uv == std::array<float,4>{4,2,0,0} && values[1].uv[0] == .5f &&
+          Near(values[2].uv[2],.5f) && values[2].images[1] == 13,"composed multi-channel material receives all three UV motion modes");
+  const auto retained=values; source.words.clear(); controller.reset(); assets.fill({}); asset.reset();
+  Require(values == retained,"owned material values survive source/clip/controller destruction");
+
+  // Catalog readiness, duration conversion and queued transition branches.
+  for (uint32_t offset=0; offset<3752; offset+=4) word(visual+offset,0);
+  word(visual+3560,records); word(visual+3564,0);
+  word(visual+2212,7); word(visual+2216,8); word(visual+2220,0xFEED);
+  scalar(visual+2224,10); scalar(visual+2228,1);
+  word(visual+2232,entry); word(entry+16,object); scalar(object+312,10.9f); word(object+316,6);
+  word(visual+2240,20); word(visual+2244,21);
+  word(visual+2264,entry); word(entry+8,20); word(entry+4,entry+32);
+  word(entry+32+8,21); word(entry+32+16,object+512); word(object+512+316,6); word(entry+32+4,0);
+  auto transition=PrepareEffectUpdate(visual,1,1,{},read);
+  Require(transition && transition->transitioned && transition->timeline[0] == 20 && transition->timeline[1] == 21 &&
+          transition->timeline[2] == 0xFEED && transition->timeline[3] == 0 &&
+          transition->timeline[5] == entry && transition->timeline[6] == entry+32 && transition->timeline[7] == 0,
+          "ready queued pair restarts both entries/time/rate, preserves loop bits and clears queue");
+  word(visual+2236,entry+32);
+  Require(!PrepareEffectUpdate(visual,1,1,{},read),"both active cue durations must be available before a queued comparison");
+  scalar(object+512+312,8);
+  transition=PrepareEffectUpdate(visual,1,1,{},read);
+  Require(transition && !transition->transitioned && transition->timeline[0] == 7 && transition->timeline[7] == 20 &&
+          transition->timeline[3] == std::bit_cast<uint32_t>(11.0f),"equal entry pair retains old IDs, queue and advanced clock");
+  for (uint32_t state : {1u,2u,3u,4u}) {
+    word(object+316,state); const auto unchanged=source.words;
+    Require(!ReadReadyEffect(visual+2248,20,read) && !PrepareEffectUpdate(visual,1,1,{},read) && source.words == unchanged,
+            "pending first cue refuses without side effects or selecting a later duplicate");
+  }
+  for (uint32_t state : {0u,5u,UINT32_MAX}) {
+    word(object+316,state);
+    Require(ReadReadyEffect(visual+2248,20,read) == 0u,"terminal nonready effect is known absent, not a poll or duplicate sweep");
+  }
+  word(object+316,6);
+  Require(ReadReadyEffect(visual+2248,20,read) == entry && ReadReadyEffect(visual+2248,22,read) == 0u,
+          "ready first effect and exhausted catalog are distinct known results");
+  Require(ReadEffectDuration(entry,2,read) == 20 && ReadEffectDuration(entry,-2,read) == -20,
+          "duration truncates to integer/float before existing double scaling");
+  scalar(object+312,NAN);
+  Require(ReadEffectDuration(entry,1,read) == double(INT32_MIN),"source duration NaN conversion preserves INT_MIN behavior");
+  word(entry+32+4,entry); Require(!ReadReadyEffect(visual+2248,99,read),"cyclic effect catalogs refuse within bounded traversal");
+  word(visual+2212,0); word(visual+3564,257);
+  Require(!PrepareEffectUpdate(visual,1,1,{},read),"material record count shares the existing 256-record owner bound");
+  word(visual+3564,UINT32_MAX);
+  Require(PrepareEffectUpdate(visual,1,1,{},read).has_value(),"signed negative record count is an authored no-op");
+  word(visual+3564,1); word(visual+3560,visual+16); word(visual+2628,0);
+  Require(!PrepareEffectUpdate(visual,1,1,{},read),"aliased visual/table storage cannot invalidate transactional preflight");
+  word(visual+3560,0); source.words.erase(visual+2212);
+  Require(PrepareEffectUpdate(visual,NAN,NAN,{},read).has_value(),"null controller effect table does not inspect dormant timeline");
+
+  std::array<NativeJointChannels,1> dormant;
+  dormant[0].translation={6,-8,0};
+  NativeEffectUVMotion motion{NativeEffectUVMode::Translation,0,{NAN,NAN},{NAN,NAN},{2,4}};
+  Require(EvaluateNativeEffectUV(motion,NAN,dormant) == std::array<float,2>{3,-2},"channel-driven UV ignores replaced scrolling payload");
+  motion.joint=1; Require(!EvaluateNativeEffectUV(motion,1,dormant),"invalid pose identity refuses before publication");
+  motion.joint=0; motion.divisor[0]=0; Require(!EvaluateNativeEffectUV(motion,1,dormant),"zero active UV divisor refuses");
+  motion.mode=NativeEffectUVMode::Rotation; motion.divisor={1,1};
+  for (float angle : {-2.4f,-.7f,0.0f,.7f,2.4f}) {
+    dormant[0].rotation={0,std::sin(angle/2),0,std::cos(angle/2)};
+    const auto uv=EvaluateNativeEffectUV(motion,1,dormant);
+    Require(uv && Near((*uv)[0],angle) && Near((*uv)[1],0),"rotation-driven UV preserves signed quadrants without normalizing authored quaternions");
+    dormant[0].rotation={std::sin(angle/2),0,0,std::cos(angle/2)};
+    const auto pitch=EvaluateNativeEffectUV(motion,1,dormant);
+    const float expected=std::asin(std::sin(angle));
+    Require(pitch && Near((*pitch)[1],expected),"pitch uses projected forward length and the authored sign");
+  }
+}
 } // namespace
 void TestAnimationClips() {
   TestImportedAnimation(); TestAnimationRefusals(); TestAngularSegments(); TestPackedAngularReference(); TestLoadedAnimationAssets(); TestSelectedAnimationResidency(); TestCompressedAnimations();
@@ -1415,6 +1572,7 @@ void TestAnimationClips() {
   TestJointSelectionHandoff();
   TestAttachmentPlacement();
   TestNativeSlotSelection();
+  TestNativeEffectConsumption();
   TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }
