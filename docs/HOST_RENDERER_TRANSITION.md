@@ -959,6 +959,21 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    World/channel/palette exports, source selection, special/late effects, other
    caller placement and persistent cooking remain. Defaults unchanged.
    [Attachment implementation, source contracts and exact limits](../research/20260908_2208_native-attachment-placement.md).
+   **Ready slot selection (source8e6fcd6,host185/PID27880):** admitted ready
+   requests now bypass original selection/lookup/poll dispatch, using native
+   slot plans and existing motion residency/controller/skeleton owners. First
+   pending/null duplicate never falls through to a later ready entry; pending
+   polls retain the original complete path once. Catalog reads and slot writes/
+   controller reads remain adapters, not a permanent native catalog design.
+   Material70/CPU67,419 guards and host185 pass; no guest objects/shaders.
+   CPU66's missing-rest fixture is corrected with an explicit rejection test,
+   not a production relaxation. Fresh opening-event runtime:208 exact checked
+   selections,23restarts,56ready,152absent,1unclassified refusal;31036 matching
+   controllers,4063handoffs,changed0; late6 matching/reused/handoffs. No new
+   authored attachment/root, motion/reload/pixel/both-eye qualification. Logger
+   reused981.log; this is the22:33:32 host185 run, not historical981. Retained
+   losslessly as retained-slot-selection185.zip;988/985 failures stay protected.
+   [Contract, exact consumer evidence and remaining boundaries](../research/20260908_2236_native-slot-selection.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

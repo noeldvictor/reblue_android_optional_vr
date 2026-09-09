@@ -6952,3 +6952,74 @@ requiring fresh remeasurement. Pre-doc free63530790912B,95580160B drive-wide
 free increase vs first63435210752B; most is NOT attributable cleanup. No next
 producer queued. README/queue/new source-contract report preserve the failed
 authored-placement gate and point to caller conditions before a new probe.
+
+### 2026-09-08 ready slot selection after8e6fcd6
+
+Same cumulative ledger/budget, not a new allowance. First preflight free
+63519076352B; no matching game/build/test processes. Fixture10731178B/43files,
+EXE49336832B/PDB113524736B, buildlogs420498B/212files. Floor62509998080B,
+owner3GiB exception,100MiBdiagnostics/75MiBruntime stop,10MiBbuildlogs and
+historical no-new-raw gate unchanged. Plan material69/CPU66/host185 in the
+existing trees,300s with64/8/192MiB maximum free-drop; expected fixture<16MiB
+and host<192MiB peak. No guest/shader rebuild or image/raw/perf/cache producer.
+Retain68/65/184 receipts until replacements pass; protected988/985ZIPs stay.
+419 artifact-free guards pass0.225s. New CPU cases exercise selection through
+controller/skeleton/instance owners, pending first-duplicate refusal and exact
+slot words. Runtime needs fresh aggregate preflight and a selection-specific
+observation; neither unchanged attachment nor whole-root probe is queued.
+
+Material69/PID34800/session13188 build0. CPU66/PID38376 fails on the new
+fractional-blend consumer fixture lacking authored rest availability; production
+correctly refuses. Fixture now explicitly asserts that refusal, then supplies
+the existing owned rest fields. Material70/PID37640 build0; CPU67/PID32096
+PASS0.13s/CTest0.14s. Host185/PID33608/session55045 build0: CMake glob check,
+codegen0writes, only host/version users; no guest objects/shaders. Fixture
+1402368B SHA256 D6F5A626B1DF00353AAC1396BCECB0968378DD60D3215A49F638DBC09C0072B3,
+tree10809821B/43files. EXE49346048B/PDB113561600B, EXE SHA256
+24699648FADFA4BFFCBA39A46D06428EB081DED5BF72C34671CAFEA85185A078.
+All matching producers terminal. After replacements pass,10 exact superseded
+68/69,65/66,184 receipt files removed:6260B logical,free63516741632->63516753920,
+12288B observed reclaim. Resolved CPU66 fixture omission is preserved above and
+as a negative assertion; receipt logs reproducible, no protected data removed.
+
+Fresh diagnostics78044731B,buildlogs420395B/212files;400KiB log overlap leaves
+188869B below75MiB. Free63516688384B, profile original hash2F1BC38D... unchanged.
+SlotSelectionProbe requires positive completed==checked, ready assets and actual
+restarts plus unchanged controller/late observations. Wrapper parse passes.
+Plan989:60s/400KiB/192MiB maximum free-drop, no raw/image/perf/cache/dumps,
+guaranteed exact profile restoration. This tests the changed selection path;
+988's attachment and985's whole-root coverage failures stay unqualified.
+
+Selection run/PID27880/session86472 terminal22:34:17; explicit observation-complete
+operator exit1, not a crash/full game pass. Start22:33:32. Planned989 was not
+the actual log label: rotation reused reblue_981.log after old text retirement.
+This is host185/time/PID-identified evidence, not a restamp of historical981.
+At1133:208 matching selections,23restarts,56ready,152absent,1unclassified refusal;
+controller31036 matching,5124unclassified refusals,4068samples,8mixes,3908interior,
+4084advancing,4063handoffs,changed0; late6matching/samples/reuses/handoffs.
+Lookup737matching/found,single296matching/sampled,weighted0,owned exclusions0.
+Skeleton1102=3719matching,wrong0/unavailable0; context1103FieldActivebg41_01,event1.
+Opening-event coverage only; no post-event/reload/motion/pixel/both-eye/Quest claim.
+All11 settings took effect; original116B profile restoredhash2F1BC38D...;
+matching producers0; timestamp inventory0new raw/image/perf/cache/dump files.
+
+Log122054B SHA25698B9EC34565EB3BDA7049B781CD527DCA0A1B555764BA5CE72C50B5276A46F0A
+retained losslessly as retained-slot-selection185.zip22757B, SHA256
+136BD368C9AF80681A586FCA2501DD7205057CB613052D1FDB9D405A8DBC8156.
+Sole member/name/size/full decompressed hash checked before exact plaintext
+removal. Compressionfree63516467200->63516442624,24576Ballocation; deletion
+free63516442624->63516565504,122880Bobserved reclaim,98304Bnet archive saving.
+Total11files128314Blogical removed;135168Bobserved deletion minus24576Barchive
+allocation=110592Bnet current cleanup108KiB. No prior savings credited again.
+Plaintext fully recoverable from ZIP; superseded receipts reproducible.988/985
+ZIPs and all other unresolved failures/game data/profiles remain protected.
+
+Partial attributed retained growth147377B: fixture+78643B,EXE/PDB+46080B,
+buildlogs-103B,new selection ZIP+22757B. Retaining this small new-purpose log is
+necessary until its selection/consumer observation is superseded; existing
+protected988/985 evidence is not equivalent. Excludes hostobjects/buildmetadata/
+source/Git/external activity. Calculated diagnostics78067488B,buildlogs420395B/
+212files; next400KiBoverlap leaves166112B below75MiB, remeasure before any job.
+Pre-doc free63516565504B,drive-wide consumption2510848B versus first63519076352B,
+not all attributable build growth. No next producer queued. README/queue/report
+preserve compatibility boundaries and full desktop/both-eye acceptance scope.

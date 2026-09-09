@@ -212,6 +212,17 @@ authored attachment trigger, not another identical boot. World-buffer exports,
 animation catalog selection and late effects remain explicit adapters.
 [Placement contract, coverage failure and retained evidence](research/20260908_2208_native-attachment-placement.md).
 
+**Ready animation selection (host185; opt-in):** ready clip requests now use
+native slot plans and the existing clip/controller/skeleton owners. The targeted
+desktop check records **208 exactly matching selections, 23 restarts and 56
+ready-clip selections**, with matching controller and late-layer handoffs.
+One selection retained the original at admission; its cause is not yet classified.
+C++ consumer tests, 419 source/scenario checks and the incremental host build
+pass. This is opening-event coverage, not motion pixels, reloads or both eyes.
+Checked catalog reads, source slot storage and pending asynchronous polling
+remain adapters; attachment/root coverage failures above remain unresolved.
+[Selection contract, consumer verification and remaining work](research/20260908_2236_native-slot-selection.md).
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

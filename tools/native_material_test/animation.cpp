@@ -1,6 +1,7 @@
 #include "gpu/scene/native_animation_source.h"
 #include "gpu/scene/native_animation_controller_source.h"
 #include "gpu/scene/native_animation_placement.h"
+#include "gpu/scene/native_animation_selection_source.h"
 #include "gpu/scene/native_instance.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include <iostream>
@@ -1189,6 +1190,122 @@ void TestNativeControllerConsumption() {
             "untracked late write is still rejected with bounded causal provenance");
   }
 }
+void TestNativeSlotSelection() {
+  ClipSource source;
+  auto read=[&](uint64_t address) { return source.Read(address); };
+  auto imported=animation_source::ReadKeyedAsset(0x1000,128*1024,read);
+  Require(imported.has_value(),"ready selection reuses the production clip importer");
+  auto asset=std::make_shared<const NativeAnimationAsset>(std::move(*imported));
+  source.words.clear();
+  constexpr uint32_t visual=0x10000, catalog=visual+2248, slot=visual+1872;
+  constexpr uint32_t first=0x20000, second=0x20100;
+  source.Word(catalog+8,first);
+  for (uint32_t entry : {first,second}) {
+    source.Word(entry+4,entry == first ? second : 0);
+    source.Word(entry+8,7); source.Word(entry+12,0x1000); source.Word(entry+36,2);
+  }
+  std::array<uint32_t,14> before{99,0,17,0x3f000000,0x3f800000,0,0x41200000,
+      0x3f800000,0x7fc01234,0xFEED,0xCAFE,0xBABE,second,0x3f800000};
+  auto restore=[&] { for (size_t w=0; w<before.size(); ++w) source.Word(slot+w*4,before[w]); };
+  restore();
+  auto select=[&](bool force=false, double weight=.75) {
+    return animation_source::PrepareSlotSelection(visual,0,7,0x80000001u,force,weight,read);
+  };
+  const auto original=source.words;
+  const auto selected=select();
+  auto expected=before;
+  expected[0]=7; expected[1]=0x80000001; expected[2]=0;
+  expected[3]=0x3f400000; expected[6]=0; expected[12]=first;
+  Require(selected && selected->restart && selected->selected.entry == first &&
+          selected->selected.source == 0x1000 && selected->destination == slot &&
+          selected->before == before && selected->after == expected && source.words == original,
+          "first ready entry restarts even when two entries alias one asset; exact six writes, no source mutation");
+  source.Word(slot+48,first);
+  auto unchanged=select(false,std::numeric_limits<double>::quiet_NaN());
+  Require(unchanged && !unchanged->restart && unchanged->after == unchanged->before &&
+          unchanged->after[0] == 99 && unchanged->after[1] == 0 && unchanged->after[6] == before[6],
+          "same identity ignores changed ID/loop/weight arguments and preserves all dormant words");
+  Require(select(true)->restart,"forced same-identity selection restarts");
+  Require(!select(true,std::numeric_limits<double>::quiet_NaN()) &&
+          !select(true,std::numeric_limits<double>::infinity()),"nonfinite restart refuses");
+  Require(select(true,-1)->after[3] == before[3] &&
+          select(true,-std::numeric_limits<double>::denorm_min())->after[3] == before[3],
+          "negative weight comparison occurs before float rounding, including tiny negative double");
+  Require(select(true,-0.0)->after[3] == 0x80000000,"negative zero is a replacement, not preserve-weight sentinel");
+  source.Word(slot+12,0x7fc05678);
+  Require(select()->after[3] == 0x7fc05678 && !select(true,-1),
+          "dormant NaN survives no-op but cannot feed a restarted native slot");
+  restore();
+
+  source.Word(first+36,1);
+  unsigned payload_reads=0;
+  auto pending=animation_source::PrepareSlotSelection(visual,0,7,1,false,1,
+      [&](uint64_t address) { payload_reads+=address == first+12 || address == second+12; return read(address); });
+  Require(!pending && payload_reads == 0,"first pending duplicate refuses before payload, later match or side-effecting poll");
+  source.Word(first+36,2); source.Word(first+12,0);
+  const auto absent=select();
+  Require(absent && absent->restart && absent->selected.entry == 0 && absent->selected.source == 0 &&
+          absent->after[12] == 0,"first null duplicate means absent, never selects a later ready duplicate");
+  source.Word(first+12,0x1000);
+  const auto missing=animation_source::ReadReadySelection(catalog,88,read);
+  Require(missing && missing->entry == 0,"complete catalog without matching ID means known absent");
+  source.Word(second+4,first);
+  unsigned cycle_reads=0;
+  Require(!animation_source::ReadReadySelection(catalog,88,[&](uint64_t address) {
+    ++cycle_reads; return read(address);
+  }) && cycle_reads == 8193,"cyclic catalog refuses at fixed 4096-node bound");
+  source.Word(second+4,0);
+  source.words.erase(first+36);
+  Require(!select(),"unreadable readiness is not known absence");
+  source.Word(first+36,2); source.words.erase(slot+52);
+  Require(!select(),"truncated untouched slot data refuses before publication");
+  restore(); source.Word(catalog+8,first+1);
+  Require(!select(),"misaligned catalog entry refuses");
+  source.Word(catalog+8,first);
+  for (uint32_t invalid : {0u,visual+1,UINT32_MAX-3})
+    Require(!animation_source::PrepareSlotSelection(invalid,0,7,1,false,1,read),"invalid visual address refuses");
+  Require(!animation_source::PrepareSlotSelection(visual,6,7,1,false,1,read),"six-slot extent is exact");
+  source.Word(catalog+8,0); source.Word(slot+48,0);
+  Require(select() && !select()->restart && select(true)->restart,"absent-to-absent no-op still obeys force");
+
+  // Continue the real selection result through the existing native consumers.
+  // Neither clip keys nor catalog/slot bytes survive the checked boundary.
+  source.words.clear();
+  NativeAnimationControllerInput input; input.active=1; input.delta_ticks=.5f;
+  auto &state=input.slots[0]; state.present=bool(selected->selected.entry);
+  state.loop=selected->after[1] != 0; state.loops=selected->after[2];
+  state.weight=std::bit_cast<float>(selected->after[3]);
+  state.target_weight=std::bit_cast<float>(selected->after[4]);
+  state.weight_rate=std::bit_cast<float>(selected->after[5]);
+  state.time_ticks=std::bit_cast<float>(selected->after[6]);
+  state.time_rate=std::bit_cast<float>(selected->after[7]); state.duration_ticks=30;
+  state.contribution=std::bit_cast<float>(selected->after[13]);
+  const auto plan=PlanNativeAnimationController(input);
+  Require(plan && plan->count == 1 && plan->slots[0].time_ticks == .5f && plan->slots[0].loops == 0,
+          "ready restart feeds advancing native controller, not stale pre-selection clock");
+  constexpr std::array names{0xBB776655u,0xCC332211u,0xAA998877u};
+  std::array<NativeSkeletonJoint,3> skeleton;
+  skeleton[0].pose_index=2; skeleton[0].animation_name=ControllerName("root");
+  skeleton[1].pose_index=0; skeleton[1].parent=0; skeleton[1].animation_name=ControllerName("arm");
+  skeleton[2].pose_index=1; skeleton[2].parent=0; skeleton[2].animation_name=ControllerName("hand");
+  std::array<std::shared_ptr<const NativeAnimationAsset>,6> assets; assets[0]=asset;
+  Require(!animation_source::ExecuteController(*plan,assets,names,skeleton,
+      animation_source::ControllerLayer(3),0,{}),"fractional selected blend refuses missing authored rest channels");
+  for (auto &joint : skeleton)
+    joint.blend_rest.translated=joint.blend_rest.rotated=joint.blend_rest.scaled=true;
+  const auto result=animation_source::ExecuteController(*plan,assets,names,skeleton,
+      animation_source::ControllerLayer(3),0,{});
+  Require(result && result->sampled == 1 && result->output.channels[2].translated,
+          "selected owned clip reaches native layer sampling after source destruction");
+  std::vector<RenderMatrix> pose;
+  Require(EvaluateNativeSkeleton(skeleton,result->output.channels,JointIdentity(),pose),
+          "selected native layers reach production hierarchy");
+  NativeInstanceRegistry instances; const auto instance=instances.Create(91);
+  Require(instances.Publish(instance,0,pose) && instances.Transfer(instance,0,1,pose.size()),
+          "selected pose reaches completed render instance");
+  const auto retained=instances.Read(instance,1); instances.Retire(instance); assets[0].reset(); asset.reset();
+  Require(retained && retained->transforms == pose,"selected completed pose survives owner retirement");
+}
 void TestAttachmentPlacement() {
   ClipSource source; source.words.clear();
   constexpr uint32_t visual=0x10000, parent=0x20000;
@@ -1297,6 +1414,7 @@ void TestAnimationClips() {
   TestSelectedTrackAndRootMotion();
   TestJointSelectionHandoff();
   TestAttachmentPlacement();
+  TestNativeSlotSelection();
   TestNativeControllerPlan(); TestNativeControllerConsumption();
   std::cout << "native keyed clips: source-free channels, hierarchy/instance consumption, lifetime and budgets passed\n";
 }

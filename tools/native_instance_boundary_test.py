@@ -21,6 +21,24 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         cls.animation_asset = (root / "src/gpu/scene/native_animation_asset.h").read_text(encoding="utf-8")
         cls.controller = (root / "src/gpu/scene/native_animation_controller.h").read_text(encoding="utf-8")
         cls.controller_source = (root / "src/gpu/scene/native_animation_controller_source.h").read_text(encoding="utf-8")
+        cls.selection_source = (root / "src/gpu/scene/native_animation_selection_source.h").read_text(encoding="utf-8")
+
+    def test_ready_slot_selection_reuses_owned_clips_and_preserves_pending_original(self):
+        selection = self.animation_bridge.split("bool SelectAnimation(", 1)[1].split("std::optional<Placement>", 1)[0]
+        hook = self.animation_bridge.split("REX_HOOK_RAW(bdVisualObjectSetAnimation)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertIn("if (!SelectAnimation(ctx,base)) __imp__bdVisualObjectSetAnimation(ctx,base);", hook)
+        self.assertIn("controller_reference", selection)
+        self.assertLess(selection.index("PrepareSlotSelection("), selection.index("PrepareClip("))
+        self.assertIn("store.assets.Find(plan->selected.source)", selection)
+        self.assertLess(selection.index("return refuse();"), selection.index("__imp__bdVisualObjectSetAnimation"))
+        self.assertEqual(selection.count("__imp__bdVisualObjectSetAnimation"), 1)
+        self.assertLess(selection.index("throw std::runtime_error"), selection.index("bd::mem::store"))
+        self.assertIn("w<plan->after.size()", selection)
+        self.assertIn("*state == 1", self.selection_source)
+        self.assertLess(self.selection_source.index("*state == 1"), self.selection_source.index("const auto source=read"))
+        for forbidden in ("PPCContext", "bdAsyncRequestPoll", "__imp__", "unordered_map", "bd::mem::store"):
+            self.assertNotIn(forbidden, self.selection_source)
+        self.assertIn("TestNativeSlotSelection()", self.animation_test)
 
     def test_animation_registration_is_load_scoped_and_sampler_never_reads_source_keys(self):
         for name in ("sub_8217BD70", "sub_8217C5E8"):
