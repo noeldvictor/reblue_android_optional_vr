@@ -92,3 +92,56 @@ Storage remains in the original cumulative ledger in
 [scene-state bridge](20260906_0333_native-scene-state-bridge.md#2026-09-09-bind-owned-imagecue-catalog-after095918a).
 No raw/window/perf/cache/cook/device output requested. Keep image-assets194 and
 all unresolved failures until their actual verification purpose is replaced.
+
+## Live connection after source0defa30 was pushed
+
+Host195/PID34900/session20800 ran02:44:39..02:45:33 with the existing capture-free
+MaterialProgram/AnimatedUV/Eye/Controller/Late probe and native model/instance
+comparisons. All14settings applied;60s/400KiB/192MiB caps. The wrapper reached its
+unchanged regression observations and intentionally stopped(exit1); this is not
+a crash or full desktop gate. New catalog/image observations below were inspected
+separately; the wrapper does not have a dedicated catalog gate. Original116B
+profile restored exactly,SHA256
+`2F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0`.
+
+Fresh idle `bg41_01`, event0 contexts1655->1955:
+
+| Evidence | Earlier | Later |
+| --- | ---: | ---: |
+| Image updates / exact comparisons / publications | 2034 | 2934 |
+| Owned image-key inputs | 2278 | 4078 |
+| Selected / held inputs | 2254 / 24 | 4030 / 48 |
+| Image material scopes | 604 | 904 |
+| Composed / primitive material packets | 26576 | 39776 |
+| Whole-call scratch refusals | 3 | 3 |
+
+Fresh producer reports1681->1981 follow the corresponding contexts. Catalog
+bindings5unchanged,reads2932->3982,refused0/changed0. Image registrations883,
+imports6unchanged,reads2493->4293,refused0/changed0. Native indices therefore reach
+the real exact image updates and owned-image packet path, not only a lookup count.
+Shared motion/image/catalog residency1293872B/26resident payloads/1953registrations.
+These are shared totals, not image-only or unique converted-game-asset counts.
+
+At1981:controller94682exact,12017handoffs/changed0,mixes23,interior11526;late6exact/
+reused/handoffs,refused0. Eye965exact/refused0/off-center227;UV1934publications/
+refused0/ownedscroll1930;program1940bound5/4784reads,changed0/refused0. UV/eye
+packets27808->41008overlap image packets and must not be added as unique draws.
+Effects969exact/1936UV,translated0/rotated0/**transitions0**. Skeleton1940:
+12621exact/unavailable0/wrong0. No comparison exception/error appeared.
+
+Three scratch refusals: visual2381E598,slot2,owners24F6BFE0/24F6A960/24F6B460.
+Exact capacity/shape/readability predicate remains unknown; no claim of fixing
+the adapter. This run does not qualify queued transitions, viewer replacement,
+reload/motion pixels, stereo, full-frame ownership, FPS or Quest. Next is native
+selected-state/clock ownership and remaining scratch consumers, not another
+unchanged opening probe. Remove validation/exports only when their last readers
+and writers migrate.
+
+Full259314Blog retained losslessly in `retained-image-catalog195.zip`52747B,
+ZIP SHA256`7730DE9147F565AF5AAB85A10E1A5E20673B8372ABD665B9DE1521744BAC8EBE`,
+sole member`reblue_981.log`SHA256
+`205743ECD5E1A86FB5F5E556FD9B30963A8436A3A0B077030F5F2608DE00E78F`.
+Name/length/decompressed hash verified before deleting plaintext and superseded
+image-assets194ZIP.194's report remains; its log is no longer retained. Keep195
+for current passing image/catalog/program/UV/eye purposes and scratch evidence;
+older unresolved pixel/reload/effect187/placement988/root985 evidence untouched.

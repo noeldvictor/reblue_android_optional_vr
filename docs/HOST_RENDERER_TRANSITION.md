@@ -1049,27 +1049,31 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    scopes601->901, packets26444->39644 (+13200). Three pre-admission refusals
    remain unclassified and unchanged across that interval; no publication loss.
    Prior UV/eye/controller/late program gates reached; no pixel/reload/stereo,
-   full-frame or speedup qualification. The193 log has now been replaced by194
-   for these verified purposes;193's historical report remains unchanged.
-   **Ready image assets (source2f075dd,host194/PID28412):** ready-load registration
+   full-frame or speedup qualification. The193/194 logs have now been replaced by195
+   for these verified purposes; historical reports remain unchanged.
+   **Ready image assets and catalogs (source0defa30,host195/PID34900):** ready-load registration
    and actual data-release hooks feed image windows/texture leases through the
    existing8MiB animation residency, with disjoint typed keys in its one index.
    Material selection evaluates native ordinals/leases rather than decoding key
    windows or chasing selected texture chains. Exact flat source-word and GPU
    identity guards still run at lookup; this is not elimination of all reads.
-   Material81/CPU78/426guards/host194 PASS. Fresh idle1706->2006: image updates/
-   checks/publications2034->2934,owned-key-inputs2556->4356,scopes603->903,
-   primitivepackets26532->39732 (+13200). Fresh2034:883ready registrations,
-   6image imports/4577reads,refused0/changed0; all prior UV/eye/controller/late
-   regression observations reached. Shared motion/image residency1272792B.
+   Bind-owned catalogs now serve both native image and queued-cue selectors;
+   neither walks source links/IDs/kinds. Shared typed residency, exact flattened
+   late-write guard and instance/model generations cover rebind/append/clear.
+   Material82/CPU79/427guards/host195 PASS. Fresh idle1655->1955: image updates/
+   checks/publications2034->2934,owned-key-inputs2278->4078,scopes604->904,
+   primitivepackets26576->39776 (+13200). Fresh1981:5catalog bindings/3982reads,
+   883ready registrations/6image imports/4293reads; both asset types refused0/
+   changed0. All prior UV/eye/controller/late observations reached. Shared
+   motion/image/catalog residency1293872B; queued transitions remained0.
    The current three whole-call refusals are all **scratch preflight**, not asset
    import or procedural failures; exact capacity/malformed/readability subcause
    was not logged. Do not retroactively assert193's causes or claim those paths
    native. CPU tests retain tight budgets, type separation, every late-word/GPU
    change and pinned source-retirement; live reload/pixels/stereo remain open.
-   **Next:** own catalog/selected-state inputs using the current loader/instance
+   **Next:** own selected-state/clock inputs using the current loader/instance
    owners and migrate the last scratch consumers. No repeated unchanged boot:
-   positive key-to-packet consumption and the scratch refusal category are known.
+   positive catalog/key-to-packet consumption and scratch refusal category are known.
    Procedural key updates, allocation-dependent scratch, viewer overrides,
    separate late-image vector, special image writers and transient native-image
    readiness beyond ready-load state remain. Retire descriptor/UV/image/key
@@ -1077,6 +1081,7 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    No unchanged opening probe: positive image consumption is now observed.
    [Source contract, connected evidence and retained limitations](../research/20260909_0140_native-material-images.md).
    [Ready image assets, shared lifetime and current evidence](../research/20260909_0208_native-image-animation-assets.md).
+   [Bind-owned catalog, both selectors and current live evidence](../research/20260909_0237_native-image-catalog.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or

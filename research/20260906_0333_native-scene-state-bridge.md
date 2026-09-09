@@ -7523,3 +7523,29 @@ Fixture1701888B/tree11892269B (+157177B). Host195/PID35132/session42600 build0,
 link14/17,codegen0writes/no guest objects/shaders. EXE49464320B/PDB114561024B
 (+238080B),SHA2567E4FDE836A36D2F4D35F108CD53B6C5E3C82D349533D359B0F5AF21AA7A90F1B.
 Banner095918adirty, live pending. Postbuild measured free63536758784B.
+
+Source0defa30 pushed. Six superseded81/78/194 receipts5004Blogical deleted after
+replacement;free63535816704->63535824896B,8192Breclaimed. Runtime195/PID34900/
+session20800,02:44:39..02:45:33,preflightdiagnostics78147968B,free63535611904B,
+floor63334285312B;60s/400KiB/192MiB caps. All14settings effective, original116B
+profile restored exactly. Strict prior program/UV/eye/controller/late observations
+reached, intentional diagnostic-stop exit1, not a full acceptance/pixel gate.
+Fresh idle1655->1955:900additional exact image publications,1800owned-key inputs,
+13200additional owned-image material packets;3scratch refusals unchanged. Fresh
+1981:5catalogbindings/3982reads,6imageimports/4293reads;refused0/changed0forboth.
+Queued transitions0; viewer/reload/pixels/stereo remain unqualified. No raw/window/
+perf/cache/dump/cook output; all producers terminal, no queued repeat.
+
+Verified full259314B member in catalog195ZIP52747B,ZIP SHA256
+7730DE9147F565AF5AAB85A10E1A5E20673B8372ABD665B9DE1521744BAC8EBE,
+member SHA256205743ECD5E1A86FB5F5E556FD9B30963A8436A3A0B077030F5F2608DE00E78F.
+ZIP allocationfree63534522368->63534469120B,53248B. Plaintext and superseded194
+ZIP311945Blogical deleted after replacement,free63534469120->63534784512B,
+315392Breclaimed. Total8files316949Blogical removed;8192+315392-53248=270336B
+net264KiBcleanup. Old194log no longer retained; current195scratch/passing purpose
+and all older unresolved evidence retained. Partial retained growth395373B:
+fixture157177+EXE/PDB238080+ZIP116+buildlogs0; excludes hostobjects/metadata,
+source/Git and global activity. Free63534784512B (~59.17GiB),3964928Blower than
+first measured63538749440B. Diagnostics78148084B/buildlogs420690B/212files;
+next400KiB overlap leaves85516Bbelow75MiB, fresh preflight required.13window
+images10434657B unchanged. Same cumulative budget, no new raw allowance.

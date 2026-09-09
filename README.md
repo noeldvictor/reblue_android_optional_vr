@@ -248,24 +248,24 @@ Joint-driver, transition and pixel gates remain unqualified.
 descriptors feed native controller, eye and image-selection updates. Immutable
 UV values and texture leases share the existing 16 MiB instance budget and feed
 actual native material packets without re-importing their output values.
-Ready image windows and texture leases now use the existing shared 8 MiB
-animation residency, with ready-load registration and release-before-destruction.
-Host194/source `2f075dd` records **2,934 exact image-update comparisons and
-4,356 owned-key inputs**, plus **13,200 additional owned-image material packets**
-between two idle-field samples. Six image-asset imports served 4,577 lookups;
-no import/late-write failures. Three whole-call refusals were at scratch preflight;
-that adapter remains. UV/eye/controller/late regression observations also pass.
-The 426 source/scenario guards, connected C++ fixture and host build pass; CPU
-tests cover ordering, null/hold/repeat behavior, late writes, typed residency,
-source destruction, reload and pinned budgets. Key decoding and selected-image
-capture are gone from native evaluation, but exact source-word/GPU-identity
-comparison still reads the boundary. No speedup is inferred from ownership.
-Next migrate image catalog/selection-state ownership and retire scratch exports
-as their remaining consumers move. Original name resolution, procedural/viewer/
-late writers, validation and other outgoing adapters remain. Live
+Ready image windows, texture leases and instance-bound image/effect catalogs use
+the existing shared 8 MiB animation residency. Native image and queued-effect
+selectors use owned indices, not linked-list traversal. Bind/append/clear hooks
+preserve first-match ordering and retire lookup before source destruction.
+Host195/source `0defa30` records **2,934 exact image-update comparisons** and
+**13,200 additional owned-image material packets** between two idle-field samples.
+Five catalog bindings served 3,982 lookups; six image imports served 4,293 lookups,
+with no bind/import/late-write failures. Three scratch-preflight refusals remain.
+UV/eye/controller/late regression observations, 427 source/scenario guards,
+connected C++ fixtures and the host build pass. CPU tests cover duplicate/pending
+selection, late writes, typed residency, generation reuse and pinned budgets.
+Exact source-word/GPU-identity comparison still reads the boundary; no speedup
+is inferred from ownership. Next own selected-state/clock inputs and retire
+scratch exports as their remaining consumers move. Procedural/viewer/late writers,
+validation and other outgoing adapters remain. Live
 joint-driven UVs, cue transitions and preserved non-eye slots remain unexercised.
 No motion-pixel, reload/stereo, whole-frame or speedup qualification is claimed.
-[Ready image assets, verification and remaining dependencies](research/20260909_0208_native-image-animation-assets.md).
+[Catalog ownership, verification and remaining dependencies](research/20260909_0237_native-image-catalog.md).
 
 ### How much is left?
 
