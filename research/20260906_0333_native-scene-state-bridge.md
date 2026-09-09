@@ -7023,3 +7023,84 @@ source/Git/external activity. Calculated diagnostics78067488B,buildlogs420395B/
 Pre-doc free63516565504B,drive-wide consumption2510848B versus first63519076352B,
 not all attributable build growth. No next producer queued. README/queue/report
 preserve compatibility boundaries and full desktop/both-eye acceptance scope.
+
+### 2026-09-08 controller-to-effect material motion afterb9f54bb
+
+Same cumulative ledger and owner3GiB exception; floor62509998080B,
+100MiBdiagnostics/75MiBruntime stop,10MiBbuildlogs and no-new-raw gate unchanged.
+First measured free62866153472B, then62865887232B at22:56:18. Prior final
+63515893760B: ~650MB drive-wide reduction, not attributed to this source work.
+Scoped verification/build-root/log inventories show only the already-accounted
+22757B selection ZIP since22:34:17; fixture10809821B/43files, EXE49346048B,
+PDB113561600B and buildlogs420395B/212files unchanged. Get-Process and elevated
+CIM confirm no game/build/test producers. Sandbox CIM refusal is not a live job.
+420 artifact-free guards pass0.244s. Reuse material fixture71/CPU68 and host186;
+300s,64/8/192MiB free-drop supervisors, expected fixture<16MiB/host<192MiB peak.
+No guest/shader rebuild, raw/image/perf/cache producer. Retain previous receipts
+until replacements pass; protected selection185/placement988/root985 ZIPs stay.
+Fresh runtime preflight and changed-effect observation required before boot.
+
+Material71/PID37244 build0. CPU68/PID37092 fails the new equal-entry fixture:
+its second active cue lacks +312 duration; production correctly refuses before
+mutation. Added an explicit missing-duration rejection then supplied that cue's
+duration. Production unchanged. Material72/PID38496 build0; CPU69/PID36520
+PASS0.12s/CTest0.13s. Fixture1459200B SHA256
+A69AA8934B798A82A1517C23090094E0C4541B20123454E8CB0C240F32FB5BFB.
+Host186/PID21032/session73760 build0, CMake glob check/codegen0writes, only
+host/version consumers, no guest objects/shaders. EXE49355776B/PDB113659904B;
+EXE SHA256839F7AD2397A2240E93B565B1799CD6BF7671990DF91572C8D5531972258AEDA.
+Implementation/test checkpoint196d85d pushed; live and pixel gates still pending.
+All current producers terminal. Retire superseded70/71,67/68,185 build/CPU
+receipts only after exact inspection; CPU68 omission remains in this ledger and
+its negative fixture. Keep72/69/186 and all protected game/runtime evidence.
+
+Cleanup completed:10 exact superseded receipt files6125B logical, free
+62830424064->62830436352B,12288B observed reclaim; reproducible logs, not
+game assets or protected failures. Fixture now10972220B/43files (+162399B).
+Diagnostics78067488B,buildlogs420395B/212files;400KiB overlap leaves166112B
+below75MiB. Original116B profile SHA2562F1BC38D763A1B7BDBA31F560684FD4AA7E42A714600B8D344F19DA7F38E23B0.
+Runtime plan: inspected wrapper EffectAnimationProbe requires>=256 matching
+effects, positive UV and native translation/rotation drivers, plus unchanged
+controller/late/ready-slot observations.60s/400KiB/192MiB free-drop; fresh
+file/time/PID discovery, no raw/image/perf/cache/dumps, exact profile restoration.
+Rotation/transition-specific live counts will be reported, not inferred from
+aggregate driver coverage. Protected authored attachment/root and pixel gates
+are neither replaced nor relaxed.
+
+Runtime host186/PID35436/session9932 terminal23:04:46 after23:03:45 start;
+exit1: required native joint-driver observation NOT reached within60s. No crash
+or comparison mismatch, but this is a FAILED coverage gate. Logger reused981;
+time/PID/hash identify this new run. At2335:1111 matching effect transactions,
+2220 UVs,translated0/rotated0/transitions0; fresh post-event1735/2035/2335
+samples811/961/1111 and1620/1920/2220UVs. Controller108314matching,
+18004unclassified admission refusals,13731samples,23mixes,13156interior,
+13721handoffs/changed0,14533advancing. Late6matching/reused/handoffs;
+selection1399matching,27restarts,1245ready,154absent,2unclassified refusals.
+Skeleton2308=14409matching,wrong0/unavailable0. Material2309=1232override
+publications,246323checks/wrong0,184513UVblocks; not per-effect provenance.
+All11settings applied; original116Bprofile restoredhash2F1BC38D...;
+timestampinventory0new raw/image/perf/cache/dump files. No unchanged retry.
+
+Log273696B SHA256B3CBB2E21667EB4C0F086F95BBB9FBB1072DC6AC885F4477F910A0A66534B12E
+losslessly archived as retained-effect186.zip49644B, SHA256
+BECDA36519081446C5060D201C0C4C926D07B7F4511AA30C50C6E12262DBF7A1.
+Sole member/name/length/full decompressed hash verified before plaintext removal.
+Compressionfree62958125056->62958071808B,53248Ballocation. Exact273696B
+plaintext plus superseded22757Bselection185ZIP removed after hash checks:
+2files296453Blogical,free62957920256->62958219264B,299008Bobserved reclaim.
+New full ZIP preserves scrolling evidence and missing-driver coverage failure,
+and supersedes185's selection/controller/late purpose. Current text recoverable
+fromZIP; older185text is superseded/not recoverable fromGit.988/985 and all
+other protected failure evidence/game data/profiles remain. Retain186 until its
+missing native-driver observation is explained and purposefully superseded.
+
+Total current cleanup12files302578Blogical;311296Bobserved deletion minus
+53248Barchive allocation=258048B net252KiB. No prior cleanup credited again.
+Partial attributed retained growth297318B: fixture+162399B,EXE/PDB+108032B,
+buildlogs0B,newZIP replacing185ZIP+26887B. Excludes hostobjects/buildmetadata/
+source/Git/external activity. Pre-final-doc free62958206976B,drive-wide gain
+92053504B vs first62866153472B; most is not attributable cleanup. Diagnostics
+78094375B,buildlogs420395B/212files; next400KiB overlap leaves139225B below
+75MiB and requires fresh measurement. All producers terminal; no next job queued.
+Final420guards pass0.225s. README/queue/report distinguish scrolling from the
+failed joint-driver gate; no motion/reload/pixel/both-eye/Quest/speedup claim.

@@ -223,6 +223,19 @@ Checked catalog reads, source slot storage and pending asynchronous polling
 remain adapters; attachment/root coverage failures above remain unresolved.
 [Selection contract, consumer verification and remaining work](research/20260908_2236_native-slot-selection.md).
 
+**Animation-driven material updates (host186; opt-in):** native controller
+channels now feed scroll/translation/rotation UV plans and the existing material
+input owner. Admitted controllers no longer call the original effect updater;
+pending cue loads retain the complete original path once. C++ consumer tests,
+420 source/scenario checks and the incremental host build pass.
+The desktop run records **1,111 matching effect transactions and 2,220 UV
+updates**, including fresh post-event samples. However, translation/rotation
+drivers and queued transitions were not exercised: the required channel-consumer
+probe **failed its coverage gate**. No retry with weaker checks or pixel/speedup
+claim. Timeline/catalog inputs, outgoing material/channel storage and remaining
+effect callers still need migration; full desktop/both-eye acceptance stays open.
+[Connected implementation, failed live coverage gate and next decision](research/20260908_2305_native-effect-animation.md).
+
 ### How much is left?
 
 **Substantial implementation and qualification remain.** Live-qualified native

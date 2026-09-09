@@ -971,9 +971,28 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    selections,23restarts,56ready,152absent,1unclassified refusal;31036 matching
    controllers,4063handoffs,changed0; late6 matching/reused/handoffs. No new
    authored attachment/root, motion/reload/pixel/both-eye qualification. Logger
-   reused981.log; this is the22:33:32 host185 run, not historical981. Retained
-   losslessly as retained-slot-selection185.zip;988/985 failures stay protected.
+   reused981.log; this is the22:33:32 host185 run, not historical981. Its
+   selection/controller evidence is superseded by effect186 below;988/985 stay protected.
    [Contract, exact consumer evidence and remaining boundaries](../research/20260908_2236_native-slot-selection.md).
+   **Effect/material motion (source196d85d,host186/PID35436):** admitted native
+   controllers directly consume owned channels for scrolling/translation/rotation
+   UVs, then publish to the existing material-input owner. The original
+   bdEffectUpdate and packed-channel reads retire from this admitted path; pending
+   AnimeData cue loads refuse before mutation and retain the whole original once.
+   Timeline/catalog and outgoing UV storage are temporary adapters, not owners.
+   Material72/CPU69,420 guards and host186 pass; no guest objects/shaders.
+   Fresh60s run:1111 matching effect transactions/2220 UV updates;1735->2035->2335
+   post-event samples advance by150 transactions/300 UVs per window. But native
+   translation/rotation drivers and cue transitions remain0, so the new strict
+   channel-consumer observation gate FAILS. No authored-channel/pixel acceptance.
+   Controller108314 matching/13721 handoffs/changed0, late6 matching and ready
+   selection1399 matching remain regression evidence, not substitutes for that
+   failed gate. Retained-effect186.zip preserves the whole log and supersedes
+   selection185's runtime purpose; placement988/root985 failures remain protected.
+   Before another effect probe, trace bdMdlTextFileParse's152B table inputs and
+   joint-driver enable/selection into an actual authored scene, or add a bounded
+   observation that distinguishes absent drivers from admission refusal. No
+   unchanged boot. [Source contracts, evidence and remaining ownership](../research/20260908_2305_native-effect-animation.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
