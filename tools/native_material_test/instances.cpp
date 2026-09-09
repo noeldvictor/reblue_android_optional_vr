@@ -62,8 +62,8 @@ void TestEyeMaterialOwnership() {
     words[record+4]=i+1; words[record+8]=0; words[record+20]=i<2 ? 2 : 1;
     words[record+24]=0; number(record+28,9); number(record+32,8);
   }
-  auto publication=eye_source::ReadEyeControl(visual,gaze,read);
-  Require(publication && publication->material.count == 2 && publication->binding.count == 3 &&
+  auto publication=material_uv_source::ReadEyeControl(visual,gaze,read);
+  Require(publication && publication->material.count == 3 && publication->material.entries.size() == 2 && publication->binding.count == 3 &&
       publication->output[0] == std::array<float,2>{.25f,.25f} &&
       publication->output[1] == std::array<float,2>{.75f,.25f},
       "first record's limits drive both eyes; third record is not an eye output");
@@ -71,20 +71,23 @@ void TestEyeMaterialOwnership() {
   instance_source::Binding binding{registry.Create(4),4,{}};
   const auto resident=registry.Stats().bytes;
   auto publish=[&] {
-    binding.eye=publication->binding;
-    return registry.PublishEye(binding.instance,4,publication->material);
+    binding.material_uv=publication->binding;
+    return registry.PublishMaterialUVs(binding.instance,4,publication->material);
   };
   auto copy=[&] {
-    for (uint32_t i=0; i<publication->material.count; ++i)
+    for (uint32_t i=0; i<std::min(publication->material.count,2u); ++i)
       for (uint32_t axis=0; axis<2; ++axis) number(table+i*152+28+axis*4,publication->output[i][axis]);
   };
-  Require(publish() && !instance_source::ReadEye(registry,binding,visual,4,read),
+  Require(publish() && !instance_source::ReadMaterialUVs(registry,binding,visual,4,read),
       "producer cannot expose UVs before the actual caller copy");
   copy();
-  Require(!instance_source::ReadEye(registry,binding,visual,4,read), "invalidated output never resurrects from matching bytes");
+  Require(!instance_source::ReadMaterialUVs(registry,binding,visual,4,read), "invalidated output never resurrects from matching bytes");
   Require(publish(), "republish after incomplete caller");
-  const auto owned=instance_source::ReadEye(registry,binding,visual,4,read);
-  Require(owned && registry.Stats().bytes == resident, "eye snapshots reuse fixed entry budget without heap residency");
+  auto owned=instance_source::ReadMaterialUVs(registry,binding,visual,4,read);
+  const auto material_bytes=registry.Stats().bytes-resident;
+  Require(owned && material_bytes > sizeof(NativeMaterialUVs), "shared material lease charges actual retained storage");
+  Require(publish() && registry.ReadMaterialUVs(binding.instance,4) == owned &&
+      registry.Stats().bytes == resident+material_bytes, "identical publication reuses the same immutable lease");
   auto input_read=[&](uint64_t address) {
     for (uint32_t i=0; i<2; ++i)
       Require(address != table+i*152+28 && address != table+i*152+32, "native consumer must not reimport exported eye UV");
@@ -105,46 +108,91 @@ void TestEyeMaterialOwnership() {
       composed[1].uv == std::array<float,4>{.25f,.25f,.75f,.25f} && composed[1].native_eye_uv_mask == 3 &&
       composed[2].uv[0] == 9 && composed[2].native_eye_uv_mask == 2 && composed[3].native_eye_uv_mask == 0,
       "actual material ordering selects, preserves, replaces and resets owned eye provenance by channel");
+  Require(composed[0].native_animated_uv_mask == 1 && composed[1].native_animated_uv_mask == 3 &&
+      composed[2].native_animated_uv_mask == 2 && composed[3].native_animated_uv_mask == 0,
+      "shared animated provenance follows the actual material selection and reset");
   number(table+28,.125f);
-  Require(!instance_source::ReadEye(registry,binding,visual,4,read) &&
+  Require(!instance_source::ReadMaterialUVs(registry,binding,visual,4,read) &&
       ReadMaterialTextureInputs<uint32_t>(visual,read,capture)->overrides[0].uv->at(0) == .125f,
       "unknown late writer invalidates native eye publication and explicit legacy route reads current value");
-  copy(); Require(!instance_source::ReadEye(registry,binding,visual,4,read), "late write cannot resurrect an older gaze");
+  copy(); Require(!instance_source::ReadMaterialUVs(registry,binding,visual,4,read), "late write cannot resurrect an older gaze");
   for (uint32_t offset : {4u,8u,20u}) {
     Require(publish(), "republish binding"); const auto saved=words[table+offset]; words[table+offset]=0;
     if (saved == 0) words[table+offset]=1;
-    Require(!instance_source::ReadEye(registry,binding,visual,4,read), "selector/channel/enable rebind invalidates native values");
+    Require(!instance_source::ReadMaterialUVs(registry,binding,visual,4,read), "selector/channel/enable rebind invalidates native values");
     words[table+offset]=saved;
   }
   Require(publish(), "republish before table replacement"); words[visual+3560]=table+152;
-  Require(!instance_source::ReadEye(registry,binding,visual,4,read), "table replacement invalidates even at same instance");
+  Require(!instance_source::ReadMaterialUVs(registry,binding,visual,4,read), "table replacement invalidates even at same instance");
   words[visual+3560]=table; Require(publish(), "republish before count replacement"); words[visual+3564]=2;
-  Require(!instance_source::ReadEye(registry,binding,visual,4,read), "table count change invalidates publication");
+  Require(!instance_source::ReadMaterialUVs(registry,binding,visual,4,read), "table count change invalidates publication");
   words[visual+3564]=1;
-  const auto one=eye_source::ReadEyeControl(visual,gaze,read);
+  const auto one=material_uv_source::ReadEyeControl(visual,gaze,read);
   Require(one && one->material.count == 1 && one->output[1][0] == .75f, "one record still computes four scratch floats");
   for (uint32_t count : {0u,~0u,257u}) {
     words[visual+3564]=count;
-    Require(!eye_source::ReadEyeControl(visual,gaze,read), "empty/signed negative/oversized table refuses native ownership");
+    Require(!material_uv_source::ReadEyeControl(visual,gaze,read), "empty/signed negative/oversized table refuses native ownership");
   }
   words[visual+3564]=2; words[table+76]=0x7fc00000;
-  Require(!eye_source::ReadEyeControl(visual,gaze,read), "nonfinite authored limits refused");
+  Require(!material_uv_source::ReadEyeControl(visual,gaze,read), "nonfinite authored limits refused");
   number(table+76,.5f); words.erase(gaze+4);
-  Require(!eye_source::ReadEyeControl(visual,gaze,read) &&
-      !eye_source::ReadEyeControl(UINT32_MAX-100,gaze,read), "missing input and visual overflow refuse safely");
-  Require(publish() && !registry.ReadEye(binding.instance,5), "wrong model generation cannot borrow eye material");
-  auto bad=publication->material; bad.count=3;
-  Require(!registry.PublishEye(binding.instance,4,bad) && !registry.ReadEye(binding.instance,4),
+  Require(!material_uv_source::ReadEyeControl(visual,gaze,read) &&
+      !material_uv_source::ReadEyeControl(UINT32_MAX-100,gaze,read), "missing input and visual overflow refuse safely");
+  Require(publish() && !registry.ReadMaterialUVs(binding.instance,5), "wrong model generation cannot borrow eye material");
+  auto bad=publication->material; bad.count=257;
+  Require(!registry.PublishMaterialUVs(binding.instance,4,bad) && !registry.ReadMaterialUVs(binding.instance,4),
       "refused replacement clears old owned values");
   Require(publish(), "republish before retirement");
   registry.Retire(binding.instance);
   const auto replacement=registry.Create(5);
-  Require(replacement != binding.instance && !registry.ReadEye(binding.instance,4) && !registry.ReadEye(replacement,5),
+  Require(replacement != binding.instance && !registry.ReadMaterialUVs(binding.instance,4) && !registry.ReadMaterialUVs(replacement,5),
       "reload cannot inherit retired eye state");
   words.clear(); publication.reset();
   Require(owned->entries[0].uv[0] == .25f && inputs->overrides[1].uv->at(0) == .75f,
       "immutable material snapshots survive source destruction and instance reload");
-  registry.Retire(replacement); Require(registry.Stats().bytes == 0, "all fixed eye residency retires with instance");
+  registry.Retire(replacement);
+  Require(registry.Stats().bytes == material_bytes, "retired instance cannot uncharge a material lease still in use");
+  owned.reset(); Require(registry.Stats().bytes == 0, "last material lease releases all retained bytes");
+}
+void TestMaterialUVBudgets() {
+  NativeMaterialUVs material{{{0,1,0,{0,0},true,NativeMaterialUVOrigin::Effect},
+      {255,2,1,{1,2},true,NativeMaterialUVOrigin::Eye}},256};
+  Require(material.Valid() && material.Find(255) && !material.Find(254) && material.HasEyes(),
+      "sparse material slots preserve the full bounded table identity");
+  auto bad=material; bad.entries[1].slot=0;
+  Require(!bad.Valid(), "duplicate slots refuse");
+  bad=material; std::swap(bad.entries[0],bad.entries[1]); Require(!bad.Valid(), "unsorted slots refuse");
+  bad=material; bad.entries[1].slot=256; Require(!bad.Valid(), "out-of-table slots refuse");
+  bad=material; bad.entries[0].uv[0]=NAN; Require(!bad.Valid(), "nonfinite owned UV refuses");
+  bad=material; bad.entries[0].origin=NativeMaterialUVOrigin(2); Require(!bad.Valid(), "unknown writer provenance refuses");
+  bad=material; bad.entries[0].uv[0]=-0.0f; Require(!bad.Same(material), "signed-zero replacement is not elided");
+  NativeInstanceRegistry measured;
+  const auto id=measured.Create(7), base=measured.Stats().bytes;
+  Require(measured.PublishMaterialUVs(id,7,material), "measure material lease in existing registry");
+  const size_t bytes=measured.Stats().bytes-base;
+  NativeInstanceRegistry tight(base+bytes);
+  const auto limited=tight.Create(7);
+  Require(tight.PublishMaterialUVs(limited,7,material), "one lease fits exact accounted budget");
+  auto pinned=tight.ReadMaterialUVs(limited,7);
+  Require(tight.PublishMaterialUVs(limited,7,material) && tight.ReadMaterialUVs(limited,7) == pinned,
+      "unchanged data needs no replacement allocation even at full budget");
+  auto changed=material; changed.entries[0].uv[0]=3;
+  Require(!tight.PublishMaterialUVs(limited,7,changed) && !tight.ReadMaterialUVs(limited,7) &&
+      tight.Stats().bytes == base+bytes && pinned->entries[0].uv[0] == 0,
+      "pinned replacement backpressure clears visibility without changing old lease or exceeding budget");
+  pinned.reset(); Require(tight.Stats().bytes == base && tight.PublishMaterialUVs(limited,7,changed),
+      "released overlap permits a fresh publication without replaying producers");
+  pinned=tight.ReadMaterialUVs(limited,7); tight.Retire(limited);
+  Require(tight.Stats().bytes == bytes && pinned->entries[0].uv[0] == 3, "retirement retains pinned material accounting");
+  pinned.reset(); Require(tight.Stats().bytes == 0, "last lease returns tight registry to zero");
+  std::shared_ptr<const NativeMaterialUVs> survives;
+  {
+    NativeInstanceRegistry local;
+    const auto transient=local.Create(8);
+    Require(local.PublishMaterialUVs(transient,8,material), "publish before registry destruction");
+    survives=local.ReadMaterialUVs(transient,8);
+  }
+  Require(survives && survives->Same(material), "material and accounting survive registry destruction");
 }
 void TestSourceHandoff() {
   using namespace instance_source;
@@ -521,6 +569,7 @@ void TestSkeleton() {
 }
 void TestNativeInstances() {
   TestEyeMaterialOwnership();
+  TestMaterialUVBudgets();
   TestSourceHandoff();
   TestRenderPoses();
   TestSkeleton();

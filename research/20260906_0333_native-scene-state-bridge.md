@@ -7239,3 +7239,71 @@ all game/build/test producers terminal. Do not claim external activity as cleanu
 Diagnostics78149103B,buildlogs420377B/212files; next400KiBoverlap has84497B below
 75MiB stop, fresh preflight mandatory.13window images10434657B unchanged; no new
 raw allowance or budget reset. No next producer queued; goal remains active.
+
+### 2026-09-09 shared animated-material ownership afterdd6a2dc
+
+Owner-requested dd6a2dc WIP commit/push preserved the unfinished source-only
+refactor, with failed old-API guards and pending C++/live qualification disclosed.
+Resumed the connected controller -> shared instance material lease -> late eye
+patch -> next controller -> actual material composer, retaining outgoing adapters.
+Migrated fixture APIs and added sparse slots, signed-zero identity, pinned-byte
+budget/backpressure/retirement tests and source-read-prohibiting consumer tests.
+423 artifact-free Python guards PASS0.232s; C++/host/live evidence still pending.
+Initial measured free63542591488B; fixture11081699B/43files, aggregate buildlogs
+420377B/212files. No game/build/test producers live. Same original cumulative
+floor62509998080B and owner3GiB exception, no new raw/image allowance. Previous
+drive-wide fluctuation is not credited as cleanup; scoped outputs are unchanged.
+Reuse material76/CPU73/host190 supervisors,300s and64/8/192MiB free-drop caps;
+fixture peak expected <16MiB, host <192MiB. Retain75/72/189 receipts until verified
+replacement. Runtime requires fresh diagnostic-overlap preflight and a new
+owned-scroll-input/material-packet observation, preserving eye regression gates.
+
+Material76/PID25344/session99135 build0; CPU73/PID29188 PASS0.12s/CTest0.13s.
+Fixture1537536B SHA2561FA2EF3A8D9E0D74697877A52F94A7F725D44FA6D5B40EED44F90DE315858DC6;
+tree11245373B/43files (+163674B). Host190/PID35952/session69911 build0 through
+link step32; bannerdd6a2dcdirty, codegen0writes, no guest objects or shaders.
+EXE49382912B/PDB113823744B (+96256B combined); closing build free63549243392B.
+Extended existing ignored supervisor with AnimatedUVProbe: requires the existing
+EyeMaterialProbe and positive fresh owned-scroll-inputs with no owner refusal,
+plus increasing generic UV scopes/composed values/packets in the same two idle
+field contexts. No threshold change to prior eye/controller/late/effect gates.
+Same60s/400KiB/192MiB/no-capture limits and exact profile restoration. Syntax
+check passes; one purposeful new runtime remains pending, not repeated189.
+
+Host190 EXE SHA256829B80D48E8126D14F069F5873F72F049F4323339E151F74A3D7AAAE8ECC1CC7.
+Six exact75/72/189 receipts4691Blogical retired after passing replacements;
+free63558856704->63558864896B,8192Breclaimed. No protected failure data removed.
+Runtime preflight78152397Bdiagnostics,409600Blogreserve,noimage allowance;
+free63559176192B,floor63357849600B. PID38184/session94844,00:36:06..00:37:02,
+reached requested AnimatedUVProbe with original Eye/Controller/Late checks.
+Intentional diagnostic-stop exit1, not crash/CTest pass.1918native scroll inputs,
+1922publications,refused0;959exact eye updates,225off-center. Two fresh idle
+contexts1662->1962:scopes632->932,packets27808->41008 (+13200). Shared owner
+changed0;controller94106matching,late6matching,skeleton12585matching,material
+19333checks/wrong0. Live preserved non-eye slots/joint UVs/queued transitions0;
+CPU coverage does not qualify missing live routes. No full desktop/pixel gate.
+All14settings applied;116Bprofile restored with unchanged SHA256. No new raw,
+window,perf,cache or dumpfiles; all producers terminal and none queued.
+
+Full253093Blog hash0AEAAC79E344B9DA6F9D32C113287DFAA2EA3B8DA39D2AE8CF3391A8CC5D53BE
+retained in animated-uv190ZIP51516B,hash5CF0DDB4FABA6AEA3850951360417EF4583F415CAC3D2EF31C84CBA9AAC0D7C8.
+First compressor command lacked the ZipArchive assembly and created no archive;
+corrected assembly import, then full member/name/length/hash validation succeeded.
+Archive allocation free63559389184->63559335936B,53248B. Verified plaintext and
+now-superseded eye188ZIP307172Blogical removed;free63559335936->63559647232B,
+311296Breclaimed. Current complete log recoverable from newZIP; old188log is
+no longer retained, with historical report preserved. effect187/placement988/
+root985 and earlier pixel/reload failures remain protected. Retain76/73/190
+receipts and animated-uv190 until the same purpose is meaningfully replaced.
+
+Total8files311863Blogical deleted;319488Bmeasured deletion minus53248BZIP
+allocation =266240B net260KiB cleanup, no prior savings credited. Partial retained
+growth260661B (fixture+163674,EXE/PDB+96256,ZIPreplacement-2563,buildlogs+3294);
+excludes hostobjects/metadata/source/Git and unrelated drive-wide activity.
+Post-cleanup free63559647232B (~59.2GiB),drive-wide+17055744B fromfirst;
+only measured deletion/allocation is claimed cleanup. Diagnostics78149834B,
+buildlogs423671B/212files; next400KiB overlap leaves83766B below75MiB, requiring
+fresh preflight.13window images10434657B unchanged; no new raw/budget exception.
+Production source is dd6a2dc; only precondition comments changed after host190.
+Connected tests and meaningful README/queue/report updates close this bundle;
+authored binding/image/late-writer/source-adapter and full desktop work remain.

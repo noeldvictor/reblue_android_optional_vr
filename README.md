@@ -244,19 +244,21 @@ bundle to authored gaze instead of another unchanged opening-scene probe.
 Joint-driver, transition and pixel gates remain unqualified.
 [Source/content evidence and next connected boundary](research/20260908_2331_effect-input-coverage.md).
 
-**Owned eye materials (2026-09-09; opt-in):** authored gaze now computes native
-UVs and publishes them through the existing generation-checked instance owner
-to actual native scene-material packets. Host188 records **976 matching eye
-updates**, including 216 off-center controls, and 13,200 additional eye-material
-packets between two post-event field samples. No late-write mismatches occurred.
-The admitted normal path removes the original eye calculation and UV re-import
-as material input; checked outgoing scratch/table exports remain for unmigrated
-callers. CPU tests cover material order, late writes, reloads and small UV values;
-422 guards and the host build pass. Final floating-point-mode correction is
-build/fixture verified separately from host188's live evidence. No new motion
-pixels, reload/stereo qualification or speedup claim. Next: migrate the other
-animated material writers into the same owner, then retire their source adapters.
-[Producer/consumer connection, live evidence and limits](research/20260909_0000_native-eye-materials.md).
+**Shared animated materials (2026-09-09; opt-in):** controller and eye UV updates
+now share one immutable, generation-checked instance publication. Actual native
+material packets consume it, and subsequent controller ticks reuse its UV
+offsets. Eye updates preserve other animated slots; pinned snapshots, late-write
+invalidation and allocation backpressure share the existing 16 MiB instance budget.
+Host190 records **1,918 native scroll-input reuses**, zero publication refusals,
+959 matching eye updates (225 off-center), and 13,200 additional material packets
+between fresh post-event field samples. CPU tests exercise the complete
+controller/eye/next-tick/material chain without UV re-import, all three UV motion
+modes, lifetime and tight budgets; 423 guards and the host build pass.
+Live non-eye slot preservation, joint-driven UVs and cue transitions remain
+unexercised. Authored bindings/rates, remaining image/UV writers and checked
+outgoing scratch/table adapters still need migration. No motion-pixel,
+reload/stereo, whole-frame or speedup qualification is claimed.
+[Shared ownership, exact verification and remaining dependencies](research/20260909_0037_native-material-uv-ownership.md).
 
 ### How much is left?
 

@@ -48,21 +48,40 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
         importer = (root / "src/gpu/scene/native_material_texture_source.h").read_text(encoding="utf-8")
         eye = self.animation_bridge.split("bool EyeMaterial(", 1)[1].split("} // namespace", 1)[0]
         hook = self.animation_bridge.split("REX_HOOK_RAW(sub_822BA028)", 1)[1].split("REX_HOOK_RAW", 1)[0]
-        self.assertLess(hook.index("InvalidateNativeEyeMaterial"), hook.index("EyeMaterial(ctx,base)"))
+        self.assertLess(hook.index("if (!bd::gpu::scene::animation_bridge::EyeMaterial(ctx,base))"), hook.index("InvalidateNativeMaterialUVs"))
+        self.assertLess(hook.index("InvalidateNativeMaterialUVs"), hook.index("__imp__sub_822BA028"))
         self.assertEqual(eye.count("__imp__sub_822BA028"), 1)
-        self.assertLess(eye.index("throw std::runtime_error"), eye.index("PublishNativeEyeMaterial"))
+        self.assertLess(eye.index("throw std::runtime_error"), eye.index("PublishNativeMaterialUVs"))
         self.assertIn("model->Generation() != identity.model_generation", eye)
-        self.assertLess(eye.index("ctx.fpscr.disableFlushMode()"), eye.index("eye_source::ReadEyeControl"))
+        self.assertLess(eye.index("ctx.fpscr.disableFlushMode()"), eye.index("material_uv_source::ReadEyeControl"))
+        self.assertLess(eye.index("ReadNativeMaterialUVs("), eye.index("material_uv_source::ReadEyeControl"))
+        self.assertIn("Word,previous_uv.get()", eye)
         self.assertNotIn("ctx.r6", eye)
         self.assertNotIn("ctx.r7", eye)
-        self.assertIn("std::optional<NativeEyeMaterial> eye;", self.core)
-        self.assertIn("eye_source::Matches", self.source)
-        self.assertIn("registry.InvalidateEye", self.source)
-        self.assertIn("ReadNativeEyeMaterial(*visual,model ? model->Generation() : 0)", material)
-        self.assertIn("Capture, eye ? &*eye : nullptr", material)
-        self.assertIn("offset=owned.uv; entry.native_eye=true;", importer)
+        self.assertIn("std::shared_ptr<const NativeMaterialUVs> material_uv;", self.core)
+        self.assertIn("material_uv_source::Matches", self.source)
+        self.assertIn("registry.InvalidateMaterialUVs", self.source)
+        self.assertIn("ReadNativeMaterialUVs(*visual,model ? model->Generation() : 0)", material)
+        self.assertIn("Capture, animated.get()", material)
+        self.assertIn("offset=owned->uv; entry.native_animated=true;", importer)
+        self.assertIn("entry.native_eye=owned->origin == NativeMaterialUVOrigin::Eye", importer)
         for forbidden in ("unordered_map", "PPCContext", "be_f32"):
-            self.assertNotIn(forbidden, (root / "src/gpu/scene/native_eye_material.h").read_text(encoding="utf-8"))
+            self.assertNotIn(forbidden, (root / "src/gpu/scene/native_material_uv.h").read_text(encoding="utf-8"))
+
+    def test_shared_material_owner_carries_controller_offsets_without_reimport(self):
+        controller = self.animation_bridge.split("bool Controller(", 1)[1].split("bool EyeMaterial(", 1)[0]
+        self.assertLess(controller.index("ReadNativeMaterialUVs("), controller.index("PrepareEffectUpdate("))
+        self.assertLess(controller.index("effects->Matches(Word)"), controller.index("PublishNativeMaterialUVs("))
+        self.assertIn("effects->table,effects->material", controller)
+        self.assertIn("if (!material_owned) InvalidateNativeMaterialUVs(visual)", controller)
+        self.assertIn("if (owns_offset) motion.offset[axis]=owned->uv[axis]", self.effect_source)
+        self.assertIn("NativeMaterialUVOrigin::Effect", self.effect_source)
+        owner = self.core.split("bool PublishMaterialUVs(", 1)[1].split("NativeInstanceStats Stats()", 1)[0]
+        self.assertLess(owner.index("slot.reset()"), owner.index("if (!material.Valid() || !Fits("))
+        self.assertIn("owner->material.entries.capacity()*sizeof(NativeMaterialUVs::Entry)", owner)
+        self.assertIn("~MaterialOwner() { if (accounting) accounting->bytes.fetch_sub(bytes); }", self.core)
+        hook = self.animation_bridge.split("REX_HOOK_RAW(bdAnimationUpdate)", 1)[1].split("REX_HOOK_RAW", 1)[0]
+        self.assertLess(hook.index("InvalidateNativeMaterialUVs"), hook.index("__imp__bdAnimationUpdate"))
 
     def test_animation_registration_is_load_scoped_and_sampler_never_reads_source_keys(self):
         for name in ("sub_8217BD70", "sub_8217C5E8"):
@@ -99,7 +118,7 @@ class NativeInstanceBoundaryTest(unittest.TestCase):
 
     def test_effects_consume_owned_channels_before_skeleton_and_material_publication(self):
         controller = self.animation_bridge.split("bool Controller(", 1)[1].split("} // namespace", 1)[0]
-        self.assertIn("result->output.channels,Word)", controller)
+        self.assertIn("result->output.channels,Word,previous_uv.get())", controller)
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("__imp__bdAnimationUpdate"))
         self.assertLess(controller.index("effects->Matches(Word)"), controller.index("auto *destination="))
         self.assertLess(controller.index("PrepareEffectUpdate("), controller.index("completed_controller.Publish("))

@@ -47,8 +47,9 @@ std::optional<Publication> ReadEyeControl(uint32_t visual, uint32_t controls, Re
     for (const auto &entry : previous->entries) if (entry.slot >= 2) result.material.entries.push_back(entry);
   return result;
 }
-// Call only at object setup, after the caller's output copy and later writers.
-// This checks the outgoing adapter; it never imports it as native UV input.
+// Validate before a producer reuses previous values, or at object setup after
+// the caller's output copy and later writers. This checks the outgoing adapter;
+// it never imports that adapter as native UV input.
 template<class Read>
 bool Matches(uint32_t visual, Binding binding, const NativeMaterialUVs &material, Read read) {
   if (!material.Valid() || !binding.table || !binding.count || binding.count > 256 ||

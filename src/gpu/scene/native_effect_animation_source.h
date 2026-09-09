@@ -118,6 +118,8 @@ struct EffectUpdate {
   }
 };
 
+// The bridge must validate the previous publication's source association before
+// passing it here. Offset reuse does not itself check unknown outgoing writers.
 template<class Read>
 std::optional<EffectUpdate> PrepareEffectUpdate(uint32_t visual, float delta, double duration_scale,
     std::span<const NativeJointChannels> channels, Read &&read, const NativeMaterialUVs *previous=nullptr) {

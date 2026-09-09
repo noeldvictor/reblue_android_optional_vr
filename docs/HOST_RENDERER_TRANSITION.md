@@ -1006,27 +1006,30 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    rendering dependency removed. Full log retained losslessly in effect187ZIP,
    replacing186's explained missing-driver/scroll/selection/controller purpose.
    [Source/content provenance, exact evidence and next boundary](../research/20260908_2331_effect-input-coverage.md).
-   **Eye owner/material connection (source58d591a,host188/PID38012):** complete
-   actor and both viewer callers audited. Native gaze evaluation now publishes
-   fixed by-value material UVs in NativeInstanceRegistry, keyed by instance and
-   model generation, not a new visual-address cache. Actual material setup/
-   composition/scene packets consume these values; source table/UV reads only
-   validate the temporary outgoing adapter. Unknown late writes/rebinding clear
-   the owner permanently until republished; reload retires it with the instance.
-   976 exact eye comparisons,216 off-center calls,zero producer refusals;
-   field1748->2048 scopes632->932 and eye packets27808->41008 (+13200),owner
-   changed0. Skin emission/fence retirement advances separately. The bounded
-   observation reaches its requested gate, not the full desktop acceptance.
-   Final review moved non-flushing FP setup before native math and added a
-   subnormal regression; final binary's build coverage is separate from188live.
-   Material fixture/422guards/host build pass. Eye control/frame motion pixels,
-   reloads/both eyes remain pending; no FPS claim, defaults unchanged.
-   Next connected animated-material bundle: reuse the existing instance/material
-   owner for other UV/image writers and their authored bindings, then delete
-   outgoing scratch/table validation when the last consumer migrates. Reuse the
-   parser/binder/effect source contracts; do not re-audit unchanged bodies or
-   rerun188 just for a new stamp. Preserve effect187/placement988/root985 and
-   prior pixel/reload failures. No separate material-owner framework.
+   **Shared animated material connection (sourcedd6a2dc,host190/PID38184):**
+   controller -> shared immutable NativeMaterialUVs in the existing instance
+   registry -> eye patch -> subsequent controller -> native material packets.
+   Replaces the fixed eye-only owner; sparse model-local slots, full table count,
+   stable instance/generation and pinned allocation accounting under16MiB.
+   Complete controller/eye/next-tick/composer CPU chain forbids exported UV inputs;
+   tests cover three UV modes, preserved non-eye slots, source destruction,
+   reload, late writes/rebinding, signed zero and tight-budget backpressure.
+   Material76/CPU73/423guards/host190 PASS. Live:1918owned scroll inputs,
+   1922publications/refused0;959exact eyes,225off-center; idle1662->1962 scopes
+   632->932,packets27808->41008 (+13200),owner changed0. Skin emission/fence
+   retirement advances separately. Requested observation reached; no full
+   desktop, motion-pixel, reload/both-eye or speedup qualification.
+   Live preserved non-eye slots, translation/rotation drivers and cue transitions
+   remain0; their CPU coverage is not a substitute. Outgoing table/scratch checks
+   and authored/source bindings remain explicit adapters, not a host-only frame.
+   Next: publish authored UV configuration and resolved material/joint identities
+   at binding/rebinding into existing owners; migrate other UV/image writers,
+   including viewer overrides, before retiring final source UV inputs/exports.
+   Reuse completed parser/binder/effect/eye contracts, not a helper queue or new
+   cache/renderer. No unchanged opening UVCON probe or threshold reduction.
+   Lossless animated-uv190ZIP replaces eye188's verification purpose; retain
+   effect187/placement988/root985 and prior pixel/reload failures. Defaults unchanged.
+   [Shared owner, connected verification and remaining interfaces](../research/20260909_0037_native-material-uv-ownership.md).
    [Eye contracts, native consumer evidence and remaining interfaces](../research/20260909_0000_native-eye-materials.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/

@@ -5,6 +5,7 @@
 #include "gpu/scene/native_effect_animation_source.h"
 #include "gpu/scene/native_material_texture_source.h"
 #include "gpu/scene/native_instance.h"
+#include "gpu/scene/native_instance_source.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include <iostream>
 #include <limits>
@@ -1512,11 +1513,23 @@ void TestNativeEffectConsumption() {
   Require(!update->Matches(read),"effect verification catches live UV divergence");
   update->Publish(word);
 
-  // Feed the actual existing object-material importer/composer, then destroy all
-  // source and animation data. Copied material values remain usable by rendering.
+  // Publish into the production instance owner, then forbid exported UV reads
+  // inside the actual material importer. Only the late-write guard reads them.
+  NativeInstanceRegistry registry;
+  instance_source::Binding binding{registry.Create(9),9,{}};
+  binding.material_uv={update->table,update->material.count};
+  Require(registry.PublishMaterialUVs(binding.instance,9,update->material), "controller publishes shared material owner");
+  const auto owned=instance_source::ReadMaterialUVs(registry,binding,visual,9,read);
+  Require(owned && owned->entries.size() == 3 && !owned->HasEyes(), "all three controller UV modes have native ownership");
+  const auto material_read=[&](uint64_t address) {
+    for (const auto &entry : owned->entries)
+      Require(address != records+entry.slot*152+28 && address != records+entry.slot*152+32,
+          "material importer must not consume exported animated UV words");
+    return read(address);
+  };
   word(visual+3000,3); word(visual+3440,1);
   for (uint32_t n=0; n<4; ++n) scalar(visual+3444+n*4,0);
-  const auto material=ReadMaterialTextureInputs<int>(visual,read,[](uint32_t) { return MaterialImageSelection<int>{}; });
+  const auto material=ReadMaterialTextureInputs<int>(visual,material_read,[](uint32_t) { return MaterialImageSelection<int>{}; },owned.get());
   Require(material && material->overrides.size() == 3,"native UV publication reaches the existing immutable material-input owner");
   struct Range { size_t texture_assignment_end; };
   const std::array assignments{MaterialImageAssignment{MaterialImageSource::Table,0,1},
@@ -1528,8 +1541,53 @@ void TestNativeEffectConsumption() {
       "existing renderer material composition consumes animated selectors and channel pairs");
   Require(values.size() == 3 && values[0].uv == std::array<float,4>{4,2,0,0} && values[1].uv[0] == .5f &&
           Near(values[2].uv[2],.5f) && values[2].images[1] == 13,"composed multi-channel material receives all three UV motion modes");
+  Require(values[0].native_animated_uv_mask == 1 && values[1].native_animated_uv_mask == 1 &&
+      values[2].native_animated_uv_mask == 3 && values[2].native_eye_uv_mask == 0,
+      "actual composed material carries controller ownership on both channels");
+
+  // Eye is a later writer to the same table. Its first two outputs must not
+  // discard the third controller slot, and next tick must use the new eye offset.
+  constexpr uint32_t gaze=0x17000;
+  scalar(gaze,.5f); scalar(gaze+4,-.5f);
+  for (uint32_t axis=0; axis<2; ++axis) {
+    scalar(records+60+axis*4,0); scalar(records+68+axis*4,1); scalar(records+76+axis*4,.5f);
+  }
+  const auto eye=material_uv_source::ReadEyeControl(visual,gaze,read,owned.get());
+  Require(eye && eye->material.entries.size() == 3 && eye->material.count == 4 &&
+      eye->material.entries[2].Same(owned->entries[2]) && eye->material.HasEyes(),
+      "eye patch preserves untouched controller slot and full table count in the same owner");
+  Require(registry.PublishMaterialUVs(binding.instance,9,eye->material), "publish late eye writer without a second registry");
+  for (uint32_t n=0; n<2; ++n) for (uint32_t axis=0; axis<2; ++axis)
+    scalar(records+n*152+28+axis*4,eye->output[n][axis]);
+  const auto after_eye=instance_source::ReadMaterialUVs(registry,binding,visual,9,read);
+  Require(after_eye && owned->entries[0].uv[0] == 4 && after_eye->entries[0].uv[0] == .25f,
+      "late publication cannot mutate pinned controller snapshot");
+  const auto eye_material=ReadMaterialTextureInputs<int>(visual,material_read,
+      [](uint32_t) { return MaterialImageSelection<int>{}; },after_eye.get());
+  std::vector<MaterialTextureValues<int>> eye_values;
+  Require(eye_material && ComposeMaterialTextures<int>(assignments,std::span<const Range>(ranges),*eye_material,
+      [](uint32_t selector) { return MaterialImageSelection<int>{MaterialImageAction::Bind,int(selector)+10}; },eye_values) &&
+      eye_values[1].uv[0] == .75f && eye_values[2].native_eye_uv_mask == 1 &&
+      eye_values[2].native_animated_uv_mask == 3 && Near(eye_values[2].uv[2],.5f),
+      "material composition combines late eyes and preserved non-eye animated UV");
+  const auto no_scroll_import=[&](uint64_t address) {
+    Require(address != records+28 && address != records+32, "next controller must not reimport exported scroll offsets");
+    return read(address);
+  };
+  const auto next=PrepareEffectUpdate(visual,.5f,1,channels,no_scroll_import,after_eye.get());
+  Require(next && next->owned_offsets == 1 && next->material.entries[0].uv == std::array<float,2>{2.25f,-.75f} &&
+      !next->material.HasEyes(), "next controller advances late eye offsets as native input and updates writer provenance");
+  next->Publish(word);
+  Require(registry.PublishMaterialUVs(binding.instance,9,next->material) &&
+      instance_source::ReadMaterialUVs(registry,binding,visual,9,read), "next native tick publishes verified material inputs");
+  scalar(records+2*152+28,7);
+  Require(!instance_source::ReadMaterialUVs(registry,binding,visual,9,read), "late non-eye writer invalidates shared publication");
+  next->Publish(word);
+  Require(!instance_source::ReadMaterialUVs(registry,binding,visual,9,read), "restored output cannot resurrect invalidated shared owner");
+  registry.Retire(binding.instance);
   const auto retained=values; source.words.clear(); controller.reset(); assets.fill({}); asset.reset();
-  Require(values == retained,"owned material values survive source/clip/controller destruction");
+  Require(values == retained && after_eye->entries[0].uv[0] == .25f && owned->entries[0].uv[0] == 4,
+      "owned material values survive source/clip/controller destruction and instance retirement");
 
   // Catalog readiness, duration conversion and queued transition branches.
   for (uint32_t offset=0; offset<3752; offset+=4) word(visual+offset,0);
