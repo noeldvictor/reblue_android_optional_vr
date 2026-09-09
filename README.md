@@ -244,22 +244,22 @@ bundle to authored gaze instead of another unchanged opening-scene probe.
 Joint-driver, transition and pixel gates remain unqualified.
 [Source/content evidence and next connected boundary](research/20260908_2331_effect-input-coverage.md).
 
-**Bind-owned animated materials (2026-09-09; opt-in):** authored UV rates,
-divisors, gaze limits and resolved material/joint bindings are now published once
-at binding into the existing instance owner. Controller and eye evaluation use
-these immutable descriptors; their shared UV outputs feed subsequent ticks and
-actual native material packets. All leases share the existing 16 MiB budget.
-Host192 records **1,920 effect-slot and 957 eye evaluations using native
-descriptors**, zero descriptor changes/refusals, 1,914 native scroll-input reuses,
-and 13,200 additional material packets between fresh post-event field samples.
-CPU tests forbid descriptor/UV re-import inside evaluation and cover three UV
-modes, late writes, generation/reload lifetime and tight budgets. The 424 guards,
-C++ fixture and host build pass.
-Original load-time name resolution and per-update late-write validation still
-read guest data; other image/UV writers and outgoing scratch/table adapters remain.
-Live joint-driven UVs, cue transitions and preserved non-eye slots are unexercised.
+**Host-owned animated materials (2026-09-09; opt-in):** binding-owned UV/image
+descriptors feed native controller, eye and image-selection updates. Immutable
+UV values and texture leases share the existing 16 MiB instance budget and feed
+actual native material packets without re-importing their output values.
+Host193 records **2,934 exact image-update comparisons and 4,080 selected image
+keys**, plus **13,200 additional owned-image material packets** between two
+idle-field samples. Three earlier preparation refusals remain unclassified; the original
+fallback is still available. UV/eye/controller regression observations also pass.
+The 425 source/scenario guards, connected C++ fixture and host build pass; CPU
+tests cover ordering, null/hold/repeat behavior, late writes, reload and budgets.
+Original load-time name resolution, image catalogs/key data, procedural/viewer/
+late writers, comparison reads and outgoing scratch/table adapters remain.
+Next move the image key/catalog inputs into native load ownership. Live
+joint-driven UVs, cue transitions and preserved non-eye slots remain unexercised.
 No motion-pixel, reload/stereo, whole-frame or speedup qualification is claimed.
-[Binding ownership, verification and remaining dependencies](research/20260909_0104_native-material-uv-programs.md).
+[Image ownership, verification and remaining dependencies](research/20260909_0140_native-material-images.md).
 
 ### How much is left?
 

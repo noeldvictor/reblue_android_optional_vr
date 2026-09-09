@@ -7388,3 +7388,63 @@ mandatory.13windowimages10434657B unchanged, no new raw/budget exception.
 All producers terminal, none queued. Retain final78/75/192 and material-program192.
 README/queue and research/20260909_0104_native-material-uv-programs.md record the
 connected outcome, remaining writers/validation and unchanged full desktop goal.
+
+### 2026-09-09 native material image transactions after4625fb9
+
+The previous push-only turn was no renderer progress; resumed implementation
+connects bind-owned image descriptors -> native selection transaction -> existing
+instance image leases -> actual material composition. Original procedural-key
+callbacks, scratch allocation, source catalogs and late images remain explicit.
+425 artifact-free guards pass; new CPU tests exercise image selection, source-free
+material consumption, late writes and pinned-budget retirement. No live evidence
+is restamped. First current storage measurement63553548288B; same cumulative
+62509998080B floor/3GiB exception and existing diagnostic/raw limits, no reset.
+Reuse material79/CPU76/host193, 300s, free-drop caps64/8/192MiB; estimate fixture
+peak <16MiB, host <192MiB. No captures, recook or device work. Keep78/75/192
+receipts and material-program192ZIP until the corresponding purpose is replaced.
+
+Material79/PID25432/session15058 build0;CPU76/PID32528 pass0.12s/CTest0.14s.
+Host193/PID37240/session10198 build0 through link39, codegen0writes and no guest
+objects/shaders. EXE49421824B/PDB114126848B (+216576B);EXE SHA256
+93616DCD126AF3D38634C0591918A348F880FECAB1DCD01C6EEE695170C0A4A6.
+Source/test f28789f pushed before runtime; binary banner4625fb9dirty is not
+restamped. Six superseded78/75/192 receipts4288Blogical removed after replacement;
+free63551229952->63551238144B,8192Breclaimed. No failure evidence deleted.
+
+Runtime preflight diagnostics78152514B,409600Blog overlap, no images,
+free63551016960B/floor63349690368B. Host193/PID37784/session60080 ran
+01:36:13..01:37:08, all14settings applied,60s/400KiB/192MiB caps, no raw/window/
+perf/cache/dumps. Original116Bprofile restored exactly. Existing MaterialProgram/
+UV/eye/controller/late observations reached (intentional diagnostic-stop exit1).
+New image observation: idle1693->1993 updates/exact checks/publications2034->2934,
+selected2280->4080,held40; scopes601->901,packets26444->39644. Three earlier
+preparation refusals remain unclassified/unchanged; no publication loss.
+No motion-pixel/reload/stereo/full-frame/FPS/Quest claim. Positive image-key
+consumption selects native loader/key/catalog ownership next, not a repeated boot.
+
+Full255709Blog retained losslessly in material-images193ZIP52102B,
+ZIP SHA256E897963F05666F0B04A4C0C9EF3E8876FD1DCDEB73526D05803D383392E3F206,
+member SHA256F600CA3AA5A850301E1417DC74FFD74EBCA14E2867B9506FBE9FB60960DB831D.
+Full name/length/decompressed hash checked. ZIP allocationfree63549464576->
+63549411328B,53248B. Plaintext plus supersededmaterial-program192ZIP307578B
+logical removed after193verified all its purposes:free63549280256->63549591552B,
+311296Breclaimed. Old192log no longer retained; its report remains. Keep193,
+effect187/placement988/root985 and unresolved earlier pixel/reload evidence.
+
+Final test-only alternate-kind/null/table/rebind cases: material80/PID36192
+build0;CPU77/PID32332 PASS0.11s/CTest0.13s. Same300s/64/8MiB/cumulative limits;
+no new host build/run for tests. Fixture1641472B,tree11613163B/43files (+214096B),
+SHA2563CFC2FA8289EACBBBCB84C338352A9DBFCC9296847EE1FFF24E8DF836A0BF864.
+425guards pass0.227s. Four79/76receipts3487Blogical deleted after replacement;
+free63549181952->63549190144B,8192Breclaimed.
+
+Total12files315353Blogical removed;327680Bmeasured deletion gains minus53248BZIP
+allocation=274432B net268KiBcleanup, no old savings credited. Partial retained
+growth435605B (fixture+214096,EXE/PDB+216576,ZIPreplacement+233,buildlogs+4700),
+excluding hostobjects/metadata/source/Git and unrelated drive activity.
+Post-cleanupfree63549190144B (~59.2GiB),4358144Blower thanfirst63553548288B.
+Diagnostics78151423B/buildlogs424674B/212files; next400KiB overlap82177Bbelow75MiB,
+fresh preflight mandatory.13windowimages10434657Bunchanged; no raw allowance.
+All producers terminal; retain80/77/193 and material-images193. README/queue and
+research/20260909_0140_native-material-images.md close this connected bundle,
+without shrinking the unfinished renderer/full desktop/both-eye objective.

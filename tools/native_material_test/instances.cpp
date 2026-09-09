@@ -396,6 +396,20 @@ void TestMaterialImageOwnership() {
   words=before; words[0x82055230]=std::bit_cast<uint32_t>(1.0f);
   Require(!material_image_source::Prepare(visual,bound->program,producer_read,capture), "changed comparison constant refuses");
   words=before;
+  auto alternate=bound->program; alternate.slots[0].image_animation=3;
+  words[catalog+8]=8; words[catalog+12]=3;
+  const auto second_clock=material_image_source::Prepare(visual,alternate,producer_read,capture);
+  Require(second_clock && second_clock->selected == 1 && second_clock->images.entries[0].image.image == b,
+      "animation kind above one selects second clock ID but matches exact catalog kind");
+  words=before; words[37100+24]=0;
+  const auto null_key=material_image_source::Prepare(visual,bound->program,producer_read,capture);
+  Require(null_key && null_key->selected == 2 && null_key->binding.sources[0] == 42000 &&
+      null_key->images.entries[0].image.image == b, "null selected-key image preserves prior table image");
+  words=before; words[table+152+84]=0;
+  const auto null_static=material_image_source::Prepare(visual,bound->program,producer_read,capture);
+  Require(null_static && !null_static->images.entries[1].replaces_image &&
+      null_static->images.entries[1].image.action == MaterialImageAction::Keep, "null static override remains known no-op");
+  words=before;
   for (uint32_t field : {4u,8u,24u,84u}) {
     association.material_images=update->binding; registry.PublishMaterialImages(id,11,update->images);
     words[table+field]^=1;
@@ -404,8 +418,18 @@ void TestMaterialImageOwnership() {
     Require(!instance_source::ReadMaterialImages(registry,association,visual,11,read), "old image publication cannot resurrect");
   }
   registry.PublishMaterialImages(id,11,update->images); association.material_images=update->binding;
+  words[visual+3560]=table+152;
+  Require(!instance_source::ReadMaterialImages(registry,association,visual,11,read), "table replacement invalidates images");
+  words=before; registry.PublishMaterialImages(id,11,update->images); association.material_images=update->binding;
+  words[visual+3564]=3;
+  Require(!instance_source::ReadMaterialImages(registry,association,visual,11,read), "table count change invalidates images");
+  words=before; registry.PublishMaterialImages(id,11,update->images); association.material_images=update->binding;
   Require(!instance_source::ReadMaterialImages(registry,association,visual,12,read) &&
       !registry.ReadMaterialImages(id,11), "wrong generation invalidates source association");
+  Require(registry.PublishMaterialUVProgram(id,11,bound->program) && registry.PublishMaterialImages(id,11,update->images),
+      "program and image leases share instance budget");
+  registry.InvalidateMaterialUVProgram(id);
+  Require(!registry.ReadMaterialImages(id,11), "program rebind invalidates dependent image visibility");
   auto bad=update->images; bad.entries[0].image={MaterialImageAction::Bind};
   Require(!registry.PublishMaterialImages(id,11,bad), "bind without a lease is invalid");
   bad=update->images; bad.entries.resize(257);

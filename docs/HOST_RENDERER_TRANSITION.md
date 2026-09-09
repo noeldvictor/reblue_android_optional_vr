@@ -1025,15 +1025,40 @@ checks, counter resets, weaker thresholds or relabelled passing evidence.
    Original binding/name resolution remains a load-time adapter. Descriptor
    late-write validation still re-decodes source words for comparison; native
    evaluation no longer imports them as input, but not all table reads are gone.
-   Next migrate remaining UV/image writers (including viewer overrides) and their
-   publications, then retire final configuration/UV validation and outgoing
-   scratch/table exports as their last consumers leave. Reuse existing owners and
+   Image writer/consumer extension follows below. Reuse existing owners and
    complete parser/binder/effect/eye contracts; no unchanged UVCON opening probe.
-   Lossless material-program192ZIP replaces animated-uv190's purpose. Preserve
-   effect187/placement988/root985 and earlier pixel/reload failures; defaults unchanged.
+   The material-program192ZIP is now superseded by material-images193 for its
+   verified descriptor/UV/eye purpose. Preserve effect187/placement988/root985
+   and earlier pixel/reload failures; defaults unchanged.
    [Bind-owned descriptors, CPU/live evidence and next boundary](../research/20260909_0104_native-material-uv-programs.md).
    [Shared owner, connected verification and remaining interfaces](../research/20260909_0037_native-material-uv-ownership.md).
    [Eye contracts, native consumer evidence and remaining interfaces](../research/20260909_0000_native-eye-materials.md).
+   **Owned animated images (sourcef28789f,host193/PID37784):** native image
+   selection replaces sub_821444E0/selector/vector helpers on admitted calls;
+   original runs once only for comparison or pre-mutation fallback. Existing
+   binding descriptors now include image enable/kind. Immutable texture leases
+   share instance ownership/budgets and feed real ordered material composition
+   and packets, without image-pointer imports/guest recapture in that consumer.
+   No second source index; fixed exact source comparison association is charged
+   by2048B per-entry overhead within the unchanged16MiB budget.
+   Material80/CPU77,425guards and host193 PASS. CPU chain forbids descriptor
+   imports in the image producer and image-pointer/descriptor/recapture reads
+   in the material consumer; covers null/hold/repeat/order, late writes,
+   generations/rebind/retirement and pinned backpressure. Idle contexts1693->1993:
+   image updates/checks/publications2034->2934, selected2280->4080, held40;
+   scopes601->901, packets26444->39644 (+13200). Three pre-admission refusals
+   remain unclassified and unchanged across that interval; no publication loss.
+   Prior UV/eye/controller/late program gates reached; no pixel/reload/stereo,
+   full-frame or speedup qualification. Log retained as material-images193ZIP.
+   **Next:** import ready image key/catalog inputs at their loader/selection
+   lifetime into existing ownership, retire their repeated source walks, and
+   classify the three preflight refusals before claiming coverage of those
+   routes. Source catalogs/key windows, procedural selected-key callbacks,
+   allocation-dependent scratch, viewer overrides, separate late-image vector
+   and special image writers remain. Then retire final descriptor/UV/image
+   validation and outgoing scratch/table exports as their last consumers leave.
+   No unchanged opening probe: positive image consumption is now observed.
+   [Source contract, connected evidence and retained limitations](../research/20260909_0140_native-material-images.md).
    Next migrate remaining channel writers/source selection, remove validation/
    exports when their last consumer retires, and select actual authored subtree/
    indexed scenarios for motion/interior-key/pixel gates. No unchanged boot or
