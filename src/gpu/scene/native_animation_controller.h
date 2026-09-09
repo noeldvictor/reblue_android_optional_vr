@@ -9,6 +9,20 @@
 
 namespace bd::gpu::scene {
 inline constexpr size_t kNativeAnimationSlots = 6;
+struct NativeAnimationSelectionUpdate {
+  bool restart=false;
+  float weight=0;
+};
+// Selection identity is distinct from clip identity: two authored entries may
+// alias one asset yet request a restart. Same selection ignores new parameters
+// unless forced. Negative requested weight preserves the previous weight.
+inline std::optional<NativeAnimationSelectionUpdate> PlanNativeAnimationSelection(
+    uint64_t previous, uint64_t selected, bool force, double weight, float previous_weight) {
+  if (!force && previous == selected) return NativeAnimationSelectionUpdate{};
+  const float next_weight=weight < 0 ? previous_weight : float(weight);
+  if (!std::isfinite(next_weight)) return {};
+  return NativeAnimationSelectionUpdate{true,next_weight};
+}
 inline std::array<float,4> AdvanceNativeAnimationOffsets(
     const std::array<float,4> &offsets, const std::array<float,4> &rates) {
   std::array<float,4> result;

@@ -6,6 +6,7 @@
 #include "gpu/scene/native_animation_source.h"
 #include "gpu/scene/native_animation_controller_source.h"
 #include "gpu/scene/native_animation_placement.h"
+#include "gpu/scene/native_animation_selection_source.h"
 #include "gpu/scene/native_animation_bridge.h"
 #include "gpu/scene/native_skeleton_source.h"
 #include "gpu/scene/native_material.h"
@@ -72,6 +73,7 @@ struct Store {
   uint64_t joint_lookups=0, joint_lookup_checks=0, joint_lookup_found=0, joint_lookup_refused=0, owned_exclusions=0;
   uint64_t placements=0, placement_checks=0, placement_copy=0, placement_sampled=0, placement_tracks=0;
   uint64_t placement_refused=0, placement_roots=0, placement_changed=0;
+  uint64_t slot_selections=0, slot_selection_checks=0, slot_restarts=0, slot_ready=0, slot_absent=0, slot_selection_refused=0;
   std::array<uint64_t,size_t(Missing::Count)> missing{};
   uint32_t frame = 0;
 };
@@ -120,6 +122,9 @@ void Report(Store &store) {
     BD_INFO("[native-animation-placement] frame {} completed {} checked {} copy {} sampled {} tracks {} refused {}; skeleton roots {} changed {}; owned attachment placement; world/late-effect adapters remain",
         frame,store.placements,store.placement_checks,store.placement_copy,store.placement_sampled,store.placement_tracks,
         store.placement_refused,store.placement_roots,store.placement_changed);
+  if (store.slot_selections || store.slot_selection_refused)
+    BD_INFO("[native-animation-slot-select] frame {} completed {} checked {} restarted {} ready {} absent {} refused {}; native slot selection feeds controllers; pending poll/catalog boundary remains",
+        frame,store.slot_selections,store.slot_selection_checks,store.slot_restarts,store.slot_ready,store.slot_absent,store.slot_selection_refused);
 }
 bool Unavailable(Missing reason) {
   auto &store = Clips(); std::lock_guard lock(store.mutex);
@@ -410,6 +415,51 @@ struct Placement {
   uint32_t exclusions=0, depth=0;
   bool track=false;
 };
+bool SelectAnimation(PPCContext &ctx, uint8_t *base) {
+  if (!Enabled() || controller_reference) return false;
+  ctx.fpscr.disableFlushMode();
+  const auto plan=animation_source::PrepareSlotSelection(ctx.r3.u32,ctx.r4.u32,ctx.r5.u32,
+      ctx.r7.u32,ctx.r8.u32 != 0,ctx.f1.f64,Word);
+  auto refuse=[] {
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.slot_selection_refused; return false;
+  };
+  if (!plan || Word(0x82055230) != 0u) return refuse();
+  std::shared_ptr<const NativeAnimationAsset> asset;
+  if (plan->selected.source) {
+    // Preparation is scoped to an actual ready selection, not a catalog sweep.
+    // Existing motion-owner retirement and residency budget remain authoritative.
+    PrepareClip(plan->selected.source);
+    auto &store=Clips(); std::lock_guard lock(store.mutex); asset=store.assets.Find(plan->selected.source);
+  }
+  if (plan->selected.source && !asset) return refuse();
+  if (REXCVAR_GET(bd_native_materials_verify)) {
+    ReferenceScope reference;
+    __imp__bdVisualObjectSetAnimation(ctx,base);
+    bool same=ctx.r3.u32 == plan->selected.entry;
+    size_t first_word=plan->after.size();
+    for (size_t w=0; w<plan->after.size(); ++w) {
+      const bool equal=Word(uint64_t(plan->destination)+w*4) == plan->after[w];
+      if (!equal && first_word == plan->after.size()) first_word=w;
+      same &= equal;
+    }
+    auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.slot_selection_checks;
+    if (!same) {
+      ++store.wrong;
+      BD_ERROR("[native-animation-slot-selection-drift] destination {:08X} word {}; no publication/fallback",plan->destination,first_word);
+      throw std::runtime_error("Native animation selection comparison failed");
+    }
+  }
+  if (plan->restart) {
+    // Only the six authored fields change. Target/rate/name/contribution and
+    // other slot bytes remain owned by their existing producers.
+    for (size_t w : {0u,1u,2u,3u,6u,12u})
+      bd::mem::store<uint32_t>(plan->destination+uint32_t(w)*4,plan->after[w]);
+  }
+  ctx.r3.u64=plan->selected.entry;
+  auto &store=Clips(); std::lock_guard lock(store.mutex); ++store.slot_selections;
+  store.slot_restarts+=plan->restart; store.slot_ready+=bool(asset); store.slot_absent+=!plan->selected.entry; Report(store);
+  return true;
+}
 std::optional<Placement> PreparePlacement(uint32_t visual, float ticks) {
   if (!rex::system::XThread::GetCurrentThread()) return {};
   auto input=animation_source::ReadAttachmentInput(visual,ticks,rex::system::XThread::GetCurrentThreadId(),Word);
@@ -1073,7 +1123,7 @@ REX_HOOK_RAW(bdVisualObjectSetAnimation) {
       throw std::runtime_error("Native attachment animation-selection comparison failed");
     scope->selected=true;
   }
-  __imp__bdVisualObjectSetAnimation(ctx,base);
+  if (!SelectAnimation(ctx,base)) __imp__bdVisualObjectSetAnimation(ctx,base);
 }
 REX_HOOK_RAW(sub_822D3CB0) {
   bd::gpu::scene::animation_bridge::VisualScope visual(ctx.r3.u32);
